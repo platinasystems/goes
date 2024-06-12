@@ -5,6 +5,7 @@
 package binph
 
 import (
+	"io"
 	"unsafe"
 
 	"github.com/platinasystems/goes/v2/pkg/encoding/binary/binint"
@@ -15,17 +16,16 @@ type HOP6 struct {
 	Len  uint8
 }
 
-const SizeofHOP6 = int(unsafe.Sizeof(HOP6{}))
+const SizeofHOP6 = int64(unsafe.Sizeof(HOP6{}))
 
-func (v HOP6) AppendBig(data []byte) []byte {
-	return append(data, v.Type, v.Len)
+func (p *HOP6) ReadFrom(r io.Reader) (int64, error) {
+	binint.BytePointer(&p.Type).ReadFrom(r)
+	_, err := binint.BytePointer(&p.Len).ReadFrom(r)
+	return SizeofHOP6, err
 }
 
-func (p *HOP6) PullFrom(data []byte) []byte {
-	if len(data) < SizeofHOP6 {
-		return data
-	}
-	data = binint.Bite(data, &p.Type)
-	data = binint.Bite(data, &p.Len)
-	return data
+func (v HOP6) WriteTo(w io.Writer) (int64, error) {
+	binint.ByteValue(v.Type).WriteTo(w)
+	_, err := binint.ByteValue(v.Len).WriteTo(w)
+	return SizeofHOP6, err
 }

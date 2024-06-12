@@ -5,6 +5,7 @@
 package binph
 
 import (
+	"io"
 	"unsafe"
 
 	"github.com/platinasystems/goes/v2/pkg/encoding/binary/binint"
@@ -23,33 +24,30 @@ type ARP struct {
 	TPA   [4]byte
 }
 
-const SizeofARP = int(unsafe.Sizeof(ARP{}))
+const SizeofARP = int64(unsafe.Sizeof(ARP{}))
 
-func (v ARP) AppendTo(data []byte) []byte {
-	data = binint.AppendBig(data, v.HTYPE)
-	data = binint.AppendBig(data, v.PTYPE)
-	data = append(data, v.HLEN)
-	data = append(data, v.PLEN)
-	data = binint.AppendBig(data, v.OPER)
-	data = append(data, v.SHA[:]...)
-	data = append(data, v.SPA[:]...)
-	data = append(data, v.THA[:]...)
-	data = append(data, v.TPA[:]...)
-	return data
+func (p *ARP) ReadFrom(r io.Reader) (int64, error) {
+	binint.BigEndianPointer(&p.HTYPE).ReadFrom(r)
+	binint.BigEndianPointer(&p.PTYPE).ReadFrom(r)
+	binint.BytePointer(&p.HLEN).ReadFrom(r)
+	binint.BytePointer(&p.PLEN).ReadFrom(r)
+	binint.BigEndianPointer(&p.OPER).ReadFrom(r)
+	r.Read(p.SHA[:])
+	r.Read(p.SPA[:])
+	r.Read(p.THA[:])
+	_, err := r.Read(p.TPA[:])
+	return SizeofARP, err
 }
 
-func (p *ARP) PullFrom(data []byte) []byte {
-	if len(data) < SizeofARP {
-		return data
-	}
-	data = binint.PullBig(data, &p.HTYPE)
-	data = binint.PullBig(data, &p.PTYPE)
-	data = binint.Bite(data, &p.HLEN)
-	data = binint.Bite(data, &p.PLEN)
-	data = binint.PullBig(data, &p.OPER)
-	data = Pull(data, p.SHA[:])
-	data = Pull(data, p.SPA[:])
-	data = Pull(data, p.THA[:])
-	data = Pull(data, p.TPA[:])
-	return data
+func (v ARP) WriteTo(w io.Writer) (int64, error) {
+	binint.BigEndianValue(v.HTYPE).WriteTo(w)
+	binint.BigEndianValue(v.PTYPE).WriteTo(w)
+	binint.ByteValue(v.HLEN).WriteTo(w)
+	binint.ByteValue(v.PLEN).WriteTo(w)
+	binint.BigEndianValue(v.OPER).WriteTo(w)
+	w.Write(v.SHA[:])
+	w.Write(v.SPA[:])
+	w.Write(v.THA[:])
+	_, err := w.Write(v.TPA[:])
+	return SizeofARP, err
 }

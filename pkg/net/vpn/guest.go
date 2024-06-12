@@ -9,13 +9,15 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/netip"
 	"os"
 	"sync"
 	"time"
 
-	"github.com/platinasystems/goes/v2/pkg/crypto/cipher/box/label"
+	"github.com/platinasystems/goes/v2/pkg/crypto/cipher/box"
+	"github.com/platinasystems/goes/v2/pkg/encoding/binary/binint"
 	"github.com/platinasystems/goes/v2/pkg/encoding/binary/binpdu"
 	"github.com/platinasystems/goes/v2/pkg/encoding/binary/binph"
 	"github.com/platinasystems/goes/v2/pkg/errors/egress"
@@ -27,18 +29,6 @@ import (
 
 type guest struct {
 	client
-	dst    netip.Addr
-	tunnel *os.File
-	nif    *netif.NetIf
-	ch     struct {
-		pkt struct {
-			rx, tx chan *crate
-		}
-		tun struct {
-			read, write chan *crate
-		}
-	}
-	wg sync.WaitGroup
 }
 
 func (g *guest) daemon(ctx context.Context, args []string) error {
@@ -46,6 +36,7 @@ func (g *guest) daemon(ctx context.Context, args []string) error {
 usage: {{branch .}} [<options>] ` + vpnRegistrySyntax + `
 Start VPN tunnel.
 {{flags .}}`
+	var wg sync.WaitGroup
 
 	flags := goes.ContextFlags(ctx)
 	uFlag := flags.Uint("u", 0, "Unit number.")
@@ -60,11 +51,18 @@ Start VPN tunnel.
 		return ErrIncomplete
 	}
 
-	defer g.wg.Wait()
-
 	if err = g.register(ctx, args[0]); err != nil {
 		return err
 	}
+
+	cctx, cancel := context.WithCancel(ctx)
+
+	iguest := IdIndex(g.id)
+	verbose.Printf("start (%d, %v)", iguest, svc)
+	defer verbose.Printf("stopped (%d, %v) %v", iguest, svc, err)
+	defer wg.Wait()
+	defer cancel()
+	defer verbose.Printf("stopping (%d, %v)", iguest, svc)
 
 	udp, err := egress.MarkResult(net.ListenUDP("udp", &net.UDPAddr{
 		IP:   svc.Addr().AsSlice(),
@@ -77,19 +75,16 @@ Start VPN tunnel.
 
 	defer udp.Close()
 
-	verbose.Printf("start (%d, %v)", g.label, svc)
-	defer verbose.Printf("stopped (%d, %v)", g.label, svc)
+	via := g.via[iguest]
 
-	via := g.via[g.label.Index()]
-
-	viaBlk, err := httpWhoIsLabelled(ctx, g.registry, via)
+	viaBlk, err := httpWhoIsIdentified(cctx, g.registry, via)
 	if err != nil {
 		return err
 	} else if err = g.peer(viaBlk); err != nil {
 		return err
 	}
 
-	g.dst, err = egress.MarkResult(addressHeader(viaBlk))
+	dst, err := egress.MarkResult(addressHeader(viaBlk))
 	if err != nil {
 		return err
 	}
@@ -104,350 +99,331 @@ Start VPN tunnel.
 		owner   = -1
 		group   = -1
 	)
-	g.tunnel, err = egress.MarkResult(tuntap.
+	tun, err := egress.MarkResult(tuntap.
 		New(*uFlag, istap, persist, owner, group, ha))
 	if err != nil {
 		return err
 	}
-	defer g.tunnel.Close()
-	if g.nif = netif.Named(g.tunnel.Name()); g.nif == nil {
-		return egress.Markf("%s: %w", g.tunnel.Name(), ErrNotFound)
-	}
-	err = egress.Mark(g.nif.Add(ctx, g.hostPrefix, g.dst, "up"))
-	if err != nil {
-		return err
-	}
-	err = egress.Mark(routeAdd(ctx, g.vpnPrefix, g.dst),
-		"route add", g.vpnPrefix, "via", g.dst, "through", g.nif.Name)
-	if err != nil {
-		return err
-	}
-	defer routeDelete(ctx, g.vpnPrefix, g.dst)
+	defer tun.Close()
 
-	g.ch.pkt.rx = make(chan *crate, 4)
-	g.ch.pkt.tx = make(chan *crate, 4)
-	g.ch.tun.read = make(chan *crate, 4)
-	g.ch.tun.write = make(chan *crate, 4)
+	nif := netif.Named(tun.Name())
+	if nif == nil {
+		return egress.Markf("%s: %w", tun.Name(), ErrNotFound)
+	}
+
+	err = egress.Mark(nif.Add(cctx, g.hostPrefix, dst,
+		"up", "mtu", fmt.Sprintf("%d", box.ContentMTU)))
+	if err != nil {
+		return err
+	}
+
+	err = egress.Mark(routeAdd(cctx, g.vpnPrefix, dst),
+		"route add", g.vpnPrefix, "via", dst, "through", nif.Name)
+	if err != nil {
+		return err
+	}
+	defer routeDelete(cctx, g.vpnPrefix, dst)
+
+	pktRxCh := make(chan *box.Box, 4)
+	pktTxCh := make(chan *box.Box, 4)
+	tunReadCh := make(chan *box.Box, 4)
+	tunWriteCh := make(chan *box.Box, 4)
 
 	maps.Copy(binpdu.TunPIprotos, TunPIprotos)
 
-	g.wg.Add(1)
-	go pktRxRoutine(ctx, &g.wg, udp, g.ch.pkt.rx)
-	g.wg.Add(1)
-	go pktTxRoutine(ctx, &g.wg, udp, g.ch.pkt.tx)
-	g.wg.Add(1)
-	go g.tunReadRoutine(ctx)
-	g.wg.Add(1)
-	go g.tunWriteRoutine(ctx)
+	wg.Add(1)
+	go pktRxRoutine(cctx, &wg, udp, pktRxCh)
+	wg.Add(1)
+	go pktTxRoutine(cctx, &wg, udp, pktTxCh)
+	defer close(pktTxCh)
+	wg.Add(1)
+	go tunReadRoutine(cctx, &wg, tun.Name(), tun, tunReadCh)
+	wg.Add(1)
+	go tunWriteRoutine(cctx, &wg, tun.Name(), tun, tunWriteCh)
+	defer close(tunWriteCh)
 
-	g.hello(via, time.Now())
+	if err = g.hello(pktTxCh, via, time.Now()); err != nil {
+		return err
+	}
 
 	kat := time.NewTicker(30 * time.Second)
 	defer kat.Stop()
 
-	verbose.Printf("start (%s, %v)", g.nif.Name, g.hostPrefix)
-	defer verbose.Printf("stopped (%s, %v)", g.nif.Name, g.hostPrefix)
+	verbose.Printf("start (%s, %v)", nif.Name, g.hostPrefix)
+	defer verbose.Printf("stopped (%s, %v)", nif.Name, g.hostPrefix)
 
 guestLoop:
 	for {
 		select {
-		case <-ctx.Done():
-			return nil
+		case <-cctx.Done():
+			verbose.Println("done")
+			break guestLoop
 		case t := <-kat.C:
-			if x, ok := g.via[g.label.Index()]; ok && x != via {
+			if x, ok := g.via[iguest]; ok && x != via {
 				via = x
 			}
-			g.hello(via, t)
-		case c := <-g.ch.tun.read:
-			ato := g.toWhom(c.box.Contents())
+			if err = g.hello(pktTxCh, via, t); err != nil {
+				errata.Println(err)
+			}
+		case bx, ok := <-tunReadCh:
+			if !ok {
+				verbose.Println("tun read ch closed")
+				break guestLoop
+			}
+			ato := g.toWhom(bx)
 			if !ato.IsValid() {
-				inventory.Put(c)
+				bx.Return()
 				continue guestLoop
 			}
 			to, ok := g.addressed[ato]
 			if !ok {
-				g.whoisAddressed(ato)
-				inventory.Put(c)
+				g.whoisAddressed(pktTxCh, ato)
+				bx.Return()
 				continue guestLoop
 			}
-			ito := to.Index()
-			togcm, ok := g.gcm[ito]
+			ito := IdIndex(to)
+			cto, ok := g.gcm[ito]
 			if !ok {
 				verbose.Printf("no guest cipher %d, %v",
 					ito, ato)
-				inventory.Put(c)
+				bx.Return()
 				continue guestLoop
 			}
 			via, ok := g.via[ito]
 			if !ok {
 				errata.Println("no guest exchange %d, %v",
 					ito, ato)
-				inventory.Put(c)
+				bx.Return()
 				continue guestLoop
 			}
-			ivia := via.Index()
-			viagcm, ok := g.gcm[ivia]
+			ivia := IdIndex(via)
+			cvia, ok := g.gcm[ivia]
 			if !ok {
-				g.whoisLabelled(via)
-				inventory.Put(c)
+				g.whoisId(pktTxCh, via)
+				bx.Return()
 				continue guestLoop
 			}
-			c.ap, ok = g.service[ivia]
+			ap, ok := g.service[ivia]
 			if !ok {
 				errata.Println("no exchange service %d", ivia)
-				inventory.Put(c)
+				bx.Return()
 				continue guestLoop
 			}
-			c.box = c.box.From(g.label)
-			c.box = c.box.Via(via)
-			c.box = c.box.To(to)
-			c.box = c.box.CloseWith(togcm)
-			c.box.SealWith(viagcm)
-			c.Put(g.ch.pkt.tx)
-		case c := <-g.ch.pkt.rx:
-			ex, ok := g.via[g.label.Index()]
-			ivia := ex.Index()
+			bx.AddrPort = ap
+			bx.From(g.id)
+			bx.Via(via)
+			bx.To(to)
+			bx.CloseWith(cto)
+			bx.SealWith(cvia)
+			bx.NonBlockingPut(pktTxCh)
+		case bx, ok := <-pktRxCh:
+			if !ok {
+				verbose.Println("pkt tx ch closed")
+				break guestLoop
+			}
+			avia := bx.AddrPort
+			ex, ok := g.via[iguest]
+			ivia := IdIndex(ex)
 			if !ok {
 				errata.Printf("no cipher for exchange %d", ivia)
-				inventory.Put(c)
+				bx.Return()
 				continue guestLoop
 			}
-			exc, ok := g.gcm[ivia]
+			cex, ok := g.gcm[ivia]
 			if !ok {
 				errata.Printf("no cipher for exchange %d", ivia)
-				inventory.Put(c)
+				bx.Return()
 				continue guestLoop
 			}
-			if svc := g.service[ivia]; c.ap != svc {
-				verbose.Println(c.ap, "!=", svc)
-				inventory.Put(c)
+			if svc := g.service[ivia]; avia != svc {
+				verbose.Println(avia, "!=", svc)
+				bx.Return()
 				continue guestLoop
 			}
-			from := c.box.FromWhom()
-			ifrom, fromv := from.Index(), from.Version()
+			from := bx.FromWhom()
+			ifrom, vfrom := IdIndex(from), IdVersion(from)
 			ver, ok := g.ver[ifrom]
-			if !ok || ver != fromv {
-				g.whoisLabelled(from)
-				inventory.Put(c)
+			if !ok || ver != vfrom {
+				g.whoisId(pktTxCh, from)
+				bx.Return()
 				continue guestLoop
 			}
-			fromc, ok := g.gcm[ifrom]
+			cfrom, ok := g.gcm[ifrom]
 			if !ok {
 				errata.Printf("no cipher for guest %d", ifrom)
-				inventory.Put(c)
+				bx.Return()
 				continue guestLoop
 			}
-			if err = c.box.UnsealWith(exc); err != nil {
+			if err = bx.UnsealWith(cex); err != nil {
 				verbose.Println("unseal:", err)
-				inventory.Put(c)
+				bx.Return()
 				continue guestLoop
 			}
-			to := c.box.ToWhom()
-			if to != g.label {
-				g.hello(from, time.Now())
-				inventory.Put(c)
+			to := bx.ToWhom()
+			if to != g.id {
+				err = g.hello(pktTxCh, from, time.Now())
+				if err != nil {
+					errata.Println(err)
+				}
+				bx.Return()
 				continue guestLoop
 			}
-			c.box, err = c.box.OpenWith(fromc)
-			if err != nil {
+			if err = bx.OpenWith(cfrom); err != nil {
 				verbose.Print(err)
-				inventory.Put(c)
+				bx.Return()
 				continue guestLoop
 			}
-			contents := c.box.Contents()
 			var pi binph.TunPI
-			payload := pi.PullFrom(contents)
-			switch {
-			case len(payload) == len(contents):
+			if _, err = pi.ReadFrom(bx); err != nil {
 				verbose.Print(ErrUnderrun)
-				inventory.Put(c)
-			case pi.Proto == VPN_P_HELLO:
+				bx.Return()
+				continue guestLoop
+			}
+			switch pi.Proto {
+			case VPN_P_HELLO:
 				verbose.Print(FIXME)
 				// re-checkin if registry era mismatch
 				// else re-query exchange from registry
 				// if that era is mismatched
-			case pi.Proto == VPN_P_PUBLIC_KEY:
-				if blk, _ := pem.Decode(payload); blk == nil {
-					errata.Print(ErrNotPEM)
+			case VPN_P_PUBLIC_KEY:
+				blk, _ := pem.Decode(bx.Contents)
+				if blk == nil {
+					errata.Println(ErrNotPEM)
 				} else if err = g.peer(blk); err != nil {
-					fmt.Fprint(verbose, err)
+					verbose.Println(err)
 				}
-				inventory.Put(c)
-			case pi.Proto == binpdu.ETH_P_IP ||
-				pi.Proto == binpdu.ETH_P_IPV6:
-				g.ch.tun.write <- c
+				bx.Return()
+			case binpdu.ETH_P_IP, binpdu.ETH_P_IPV6:
+				bx.Rewind()
+				tunWriteCh <- bx
 			default:
-				verbose.Printf("unknown %#x", pi.Proto)
-				inventory.Put(c)
+				verbose.Printf("unknown %#x\n", pi.Proto)
+				bx.Return()
 			}
 		}
 	}
+	return err
 }
 
-/*FIXME
-func (*guest) getLnIP(want4 bool) (net.IP, error) {
-	ifas, err := net.InterfaceAddrs()
-	if err != nil {
-		return nil, err
-	}
-	for _, ifa := range ifas {
-		prefix, err := netip.ParsePrefix(ifa.String())
-		if err != nil {
-			continue
-		}
-		addr := prefix.Addr()
-		if addr.IsLoopback() {
-			continue
-		}
-		if (want4 && addr.Is4()) || (!want4 && addr.Is6()) {
-			return net.IP(addr.AsSlice()), nil
-		}
-	}
-	return nil, ErrNoServiceIP
-}
-*/
-
-func (g *guest) hello(to label.Label, now time.Time) {
-	ifrom := g.label.Index()
-	ito := to.Index()
-	c := newCrate()
-	c.box = c.box.Empty()
-	c.box = binph.TunPI{
-		Proto: VPN_P_HELLO,
-	}.AppendTo(c.box)
-	c.box = AppendVpnHelloUnixMicro(c.box, now.UnixMicro())
-	c.box = c.box.From(g.label)
-	c.box = c.box.To(to)
-	via, ok := g.via[ito]
-	if !ok {
-		via = to
-	}
-	ivia := via.Index()
-	c.box = c.box.Via(via)
-	c.ap, ok = g.service[ivia]
-	if !ok {
-		errata.Println("no exchange service for", ivia)
-		inventory.Put(c)
-		return
-	}
-	gcm, ok := g.gcm[ivia]
-	if !ok {
-		errata.Println("no exchange cipher for", ivia)
-		inventory.Put(c)
-		return
-	}
-	c.box = c.box.CloseWith(gcm)
-	c.box.SealWith(gcm)
-	verbose.Println("hello", ito, "from", ifrom, "via", ivia)
-	g.ch.pkt.tx <- c
-}
-
-var zaddr netip.Addr
-
-func (*guest) toWhom(contents []byte) netip.Addr {
+func (*guest) toWhom(bx *box.Box) netip.Addr {
 	var pi binph.TunPI
-	payload := pi.PullFrom(contents)
-	switch {
-	case len(payload) == len(contents):
+	defer bx.Rewind()
+	if _, err := pi.ReadFrom(bx); err != nil {
 		return zaddr
-	case pi.Proto == binpdu.ETH_P_IP:
+	}
+	switch pi.Proto {
+	case binpdu.ETH_P_IP:
 		var ip binph.IP
-		if pl := ip.PullFrom(payload); len(pl) < len(contents) {
+		if _, err := ip.ReadFrom(bx); err == nil {
 			return netip.AddrFrom4([4]byte(ip.DA))
 		}
-	case pi.Proto == binpdu.ETH_P_IPV6:
+	case binpdu.ETH_P_IPV6:
 		var ip6 binph.IP6
-		if pl := ip6.PullFrom(payload); len(pl) < len(contents) {
+		if _, err := ip6.ReadFrom(bx); err == nil {
 			return netip.AddrFrom16([16]byte(ip6.DA))
 		}
 	}
 	return zaddr
 }
 
-func (g *guest) tunReadRoutine(ctx context.Context) {
-	defer g.wg.Done()
-	tname := g.tunnel.Name()
-	verbose.Println("start", tname, "read routine")
-	defer verbose.Println("stopped", tname, "read routine")
+func (g *guest) whoisAddressed(ch chan<- *box.Box, addr netip.Addr) {
+	bx := box.New()
+	binph.TunPI{
+		Proto: VPN_P_WHOIS_ADDRESSED,
+	}.WriteTo(bx)
+	WriteAddrTo(bx, addr)
+	g.whois(ch, bx)
+}
+
+func (g *guest) whoisId(ch chan<- *box.Box, id box.Id) {
+	bx := box.New()
+	binph.TunPI{
+		Proto: VPN_P_WHOIS_IDENTIFIED,
+	}.WriteTo(bx)
+	binint.BigEndianValue(id).WriteTo(bx)
+	g.whois(ch, bx)
+}
+
+func (g *guest) whois(ch chan<- *box.Box, bx *box.Box) {
+	via, ok := g.via[IdIndex(g.id)]
+	if !ok {
+		errata.Print("no assigned exchange")
+		bx.Return()
+		return
+	}
+	ivia := IdIndex(via)
+	cvia, ok := g.gcm[ivia]
+	if !ok {
+		errata.Print("no shared cipher")
+		bx.Return()
+		return
+	}
+	svc, ok := g.service[ivia]
+	if !ok {
+		errata.Print("no assigned service")
+		bx.Return()
+		return
+	}
+	bx.AddrPort = svc
+	bx.From(g.id)
+	bx.Via(via)
+	bx.To(via)
+	bx.CloseWith(cvia)
+	bx.SealWith(cvia)
+	bx.NonBlockingPut(ch)
+}
+
+func tunReadRoutine(
+	ctx context.Context,
+	wg *sync.WaitGroup,
+	name string,
+	r io.Reader,
+	ch chan<- *box.Box,
+) {
+	defer wg.Done()
+	verbose.Println("start", name, "read routine")
+	defer verbose.Println("stopped", name, "read routine")
 	for ctx.Err() == nil {
-		c := newCrate()
-		n, err := g.tunnel.Read(c.box.Contents())
+		bx, err := box.NewReadContents(r)
 		if err != nil {
 			if !errors.Is(err, os.ErrClosed) {
 				verbose.Print(err)
 			}
 			return
 		}
-		c.box = c.box.Shrink(n)
-		verbose.Print(binpdu.TunPI(c.box.Contents()))
-		g.ch.tun.read <- c
+		verbose.Print(binpdu.TunPI(bx.Contents))
+		ch <- bx
 	}
 }
 
-func (g *guest) tunWriteRoutine(ctx context.Context) {
-	defer g.wg.Done()
-	tname := g.tunnel.Name()
-	verbose.Println("start", tname, "write routine")
-	defer verbose.Println("stopped", tname, "write routine")
+func tunWriteRoutine(
+	ctx context.Context,
+	wg *sync.WaitGroup,
+	name string,
+	w io.Writer,
+	ch <-chan *box.Box,
+) {
+	defer wg.Done()
+	verbose.Println("start", name, "write routine")
+	defer verbose.Println("stopped", name, "write routine")
 	for {
 		select {
 		case <-ctx.Done():
+			verbose.Println("done")
 			return
-		case c := <-g.ch.tun.write:
-			data := c.box.Contents()
-			if len(data) == 0 {
+		case bx, ok := <-ch:
+			if !ok {
+				verbose.Println("tun write ch closed")
+				return
+			}
+			if len(bx.Contents) == 0 {
 				verbose.Print("no content")
-			} else if _, err := g.tunnel.Write(data); err != nil {
+			} else if _, err := bx.WriteTo(w); err != nil {
 				verbose.Print(err)
 			} else {
-				verbose.Print(binpdu.TunPI(data))
+				verbose.Print(binpdu.TunPI(bx.Contents))
 			}
-			inventory.Put(c)
+			bx.Return()
 		}
 	}
-}
-
-func (g *guest) whoisAddressed(addr netip.Addr) {
-	c := newCrate()
-	c.box = c.box.Empty()
-	c.box = binph.TunPI{
-		Proto: VPN_P_WHOIS_ADDRESSED,
-	}.AppendTo(c.box)
-	c.box = AppendVpnWhoisAddress(c.box, addr)
-	g.whois(c)
-}
-
-func (g *guest) whoisLabelled(lbl label.Label) {
-	c := newCrate()
-	c.box = c.box.Empty()
-	c.box = binph.TunPI{
-		Proto: VPN_P_WHOIS_LABELLED,
-	}.AppendTo(c.box)
-	c.box = AppendVpnWhoisLabel(c.box, lbl)
-	g.whois(c)
-}
-
-func (g *guest) whois(c *crate) {
-	verbose.Print(string(c.box.Contents()))
-	via, ok := g.via[g.label.Index()]
-	if !ok {
-		errata.Print("no assigned exchange")
-		inventory.Put(c)
-	}
-	ivia := via.Index()
-	gcm, ok := g.gcm[ivia]
-	if !ok {
-		errata.Print("no shared cipher")
-		inventory.Put(c)
-	}
-	if c.ap, ok = g.service[ivia]; !ok {
-		errata.Print("no assigned service")
-		inventory.Put(c)
-	}
-	c.box = c.box.From(g.label)
-	c.box = c.box.Via(via)
-	c.box = c.box.To(via)
-	c.box = c.box.CloseWith(gcm)
-	c.box.SealWith(gcm)
-	c.Put(g.ch.pkt.tx)
 }

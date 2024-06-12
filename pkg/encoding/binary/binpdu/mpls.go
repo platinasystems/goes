@@ -5,6 +5,7 @@
 package binpdu
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 
@@ -35,11 +36,13 @@ func (pdu MPLS_MC) Format(w fmt.State, verb rune) {
 
 func mplsFormat[PDU MPLS_UC | MPLS_MC](w fmt.State, verb rune, pdu PDU) {
 	var h binph.MPLS
-	if payload := h.PullFrom(pdu); len(payload) == len(pdu) {
-		fmt.Fprint(w, ErrUnderrun)
+	buf := bytes.NewBuffer(pdu)
+	if _, err := h.ReadFrom(buf); err != nil {
+		fmt.Fprint(w, err)
 	} else {
 		fmt.Fprintf(w, "label[%#x] tc[%#x] ttl[%d]",
 			h.Label(), h.TC(), h.TTL())
+		payload := buf.Bytes()
 		t := binary.BigEndian.Uint16(payload)
 		if !h.IsBOS() {
 			fmt.Fprint(w, Mark, payload)

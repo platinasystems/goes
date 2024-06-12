@@ -5,6 +5,7 @@
 package binph
 
 import (
+	"io"
 	"unsafe"
 
 	"github.com/platinasystems/goes/v2/pkg/encoding/binary/binint"
@@ -17,23 +18,20 @@ type Eth struct {
 	Type uint16
 }
 
-const SizeofEth = int(unsafe.Sizeof(Eth{}))
+const SizeofEth = int64(unsafe.Sizeof(Eth{}))
 
-func (v Eth) AppendTo(data []byte) []byte {
-	data = append(data, v.DMAC[:]...)
-	data = append(data, v.SMAC[:]...)
-	data = binint.AppendBig(data, v.Type)
-	return data
+func (p *Eth) ReadFrom(r io.Reader) (int64, error) {
+	r.Read(p.DMAC[:])
+	r.Read(p.SMAC[:])
+	_, err := binint.BigEndianPointer(&p.Type).ReadFrom(r)
+	return SizeofEth, err
 }
 
-func (p *Eth) PullFrom(data []byte) []byte {
-	if len(data) < SizeofEth {
-		return data
-	}
-	data = Pull(data, p.DMAC[:])
-	data = Pull(data, p.SMAC[:])
-	data = binint.PullBig(data, &p.Type)
-	return data
+func (v Eth) WriteTo(w io.Writer) (int64, error) {
+	w.Write(v.DMAC[:])
+	w.Write(v.SMAC[:])
+	_, err := binint.BigEndianValue(v.Type).WriteTo(w)
+	return SizeofEth, err
 }
 
 func (p *Eth) IsUnicast() bool   { return (p.DMAC[0] & 1) == 0 }

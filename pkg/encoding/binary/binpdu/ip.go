@@ -5,6 +5,7 @@
 package binpdu
 
 import (
+	"bytes"
 	"fmt"
 	"net"
 
@@ -27,14 +28,15 @@ type IP []byte
 
 func (pdu IP) Format(w fmt.State, verb rune) {
 	var h binph.IP
+	buf := bytes.NewBuffer(pdu)
 	fmt.Fprint(w, "ip ")
-	if payload := h.PullFrom(pdu); len(payload) == len(pdu) {
-		fmt.Fprint(w, ErrUnderrun)
+	if _, err := h.ReadFrom(buf); err != nil {
+		fmt.Fprint(w, err)
 	} else {
 		fmt.Fprint(w, net.IP(h.DA[:]), " <- ", net.IP(h.SA[:]))
 		i := h.IHL() * 4
 		if f, ok := IPprotocols[h.Protocol]; ok && i < len(pdu) {
-			fmt.Fprint(w, Mark, f(payload))
+			fmt.Fprint(w, Mark, f(buf.Bytes()))
 		} else {
 			fmt.Fprintf(w, ", protocol[%#x]", h.Protocol)
 		}

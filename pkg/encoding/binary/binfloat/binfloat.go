@@ -6,6 +6,7 @@ package binfloat
 
 import (
 	"encoding/binary"
+	"io"
 	"math"
 	"unsafe"
 
@@ -14,50 +15,72 @@ import (
 
 type Floater interface{ ~float32 | ~float64 }
 
-func Append[F Floater](apo binary.AppendByteOrder, data []byte, v F) []byte {
-	switch unsafe.Sizeof(v) {
-	case 4:
-		data = binint.Append(apo, data, math.Float32bits(float32(v)))
-	case 8:
-		data = binint.Append(apo, data, math.Float64bits(float64(v)))
-	}
-	return data
+type Pointer[F Floater] struct {
+	binary.ByteOrder
+	P *F
 }
 
-func AppendBig[F Floater](data []byte, v F) []byte {
-	return Append(binary.BigEndian, data, v)
+func BigEndianPointer[F Floater](p *F) Pointer[F] {
+	return Pointer[F]{binary.BigEndian, p}
 }
 
-func AppendLittle[F Floater](data []byte, v F) []byte {
-	return Append(binary.LittleEndian, data, v)
+func ByteOrderPointer[F Floater](bo binary.ByteOrder, p *F) Pointer[F] {
+	return Pointer[F]{bo, p}
 }
 
-func AppendNative[F Floater](data []byte, v F) []byte {
-	return Append(binary.NativeEndian, data, v)
+func LittleEndianPointer[F Floater](p *F) Pointer[F] {
+	return Pointer[F]{binary.LittleEndian, p}
 }
 
-func Pull[F Floater](bo binary.ByteOrder, data []byte, p *F) []byte {
-	switch unsafe.Sizeof(*p) {
+func NativeEndianPointer[F Floater](p *F) Pointer[F] {
+	return Pointer[F]{binary.NativeEndian, p}
+}
+
+func (p Pointer[F]) ReadFrom(r io.Reader) (int64, error) {
+	var n int64
+	err := binint.ErrInvalid
+	switch unsafe.Sizeof(*p.P) {
 	case 4:
 		var u uint32
-		data = binint.Pull(bo, data, &u)
-		*p = F(math.Float32frombits(u))
+		n, err = binint.ByteOrderPointer(p.ByteOrder, &u).ReadFrom(r)
+		*p.P = F(math.Float32frombits(u))
 	case 8:
 		var u uint64
-		data = binint.Pull(bo, data, &u)
-		*p = F(math.Float64frombits(u))
+		n, err = binint.ByteOrderPointer(p.ByteOrder, &u).ReadFrom(r)
+		*p.P = F(math.Float64frombits(u))
 	}
-	return data
+	return n, err
 }
 
-func PullBig[F Floater](data []byte, p *F) []byte {
-	return Pull[F](binary.BigEndian, data, p)
+type Value[F Floater] struct {
+	binary.ByteOrder
+	V F
 }
 
-func PullLittle[F Floater](data []byte, p *F) []byte {
-	return Pull[F](binary.LittleEndian, data, p)
+func BigEndianValue[F Floater](v F) Value[F] {
+	return Value[F]{binary.BigEndian, v}
 }
 
-func PullNative[F Floater](data []byte, p *F) []byte {
-	return Pull[F](binary.NativeEndian, data, p)
+func ByteOrderValue[F Floater](bo binary.ByteOrder, v F) Value[F] {
+	return Value[F]{bo, v}
+}
+
+func LittleEndianValue[F Floater](v F) Value[F] {
+	return Value[F]{binary.LittleEndian, v}
+}
+
+func NativeEndianValue[F Floater](v F) Value[F] {
+	return Value[F]{binary.NativeEndian, v}
+}
+
+func (v Value[F]) WriteTo(w io.Writer) (int64, error) {
+	switch unsafe.Sizeof(v.V) {
+	case 4:
+		u := math.Float32bits(float32(v.V))
+		return binint.ByteOrderValue(v.ByteOrder, u).WriteTo(w)
+	case 8:
+		u := math.Float64bits(float64(v.V))
+		return binint.ByteOrderValue(v.ByteOrder, u).WriteTo(w)
+	}
+	return 0, binint.ErrInvalid
 }

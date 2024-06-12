@@ -5,6 +5,7 @@
 package binpdu
 
 import (
+	"bytes"
 	"fmt"
 
 	"github.com/platinasystems/goes/v2/pkg/encoding/binary/binph"
@@ -21,9 +22,10 @@ type ICMP6 []byte
 
 func (pdu ICMP6) Format(w fmt.State, verb rune) {
 	var h binph.ICMP6
+	buf := bytes.NewBuffer(pdu)
 	fmt.Fprint(w, "icmp6 ")
-	if payload := h.PullFrom(pdu); len(payload) == len(pdu) {
-		fmt.Fprint(w, ErrUnderrun)
+	if _, err := h.ReadFrom(buf); err != nil {
+		fmt.Fprint(w, err)
 	} else {
 		fmt.Fprint(w, ICMP6TypeName(h.Type), ", ")
 		if f, ok := ICMP6TypeCodes[h.Type]; ok {

@@ -5,6 +5,7 @@
 package binph
 
 import (
+	"io"
 	"unsafe"
 
 	"github.com/platinasystems/goes/v2/pkg/encoding/binary/binint"
@@ -20,30 +21,27 @@ type IP6 struct {
 	DA         [16]byte
 }
 
-const SizeofIP6 = int(unsafe.Sizeof(IP6{}))
+const SizeofIP6 = int64(unsafe.Sizeof(IP6{}))
 const IP6FlowMask = ((1 << 20) - 1)
 
-func (v IP6) AppendTo(data []byte) []byte {
-	data = binint.AppendBig(data, v.VCF)
-	data = binint.AppendBig(data, v.LEN)
-	data = append(data, v.NextHeader)
-	data = append(data, v.HopLimit)
-	data = append(data, v.SA[:]...)
-	data = append(data, v.DA[:]...)
-	return data
+func (p *IP6) ReadFrom(r io.Reader) (int64, error) {
+	binint.BigEndianPointer(&p.VCF).ReadFrom(r)
+	binint.BigEndianPointer(&p.LEN).ReadFrom(r)
+	binint.BytePointer(&p.NextHeader).ReadFrom(r)
+	binint.BytePointer(&p.HopLimit).ReadFrom(r)
+	r.Read(p.SA[:])
+	_, err := r.Read(p.DA[:])
+	return SizeofIP6, err
 }
 
-func (p *IP6) PullFrom(data []byte) []byte {
-	if len(data) < SizeofIP6 {
-		return data
-	}
-	data = binint.PullBig(data, &p.VCF)
-	data = binint.PullBig(data, &p.LEN)
-	data = binint.Bite(data, &p.NextHeader)
-	data = binint.Bite(data, &p.HopLimit)
-	data = Pull(data, p.SA[:])
-	data = Pull(data, p.DA[:])
-	return data
+func (v IP6) WriteTo(w io.Writer) (int64, error) {
+	binint.BigEndianValue(v.VCF).WriteTo(w)
+	binint.BigEndianValue(v.LEN).WriteTo(w)
+	binint.ByteValue(v.NextHeader).WriteTo(w)
+	binint.ByteValue(v.HopLimit).WriteTo(w)
+	w.Write(v.SA[:])
+	_, err := w.Write(v.DA[:])
+	return SizeofIP6, err
 }
 
 func (p *IP6) Version() uint8 { return uint8(p.VCF >> 28) }

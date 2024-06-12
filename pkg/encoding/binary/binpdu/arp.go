@@ -5,6 +5,7 @@
 package binpdu
 
 import (
+	"bytes"
 	"fmt"
 	"net"
 
@@ -15,9 +16,10 @@ type ARP []byte
 
 func (pdu ARP) Format(w fmt.State, verb rune) {
 	var h binph.ARP
+	buf := bytes.NewBuffer(pdu)
 	fmt.Fprint(w, "arp: ")
-	if payload := h.PullFrom(pdu); len(payload) == len(pdu) {
-		fmt.Fprint(w, ErrUnderrun)
+	if _, err := h.ReadFrom(buf); err != nil {
+		fmt.Fprint(w, err)
 	} else {
 		switch h.OPER {
 		case 1:

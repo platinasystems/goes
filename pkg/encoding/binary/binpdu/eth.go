@@ -5,6 +5,7 @@
 package binpdu
 
 import (
+	"bytes"
 	"fmt"
 	"net"
 
@@ -39,14 +40,15 @@ type Eth []byte
 
 func (pdu Eth) Format(w fmt.State, verb rune) {
 	var h binph.Eth
+	buf := bytes.NewBuffer(pdu)
 	fmt.Fprint(w, "eth: ")
-	if payload := h.PullFrom(pdu); len(payload) == len(pdu) {
-		fmt.Fprint(w, ErrUnderrun)
+	if _, err := h.ReadFrom(buf); err != nil {
+		fmt.Fprint(w, err)
 	} else {
 		fmt.Fprint(w, net.HardwareAddr(h.DMAC[:]), " <- ",
 			net.HardwareAddr(h.SMAC[:]))
 		if f, ok := EthTypes[h.Type]; ok {
-			fmt.Fprint(w, Mark, f(payload))
+			fmt.Fprint(w, Mark, f(buf.Bytes()))
 		} else {
 			fmt.Fprintf(w, ", type[%#x]", h.Type)
 		}

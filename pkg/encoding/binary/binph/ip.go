@@ -5,6 +5,7 @@
 package binph
 
 import (
+	"io"
 	"unsafe"
 
 	"github.com/platinasystems/goes/v2/pkg/encoding/binary/binint"
@@ -24,7 +25,7 @@ type IP struct {
 	DA       [4]byte
 }
 
-const SizeofIP = int(unsafe.Sizeof(IP{}))
+const SizeofIP = int64(unsafe.Sizeof(IP{}))
 
 const (
 	IP4MFbit    = 13
@@ -32,47 +33,32 @@ const (
 	IP4FlagMask = ((1 << IP4MFbit) - 1)
 )
 
-func (v IP) AppendTo(data []byte) []byte {
-	if v.Version() != 4 || v.IHL() < 5 {
-		return data
-	}
-	data = append(data, v.VIHL)
-	data = append(data, v.TOS)
-	data = binint.AppendBig(data, v.TL)
-	data = binint.AppendBig(data, v.ID)
-	data = binint.AppendBig(data, v.FFO)
-	data = append(data, v.TTL)
-	data = append(data, v.Protocol)
-	data = binint.AppendBig(data, v.Checksum)
-	data = append(data, v.SA[:]...)
-	data = append(data, v.DA[:]...)
-	return data
+func (p *IP) ReadFrom(r io.Reader) (int64, error) {
+	binint.BytePointer(&p.VIHL).ReadFrom(r)
+	binint.BytePointer(&p.TOS).ReadFrom(r)
+	binint.BigEndianPointer(&p.TL).ReadFrom(r)
+	binint.BigEndianPointer(&p.ID).ReadFrom(r)
+	binint.BigEndianPointer(&p.FFO).ReadFrom(r)
+	binint.BytePointer(&p.TTL).ReadFrom(r)
+	binint.BytePointer(&p.Protocol).ReadFrom(r)
+	binint.BigEndianPointer(&p.Checksum).ReadFrom(r)
+	r.Read(p.SA[:])
+	_, err := r.Read(p.DA[:])
+	return SizeofIP, err
 }
 
-func (p *IP) PullFrom(data []byte) []byte {
-	if len(data) < SizeofIP {
-		return data
-	}
-	if data[0] == 0 {
-		data[0] = 0x45
-	}
-	if (data[0] >> 4) != 4 {
-		return data
-	}
-	if ihl4 := 4 * int(data[0]&0xf); len(data) < ihl4 {
-		return data
-	}
-	data = binint.Bite(data, &p.VIHL)
-	data = binint.Bite(data, &p.TOS)
-	data = binint.PullBig(data, &p.TL)
-	data = binint.PullBig(data, &p.ID)
-	data = binint.PullBig(data, &p.FFO)
-	data = binint.Bite(data, &p.TTL)
-	data = binint.Bite(data, &p.Protocol)
-	data = binint.PullBig(data, &p.Checksum)
-	data = Pull(data, p.SA[:])
-	data = Pull(data, p.DA[:])
-	return data
+func (v IP) WriteTo(w io.Writer) (int64, error) {
+	binint.ByteValue(v.VIHL).WriteTo(w)
+	binint.ByteValue(v.TOS).WriteTo(w)
+	binint.BigEndianValue(v.TL).WriteTo(w)
+	binint.BigEndianValue(v.ID).WriteTo(w)
+	binint.BigEndianValue(v.FFO).WriteTo(w)
+	binint.ByteValue(v.TTL).WriteTo(w)
+	binint.ByteValue(v.Protocol).WriteTo(w)
+	binint.BigEndianValue(v.Checksum).WriteTo(w)
+	w.Write(v.SA[:])
+	_, err := w.Write(v.DA[:])
+	return SizeofIP, err
 }
 
 func (p *IP) Version() uint8 { return p.VIHL >> 4 }

@@ -5,6 +5,7 @@
 package binph
 
 import (
+	"io"
 	"unsafe"
 
 	"github.com/platinasystems/goes/v2/pkg/encoding/binary/binint"
@@ -21,31 +22,28 @@ type TCP struct {
 	UP    uint16
 }
 
-const SizeofTCP = int(unsafe.Sizeof(TCP{}))
+const SizeofTCP = int64(unsafe.Sizeof(TCP{}))
 
-func (v TCP) AppendTo(data []byte) []byte {
-	data = binint.AppendBig(data, v.SP)
-	data = binint.AppendBig(data, v.DP)
-	data = binint.AppendBig(data, v.Seq)
-	data = binint.AppendBig(data, v.Ack)
-	data = binint.AppendBig(data, v.Flags)
-	data = binint.AppendBig(data, v.Sum)
-	data = binint.AppendBig(data, v.UP)
-	return data
+func (p *TCP) ReadFrom(r io.Reader) (int64, error) {
+	binint.BigEndianPointer(&p.SP).ReadFrom(r)
+	binint.BigEndianPointer(&p.DP).ReadFrom(r)
+	binint.BigEndianPointer(&p.Seq).ReadFrom(r)
+	binint.BigEndianPointer(&p.Ack).ReadFrom(r)
+	binint.BigEndianPointer(&p.Flags).ReadFrom(r)
+	binint.BigEndianPointer(&p.Sum).ReadFrom(r)
+	_, err := binint.BigEndianPointer(&p.UP).ReadFrom(r)
+	return SizeofTCP, err
 }
 
-func (p *TCP) PullFrom(data []byte) []byte {
-	if len(data) < SizeofTCP {
-		return data
-	}
-	data = binint.PullBig(data, &p.SP)
-	data = binint.PullBig(data, &p.DP)
-	data = binint.PullBig(data, &p.Seq)
-	data = binint.PullBig(data, &p.Ack)
-	data = binint.PullBig(data, &p.Flags)
-	data = binint.PullBig(data, &p.Sum)
-	data = binint.PullBig(data, &p.UP)
-	return data
+func (v TCP) WriteTo(w io.Writer) (int64, error) {
+	binint.BigEndianValue(v.SP).WriteTo(w)
+	binint.BigEndianValue(v.DP).WriteTo(w)
+	binint.BigEndianValue(v.Seq).WriteTo(w)
+	binint.BigEndianValue(v.Ack).WriteTo(w)
+	binint.BigEndianValue(v.Flags).WriteTo(w)
+	binint.BigEndianValue(v.Sum).WriteTo(w)
+	_, err := binint.BigEndianValue(v.UP).WriteTo(w)
+	return SizeofTCP, err
 }
 
 func (p *TCP) DataOffset() uint8 { return uint8(p.Flags >> 28) }

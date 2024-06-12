@@ -65,7 +65,7 @@ var (
 	}
 )
 
-var errata = mute.Off(log.New(os.Stderr, "", log.Lshortfile))
+var errata = mute.Off(log.New(os.Stdout, "", log.Lshortfile))
 var verbose = mute.On(log.New(os.Stdout, "", log.Lshortfile))
 
 var vpnCrtFile = sync.OnceValues(func() (*x509certs.File, error) {

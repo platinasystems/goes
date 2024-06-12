@@ -23,7 +23,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/platinasystems/goes/v2/pkg/crypto/cipher/box/label"
+	"github.com/platinasystems/goes/v2/pkg/crypto/cipher/box"
 	"github.com/platinasystems/goes/v2/pkg/crypto/x509/x509certs"
 	"github.com/platinasystems/goes/v2/pkg/errors/egress"
 	"github.com/platinasystems/goes/v2/pkg/goes"
@@ -258,7 +258,7 @@ func httpCheckin(
 	nonce []byte,
 	optsvc ...netip.AddrPort,
 ) (
-	lbl, via label.Label,
+	id, via box.Id,
 	addr netip.Addr,
 	prefix netip.Prefix,
 	err error,
@@ -301,10 +301,10 @@ func httpCheckin(
 		}
 		val := scanner.Text()
 		switch key {
-		case "label:":
-			lbl, err = egress.MarkResult(label.Parse(val))
+		case "id:":
+			id, err = egress.MarkResult(ParseId(val))
 		case "via:":
-			via, err = egress.MarkResult(label.Parse(val))
+			via, err = egress.MarkResult(ParseId(val))
 		case "address:":
 			addr, err = egress.MarkResult(netip.ParseAddr(val))
 		case "prefix:":
@@ -485,8 +485,8 @@ func httpWhoIsAddressed(ctx context.Context, svr *url.URL, addr netip.Addr) (
 
 }
 
-func httpWhoIsLabelled(ctx context.Context, svr *url.URL, lbl label.Label) (
+func httpWhoIsIdentified(ctx context.Context, svr *url.URL, id box.Id) (
 	*pem.Block, error,
 ) {
-	return httpWhoIs(ctx, svr, "label", lbl.String())
+	return httpWhoIs(ctx, svr, "id", fmt.Sprint(IdIndex(id)))
 }

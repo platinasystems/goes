@@ -5,6 +5,7 @@
 package binph
 
 import (
+	"io"
 	"unsafe"
 
 	"github.com/platinasystems/goes/v2/pkg/encoding/binary/binint"
@@ -16,22 +17,20 @@ type IEEE8021Q struct {
 	Type uint16
 }
 
-const SizeofIEEE8021Q = int(unsafe.Sizeof(IEEE8021Q{}))
+const SizeofIEEE8021Q = int64(unsafe.Sizeof(IEEE8021Q{}))
 
-func (v IEEE8021Q) Append(data []byte) []byte {
-	data = binint.AppendBig(data, v.TCI)
-	data = binint.AppendBig(data, v.Type)
-	return data
+func (p *IEEE8021Q) ReadFrom(r io.Reader) (int64, error) {
+	binint.BigEndianPointer(&p.TCI).ReadFrom(r)
+	_, err := binint.BigEndianPointer(&p.Type).ReadFrom(r)
+	return SizeofIEEE8021Q, err
 }
 
-func (p *IEEE8021Q) PullFrom(data []byte) []byte {
-	if len(data) < SizeofIEEE8021Q {
-		return data
-	}
-	data = binint.PullBig(data, &p.TCI)
-	data = binint.PullBig(data, &p.Type)
-	return data
+func (v IEEE8021Q) WriteTo(w io.Writer) (int64, error) {
+	binint.BigEndianValue(v.TCI).WriteTo(w)
+	_, err := binint.BigEndianValue(v.Type).WriteTo(w)
+	return SizeofIEEE8021Q, err
 }
+
 func (p *IEEE8021Q) PCP() uint8  { return uint8(p.TCI >> (1 + 12)) }
 func (p *IEEE8021Q) DEI() bool   { return (p.TCI & (1 << 12)) != 0 }
 func (p *IEEE8021Q) VID() uint16 { return p.TCI & ((1 << 12) - 1) }

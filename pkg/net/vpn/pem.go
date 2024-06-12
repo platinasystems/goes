@@ -11,15 +11,15 @@ import (
 	"encoding/pem"
 	"net/netip"
 
-	"github.com/platinasystems/goes/v2/pkg/crypto/cipher/box/label"
+	"github.com/platinasystems/goes/v2/pkg/crypto/cipher/box"
 )
 
-func labelHeader(blk *pem.Block) (label.Label, error) {
-	return label.Parse(blk.Headers["label"])
+func idHeader(blk *pem.Block) (box.Id, error) {
+	return ParseId(blk.Headers["id"])
 }
 
-func viaHeader(blk *pem.Block) (label.Label, error) {
-	return label.Parse(blk.Headers["via"])
+func viaHeader(blk *pem.Block) (box.Id, error) {
+	return ParseId(blk.Headers["via"])
 }
 
 func addressHeader(blk *pem.Block) (netip.Addr, error) {

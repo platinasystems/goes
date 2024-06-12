@@ -7,12 +7,11 @@ package vpn
 import (
 	"context"
 	"encoding/pem"
-	"fmt"
 	"net"
 	"net/netip"
 	"sync"
 
-	"github.com/platinasystems/goes/v2/pkg/crypto/cipher/box/label"
+	"github.com/platinasystems/goes/v2/pkg/crypto/cipher/box"
 	"github.com/platinasystems/goes/v2/pkg/encoding/binary/binph"
 	"github.com/platinasystems/goes/v2/pkg/errors/egress"
 	"github.com/platinasystems/goes/v2/pkg/goes"
@@ -21,19 +20,10 @@ import (
 type exchange struct {
 	client
 	pem struct {
-		addressed map[netip.Addr]*pem.Block
-		labelled  map[label.Index]*pem.Block
+		addressed  map[netip.Addr]*pem.Block
+		identified map[int]*pem.Block
 	}
-	ch struct {
-		pkt struct {
-			rx chan *crate
-			tx chan *crate
-		}
-		whois struct {
-			response chan *pem.Block
-		}
-	}
-	wg sync.WaitGroup
+	whoisResponseCh chan *pem.Block
 }
 
 func (ex *exchange) daemon(ctx context.Context, args []string) error {
@@ -41,6 +31,7 @@ func (ex *exchange) daemon(ctx context.Context, args []string) error {
 usage: {{branch .}} [<options>] ` + vpnRegistrySyntax + `
 Start VPN packet exchange.
 {{flags .}}`
+	var wg sync.WaitGroup
 
 	if goes.ContextComplete(ctx) {
 		return nil
@@ -56,17 +47,27 @@ Start VPN packet exchange.
 	}
 
 	ex.pem.addressed = make(map[netip.Addr]*pem.Block)
-	ex.pem.labelled = make(map[label.Index]*pem.Block)
+	ex.pem.identified = make(map[int]*pem.Block)
 
-	ex.ch.pkt.rx = make(chan *crate, 4)
-	ex.ch.pkt.tx = make(chan *crate, 4)
-	ex.ch.whois.response = make(chan *pem.Block)
+	pktRxCh := make(chan *box.Box, 4)
+	pktTxCh := make(chan *box.Box, 4)
 
-	defer ex.wg.Wait()
+	ex.whoisResponseCh = make(chan *pem.Block)
 
 	if err = ex.register(ctx, args[0], svc); err != nil {
 		return err
 	}
+
+	cctx, cancel := context.WithCancel(ctx)
+
+	iex, vex := IdIndex(ex.id), IdVersion(ex.id)
+
+	verbose.Printf("start (%d, %v)\n", iex, svc)
+	defer verbose.Println("foobar")
+	defer verbose.Printf("stopped (%d, %v) %v\n", iex, svc, err)
+	defer wg.Wait()
+	defer cancel()
+	defer verbose.Printf("stopping (%d, %v) ...\n", iex, svc)
 
 	udp, err := egress.MarkResult(net.ListenUDP("udp", &net.UDPAddr{
 		IP:   svc.Addr().AsSlice(),
@@ -79,176 +80,213 @@ Start VPN packet exchange.
 
 	defer udp.Close()
 
-	verbose.Printf("start (%d, %v)", ex.label, svc)
-	defer verbose.Printf("stopped (%d, %v)", ex.label, svc)
-
-	ex.wg.Add(1)
-	go pktRxRoutine(ctx, &ex.wg, udp, ex.ch.pkt.rx)
-	ex.wg.Add(1)
-	go pktTxRoutine(ctx, &ex.wg, udp, ex.ch.pkt.tx)
+	wg.Add(1)
+	go pktRxRoutine(cctx, &wg, udp, pktRxCh)
+	wg.Add(1)
+	go pktTxRoutine(cctx, &wg, udp, pktTxCh)
+	defer close(pktTxCh)
 
 pktRxLoop:
 	for {
 		select {
-		case <-ctx.Done():
-			return nil
-		case c := <-ex.ch.pkt.rx:
-			from := c.box.FromWhom()
-			ifrom := from.Index()
-			if from.Version() != ex.ver[ifrom] {
-				ex.wg.Add(1)
-				go ex.whoisLabelledRoutine(ctx, from)
-				inventory.Put(c)
+		case <-cctx.Done():
+			verbose.Println("done", cctx.Err())
+			break pktRxLoop
+		case bx, ok := <-pktRxCh:
+			if !ok {
+				verbose.Println("pkt rx ch closed")
+				break pktRxLoop
+			}
+			afrom := bx.AddrPort
+			from := bx.FromWhom()
+			ifrom, vfrom := IdIndex(from), IdVersion(from)
+			via := bx.ViaWhom()
+			ivia, vvia := IdIndex(via), IdVersion(via)
+			if ivia != iex {
+				verbose.Printf("via %d != exchange %d",
+					ivia, iex)
+				bx.Return()
 				continue pktRxLoop
 			}
-			ex.service[ifrom] = c.ap
-			if gcm, ok := ex.gcm[ifrom]; !ok {
-				ex.wg.Add(1)
-				go ex.whoisLabelledRoutine(ctx, from)
-				inventory.Put(c)
+			if vvia != vex {
+				verbose.Printf("FIXME version via "+
+					"%d != exchange %d", vvia, vex)
+				bx.Return()
 				continue pktRxLoop
-			} else if err := c.box.UnsealWith(gcm); err != nil {
-				verbose.Println(ifrom, c.ap, "unseal", err)
-				inventory.Put(c)
+			}
+			if vfrom != ex.ver[ifrom] {
+				wg.Add(1)
+				go ex.whoisIdRoutine(cctx, &wg, from)
+				bx.Return()
 				continue pktRxLoop
-			} else if to := c.box.ToWhom(); to == ex.label {
-				c.box, err = c.box.OpenWith(gcm)
-				if err != nil {
-					verbose.Println(ifrom, c.ap, "open", err)
-					inventory.Put(c)
+			}
+			ex.service[ifrom] = afrom
+			cfrom, ok := ex.gcm[ifrom]
+			if !ok {
+				verbose.Printf("(%d, %v) who?", ifrom, afrom)
+				wg.Add(1)
+				go ex.whoisIdRoutine(cctx, &wg, from)
+				bx.Return()
+				continue pktRxLoop
+			}
+			if err := bx.UnsealWith(cfrom); err != nil {
+				verbose.Printf("(%d, %v) unseal %v",
+					ifrom, afrom, err)
+				bx.Return()
+				continue pktRxLoop
+			}
+			to := bx.ToWhom()
+			ito, vto := IdIndex(to), IdVersion(to)
+			if ito == iex {
+				if vto != vex {
+					verbose.Printf("(%d, %v) "+
+						"FIXME prompt exchange update",
+						ifrom, afrom)
+					bx.Return()
 				} else {
-					ex.rx(ctx, c)
+					err = bx.OpenWith(cfrom)
+					if err != nil {
+						verbose.Printf("(%d, %v) "+
+							"open %v",
+							ifrom, afrom, err)
+						bx.Return()
+					} else {
+						ex.rx(cctx, &wg, bx, pktTxCh)
+					}
 				}
-			} else if ito := to.Index(); ito == ex.label.Index() {
-				verbose.Print("FIXME exchange version")
-				inventory.Put(c)
-			} else if vto, ok := ex.ver[ito]; !ok {
-				verbose.Print("FIXME whois", ito)
-				inventory.Put(c)
-			} else if vto != to.Version() {
-				verbose.Print("FIXME to version")
-				inventory.Put(c)
-			} else if c.ap, ok = ex.service[ito]; !ok {
-				verbose.Println(ifrom, c.ap, "no service")
-				inventory.Put(c)
-			} else if gcm, ok = ex.gcm[ito]; !ok {
-				verbose.Println(ifrom, c.ap, "unknown", ito)
-				inventory.Put(c)
+			} else if vto != ex.ver[ito] {
+				verbose.Printf("(%d, %v) "+
+					"FIXME prompt host %d update",
+					ifrom, afrom, ito)
+				bx.Return()
+			} else if ato, ok := ex.service[ito]; !ok {
+				verbose.Printf("(%d, %v) no service to %d",
+					ifrom, afrom, ito)
+				bx.Return()
+			} else if cto, ok := ex.gcm[ito]; !ok {
+				verbose.Printf("(%d, %v) not peered with %d",
+					ifrom, afrom, ito)
+				bx.Return()
 			} else {
-				verbose.Println("reseal/send", to, c.ap)
-				c.box.SealWith(gcm)
-				c.Put(ex.ch.pkt.tx)
+				verbose.Printf("(%d, %v) reseal and send to "+
+					"(%d, %v)", ifrom, afrom, ito, ato)
+				bx.AddrPort = ato
+				bx.SealWith(cto)
+				bx.NonBlockingPut(pktTxCh)
 			}
-		case blk := <-ex.ch.whois.response:
+		case blk, ok := <-ex.whoisResponseCh:
+			if !ok {
+				verbose.Println("closed whois response ch")
+				break pktRxLoop
+			}
 			if err = ex.whoisResponse(blk); err != nil {
-				fmt.Fprintln(errata, err)
+				errata.Println(err)
 			}
 		}
 	}
+	return nil
 }
 
-func (ex *exchange) rx(ctx context.Context, c *crate) {
-	var blk *pem.Block
+func (ex *exchange) rx(
+	ctx context.Context,
+	wg *sync.WaitGroup,
+	bx *box.Box,
+	pktTxCh chan<- *box.Box,
+) {
 	var pi binph.TunPI
-	from := c.box.FromWhom()
-	ifrom := from.Index()
-	gcm := ex.gcm[ifrom]
-	contents := c.box.Contents()
-	payload := pi.PullFrom(contents)
-	switch {
-	case len(payload) == len(contents):
-		verbose.Println(ifrom, c.ap, ErrUnderrun)
-		inventory.Put(c)
-		return
-	case pi.Proto == VPN_P_HELLO:
-		if span := VpnHelloTimeSpan(payload); span == 0 {
-			verbose.Println(ifrom, c.ap, "hello", ErrUnderrun)
-		} else {
-			verbose.Println(ifrom, c.ap, "hello", span)
-		}
-		inventory.Put(c)
-		return
-	case pi.Proto == VPN_P_WHOIS_ADDRESSED:
-		if addr := VpnWhoisAddress(payload); !addr.IsValid() {
-			verbose.Println(ifrom, c.ap, "whois-addressed",
-				ErrUnderrun)
-			inventory.Put(c)
-			return
-		} else {
-			verbose.Println(ifrom, c.ap, "whois-addressed", addr)
-			blk = ex.pem.addressed[addr]
-			if blk == nil {
-				ex.wg.Add(1)
-				go ex.whoisAddressedRoutine(ctx, addr)
-				inventory.Put(c)
-				return
-			}
-		}
-	case pi.Proto == VPN_P_WHOIS_LABELLED:
-		if lbl, ok := VpnWhoisLabel(payload); !ok {
-			verbose.Println(ifrom, c.ap, "whois-labelled",
-				ErrUnderrun)
-			inventory.Put(c)
-			return
-		} else {
-			verbose.Println(ifrom, c.ap, "whois-labelled", lbl)
-			blk = ex.pem.labelled[lbl.Index()]
-			if blk == nil {
-				ex.wg.Add(1)
-				go ex.whoisLabelledRoutine(ctx, lbl)
-				inventory.Put(c)
-				return
-			}
-		}
-	case pi.Proto == VPN_P_WHOIS_SERVICE:
-		if ap := VpnWhoisService(payload); !ap.Addr().IsValid() {
-			verbose.Println(ifrom, c.ap, "whois-service",
-				ErrUnderrun)
-		} else {
-			verbose.Println(ifrom, c.ap, "whois-service", ap)
-		}
-		inventory.Put(c)
-		return
-	default:
-		verbose.Println(ifrom, c.ap, "unknown", pi.Proto)
-		inventory.Put(c)
+	afrom := bx.AddrPort
+	from := bx.FromWhom()
+	ifrom := IdIndex(from)
+	cfrom := ex.gcm[ifrom]
+	_, err := pi.ReadFrom(bx)
+	if err != nil {
+		verbose.Println("rx (%d, %v) pi %v", ifrom, afrom, err)
+		bx.Return()
 		return
 	}
-	c.box = c.box.From(ex.label)
-	c.box = c.box.To(from)
-	c.box = c.box.Empty()
-	c.box = binph.TunPI{
-		Proto: VPN_P_PUBLIC_KEY,
-	}.AppendTo(c.box)
-	c.box = AppendVpnPublicKey(c.box, blk)
-	c.box = c.box.CloseWith(gcm)
-	c.box.SealWith(gcm)
-	c.Put(ex.ch.pkt.tx)
+	switch pi.Proto {
+	case VPN_P_HELLO:
+		verbose.Printf("rx (%d, %v) hello %v",
+			ifrom, afrom, VpnHelloTimeSpan(bx))
+		bx.Return()
+	case VPN_P_WHOIS_ADDRESSED:
+		if addr := VpnWhoisAddress(bx); !addr.IsValid() {
+			verbose.Printf("rx (%d, %v) whois %v",
+				ifrom, afrom, ErrUnderrun)
+			bx.Return()
+		} else if blk := ex.pem.addressed[addr]; blk == nil {
+			verbose.Printf("rc (%d, %v) whois %v",
+				ifrom, afrom, addr)
+			bx.Return()
+			wg.Add(1)
+			go ex.whoisAddressedRoutine(ctx, wg, addr)
+		} else {
+			binph.TunPI{
+				Proto: VPN_P_PUBLIC_KEY,
+			}.WriteTo(bx)
+			pem.Encode(bx, blk)
+			bx.From(ex.id)
+			bx.To(from)
+			bx.CloseWith(cfrom)
+			bx.SealWith(cfrom)
+			bx.NonBlockingPut(pktTxCh)
+		}
+	case VPN_P_WHOIS_IDENTIFIED:
+		if id, ok := VpnWhoisId(bx); !ok {
+			verbose.Printf("rx (%d, %v) whois %v",
+				ifrom, afrom, ErrUnderrun)
+			bx.Return()
+		} else if blk := ex.pem.identified[IdIndex(id)]; blk == nil {
+			verbose.Printf("rx (%d, %v) whois %d",
+				ifrom, afrom, id)
+			bx.Return()
+			wg.Add(1)
+			go ex.whoisIdRoutine(ctx, wg, id)
+		} else {
+			binph.TunPI{
+				Proto: VPN_P_PUBLIC_KEY,
+			}.WriteTo(bx)
+			pem.Encode(bx, blk)
+			bx.From(ex.id)
+			bx.To(from)
+			bx.CloseWith(cfrom)
+			bx.SealWith(cfrom)
+			bx.NonBlockingPut(pktTxCh)
+		}
+	case VPN_P_WHOIS_SERVICE:
+		verbose.Printf("rx (%d, %v) whois-service %v",
+			ifrom, afrom, VpnWhoisService(bx))
+		bx.Return()
+	default:
+		verbose.Printf("rx (%d, %v) unknown proto %#x",
+			ifrom, afrom, pi.Proto)
+		bx.Return()
+	}
 }
 
 func (ex *exchange) whoisAddressedRoutine(
-	ctx context.Context, addr netip.Addr,
+	ctx context.Context, wg *sync.WaitGroup, addr netip.Addr,
 ) {
-	defer ex.wg.Done()
-	verbose.Println("whois addressed", addr)
+	defer wg.Done()
+	verbose.Println("whois", addr)
 	blk, err := httpWhoIsAddressed(ctx, ex.registry, addr)
 	if err != nil {
 		verbose.Println(err)
 	} else {
-		ex.ch.whois.response <- blk
+		ex.whoisResponseCh <- blk
 	}
 }
 
-func (ex *exchange) whoisLabelledRoutine(
-	ctx context.Context, lbl label.Label,
+func (ex *exchange) whoisIdRoutine(
+	ctx context.Context, wg *sync.WaitGroup, id box.Id,
 ) {
-	defer ex.wg.Done()
-	verbose.Println("whois labelled", lbl.Index())
-	blk, err := httpWhoIsLabelled(ctx, ex.registry, lbl)
+	defer wg.Done()
+	verbose.Println("whois", IdIndex(id))
+	blk, err := httpWhoIsIdentified(ctx, ex.registry, id)
 	if err != nil {
 		verbose.Println(err)
 	} else {
-		ex.ch.whois.response <- blk
+		ex.whoisResponseCh <- blk
 	}
 }
 
@@ -257,16 +295,16 @@ func (ex *exchange) whoisResponse(blk *pem.Block) error {
 	if err != nil {
 		return err
 	}
-	lbl, err := egress.MarkResult(labelHeader(blk))
+	id, err := egress.MarkResult(idHeader(blk))
 	if err != nil {
 		return err
 	}
-	ilbl := lbl.Index()
+	idi := IdIndex(id)
 	if err = ex.peer(blk); err != nil {
 		return err
 	}
 	ex.pem.addressed[addr] = blk
-	ex.pem.labelled[ilbl] = blk
-	verbose.Printf("peer[%d] ok", ilbl)
+	ex.pem.identified[idi] = blk
+	verbose.Printf("peer[%d] ok", idi)
 	return nil
 }

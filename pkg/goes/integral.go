@@ -5,6 +5,7 @@
 package goes
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"flag"
@@ -55,7 +56,6 @@ var IntegralCommands = map[string]any{
 	"complete": IntegralComplete,
 	"cutoff":   IntegralCutoff,
 	"help":     IntegralHelp,
-	"log":      IntegralLog,
 	"input":    IntegralInput,
 	"output":   IntegralOutput,
 	"pty":      IntegralPTY,
@@ -64,6 +64,11 @@ var IntegralCommands = map[string]any{
 
 var IntegralDaemons = map[string]any{
 	"standby": IntegralStandby,
+}
+
+var IntegralLoggers = map[string]any{
+	"errata": IntegralErrata,
+	"notice": IntegralNotice,
 }
 
 var IntegralShow = map[string]any{
@@ -174,6 +179,32 @@ Run <command> until max <duration>.`
 	return Do(toctx, Select, args[1:])
 }
 
+func IntegralErrata(ctx context.Context, args []string) error {
+	const usage = `
+usage: {{branch .}} [<message>]...
+Log space separated message or stdin as errata.`
+	if ContextComplete(ctx) {
+		return nil
+	}
+	if ContextHelp(ctx) {
+		return Usage(ctx, usage)
+	}
+	w, err := oslog.OpenError()
+	if err != nil {
+		return err
+	}
+	defer w.Close()
+	if len(args) > 0 {
+		fmt.Fprintln(w, strings.Join(args, " "))
+		return nil
+	}
+	data, err := io.ReadAll(ContextStdin(ctx))
+	if err == nil {
+		_, err = w.Write(data)
+	}
+	return err
+}
+
 func IntegralHelp(ctx context.Context, args []string) error {
 	const usage = `
 {{$cmd := branch . 0 1 -}}
@@ -235,69 +266,42 @@ Run <command> with <file> input.`
 	return Do(StdinContext(ctx, r), Select, args[1:])
 }
 
-func IntegralKoAppLog(ctx context.Context, args []string) error {
+func IntegralNotice(ctx context.Context, args []string) error {
 	const usage = `
-usage: {{branch .}} <command> [<options>]
-Stubb ko-app logging; instead, everything is printed to stdout or stderr.`
+usage: {{branch .}} [<message>]...
+Log space separated message or stdin as notice.`
 	if ContextComplete(ctx) {
-		if len(args) == 0 {
-			return complete.Last(args, Root)
-		}
-		return Do(ctx, Select, args)
+		return nil
 	}
 	if ContextHelp(ctx) {
-		if len(args) == 0 {
-			return Usage(ctx, usage)
-		}
-		return Do(ctx, Select, args)
+		return Usage(ctx, usage)
 	}
-	if len(args) == 0 {
-		return ErrIncomplete
+
+	w, err := oslog.OpenNotice()
+	if err != nil {
+		return err
 	}
-	return Do(ctx, Select, args)
+	defer w.Close()
+	if len(args) > 0 {
+		fmt.Fprintln(w, strings.Join(args, " "))
+		return nil
+	}
+	data, err := io.ReadAll(ContextStdin(ctx))
+	if err == nil {
+		_, err = w.Write(data)
+	}
+	return err
 }
 
-func IntegralKoAppStart(ctx context.Context, args []string) error {
+func IntegralLogDaemon(ctx context.Context, args []string) error {
 	const usage = `
 usage: {{branch .}} <daemon> [<options>]
-Run ko-app <daemon>.
+Fork self again to pipe <daemon> output to syslog.
+
+   {{branch . 0 1}} daemon <daemon> [<options>]
 
 Daemons
 {{root .}}`
-	vdaemon, ok := ContextRoot(ctx)["daemon"]
-	if !ok {
-		return egress.Mark(FIXME)
-	}
-	daemons, ok := vdaemon.(map[string]any)
-	if !ok {
-		return egress.Mark(FIXME)
-	}
-	ctx = RootContext(ctx, daemons)
-	if ContextComplete(ctx) {
-		if len(args) == 0 {
-			return complete.Last(args, daemons)
-		}
-		return Do(ctx, Select, args)
-	}
-	if ContextHelp(ctx) {
-		if len(args) == 0 {
-			return Usage(ctx, usage)
-		}
-		return Do(ctx, Select, args)
-	}
-	if len(args) == 0 {
-		return ErrIncomplete
-	}
-	return Do(ctx, Select, args)
-}
-
-func IntegralLog(ctx context.Context, args []string) error {
-	const usage = `
-usage: {{branch .}} <command> [<options>]
-Print <command> output and errors to syslog.`
-	if program.IsKoApp() {
-		return IntegralKoAppLog(ctx, args)
-	}
 	if ContextComplete(ctx) {
 		return Do(ctx, Select, args)
 	}
@@ -310,35 +314,58 @@ Print <command> output and errors to syslog.`
 	if len(args) == 0 {
 		return ErrIncomplete
 	}
-
-	outLog, err := oslog.OpenNotice()
-	if err != nil {
-		return err
-	}
-	defer outLog.Close()
-	rOutPipe, wOutPipe, err := os.Pipe()
-	if err != nil {
-		return err
-	}
-	defer wOutPipe.Close()
-	go io.Copy(outLog, rOutPipe)
 
 	errLog, err := oslog.OpenError()
 	if err != nil {
 		return err
 	}
 	defer errLog.Close()
-	rErrPipe, wErrPipe, err := os.Pipe()
+
+	defer func() {
+		if err != nil {
+			fmt.Fprintln(errLog, err)
+		}
+	}()
+
+	outLog, err := oslog.OpenNotice()
 	if err != nil {
 		return err
 	}
-	defer wErrPipe.Close()
-	go io.Copy(errLog, rErrPipe)
+	defer outLog.Close()
 
-	ctx = StdoutContext(ctx, wOutPipe)
-	ctx = StderrContext(ctx, wErrPipe)
+	cmd := exec.CommandContext(ctx, program.Executable(),
+		append([]string{"daemon"}, args...)...)
+	cmd.Stdin = nil
 
-	return Do(ctx, Select, args)
+	errPipe, err := cmd.StderrPipe()
+	if err != nil {
+		return err
+	}
+	defer errPipe.Close()
+
+	outPipe, err := cmd.StdoutPipe()
+	if err != nil {
+		return err
+	}
+	defer outPipe.Close()
+
+	if err = cmd.Start(); err != nil {
+		return err
+	}
+
+	go loglines(outLog, outPipe)
+
+	errData, err := io.ReadAll(errPipe)
+	errLog.Write(errData)
+
+	err = cmd.Wait()
+	return err
+}
+
+func loglines(w io.Writer, r io.Reader) {
+	for sc := bufio.NewScanner(r); sc.Scan(); {
+		w.Write(sc.Bytes())
+	}
 }
 
 func IntegralOutput(ctx context.Context, args []string) error {
@@ -403,7 +430,7 @@ Modifiers{{flags .}}`
 // Use this to hold container until interrupt or termination signal.
 func IntegralStandby(ctx context.Context, args []string) error {
 	const usage = `
-usage: {{branch .}} [<pids>]
+usage: {{branch .}}
 Wait until interrupt or termination signal.`
 	if ContextComplete(ctx) {
 		return nil
@@ -418,15 +445,12 @@ Wait until interrupt or termination signal.`
 func IntegralStart(ctx context.Context, args []string) error {
 	const usage = `
 usage: {{branch .}} <daemon> [<options>]
-Fork self to run <daemon> like this,
+Detach self to run <daemon> like this,
 
-   {{branch . 0 1}} oslog daemon <daemon> [<options>]
+   {{branch . 0 1}} log-daemon <daemon> [<options>]
 
 Daemons
 {{root .}}`
-	if program.IsKoApp() {
-		return IntegralKoAppStart(ctx, args)
-	}
 	vdaemon, ok := ContextRoot(ctx)["daemon"]
 	if !ok {
 		return egress.Mark(FIXME)
@@ -452,7 +476,7 @@ Daemons
 		return ErrIncomplete
 	}
 	cmd := exec.Command(program.Executable(),
-		append([]string{"oslog", "daemon"}, args...)...)
+		append([]string{"log-daemon"}, args...)...)
 	cmd.Env = DaemonEnv()
 	cmd.Dir = program.RunTimeDir()
 	_, err := os.Stat(cmd.Dir)

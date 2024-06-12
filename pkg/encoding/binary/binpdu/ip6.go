@@ -5,6 +5,7 @@
 package binpdu
 
 import (
+	"bytes"
 	"fmt"
 	"net"
 
@@ -30,13 +31,14 @@ type IP6 []byte
 
 func (pdu IP6) Format(w fmt.State, verb rune) {
 	var h binph.IP6
+	buf := bytes.NewBuffer(pdu)
 	fmt.Fprint(w, "ip6 ")
-	if payload := h.PullFrom(pdu); len(payload) == len(pdu) {
-		fmt.Fprint(w, ErrUnderrun)
+	if _, err := h.ReadFrom(buf); err != nil {
+		fmt.Fprint(w, err)
 	} else {
 		fmt.Fprint(w, net.IP(h.DA[:]), " <- ", net.IP(h.SA[:]))
 		if f, ok := IP6NextHeaders[h.NextHeader]; ok {
-			fmt.Fprint(w, Mark, f(payload))
+			fmt.Fprint(w, Mark, f(buf.Bytes()))
 		} else {
 			fmt.Fprintf(w, " next[%#x]", h.NextHeader)
 		}

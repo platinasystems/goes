@@ -5,6 +5,7 @@
 package binph
 
 import (
+	"io"
 	"unsafe"
 
 	"github.com/platinasystems/goes/v2/pkg/encoding/binary/binint"
@@ -17,21 +18,18 @@ type ICMP6 struct {
 	Sum  uint16
 }
 
-const SizeofICMP6 = int(unsafe.Sizeof(ICMP6{}))
+const SizeofICMP6 = int64(unsafe.Sizeof(ICMP6{}))
 
-func (v ICMP6) AppendTo(data []byte) []byte {
-	data = append(data, v.Type)
-	data = append(data, v.Code)
-	data = binint.AppendBig(data, v.Sum)
-	return data
+func (p *ICMP6) ReadFrom(r io.Reader) (int64, error) {
+	binint.BytePointer(&p.Type).ReadFrom(r)
+	binint.BytePointer(&p.Code).ReadFrom(r)
+	_, err := binint.BigEndianPointer(&p.Sum).ReadFrom(r)
+	return SizeofICMP6, err
 }
 
-func (p *ICMP6) PullFrom(data []byte) []byte {
-	if len(data) < SizeofICMP6 {
-		return data
-	}
-	data = binint.Bite(data, &p.Type)
-	data = binint.Bite(data, &p.Code)
-	data = binint.PullBig(data, &p.Sum)
-	return data
+func (v ICMP6) WriteTo(w io.Writer) (int64, error) {
+	binint.ByteValue(v.Type).WriteTo(w)
+	binint.ByteValue(v.Code).WriteTo(w)
+	_, err := binint.BigEndianValue(v.Sum).WriteTo(w)
+	return SizeofICMP6, err
 }

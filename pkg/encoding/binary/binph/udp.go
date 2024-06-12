@@ -5,6 +5,7 @@
 package binph
 
 import (
+	"io"
 	"unsafe"
 
 	"github.com/platinasystems/goes/v2/pkg/encoding/binary/binint"
@@ -18,23 +19,20 @@ type UDP struct {
 	Sum uint16
 }
 
-const SizeofUDP = int(unsafe.Sizeof(UDP{}))
+const SizeofUDP = int64(unsafe.Sizeof(UDP{}))
 
-func (v UDP) AppendTo(data []byte) []byte {
-	data = binint.AppendBig(data, v.SP)
-	data = binint.AppendBig(data, v.DP)
-	data = binint.AppendBig(data, v.Len)
-	data = binint.AppendBig(data, v.Sum)
-	return data
+func (p *UDP) ReadFrom(r io.Reader) (int64, error) {
+	binint.BigEndianPointer(&p.SP).ReadFrom(r)
+	binint.BigEndianPointer(&p.DP).ReadFrom(r)
+	binint.BigEndianPointer(&p.Len).ReadFrom(r)
+	_, err := binint.BigEndianPointer(&p.Sum).ReadFrom(r)
+	return SizeofUDP, err
 }
 
-func (p *UDP) PullFrom(data []byte) []byte {
-	if len(data) < SizeofUDP {
-		return data
-	}
-	data = binint.PullBig(data, &p.SP)
-	data = binint.PullBig(data, &p.DP)
-	data = binint.PullBig(data, &p.Len)
-	data = binint.PullBig(data, &p.Sum)
-	return data
+func (v UDP) WriteTo(w io.Writer) (int64, error) {
+	binint.BigEndianValue(v.SP).WriteTo(w)
+	binint.BigEndianValue(v.DP).WriteTo(w)
+	binint.BigEndianValue(v.Len).WriteTo(w)
+	_, err := binint.BigEndianValue(v.Sum).WriteTo(w)
+	return SizeofUDP, err
 }

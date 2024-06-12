@@ -29,6 +29,7 @@ var (
 	ErrTooLong            = errors.New("duration can't exceed 10 years")
 	ErrTooManyExchanges   = errors.New("too many exchanges")
 	ErrUnauthorized       = errors.New("unauthorized")
+	ErrUnavailable        = errors.New("unavailable")
 	ErrUnderrun           = errors.New("underrun")
 	ErrUnnamedCertificate = errors.New("unnamed certificate")
 	ErrUnspecifiedAddress = errors.New("unspecified <address>")

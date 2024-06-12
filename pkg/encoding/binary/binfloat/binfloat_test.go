@@ -5,37 +5,36 @@
 package binfloat
 
 import (
+	"bytes"
+	"encoding/binary"
 	"math"
 	"testing"
-
-	"github.com/platinasystems/goes/v2/pkg/encoding/binary/binint"
 )
 
-func Test(t *testing.T) {
-	for name, endian := range binint.Endians {
-		t.Run(name, func(t *testing.T) {
-			t.Helper()
-
-			var b [8]byte
-			var got float64
-
-			for _, want := range []float64{
-				math.E,
-				math.Pi,
-				math.Phi,
-				math.Sqrt2,
-				math.SqrtE,
-				math.SqrtPi,
-				math.SqrtPhi,
-				math.Ln2,
-				math.Ln10,
-			} {
-				Append(endian, b[:0], want)
-				Pull(endian, b[:], &got)
-				if got != want {
-					t.Error(got, "!=", want)
-				}
-			}
-		})
+func ByteOrderTest(bo binary.ByteOrder, t *testing.T) {
+	var got float64
+	b := new(bytes.Buffer)
+	t.Helper()
+	for _, want := range []float64{
+		math.E,
+		math.Pi,
+		math.Phi,
+		math.Sqrt2,
+		math.SqrtE,
+		math.SqrtPi,
+		math.SqrtPhi,
+		math.Ln2,
+		math.Ln10,
+	} {
+		b.Reset()
+		ByteOrderValue(bo, want).WriteTo(b)
+		ByteOrderPointer(bo, &got).ReadFrom(b)
+		if got != want {
+			t.Errorf("%#x != %#x", got, want)
+		}
 	}
 }
+
+func TestBig(t *testing.T)    { ByteOrderTest(binary.BigEndian, t) }
+func TestLittle(t *testing.T) { ByteOrderTest(binary.LittleEndian, t) }
+func TestNative(t *testing.T) { ByteOrderTest(binary.NativeEndian, t) }

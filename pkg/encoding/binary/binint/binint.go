@@ -6,82 +6,114 @@ package binint
 
 import (
 	"encoding/binary"
+	"errors"
+	"io"
 	"unsafe"
 )
 
-type Integer interface {
-	Signed | Unsigned
+var ErrInvalid = errors.New("invalid")
+
+type Byte interface {
+	~int8 | ~uint8
 }
 
-type Signed interface {
-	~int | ~int16 | ~int32 | ~int64
+type Word interface {
+	~uint | ~uint16 | ~uint32 | ~uint64 | ~uintptr |
+		~int | ~int16 | ~int32 | ~int64
 }
 
-type Unsigned interface {
-	~uint | ~uint16 | ~uint32 | ~uint64 | ~uintptr
-}
-
-var Endians = map[string]interface {
+type Pointer[I Byte | Word] struct {
 	binary.ByteOrder
-	binary.AppendByteOrder
-}{
-	"big":    binary.BigEndian,
-	"little": binary.LittleEndian,
-	"native": binary.NativeEndian,
+	P *I
 }
 
-func Append[I Integer](abo binary.AppendByteOrder, data []byte, v I) []byte {
-	switch unsafe.Sizeof(v) {
+func BigEndianPointer[W Word](p *W) Pointer[W] {
+	return Pointer[W]{binary.BigEndian, p}
+}
+
+func BytePointer[B Byte](p *B) Pointer[B] {
+	return Pointer[B]{P: p}
+}
+
+func ByteOrderPointer[W Word](bo binary.ByteOrder, p *W) Pointer[W] {
+	return Pointer[W]{bo, p}
+}
+
+func LittleEndianPointer[W Word](p *W) Pointer[W] {
+	return Pointer[W]{binary.LittleEndian, p}
+}
+
+func NativeEndianPointer[W Word](p *W) Pointer[W] {
+	return Pointer[W]{binary.NativeEndian, p}
+}
+
+func (p Pointer[I]) ReadFrom(r io.Reader) (int64, error) {
+	var (
+		a [8]byte
+		n int
+	)
+	err := ErrInvalid
+	switch unsafe.Sizeof(*p.P) {
+	case 1:
+		n, err = r.Read(a[:1])
+		*p.P = I(a[0])
 	case 2:
-		return abo.AppendUint16(data, uint16(v))
+		n, err = r.Read(a[:2])
+		*p.P = I(p.Uint16(a[:2]))
 	case 4:
-		return abo.AppendUint32(data, uint32(v))
+		n, err = r.Read(a[:4])
+		*p.P = I(p.Uint32(a[:4]))
 	case 8:
-		return abo.AppendUint64(data, uint64(v))
+		n, err = r.Read(a[:8])
+		*p.P = I(p.Uint64(a[:8]))
 	}
-	return data
+	return int64(n), err
 }
 
-func AppendBig[I Integer](data []byte, v I) []byte {
-	return Append[I](binary.BigEndian, data, v)
+type Value[I Byte | Word] struct {
+	binary.ByteOrder
+	V I
 }
 
-func AppendLittle[I Integer](data []byte, v I) []byte {
-	return Append[I](binary.LittleEndian, data, v)
+func BigEndianValue[W Word](v W) Value[W] {
+	return Value[W]{binary.BigEndian, v}
 }
 
-func AppendNative[I Integer](data []byte, v I) []byte {
-	return Append[I](binary.NativeEndian, data, v)
+func ByteValue[B Byte](v B) Value[B] {
+	return Value[B]{V: v}
 }
 
-func Bite[I ~int8 | ~uint8](data []byte, p *I) []byte {
-	*p = I(data[0])
-	return data[1:]
+func ByteOrderValue[W Word](bo binary.ByteOrder, v W) Value[W] {
+	return Value[W]{bo, v}
 }
 
-func Pull[I Integer](bo binary.ByteOrder, data []byte, p *I) []byte {
-	switch unsafe.Sizeof(*p) {
+func LittleEndianValue[W Word](v W) Value[W] {
+	return Value[W]{binary.LittleEndian, v}
+}
+
+func NativeEndianValue[W Word](v W) Value[W] {
+	return Value[W]{binary.NativeEndian, v}
+}
+
+func (v Value[I]) WriteTo(w io.Writer) (int64, error) {
+	var (
+		a [8]byte
+		n int
+	)
+	err := ErrInvalid
+	switch unsafe.Sizeof(v.V) {
+	case 1:
+		a[0] = byte(v.V)
+		n, err = w.Write(a[:1])
 	case 2:
-		*p = I(bo.Uint16(data))
-		data = data[2:]
+		v.PutUint16(a[:2], uint16(v.V))
+		n, err = w.Write(a[:2])
 	case 4:
-		*p = I(bo.Uint32(data))
-		data = data[4:]
+		v.PutUint32(a[:4], uint32(v.V))
+		n, err = w.Write(a[:4])
 	case 8:
-		*p = I(bo.Uint64(data))
-		data = data[8:]
+		v.PutUint64(a[:8], uint64(v.V))
+		n, err = w.Write(a[:8])
 	}
-	return data
-}
-
-func PullBig[I Integer](data []byte, p *I) []byte {
-	return Pull[I](binary.BigEndian, data, p)
-}
-
-func PullLittle[I Integer](data []byte, p *I) []byte {
-	return Pull[I](binary.LittleEndian, data, p)
-}
-
-func PullNative[I Integer](data []byte, p *I) []byte {
-	return Pull[I](binary.NativeEndian, data, p)
+	return int64(n), err
 }

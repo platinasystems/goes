@@ -5,6 +5,7 @@
 package binpdu
 
 import (
+	"bytes"
 	"fmt"
 
 	"github.com/platinasystems/goes/v2/pkg/encoding/binary/binph"
@@ -45,13 +46,14 @@ func ieee8021qFormat[PDU IEEE8021Q | IEEE8021AD](
 	w fmt.State, verb rune, pdu PDU,
 ) {
 	var h binph.IEEE8021Q
-	if payload := h.PullFrom(pdu); len(payload) == len(pdu) {
-		fmt.Fprint(w, ErrUnderrun)
+	buf := bytes.NewBuffer(pdu)
+	if _, err := h.ReadFrom(buf); err != nil {
+		fmt.Fprint(w, err)
 	} else {
 		fmt.Fprintf(w, "pcp[%#x] dei[%d] vid [%#x]",
 			h.PCP(), h.DEI(), h.VID())
 		if f, ok := IEEE8021Qtypes[h.Type]; ok {
-			fmt.Fprint(w, Mark, f(payload))
+			fmt.Fprint(w, Mark, f(buf.Bytes()))
 		} else {
 			fmt.Fprintf(w, " type[%#x]", h.Type)
 		}

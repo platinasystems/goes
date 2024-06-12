@@ -11,6 +11,7 @@ var (
 	ErrDisabled    = errors.New("disabled")
 	ErrEmpty       = errors.New("empty selection")
 	ErrIncomplete  = errors.New("incomplete")
+	ErrInvalid     = errors.New("invalid")
 	ErrNoRoom      = errors.New("no room")
 	ErrNotFound    = errors.New("not found")
 	ErrRange       = errors.New("out of range")

@@ -71,7 +71,6 @@ func New(
 			unix.Close(fd)
 		}
 	}()
-	defer egress.Recovery(&err)
 
 	if err = ioctl(uintptr(fd), unix.TUNSETIFF, ifrp); err != nil {
 		return nil, egress.Mark(err)

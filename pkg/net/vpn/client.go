@@ -15,9 +15,11 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/platinasystems/goes/v2/pkg/crypto/cipher/box/label"
+	"github.com/platinasystems/goes/v2/pkg/crypto/cipher/box"
 	"github.com/platinasystems/goes/v2/pkg/crypto/cipher/gcm"
 	"github.com/platinasystems/goes/v2/pkg/crypto/cipher/nonce"
+	"github.com/platinasystems/goes/v2/pkg/encoding/binary/binint"
+	"github.com/platinasystems/goes/v2/pkg/encoding/binary/binph"
 	"github.com/platinasystems/goes/v2/pkg/errors/egress"
 )
 
@@ -28,16 +30,16 @@ type client struct {
 	pub      *ecdh.PublicKey
 	pubder   []byte
 	nonce    [nonce.Size]byte
-	label    label.Label
+	id       box.Id
 	registry *url.URL
 	addr     netip.Addr
 	hostPrefix,
 	vpnPrefix netip.Prefix
-	addressed map[netip.Addr]label.Label
-	gcm       map[label.Index]*gcm.Cipher
-	service   map[label.Index]netip.AddrPort
-	ver       map[label.Index]label.Version
-	via       map[label.Index]label.Label
+	addressed map[netip.Addr]box.Id
+	gcm       map[int]*gcm.Cipher
+	service   map[int]netip.AddrPort
+	ver       map[int]uint8
+	via       map[int]box.Id
 }
 
 func (cl *client) register(
@@ -60,11 +62,11 @@ func (cl *client) register(
 		return err
 	}
 
-	cl.addressed = make(map[netip.Addr]label.Label)
-	cl.gcm = make(map[label.Index]*gcm.Cipher)
-	cl.service = make(map[label.Index]netip.AddrPort)
-	cl.via = make(map[label.Index]label.Label)
-	cl.ver = make(map[label.Index]label.Version)
+	cl.addressed = make(map[netip.Addr]box.Id)
+	cl.gcm = make(map[int]*gcm.Cipher)
+	cl.service = make(map[int]netip.AddrPort)
+	cl.via = make(map[int]box.Id)
+	cl.ver = make(map[int]uint8)
 
 	cl.priv, err = egress.MarkResult(ecdh.X25519().GenerateKey(rand.Reader))
 	if err != nil {
@@ -84,21 +86,22 @@ func (cl *client) register(
 		return fmt.Errorf("nonce: %w", ErrUnderrun)
 	}
 
-	var via label.Label
-	cl.label, via, cl.addr, cl.vpnPrefix, err =
+	var via box.Id
+	cl.id, via, cl.addr, cl.vpnPrefix, err =
 		httpCheckin(ctx, cl.registry, cl.pubder, cl.nonce[:], optsvc...)
 	if err != nil {
 		return err
 	}
-	if via != label.Mislabel {
-		cl.via[cl.label.Index()] = via
+	idi := IdIndex(cl.id)
+	if via != InvalidId {
+		cl.via[idi] = via
 	}
 	if len(optsvc) > 0 {
-		cl.service[cl.label.Index()] = optsvc[0]
+		cl.service[idi] = optsvc[0]
 	}
 
-	verbose.Println("label", cl.label, "via", via, "addr", cl.addr,
-		"prefix", cl.vpnPrefix)
+	verbose.Printf("id %d %v via %v prefix %v",
+		cl.id, cl.addr, via, cl.vpnPrefix)
 
 	if cl.addr.Is4() {
 		cl.hostPrefix = netip.PrefixFrom(cl.addr, 32)
@@ -106,6 +109,42 @@ func (cl *client) register(
 		cl.hostPrefix = netip.PrefixFrom(cl.addr, 128)
 	}
 
+	return nil
+}
+
+func (cl *client) hello(ch chan<- *box.Box, to box.Id, now time.Time) error {
+	ifrom := IdIndex(cl.id)
+	ito := IdIndex(to)
+	cto, ok := cl.gcm[ito]
+	if !ok {
+		return fmt.Errorf("%d: no cipher", ito)
+	}
+	via, ok := cl.via[ito]
+	if !ok {
+		via = to
+	}
+	ivia := IdIndex(via)
+	cvia, ok := cl.gcm[ivia]
+	if !ok {
+		return fmt.Errorf("%d: no exchange cipher", ivia)
+	}
+	svc, ok := cl.service[ivia]
+	if !ok {
+		return fmt.Errorf("%d: no exchange service", ivia)
+	}
+	bx := box.New()
+	binph.TunPI{
+		Proto: VPN_P_HELLO,
+	}.WriteTo(bx)
+	binint.BigEndianValue(now.UnixMicro()).WriteTo(bx)
+	bx.AddrPort = svc
+	bx.From(cl.id)
+	bx.To(to)
+	bx.Via(via)
+	bx.CloseWith(cto)
+	bx.SealWith(cvia)
+	bx.NonBlockingPut(ch)
+	verbose.Printf("hello %d from %d via %d", ito, ifrom, ivia)
 	return nil
 }
 
@@ -122,32 +161,32 @@ func (cl *client) peer(blk *pem.Block) error {
 		return egress.Mark(ErrUnderrun)
 	}
 
-	lbl, err := egress.MarkResult(labelHeader(blk))
+	id, err := egress.MarkResult(idHeader(blk))
 	if err != nil {
 		return err
 	}
 
-	lbli := lbl.Index()
-	cl.ver[lbli] = lbl.Version()
+	idi := IdIndex(id)
+	cl.ver[idi] = IdVersion(id)
 
 	addr, err := egress.MarkResult(addressHeader(blk))
 	if err != nil {
 		return err
 	}
-	cl.addressed[addr] = lbl
+	cl.addressed[addr] = id
 
 	if _, ok := blk.Headers["service"]; ok {
-		cl.service[lbli], err = egress.MarkResult(serviceHeader(blk))
+		cl.service[idi], err = egress.MarkResult(serviceHeader(blk))
 		if err != nil {
 			return err
 		}
 	} else if via, err := egress.MarkResult(viaHeader(blk)); err != nil {
 		return err
 	} else {
-		cl.via[lbli] = via
+		cl.via[idi] = via
 	}
 
-	cl.gcm[lbli], err = gcm.New(cl.priv, pub, cl.nonce[:], remNonce)
+	cl.gcm[idi], err = gcm.New(cl.priv, pub, cl.nonce[:], remNonce)
 	return err
 }
 

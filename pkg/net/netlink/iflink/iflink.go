@@ -2,7 +2,10 @@
 
 package iflink
 
-import "github.com/platinasystems/goes/v2/pkg/encoding/binary/binint"
+import (
+	"encoding/binary"
+	"unsafe"
+)
 
 type Stats[T uint32 | uint64] struct {
 	RxPackets,
@@ -514,16 +517,18 @@ type IflaVxlanPortRange struct {
 	High uint16
 }
 
+const SizeofIflaVxlanPortRange = int(unsafe.Sizeof(IflaVxlanPortRange{}))
+
 func NewIflaVxlanPortRange(data []byte) (*IflaVxlanPortRange, []byte) {
-	p := new(IflaVxlanPortRange)
-	data = binint.PullBig(data, &p.Low)
-	data = binint.PullBig(data, &p.High)
-	return p, data
+	return &IflaVxlanPortRange{
+		Low:  binary.BigEndian.Uint16(data),
+		High: binary.BigEndian.Uint16(data[2:]),
+	}, data[SizeofIflaVxlanPortRange:]
 }
 
 func (v IflaVxlanPortRange) Append(data []byte) []byte {
-	data = binint.AppendBig(data, v.Low)
-	data = binint.AppendBig(data, v.High)
+	data = binary.BigEndian.AppendUint16(data, v.Low)
+	data = binary.BigEndian.AppendUint16(data, v.High)
 	return data
 }
 
@@ -718,20 +723,22 @@ type IflaVfVlanInfo struct {
 	VlanProto uint16
 }
 
+const SizeofIflaVfVlanInfo = int(unsafe.Sizeof(IflaVfVlanInfo{}))
+
 func NewIflaVfVlanInfo(data []byte) (*IflaVfVlanInfo, []byte) {
-	p := new(IflaVfVlanInfo)
-	data = binint.PullNative(data, &p.Vf)
-	data = binint.PullNative(data, &p.Vlan)
-	data = binint.PullNative(data, &p.Qos)
-	data = binint.PullBig(data, &p.VlanProto)
-	return p, data
+	return &IflaVfVlanInfo{
+		Vf:        binary.NativeEndian.Uint32(data[0:]),
+		Vlan:      binary.NativeEndian.Uint32(data[4:]),
+		Qos:       binary.NativeEndian.Uint32(data[8:]),
+		VlanProto: binary.BigEndian.Uint16(data[12:]),
+	}, data[SizeofIflaVfVlanInfo:]
 }
 
 func (v IflaVfVlanInfo) Append(data []byte) []byte {
-	data = binint.AppendNative(data, v.Vf)
-	data = binint.AppendNative(data, v.Vlan)
-	data = binint.AppendNative(data, v.Qos)
-	data = binint.AppendBig(data, v.VlanProto)
+	data = binary.NativeEndian.AppendUint32(data, v.Vf)
+	data = binary.NativeEndian.AppendUint32(data, v.Vlan)
+	data = binary.NativeEndian.AppendUint32(data, v.Qos)
+	data = binary.BigEndian.AppendUint16(data, v.VlanProto)
 	return data
 }
 

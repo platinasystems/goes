@@ -11,6 +11,8 @@ import (
 	"os"
 	"sync"
 	"time"
+
+	"github.com/platinasystems/goes/v2/pkg/crypto/cipher/box"
 )
 
 const (
@@ -22,26 +24,22 @@ func pktRxRoutine(
 	ctx context.Context,
 	wg *sync.WaitGroup,
 	udp *net.UDPConn,
-	ch chan<- *crate,
+	ch chan<- *box.Box,
 ) {
-	var n int
 	defer wg.Done()
 	defer close(ch)
-	verbose.Print("start ", udp.LocalAddr(), " rx routine")
-	defer verbose.Print("stopped ", udp.LocalAddr(), " rx routine")
+	verbose.Printf("start %v rx routine", udp.LocalAddr())
+	defer verbose.Printf("stopped %v rx routine", udp.LocalAddr())
 	udp.SetReadDeadline(time.Time{})
 	for dur := minPktRxDeadline; ctx.Err() == nil; {
 		err := udp.SetReadDeadline(time.Now().Add(dur))
 		if err != nil {
 			verbose.Print(err)
 			break
-		}
-		crate := newCrate()
-		n, crate.ap, err = udp.ReadFromUDPAddrPort(crate.box)
-		if err == nil {
-			crate.box = crate.box[:n]
-			verbose.Println("rx", n, "bytes from", crate.ap)
-			ch <- crate
+		} else if bx, err := box.NewRx(udp); err == nil {
+			verbose.Printf("rx %d bytes from %v",
+				bx.Len(), bx.AddrPort)
+			ch <- bx
 		} else if operr, ok := err.(*net.OpError); ok {
 			if !operr.Timeout() {
 				verbose.Print(err)
@@ -50,8 +48,7 @@ func pktRxRoutine(
 		} else if !errors.Is(err, os.ErrDeadlineExceeded) {
 			verbose.Print(err)
 			break
-		}
-		if dur < maxPktRxDeadline {
+		} else if dur < maxPktRxDeadline {
 			if dur *= 2; dur > maxPktRxDeadline {
 				dur = maxPktRxDeadline
 			}
@@ -63,21 +60,31 @@ func pktTxRoutine(
 	ctx context.Context,
 	wg *sync.WaitGroup,
 	udp *net.UDPConn,
-	ch <-chan *crate,
+	ch <-chan *box.Box,
 ) {
 	defer wg.Done()
 	la := udp.LocalAddr()
-	verbose.Print("start ", la, " tx routine")
-	defer verbose.Print("stopped ", la, " tx routine")
+	verbose.Printf("start %v tx routine", la)
+	defer verbose.Printf("stopped %v tx routine", la)
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case crate := <-ch:
-			udp.WriteToUDPAddrPort(crate.box, crate.ap)
-			verbose.Printf("tx %d bytes from %v to %v",
-				len(crate.box), la, crate.ap)
-			inventory.Put(crate)
+		case bx, ok := <-ch:
+			if !ok {
+				verbose.Println("pkt tx ch closed")
+				return
+			}
+			ta := bx.AddrPort
+			n, err := bx.Tx(udp)
+			if err != nil {
+				verbose.Printf("tx from %v to %v: %v",
+					la, ta, err)
+			} else {
+				verbose.Printf("tx %d bytes from %v to %v",
+					n, la, ta)
+			}
+			bx.Return()
 		}
 	}
 }

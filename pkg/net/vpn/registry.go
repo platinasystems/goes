@@ -21,7 +21,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/platinasystems/goes/v2/pkg/crypto/cipher/box/label"
+	"github.com/platinasystems/goes/v2/pkg/crypto/cipher/box"
 	"github.com/platinasystems/goes/v2/pkg/crypto/x509/x509certs"
 	"github.com/platinasystems/goes/v2/pkg/errors/egress"
 	"github.com/platinasystems/goes/v2/pkg/goes"
@@ -47,14 +47,14 @@ type regVpn struct {
 	pending pending
 
 	block struct {
-		addressed map[netip.Addr]*pem.Block
-		labelled  map[label.Index]*pem.Block
-		named     map[string]*pem.Block
+		addressed  map[netip.Addr]*pem.Block
+		identified map[int]*pem.Block
+		named      map[string]*pem.Block
 	}
 
-	labels label.Book
+	idbook IdBook
 
-	exchange label.Ring
+	exchange IdRing
 }
 
 func (reg *registry) daemon(ctx context.Context, args []string) error {
@@ -410,7 +410,7 @@ func (reg *registry) walker(
 	}
 
 	vpn.block.addressed = make(map[netip.Addr]*pem.Block)
-	vpn.block.labelled = make(map[label.Index]*pem.Block)
+	vpn.block.identified = make(map[int]*pem.Block)
 	vpn.block.named = make(map[string]*pem.Block)
 
 	afn := filepath.Join(name, vpnAdminsFileName)
@@ -514,7 +514,7 @@ func (vpn *regVpn) adminUnsubscribe(req *http.Request) error {
 }
 
 func (vpn *regVpn) checkin(w http.ResponseWriter, req *http.Request) error {
-	var lbl, via label.Label
+	var id, via box.Id
 	var addr netip.Addr
 	var svc string
 
@@ -536,15 +536,15 @@ func (vpn *regVpn) checkin(w http.ResponseWriter, req *http.Request) error {
 			var err error
 			via, err = vpn.exchange.Next()
 			if err == nil {
-				verbose.Println("new quest", name, "via",
-					via.Index())
+				verbose.Printf("new quest %s via %d",
+					name, IdIndex(via))
 				break
 			}
 			if try == 3 {
 				return fmt.Errorf("exchange %w", err)
 			}
-			verbose.Println("retry", name, "exchange assignment",
-				"in", period)
+			verbose.Printf("retry %s exchange assignment in %v",
+				name, period)
 			time.Sleep(period)
 		}
 	}
@@ -575,23 +575,23 @@ func (vpn *regVpn) checkin(w http.ResponseWriter, req *http.Request) error {
 			return fmt.Errorf("existing address header: %w", err)
 		}
 		entry.Headers["address"] = addr.String()
-		if lbl, err = labelHeader(entry); err != nil {
-			return fmt.Errorf("existing label header: %w", err)
+		if id, err = idHeader(entry); err != nil {
+			return fmt.Errorf("existing id header: %w", err)
 		}
-		lbl.Bump()
-		entry.Headers["label"] = lbl.String()
+		id = BumpIdVersion(id)
+		entry.Headers["id"] = fmt.Sprint(id)
 		if len(svc) > 0 {
-			err = vpn.exchange.Update(lbl)
+			err = vpn.exchange.Update(id)
 			if err != nil {
-				return fmt.Errorf("exchange label:", err)
+				return fmt.Errorf("exchange id:", err)
 			}
 			entry.Headers["service"] = svc
 		} else {
 			via, err = vpn.exchange.Next()
 			if err != nil {
-				return fmt.Errorf("exchange label:", err)
+				return fmt.Errorf("exchange id:", err)
 			}
-			entry.Headers["via"] = via.String()
+			entry.Headers["via"] = fmt.Sprint(via)
 		}
 	} else {
 		blk.Headers["name"] = name
@@ -600,25 +600,25 @@ func (vpn *regVpn) checkin(w http.ResponseWriter, req *http.Request) error {
 			return fmt.Errorf("address: %w", err)
 		}
 		blk.Headers["address"] = addr.String()
-		lbl = vpn.labels.New()
-		blk.Headers["label"] = lbl.String()
+		id = vpn.idbook.New()
+		blk.Headers["id"] = fmt.Sprint(id)
 		if len(svc) > 0 {
-			vpn.exchange.Append(lbl)
+			vpn.exchange.Append(id)
 			blk.Headers["service"] = svc
 		} else {
 			via, err = vpn.exchange.Next()
 			if err != nil {
-				return fmt.Errorf("exchange label:", err)
+				return fmt.Errorf("exchange id:", err)
 			}
-			blk.Headers["via"] = via.String()
+			blk.Headers["via"] = fmt.Sprint(via)
 		}
 
 		vpn.block.named[name] = blk
 		vpn.block.addressed[addr] = blk
-		vpn.block.labelled[lbl.Index()] = blk
+		vpn.block.identified[IdIndex(id)] = blk
 	}
 
-	fmt.Fprintln(w, "label:", lbl)
+	fmt.Fprintln(w, "id:", id)
 	fmt.Fprintln(w, "address:", addr)
 	fmt.Fprintln(w, "prefix:", vpn.prefix)
 	if len(svc) == 0 {
@@ -637,20 +637,20 @@ func (vpn *regVpn) checkout(w http.ResponseWriter, req *http.Request) error {
 		return egress.Mark(ErrNotFound)
 	}
 	delete(vpn.block.named, name)
-	lbl, err := egress.MarkResult(labelHeader(blk))
+	id, err := egress.MarkResult(idHeader(blk))
 	if err != nil {
 		return err
 	}
-	delete(vpn.block.labelled, lbl.Index())
+	delete(vpn.block.identified, IdIndex(id))
 	addr, err := egress.MarkResult(addressHeader(blk))
 	if err != nil {
 		return err
 	}
 	delete(vpn.block.addressed, addr)
 	if _, ok := blk.Headers["service"]; ok {
-		vpn.exchange.Remove(lbl)
+		vpn.exchange.Remove(id)
 	}
-	vpn.labels.Put(lbl)
+	vpn.idbook.Put(id)
 	return nil
 }
 
@@ -674,11 +674,11 @@ func (vpn *regVpn) showActive(w http.ResponseWriter) error {
 	vpn.mutex.RLock()
 	defer vpn.mutex.RUnlock()
 	for name, blk := range vpn.block.named {
-		lbl, err := labelHeader(blk)
+		id, err := idHeader(blk)
 		if err != nil {
 			continue
 		}
-		fmt.Fprintf(w, "%s (%d, %d", name, lbl.Index(), lbl.Version())
+		fmt.Fprintf(w, "%s (%d, %d", name, IdIndex(id), IdVersion(id))
 		addr, err := addressHeader(blk)
 		if err == nil {
 			fmt.Fprintf(w, ", %v", addr)
@@ -686,7 +686,7 @@ func (vpn *regVpn) showActive(w http.ResponseWriter) error {
 		fmt.Fprint(w, ")")
 		via, err := viaHeader(blk)
 		if err == nil {
-			fmt.Fprintf(w, " via %d", via.Index())
+			fmt.Fprintf(w, " via %d", IdIndex(via))
 		}
 		svc, err := serviceHeader(blk)
 		if err == nil {
@@ -725,12 +725,12 @@ func (vpn *regVpn) whois(w http.ResponseWriter, req *http.Request) error {
 	defer vpn.mutex.RUnlock()
 	if qv.Has("name") {
 		blk, ok = vpn.block.named[qv.Get("name")]
-	} else if qv.Has("label") {
-		lbl, err := egress.MarkResult(label.Parse(qv.Get("label")))
+	} else if qv.Has("id") {
+		id, err := egress.MarkResult(ParseId(qv.Get("id")))
 		if err != nil {
 			return err
 		}
-		blk, ok = vpn.block.labelled[lbl.Index()]
+		blk, ok = vpn.block.identified[IdIndex(id)]
 	} else if qv.Has("address") {
 		addr, err := egress.MarkResult(netip.
 			ParseAddr(qv.Get("address")))
@@ -739,7 +739,7 @@ func (vpn *regVpn) whois(w http.ResponseWriter, req *http.Request) error {
 		}
 		blk, ok = vpn.block.addressed[addr]
 	} else {
-		return errors.New("no <name>, <address> or <label>")
+		return errors.New("no <name>, <address> or <id>")
 	}
 	if blk == nil || !ok {
 		return ErrNotFound

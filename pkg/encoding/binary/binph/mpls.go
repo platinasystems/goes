@@ -5,6 +5,7 @@
 package binph
 
 import (
+	"io"
 	"unsafe"
 
 	"github.com/platinasystems/goes/v2/pkg/encoding/binary/binint"
@@ -13,18 +14,16 @@ import (
 // https://en.wikipedia.org/wiki/Multiprotocol_Label_Switching
 type MPLS uint32
 
-const SizeofMPLS = int(unsafe.Sizeof(MPLS(0)))
+const SizeofMPLS = int64(unsafe.Sizeof(MPLS(0)))
 
-func (v MPLS) AppendTo(data []byte) []byte {
-	return binint.AppendBig(data, v)
+func (p *MPLS) ReadFrom(r io.Reader) (int64, error) {
+	_, err := binint.BigEndianPointer(p).ReadFrom(r)
+	return SizeofMPLS, err
 }
 
-func (p *MPLS) PullFrom(data []byte) []byte {
-	if len(data) < SizeofMPLS {
-		return data
-	}
-	data = binint.PullBig(data, p)
-	return data
+func (v MPLS) WriteTo(w io.Writer) (int64, error) {
+	_, err := binint.BigEndianValue(v).WriteTo(w)
+	return SizeofMPLS, err
 }
 
 func (v MPLS) Label() uint32 { return uint32(v) >> (3 + 1 + 8) }

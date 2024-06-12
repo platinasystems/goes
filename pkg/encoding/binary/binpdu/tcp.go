@@ -5,6 +5,7 @@
 package binpdu
 
 import (
+	"bytes"
 	"fmt"
 
 	"github.com/platinasystems/goes/v2/pkg/encoding/binary/binph"
@@ -14,9 +15,10 @@ type TCP []byte
 
 func (pdu TCP) Format(w fmt.State, verb rune) {
 	var h binph.TCP
+	buf := bytes.NewBuffer(pdu)
 	fmt.Fprint(w, "tcp ")
-	if payload := h.PullFrom(pdu); len(payload) == len(pdu) {
-		fmt.Fprint(w, ErrUnderrun)
+	if _, err := h.ReadFrom(buf); err != nil {
+		fmt.Fprint(w, err)
 	} else {
 		fmt.Fprint(w, "port ", h.DP, " <- ", h.SP)
 	}

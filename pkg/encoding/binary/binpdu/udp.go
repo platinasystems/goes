@@ -5,6 +5,7 @@
 package binpdu
 
 import (
+	"bytes"
 	"fmt"
 
 	"github.com/platinasystems/goes/v2/pkg/encoding/binary/binph"
@@ -14,9 +15,10 @@ type UDP []byte
 
 func (pdu UDP) Format(w fmt.State, verb rune) {
 	var h binph.UDP
+	buf := bytes.NewBuffer(pdu)
 	fmt.Fprint(w, "udp ")
-	if payload := h.PullFrom(pdu); len(payload) == len(pdu) {
-		fmt.Fprint(w, ErrUnderrun)
+	if _, err := h.ReadFrom(buf); err != nil {
+		fmt.Fprint(w, err)
 	} else {
 		fmt.Fprint(w, "port ", h.DP, " <- ", h.SP)
 	}

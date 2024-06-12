@@ -5,6 +5,7 @@
 package binpdu
 
 import (
+	"bytes"
 	"fmt"
 
 	"github.com/platinasystems/goes/v2/pkg/encoding/binary/binph"
@@ -23,11 +24,12 @@ type TunPI []byte
 
 func (pdu TunPI) Format(w fmt.State, verb rune) {
 	var h binph.TunPI
+	buf := bytes.NewBuffer(pdu)
 	fmt.Fprint(w, "tun")
-	if payload := h.PullFrom(pdu); len(payload) == len(pdu) {
-		fmt.Fprint(w, ErrUnderrun)
+	if _, err := h.ReadFrom(buf); err != nil {
+		fmt.Fprint(w, err)
 	} else if f, ok := TunPIprotos[h.Proto]; ok {
-		fmt.Fprint(w, Mark, f(payload))
+		fmt.Fprint(w, Mark, f(buf.Bytes()))
 	} else {
 		fmt.Fprintf(w, " proto[%#x]", h.Proto)
 	}

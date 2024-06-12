@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	"github.com/platinasystems/goes/v2/pkg/errors/egress"
+	"github.com/platinasystems/goes/v2/pkg/os/program"
 	"github.com/platinasystems/goes/v2/pkg/os/termination"
 	"github.com/platinasystems/goes/v2/pkg/text/complete"
 )
@@ -85,6 +86,12 @@ func Main() {
 	maps.Copy(Root, IntegralCommands)
 	maps.Copy(RootDaemons(), IntegralDaemons)
 	maps.Copy(RootShows(), IntegralShow)
+	if program.IsKoApp() {
+		Root["start"] = RootDaemons()
+	} else {
+		maps.Copy(Root, IntegralLoggers)
+		Root["log-daemon"] = IntegralLogDaemon
+	}
 	Exec(context.Background(), Select, os.Args[1:])
 }
 
