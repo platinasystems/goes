@@ -2,10 +2,14 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
+// Vpn is a [goes] app providing [Daemons], utility [Commands], and information
+// [Shows] to implement and manage a secure, Virtual Private Network.
 package vpn
 
 import (
 	"context"
+	_ "embed"
+	"flag"
 	"fmt"
 	"io"
 	"log"
@@ -18,13 +22,12 @@ import (
 
 	"github.com/platinasystems/goes/v2/pkg/crypto/x509/x509certs"
 	"github.com/platinasystems/goes/v2/pkg/crypto/x509/x509keys"
+	"github.com/platinasystems/goes/v2/pkg/flag/flagset"
 	"github.com/platinasystems/goes/v2/pkg/goes"
 	"github.com/platinasystems/goes/v2/pkg/log/mute"
 	"github.com/platinasystems/goes/v2/pkg/os/program"
 	"github.com/platinasystems/goes/v2/pkg/text/complete"
 )
-
-const pathSeparatorString = string(filepath.Separator)
 
 const (
 	vpnAdminsFileName        = "vpn.admins"
@@ -38,32 +41,38 @@ const (
 	vpnSubscriptionsFileName = "vpn.subscriptions"
 )
 
-var (
-	Commands = map[string]any{
-		"approve":     httpAdmin,
-		"certify":     httpCertify,
-		"deny":        httpAdmin,
-		"disable":     httpAdmin,
-		"enable":      httpAdmin,
-		"generate":    generate,
-		"ping":        httpPing,
-		"subscribe":   httpSubscribe,
-		"unsubscribe": httpAdmin,
-	}
-	Daemons = map[string]any{
-		"exchange": new(exchange).daemon,
-		"guest":    new(guest).daemon,
-		"registry": new(registry).daemon,
-	}
-	Shows = map[string]any{
-		"active":      httpShow,
-		"admins":      httpShow,
-		"certificate": showCertificateFile,
-		"key":         showKeyFile,
-		"mirrors":     httpShow,
-		"pending":     httpShow,
-	}
-)
+var Commands = map[string]any{
+	"approve":     httpAdmin,
+	"certify":     httpCertify,
+	"deny":        httpAdmin,
+	"disable":     httpAdmin,
+	"enable":      httpAdmin,
+	"generate":    generate,
+	"ping":        httpPing,
+	"subscribe":   httpSubscribe,
+	"unsubscribe": httpAdmin,
+}
+
+var Daemons = map[string]any{
+	"exchange": Exchange,
+	"guest":    Guest,
+	"registry": Registry,
+}
+
+var DaemonHelp = map[string]any{
+	"exchange": ExchangeHelp,
+	"guest":    GuestHelp,
+	"registry": RegistryHelp,
+}
+
+var Shows = map[string]any{
+	"active":      httpShow,
+	"admins":      httpShow,
+	"certificate": showCertificateFile,
+	"key":         showKeyFile,
+	"mirrors":     httpShow,
+	"pending":     httpShow,
+}
 
 var errata = mute.Off(log.New(os.Stdout, "", log.Lshortfile))
 var verbose = mute.On(log.New(os.Stdout, "", log.Lshortfile))
@@ -104,30 +113,24 @@ func vpnCertsFile(subpath string) (*x509certs.File, error) {
 	return &x509certs.File{Path: state}, nil
 }
 
-func vpnDaemonFlags(
-	ctx context.Context, usage string, args []string,
-) (
-	netip.AddrPort, error,
-) {
-	flags := goes.ContextFlags(ctx)
-	qFlag := flags.Bool("q", false, "Silence most logs.")
-	vFlag := flags.Bool("v", false, "Log everything.")
+// DaemonFlags common to [Registry], [Exchange] and [Guest] daemons.
+//
+//	-q	Silence most logs.
+//
+//	-service <addr>:<port>	(default 0.0.0.0:8003)
+//		If the service <addr> is 0.0.0.0 or [::], this will lookup
+//		first ipv4 or ipv6 address of certificate's primary DNS name.
+//
+//	-v	Log everything.
+func DaemonFlags(ctx context.Context, args []string) (netip.AddrPort, error) {
+	qFlag := flag.Bool("q", false, "Silence most logs.")
+	vFlag := flag.Bool("v", false, "Log everything.")
 	svc := netip.AddrPortFrom(netip.IPv4Unspecified(), 8003)
-	flags.TextVar(&svc, "service", svc, `
-If <addr> of <addr>:<port> is 0.0.0.0 or [::],
-lookup first ipv4 or ipv6 address of certificate's
-primary DNS name.`[1:])
+	flag.TextVar(&svc, "service", svc, "<addr>:<port>")
 
-	ctx, err := goes.ParseFlagsContext(ctx, args)
+	err := flagset.SilentParse(flag.CommandLine, args)
 	if err != nil {
 		return svc, err
-	}
-	if goes.ContextHelp(ctx) {
-		branch := goes.ContextBranch(ctx)
-		if len(branch) > 1 && branch[1] == "daemon" {
-			branch[1] = "start"
-		}
-		return svc, goes.Usage(ctx, usage)
 	}
 
 	if *vFlag {
@@ -192,6 +195,7 @@ primary DNS name.`[1:])
 }
 
 func vpnName(dir string) string {
+	const pathSeparatorString = string(filepath.Separator)
 	name := strings.TrimPrefix(dir, program.ConfigHome())
 	return strings.TrimLeft(name, pathSeparatorString)
 }

@@ -6,7 +6,11 @@ package vpn
 
 import (
 	"context"
+	_ "embed"
 	"encoding/pem"
+	"errors"
+	"flag"
+	"fmt"
 	"net"
 	"net/netip"
 	"sync"
@@ -17,32 +21,47 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/goes"
 )
 
-type exchange struct {
-	client
-	pem struct {
-		addressed  map[netip.Addr]*pem.Block
-		identified map[int]*pem.Block
-	}
-	whoisResponseCh chan *pem.Block
-}
+//go:embed exchange.txt
+var ExchangeHelp string
 
-func (ex *exchange) daemon(ctx context.Context, args []string) error {
-	const usage = `
-usage: {{branch .}} [<options>] ` + vpnRegistrySyntax + `
-Start VPN packet exchange.
-{{flags .}}`
+// Exchange is a [goes] daemon that fowards [box.Box] encapulated packets
+// between VPN [Guest]'s.
+//
+// Usage:  goes start vpn exchange [flags] https://<registry>[:<port>][/<vpn>]
+//
+// Flags:
+//
+//	-q	Silence most logs.
+//
+//	-service <addr>:<port>	(default 0.0.0.0:8003)
+//		If <addr> is 0.0.0.0 or [::], this will lookup the first ipv4
+//		or ipv6 address of certificate's primary DNS name.
+//
+//	-v	Log everything.
+//
+// Prerequisite Configuration Files:
+//
+//   - [KeyFileName]
+//   - [CrtFileName]
+func Exchange(ctx context.Context, args []string) error {
 	var wg sync.WaitGroup
+	var ex exchange
 
 	if goes.ContextComplete(ctx) {
 		return nil
 	}
-	svc, err := vpnDaemonFlags(ctx, usage, args)
-	if err != nil {
-		return err
+	if goes.ContextHelp(ctx) {
+		fmt.Print(ExchangeHelp)
+		return nil
 	}
 
-	args = goes.ContextFlags(ctx).Args()
-	if len(args) < 1 {
+	svc, err := DaemonFlags(ctx, args)
+	if err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			fmt.Print(ExchangeHelp)
+		}
+		return err
+	} else if args = flag.Args(); len(args) < 1 {
 		return ErrIncomplete
 	}
 
@@ -63,7 +82,6 @@ Start VPN packet exchange.
 	iex, vex := IdIndex(ex.id), IdVersion(ex.id)
 
 	verbose.Printf("start (%d, %v)\n", iex, svc)
-	defer verbose.Println("foobar")
 	defer verbose.Printf("stopped (%d, %v) %v\n", iex, svc, err)
 	defer wg.Wait()
 	defer cancel()
@@ -185,6 +203,15 @@ pktRxLoop:
 		}
 	}
 	return nil
+}
+
+type exchange struct {
+	client
+	pem struct {
+		addressed  map[netip.Addr]*pem.Block
+		identified map[int]*pem.Block
+	}
+	whoisResponseCh chan *pem.Block
 }
 
 func (ex *exchange) rx(

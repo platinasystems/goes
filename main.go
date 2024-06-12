@@ -14,6 +14,8 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/net/vpn"
 )
 
+//go:generate go run ./tool/gendoctxt
+
 //go:embed LICENSE
 var license []byte
 

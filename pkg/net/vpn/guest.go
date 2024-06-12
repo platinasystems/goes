@@ -6,8 +6,10 @@ package vpn
 
 import (
 	"context"
+	_ "embed"
 	"encoding/pem"
 	"errors"
+	"flag"
 	"fmt"
 	"io"
 	"net"
@@ -27,27 +29,55 @@ import (
 	"golang.org/x/exp/maps"
 )
 
-type guest struct {
-	client
-}
+//go:embed guest.txt
+var GuestHelp string
 
-func (g *guest) daemon(ctx context.Context, args []string) error {
-	const usage = `
-usage: {{branch .}} [<options>] ` + vpnRegistrySyntax + `
-Start VPN tunnel.
-{{flags .}}`
+// Guest is a [goes] daemon that creates a tunnel interface then forwards
+// [bo.Box] encapsulated packets to a VPN [Exchange] assigned by the
+// [Registry].
+//
+// Usage: goes start vpn guest [flags] https://<registry>[:<port>][/<vpn>]
+//
+// Flags:
+//
+//	-q	Silence most logs.
+//
+//	-service <addr>:<port>	(default 0.0.0.0:8003)
+//		If <addr> is 0.0.0.0 or [::], this will lookup the first ipv4
+//		or ipv6 address of certificate's primary DNS name.
+//
+//	-u <number>		(default 0)
+//		Tunnel device name unit suffix.
+//
+//	-v	Log everything.
+//
+// Prerequisite Configuration Files:
+//
+//   - [KeyFileName]
+//   - [CrtFileName]
+//   - [PrefixFileName]
+//   - [HostFileName]
+func Guest(ctx context.Context, args []string) error {
 	var wg sync.WaitGroup
-
-	flags := goes.ContextFlags(ctx)
-	uFlag := flags.Uint("u", 0, "Unit number.")
+	var g guest
 
 	if goes.ContextComplete(ctx) {
 		return nil
 	}
-	svc, err := vpnDaemonFlags(ctx, usage, args)
+	if goes.ContextHelp(ctx) {
+		fmt.Print(GuestHelp)
+		return nil
+	}
+
+	uFlag := flag.Uint("u", 0, "Unit number.")
+
+	svc, err := DaemonFlags(ctx, args)
 	if err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			fmt.Print(GuestHelp)
+		}
 		return err
-	} else if args = flags.Args(); len(args) < 1 {
+	} else if args = flag.Args(); len(args) < 1 {
 		return ErrIncomplete
 	}
 
@@ -303,6 +333,10 @@ guestLoop:
 		}
 	}
 	return err
+}
+
+type guest struct {
+	client
 }
 
 func (*guest) toWhom(bx *box.Box) netip.Addr {

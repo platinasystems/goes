@@ -8,8 +8,10 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	_ "embed"
 	"encoding/pem"
 	"errors"
+	"flag"
 	"fmt"
 	"io"
 	"io/fs"
@@ -27,6 +29,109 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/goes"
 	"github.com/platinasystems/goes/v2/pkg/os/program"
 )
+
+//go:embed registry.txt
+var RegistryHelp string
+
+// Registry is a [goes] daemon that provides a [RESTful] API to a VPN's
+// ephemeral cipher key database and its persistent authentication
+// certificates.
+// Each VPN has one and only one active Registry that should use replicated
+// storage volumes for prerequisite configuration and dynamic state files.
+//
+// Usage: goes start vpn registry [flags]
+//
+// Flags:
+//
+//	-q	Silence most logs.
+//
+//	-service <addr>:<port> (default 0.0.0.0:8003)
+//		If <addr> is 0.0.0.0 or [::], this will lookup the first ipv4
+//		or ipv6 address of certificate's primary DNS name.
+//
+//	-v	Log everything.
+//
+// Prerequisite Configuration Files:
+//
+//   - [KeyFileName]
+//   - [CrtFileName]
+//   - [PrefixFileName]
+//   - [HostFileName]
+//
+// [RESTful]: https://en.wikipedia.org/wiki/REST
+func Registry(ctx context.Context, args []string) error {
+	var wg sync.WaitGroup
+	var reg registry
+
+	if goes.ContextComplete(ctx) {
+		return nil
+	}
+	if goes.ContextHelp(ctx) {
+		fmt.Print(RegistryHelp)
+		return nil
+	}
+
+	svc, err := DaemonFlags(ctx, args)
+	if err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			fmt.Print(RegistryHelp)
+		}
+		return err
+	}
+
+	cctx, cancel := context.WithCancel(ctx)
+
+	verbose.Println("start", svc)
+	defer verbose.Println("stopped", svc)
+	defer wg.Wait()
+	defer cancel()
+	defer verbose.Println("stopping", svc, "...")
+
+	c, err := vpnCrtFile()
+	if err != nil {
+		return err
+	}
+	k, err := vpnKeyFile()
+	if err != nil {
+		return err
+	}
+
+	// reg.subjectCommonName = first.Subject.CommonName
+
+	reg.vpn = make(map[string]*regVpn)
+
+	reg.http = &http.Server{
+		Addr:    svc.String(),
+		Handler: &reg,
+		TLSConfig: &tls.Config{
+			ClientAuth: tls.RequireAnyClientCert,
+		},
+		BaseContext: func(net.Listener) context.Context {
+			return cctx
+		},
+	}
+
+	err = filepath.WalkDir(program.ConfigHome(),
+		func(path string, de fs.DirEntry, err error) error {
+			return reg.walker(ctx, path, de, err)
+		})
+	if err != nil {
+		return err
+	}
+
+	wg.Add(1)
+	go reg.shutdown(cctx, &wg)
+
+	verbose.Print("start ", reg.http.Addr)
+	defer verbose.Print("stopped ", reg.http.Addr)
+
+	err = reg.http.ListenAndServeTLS(c.Path, k.Path)
+	cancel()
+	if errors.Is(err, http.ErrServerClosed) {
+		err = nil
+	}
+	return err
+}
 
 type registry struct {
 	mutex sync.RWMutex
@@ -55,70 +160,6 @@ type regVpn struct {
 	idbook IdBook
 
 	exchange IdRing
-}
-
-func (reg *registry) daemon(ctx context.Context, args []string) error {
-	const usage = `
-usage: {{branch .}} [<options>]
-Run VPN key service.
-{{flags .}}`
-
-	if goes.ContextComplete(ctx) {
-		return nil
-	}
-	svc, err := vpnDaemonFlags(ctx, usage, args)
-	if err != nil {
-		return err
-	}
-
-	defer reg.wg.Wait()
-
-	c, err := vpnCrtFile()
-	if err != nil {
-		return err
-	}
-	k, err := vpnKeyFile()
-	if err != nil {
-		return err
-	}
-
-	// reg.subjectCommonName = first.Subject.CommonName
-
-	reg.vpn = make(map[string]*regVpn)
-	cctx, cancel := context.WithCancel(ctx)
-
-	reg.http = &http.Server{
-		Addr:    svc.String(),
-		Handler: reg,
-		TLSConfig: &tls.Config{
-			ClientAuth: tls.RequireAnyClientCert,
-		},
-		BaseContext: func(net.Listener) context.Context {
-			return cctx
-		},
-	}
-
-	err = filepath.WalkDir(program.ConfigHome(),
-		func(path string, de fs.DirEntry, err error) error {
-			return reg.walker(ctx, path, de, err)
-		})
-	if err != nil {
-		cancel()
-		return err
-	}
-
-	reg.wg.Add(1)
-	go reg.shutdown(cctx)
-
-	verbose.Print("start ", reg.http.Addr)
-	defer verbose.Print("stopped ", reg.http.Addr)
-
-	err = reg.http.ListenAndServeTLS(c.Path, k.Path)
-	cancel()
-	if errors.Is(err, http.ErrServerClosed) {
-		err = nil
-	}
-	return err
 }
 
 func (reg *registry) vpnNamed(name string) *regVpn {
@@ -364,8 +405,8 @@ func (reg *registry) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func (reg *registry) shutdown(ctx context.Context) {
-	defer reg.wg.Done()
+func (reg *registry) shutdown(ctx context.Context, wg *sync.WaitGroup) {
+	defer wg.Done()
 	<-ctx.Done()
 	cctx, cancel := context.
 		WithTimeout(context.Background(), 3*time.Second)
