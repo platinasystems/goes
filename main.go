@@ -1,4 +1,4 @@
-// Copyright © 2022-2023 Platina Systems, Inc. All rights reserved.
+// Copyright © 2022-2024 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -6,32 +6,43 @@ package main
 
 import (
 	_ "embed"
-	"maps"
 
-	"github.com/platinasystems/goes/v2/pkg/coreutils"
+	core_util "github.com/platinasystems/goes/v2/pkg/core-util"
 	"github.com/platinasystems/goes/v2/pkg/goes"
-	net_tools "github.com/platinasystems/goes/v2/pkg/net/net-tools"
-	"github.com/platinasystems/goes/v2/pkg/net/vpn"
+	goes_util "github.com/platinasystems/goes/v2/pkg/goes-util"
+	net_tool "github.com/platinasystems/goes/v2/pkg/net-tool"
+	"github.com/platinasystems/goes/v2/pkg/vpn"
 )
 
-//go:generate go run ./tool/gendoctxt
-
 //go:embed LICENSE
-var license []byte
+var license string
 
 //go:embed PATENTS
-var patents []byte
+var patents string
 
-func main() {
-	maps.Copy(goes.RootShows(), map[string]any{
-		"license": license,
-		"patents": patents,
-	})
-	maps.Copy(goes.Root, coreutils.Root)
-	maps.Copy(goes.Root, net_tools.Root)
-	maps.Copy(goes.RootDaemons(), net_tools.Daemons)
-	goes.Root["vpn"] = vpn.Commands
-	goes.RootDaemons()["vpn"] = vpn.Daemons
-	goes.RootShows()["vpn"] = vpn.Shows
-	goes.Main()
+//go:embed completion.bash
+var bash string
+
+//go:embed completion.zsh
+var zsh string
+
+var features = []map[string]any{
+	map[string]any{
+		"show": map[string]any{
+			"completion": map[string]any{
+				"bash": bash,
+				"zsh":  zsh,
+			},
+			"license": license,
+			"patents": patents,
+		},
+	},
+	goes_util.Features,
+	core_util.Features,
+	net_tool.Features,
+	vpn.Features,
 }
+
+func init() { goes.Install(features...) }
+
+func main() { goes.Main() }

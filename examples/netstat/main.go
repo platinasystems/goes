@@ -6,13 +6,14 @@
 package main
 
 import (
-	"context"
-	"os"
-
 	"github.com/platinasystems/goes/v2/pkg/goes"
-	net_tools "github.com/platinasystems/goes/v2/pkg/net/net-tools"
+	"github.com/platinasystems/goes/v2/pkg/net-tool/netstat"
 )
 
-func main() {
-	goes.Exec(context.Background(), net_tools.Netstat, os.Args[1:])
+var features = map[string]any{
+	"netstat": netstat.Feature,
 }
+
+func init() { goes.Install(features) }
+
+func main() { goes.Main() }

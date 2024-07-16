@@ -2,124 +2,202 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
+// Package goes provides a GO-Embedded-System where the importing main program
+// [xmaps.Install] [Features] before calling [Exec], e.g.
+//
+//	var features = []map[string]any{
+//		goes_util.Features,
+//		core_util.Features,
+//		net_tool.Features,
+//		...
+//	}
+//
+//	func init() { goes.Install(features...)	}
+//
+//	main() { goes.Main() }
+//
+// [Features] may be explict functions or implied by type:
+//
+//	error	Return.
+//
+//	map[string]any
+//		Select sub-feature with next argument(s).
+//
+//	func(ctx context.Context, args []string) error
+//		Explicit function.
+//
+//	func(ctx context.Context, complete bool, args []string) error
+//		Explicit function thet prints last argument completion when
+//		flagged.
+//
+//	func() (any, error)
+//		Imply [PrintResults].
+//
+// Otherwise, imply [PrintOrScanObject].
+//
+// Goes has these intrinsic features:
+//
+//	complete [feature [args]]
+//		Print prefix match of last argument.
+//
+//	help [feature [args]]
+//		Print feature usage.
 package goes
 
 import (
 	"context"
-	"embed"
+	"errors"
+	"flag"
 	"fmt"
-	"io"
-	"maps"
 	"os"
+	"os/exec"
 	"os/signal"
+	"path/filepath"
+	"sort"
 	"strings"
 
-	"github.com/platinasystems/goes/v2/pkg/errors/egress"
-	"github.com/platinasystems/goes/v2/pkg/os/program"
-	"github.com/platinasystems/goes/v2/pkg/os/termination"
-	"github.com/platinasystems/goes/v2/pkg/text/complete"
+	"github.com/platinasystems/goes/v2/pkg/xerrors"
+	"github.com/platinasystems/goes/v2/pkg/xmaps"
+	"github.com/platinasystems/goes/v2/pkg/xos"
+	"github.com/platinasystems/goes/v2/pkg/xslices"
+	"github.com/platinasystems/goes/v2/pkg/xutf8"
 )
 
-func Do(ctx context.Context, subsys any, args []string) error {
-	switch t := subsys.(type) {
-	case error:
-		return t
-	case map[string]any:
-		return Select(RootContext(ctx, t), args)
-	case func(context.Context, []string) error:
-		return t(ctx, args)
-	case embed.FS:
-		return ImplicitPrintEmbedFS(ctx, t, args)
-	case []byte:
-		return ImplicitPrintOrReadBytes(ctx, t, args)
-	case string:
-		return ImplicitPrintString(ctx, t, args)
-	case fmt.Stringer:
-		return ImplicitPrintStringer(ctx, t, args)
-	case func() ([]byte, error):
-		return ImplicitPrintBytesResult(ctx, t, args)
-	case func() string:
-		return ImplicitPrintStringResult(ctx, t, args)
-	case JSONer:
-		return ImplicitPrintOrUnmarshalJSON(ctx, t, args)
-	case Texter:
-		return ImplicitPrintOrUnmarshalText(ctx, t, args)
-	default:
-		return ImplicitPrintOrScanObject(ctx, subsys, args)
-	}
+type Preemption uint8
+
+const (
+	None Preemption = iota
+	Complete
+	Help
+)
+
+var Features = make(map[string]any)
+
+func Install(features ...map[string]any) {
+	xmaps.Install(Features, features...)
 }
 
-// Execute subsystem with an interruptible context.
-func Exec(ctx context.Context, subsys any, args []string) {
-	ctx, stop := signal.NotifyContext(ctx, termination.Signals...)
+// Perform feature in an interruptible context.
+//
+// Precedence: [os.Args][0], [filepath.Base](os.Args[0]), os.Args[1]
+func Main() {
+	var err error
+
+	defer func() {
+		if err == nil || errors.Is(err, flag.ErrHelp) {
+			return
+		}
+		ecode := 1
+		if ee, ok := err.(*exec.ExitError); ok {
+			ecode = ee.ExitCode()
+			if len(ee.Stderr) == 0 {
+				err = nil
+			} else {
+				err = errors.New(string(ee.Stderr))
+			}
+		}
+		fields := strings.Fields(flag.CommandLine.Name())
+		err = xerrors.Label(err, fields...)
+		if err != nil {
+			os.Stderr.WriteString(xutf8.AlineString(err.Error()))
+		}
+		if ecode != 0 {
+			os.Exit(ecode)
+		}
+	}()
+
+	prog := filepath.Base(os.Args[0])
+	args := os.Args[1:]
+
+	Features["complete"] = IntrinsicComplete
+	Features["help"] = IntrinsicHelp
+
+	ctx := context.Background()
+	ctx, stop := signal.NotifyContext(ctx, xos.Termination...)
 	defer stop()
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	err := Do(ctx, subsys, args)
-	if err == nil {
-		return
-	}
-	if IsUsage(err) {
-		FprintErr(os.Stdout, err)
-		return
-	}
-	if !IsMarked(err) && !egress.IsMarked(err) {
-		err = Mark(ctx, err)
-	}
-	FprintErr(os.Stderr, err)
-	os.Exit(1)
-}
-
-func FprintErr(w io.Writer, err error) {
-	const nl = "\n"
-	es := err.Error()
-	if !strings.HasSuffix(es, nl) {
-		es += nl
-	}
-	w.Write([]byte(es))
-}
-
-// Merge IntegralCommands into Root then Exec Select of Root with args.
-func Main() {
-	maps.Copy(Root, IntegralCommands)
-	maps.Copy(RootDaemons(), IntegralDaemons)
-	maps.Copy(RootShows(), IntegralShow)
-	if program.IsKoApp() {
-		Root["start"] = RootDaemons()
-	} else {
-		maps.Copy(Root, IntegralLoggers)
-		Root["log-daemon"] = IntegralLogDaemon
-	}
-	Exec(context.Background(), Select, os.Args[1:])
-}
-
-// Select subsystem from args.
-func Select(ctx context.Context, args []string) (err error) {
-	root := ContextRoot(ctx)
-	if len(root) == 0 {
-		err = ErrEmpty
+	flag.CommandLine.Init(prog, flag.ContinueOnError)
+	v, ok := Features[os.Args[0]]
+	if ok {
+		flag.CommandLine.Init(os.Args[0], flag.ContinueOnError)
+	} else if v, ok = Features[prog]; ok {
 	} else if len(args) == 0 {
-		if ContextComplete(ctx) {
-			err = complete.Last(args, root)
-		} else {
-			err = IntegralHelp(ctx, args)
-		}
-	} else if v, ok := root[args[0]]; ok {
-		ctx = AppendBranchContext(ctx, args[0])
-		err = Do(ctx, v, args[1:])
-	} else if len(args) == 1 && ContextComplete(ctx) {
-		err = complete.Last(args, root)
-	} else if len(ContextBranch(ctx)) == 1 {
-		err = IntegralCommand(ctx, args)
+		v = IntrinsicHelp
 	} else {
-		ctx = AppendBranchContext(ctx, args[0])
-		err = ErrNotFound
+		v = Features
 	}
-	if err != nil && !IsMarked(err) && !IsUsage(err) &&
-		!egress.IsMarked(err) {
-		err = Mark(ctx, err)
+
+	err = Do(ctx, None, v, args)
+}
+
+func Do(
+	ctx context.Context,
+	preempt Preemption,
+	feature any,
+	args []string,
+) error {
+	switch t := feature.(type) {
+	case func(context.Context, []string) error:
+		switch preempt {
+		case None:
+			return t(ctx, args)
+		case Complete:
+			return nil
+		case Help:
+			return t(ctx, xslices.Prepend(args, "-h"))
+		}
+	case func(context.Context, bool, []string) error:
+		switch preempt {
+		case None:
+			return t(ctx, false, args)
+		case Complete:
+			return t(ctx, true, args)
+		case Help:
+			return t(ctx, false, xslices.Prepend(args, "-h"))
+		}
+	case error:
+		switch preempt {
+		case None:
+			return t
+		case Complete:
+			return nil
+		case Help:
+			return t
+			flag.CommandLine.Usage()
+		}
+	case map[string]any:
+		return ImpliedSelect(ctx, preempt, t, args)
+	case func() (any, error):
+		switch preempt {
+		case None:
+			return ImpliedPrintResults(ctx, t, args)
+		case Complete:
+			return nil
+		case Help:
+			return ImpliedPrintResults(ctx, t,
+				xslices.Prepend(args, "-h"))
+		}
+	default:
+		switch preempt {
+		case None:
+			return ImpliedPrintOrScanObject(ctx, false, t, args)
+		case Complete:
+			return ImpliedPrintOrScanObject(ctx, true, t, args)
+		case Help:
+			return ImpliedPrintOrScanObject(ctx, false, t,
+				xslices.Prepend(args, "-h"))
+		}
 	}
-	return
+	return nil
+}
+
+func PrintMatchingKeys(m map[string]any, prefixes ...string) {
+	keys := xmaps.Match(m, strings.HasPrefix, prefixes...)
+	sort.Strings(keys)
+	for _, k := range keys {
+		fmt.Println(k)
+	}
 }

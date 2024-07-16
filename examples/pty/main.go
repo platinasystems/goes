@@ -1,4 +1,4 @@
-// Copyright © 2022 Platina Systems, Inc. All rights reserved.
+// Copyright © 2022-2024 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -14,19 +14,19 @@ import (
 	"syscall"
 
 	"github.com/creack/pty"
-	"github.com/platinasystems/goes/v2/pkg/context/rawtty"
-	"github.com/platinasystems/goes/v2/pkg/errors/egress"
-	"github.com/platinasystems/goes/v2/pkg/os/termination"
+	"github.com/platinasystems/goes/v2/pkg/xcontext"
+	"github.com/platinasystems/goes/v2/pkg/xerrors"
+	"github.com/platinasystems/goes/v2/pkg/xos"
 )
 
 func main() {
 	suppressed := []error{io.EOF, context.Canceled}
 	ctx, stop := signal.NotifyContext(context.Background(),
-		termination.Signals...)
+		xos.Termination...)
 	defer stop()
-	tty, err := rawtty.With(ctx)
+	tty, err := xcontext.WithRawTTY(ctx)
 	if err != nil {
-		if err = egress.Suppress(err, suppressed...); err != nil {
+		if err = xerrors.Suppress(err, suppressed...); err != nil {
 			log.Print(err)
 		}
 		return
@@ -37,7 +37,7 @@ func main() {
 
 	ptmx, err := pty.Start(c)
 	if err != nil {
-		if err = egress.Suppress(err, suppressed...); err != nil {
+		if err = xerrors.Suppress(err, suppressed...); err != nil {
 			log.Print(err)
 		}
 		return
@@ -61,12 +61,12 @@ func main() {
 
 	go func() {
 		_, err := io.Copy(ptmx, tty)
-		if err = egress.Suppress(err, suppressed...); err != nil {
+		if err = xerrors.Suppress(err, suppressed...); err != nil {
 			log.Print(err)
 		}
 	}()
 	_, err = io.Copy(tty, ptmx)
-	if err = egress.Suppress(err, suppressed...); err != nil {
+	if err = xerrors.Suppress(err, suppressed...); err != nil {
 		log.Print(err)
 	}
 }

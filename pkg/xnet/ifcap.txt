@@ -1,0 +1,15 @@
+rxcsum
+txcsum
+vlan_mtu
+vlan_hwtagging
+jumbo_mtu
+tso4
+tso6
+lro
+av
+txstatus
+skywalk
+hw_timestamp
+sw_timestamp
+csum_partial
+csum_zero_invert

@@ -1,4 +1,4 @@
-// Copyright © 2022-2023 Platina Systems, Inc. All rights reserved.
+// Copyright © 2022-2024 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -10,15 +10,15 @@ import (
 	"io"
 	"os/signal"
 
-	"github.com/platinasystems/goes/v2/pkg/context/rawtty"
-	"github.com/platinasystems/goes/v2/pkg/os/termination"
+	"github.com/platinasystems/goes/v2/pkg/xcontext"
+	"github.com/platinasystems/goes/v2/pkg/xos"
 )
 
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(),
-		termination.Signals...)
+		xos.Termination...)
 	defer stop()
-	tty, err := rawtty.With(ctx)
+	tty, err := xcontext.WithRawTTY(ctx)
 	if err != nil {
 		if err != io.EOF {
 			panic(err)
