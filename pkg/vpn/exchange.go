@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/pem"
 	"flag"
+	"fmt"
 	"net"
 	"net/netip"
 	"sync"
@@ -15,7 +16,6 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/box"
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xflag"
-	"github.com/platinasystems/goes/v2/pkg/xlog"
 	"github.com/platinasystems/goes/v2/pkg/xnet/netph"
 )
 
@@ -23,36 +23,21 @@ func exchangeDaemon(ctx context.Context, args []string) error {
 	var wg sync.WaitGroup
 	var ex exchange
 
-	svc := netip.AddrPortFrom(netip.IPv4Unspecified(), 8003)
-
 	xflag.UsageTemplate(flag.CommandLine, `
 usage: {{.Name}} [flags] `+RegistryURL+`
+Exchange ciphered packets between guests.
 
 {{flags .}}`)
 
-	qFlag := flag.Bool("q", false, "Quiet logging.")
-	vFlag := flag.Bool("v", false, "Verbose logging.")
-	flag.TextVar(&svc, "service", svc, "<addr>:<port>")
+	opts.svc = DefaultService()
 
-	err := flag.CommandLine.Parse(args)
+	err := parseOpts(ctx, args)
 	if err != nil {
 		return err
 	} else if args = flag.Args(); len(args) == 0 {
 		return xerrors.Incomplete("registry")
 	}
 	reg := args[0]
-
-	if *qFlag {
-		errata = xlog.Mute(errata)
-	} else if *vFlag {
-		verbose = xlog.Unmute(verbose)
-	}
-
-	if svc.Addr().IsUnspecified() {
-		if svc, err = crtsvc(ctx, svc); err != nil {
-			return xerrors.Label(err, "service")
-		}
-	}
 
 	ex.pem.addressed = make(map[netip.Addr]*pem.Block)
 	ex.pem.identified = make(map[int]*pem.Block)
@@ -62,7 +47,7 @@ usage: {{.Name}} [flags] `+RegistryURL+`
 
 	ex.whoisResponseCh = make(chan *pem.Block)
 
-	if err = ex.register(ctx, reg, svc); err != nil {
+	if err = ex.register(ctx, reg, opts.svc); err != nil {
 		return err
 	}
 
@@ -70,15 +55,16 @@ usage: {{.Name}} [flags] `+RegistryURL+`
 
 	iex, vex := IdIndex(ex.id), IdVersion(ex.id)
 
-	verbose.Printf("start (%d, %v)\n", iex, svc)
-	defer verbose.Printf("stopped (%d, %v) %v\n", iex, svc, err)
+	id := fmt.Sprintf("(%d, %v)", iex, opts.svc)
+	verbose.Println("start", id)
+	defer verbose.Println("stopped", id, err)
 	defer wg.Wait()
 	defer cancel()
-	defer verbose.Printf("stopping (%d, %v) ...\n", iex, svc)
+	defer verbose.Println("stopping", id, "...")
 
 	udp, err := xerrors.MarkResult(net.ListenUDP("udp", &net.UDPAddr{
-		IP:   svc.Addr().AsSlice(),
-		Port: int(svc.Port()),
+		IP:   opts.svc.Addr().AsSlice(),
+		Port: int(opts.svc.Port()),
 		// Zone: FIXME,
 	}))
 	if err != nil {

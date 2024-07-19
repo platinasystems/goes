@@ -22,7 +22,6 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/nettun"
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xflag"
-	"github.com/platinasystems/goes/v2/pkg/xlog"
 	"github.com/platinasystems/goes/v2/pkg/xnet"
 	"github.com/platinasystems/goes/v2/pkg/xnet/netpdu"
 	"github.com/platinasystems/goes/v2/pkg/xnet/netph"
@@ -33,37 +32,23 @@ func guestDaemon(ctx context.Context, args []string) error {
 	var wg sync.WaitGroup
 	var g guest
 
-	svc := netip.AddrPortFrom(netip.IPv4Unspecified(), 8003)
-
 	xflag.UsageTemplate(flag.CommandLine, `
 usage: {{.Name}} [flags] `+RegistryURL+`
+Create VPN tunnel.
 
 {{flags .}}`)
 
-	qFlag := flag.Bool("q", false, "Quiet logging.")
-	vFlag := flag.Bool("v", false, "Verbose logging.")
-	uFlag := flag.Uint("u", 0, "Unit number.")
-	flag.TextVar(&svc, "service", svc, "<addr>:<port>")
+	opts.svc = DefaultService()
 
-	err := flag.CommandLine.Parse(args)
+	unit := flag.Uint("u", 0, "Unit number.")
+
+	err := parseOpts(ctx, args)
 	if err != nil {
 		return err
 	} else if args = flag.Args(); len(args) == 0 {
 		return xerrors.Incomplete("registry")
 	}
 	reg := args[0]
-
-	if *qFlag {
-		errata = xlog.Mute(errata)
-	} else if *vFlag {
-		verbose = xlog.Unmute(verbose)
-	}
-
-	if svc.Addr().IsUnspecified() {
-		if svc, err = crtsvc(ctx, svc); err != nil {
-			return xerrors.Label(err, "service")
-		}
-	}
 
 	if err = g.register(ctx, reg); err != nil {
 		return err
@@ -72,15 +57,16 @@ usage: {{.Name}} [flags] `+RegistryURL+`
 	cctx, cancel := context.WithCancel(ctx)
 
 	iguest := IdIndex(g.id)
-	verbose.Printf("start (%d, %v)", iguest, svc)
-	defer verbose.Printf("stopped (%d, %v) %v", iguest, svc, err)
+	id := fmt.Sprintf("(%d, %v)", iguest, opts.svc)
+	verbose.Println("start)", id)
+	defer verbose.Println("stopped", id, err)
 	defer wg.Wait()
 	defer cancel()
-	defer verbose.Printf("stopping (%d, %v)", iguest, svc)
+	defer verbose.Println("stopping", id, "...")
 
 	udp, err := xerrors.MarkResult(net.ListenUDP("udp", &net.UDPAddr{
-		IP:   svc.Addr().AsSlice(),
-		Port: int(svc.Port()),
+		IP:   opts.svc.Addr().AsSlice(),
+		Port: int(opts.svc.Port()),
 		// Zone: FIXME,
 	}))
 	if err != nil {
@@ -114,7 +100,7 @@ usage: {{.Name}} [flags] `+RegistryURL+`
 		group   = -1
 	)
 	tun, err := xerrors.MarkResult(nettun.
-		New(*uFlag, istap, persist, owner, group, ha))
+		New(*unit, istap, persist, owner, group, ha))
 	if err != nil {
 		return err
 	}

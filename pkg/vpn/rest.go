@@ -20,7 +20,6 @@ import (
 	"net/netip"
 	"net/url"
 	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -29,7 +28,6 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/x509certs"
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xflag"
-	"github.com/platinasystems/goes/v2/pkg/xos"
 )
 
 const contextApplicationPKCS8 = "application/pkcs8"
@@ -107,10 +105,11 @@ func rest(req *http.Request) (*http.Response, error) {
 
 func restAdmin(ctx context.Context, args []string) error {
 	xflag.UsageTemplate(flag.CommandLine, `
-usage: {{.Name}} `+RegistryURL+` <subscriber>
+usage: {{.Name}} [flags] `+RegistryURL+` <subscriber>
 RESTful registry administration.
-`)
-	err := flag.CommandLine.Parse(args)
+
+{{flags .}}`)
+	err := parseOpts(ctx, args)
 	if err != nil {
 		return err
 	} else if args = flag.Args(); len(args) == 0 {
@@ -153,13 +152,11 @@ RESTful registry administration.
 
 func restCertify(ctx context.Context, args []string) error {
 	xflag.UsageTemplate(flag.CommandLine, `
-usage: {{.Name}} `+RegistryURL+`
-Add registry to {{subscriptions}}.
-`)
-	xflag.UsageFuncs["subscriptions"] = func() string {
-		return filepath.Join(xos.ConfigHome(), SubscriptionsFileName)
-	}
-	err := flag.CommandLine.Parse(args)
+usage: {{.Name}} [flags] `+RegistryURL+`
+Add registry to subscriptions.
+
+{{flags .}}`)
+	err := parseOpts(ctx, args)
 	if err != nil {
 		return err
 	} else if args = flag.Args(); len(args) == 0 {
@@ -307,10 +304,11 @@ func httpCheckin(
 
 func restPing(ctx context.Context, args []string) error {
 	xflag.UsageTemplate(flag.CommandLine, `
-usage: {{.Name}} `+RegistryURL+`
+usage: {{.Name}} [flags] `+RegistryURL+`
 RESTful ping registry.
-`)
-	err := flag.CommandLine.Parse(args)
+
+{{flags .}}`)
+	err := parseOpts(ctx, args)
 	if err != nil {
 		return err
 	} else if args = flag.Args(); len(args) == 0 {
@@ -340,10 +338,11 @@ RESTful ping registry.
 
 func restShow(ctx context.Context, args []string) error {
 	xflag.UsageTemplate(flag.CommandLine, `
-usage: {{.Name}} `+RegistryURL+`
+usage: {{.Name}} [flags] `+RegistryURL+`
 RESTful query and print registry object.
-`)
-	err := flag.CommandLine.Parse(args)
+
+{{flags .}}`)
+	err := parseOpts(ctx, args)
 	if err != nil {
 		return err
 	} else if args = flag.Args(); len(args) == 0 {
@@ -380,10 +379,11 @@ RESTful query and print registry object.
 
 func restSubscribe(ctx context.Context, args []string) error {
 	xflag.UsageTemplate(flag.CommandLine, `
-usage: {{.Name}} `+RegistryURL+`
+usage: {{.Name}} [flags] `+RegistryURL+`
 RESTful subscribe to VPN.
-`)
-	err := flag.CommandLine.Parse(args)
+
+{{flags .}}`)
+	err := parseOpts(ctx, args)
 	if err != nil {
 		return err
 	} else if args = flag.Args(); len(args) == 0 {

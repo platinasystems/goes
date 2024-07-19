@@ -2,12 +2,15 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-// Vpn is a [goes] app providing [Daemons], utility [Commands], and information
-// [Shows] to implement and manage a secure, Virtual Private Network.
+// Vpn is a [goes] app providing daemons and utilities to implement and manage
+// a secure, Virtual Private Network.
+//
+// [goes]: github.com/platinasystems/goes/v2/pkg/goes
 package vpn
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"log"
 	"net/netip"
@@ -25,23 +28,19 @@ import (
 )
 
 const (
-	AdminsFileName        = "vpn.admins"
-	CrtFileName           = "vpn.crt"
-	HostsFileName         = "vpn.hosts"
-	KeyFileName           = ".vpn.key"
-	PrefixFileName        = "vpn.prefix"
-	SubscribersFileName   = "vpn.subscribers"
-	SubscriptionsFileName = "vpn.subscriptions"
+	AdminsFileName      = "vpn.admins"
+	HostsFileName       = "vpn.hosts"
+	PrefixFileName      = "vpn.prefix"
+	SubscribersFileName = "vpn.subscribers"
 )
 
 const RegistryURL = "https://<regisitry>[:<port>][/<vpn>]"
 
-const ServiceUsage = `
-Service:
+const DefaultPort = 8003
 
-  If the “-service” <addr> is 0.0.0.0 or [::], the daemons use the first
-  ip address of certificate's primary DNS name.
-`
+var DefaultService = func() netip.AddrPort {
+	return netip.AddrPortFrom(netip.IPv4Unspecified(), DefaultPort)
+}
 
 var Features = map[string]any{
 	"generate": map[string]any{
@@ -75,12 +74,53 @@ var Features = map[string]any{
 var errata = xlog.Unmute(log.New(os.Stdout, "", log.Lshortfile))
 var verbose = xlog.Mute(log.New(os.Stdout, "", log.Lshortfile))
 
+var opts struct {
+	crt,
+	key,
+	subscriptions *string
+	svc netip.AddrPort
+}
+
+func parseOpts(ctx context.Context, args []string) error {
+	q := flag.Bool("q", false,
+		"Quiet logging.")
+	v := flag.Bool("v", false,
+		"Verbose logging.")
+	opts.crt = flag.String("certificate",
+		filepath.Join(xos.ConfigHome(), "vpn.crt"),
+		"File name.")
+	opts.key = flag.String("key",
+		filepath.Join(xos.ConfigHome(), ".vpn.key"),
+		"File name.")
+	opts.subscriptions = flag.String("subscriptions",
+		filepath.Join(xos.StateHome(), "vpn.subscriptions"),
+		"File name.")
+	if opts.svc.IsValid() {
+		flag.TextVar(&opts.svc, "service", opts.svc, `<addr>:<port>
+If <addr> is 0.0.0.0 or [::], use the first ip address of
+the certificate's primary DNS name.`)
+	}
+	err := flag.CommandLine.Parse(args)
+	if err == nil {
+		if *q {
+			errata = xlog.Mute(errata)
+		} else if *v {
+			verbose = xlog.Unmute(verbose)
+		}
+		if opts.svc.Addr().IsUnspecified() {
+			err = crtsvc(ctx)
+		}
+	}
+	return err
+
+}
+
 var crtFile = sync.OnceValues(func() (*x509certs.File, error) {
 	return x509certs.NewFile(crtPath())
 })
 
 var crtPath = sync.OnceValue(func() string {
-	return filepath.Join(xos.ConfigHome(), CrtFileName)
+	return filepath.Join(xos.ConfigHome(), "vpn.crt")
 })
 
 var keyFile = sync.OnceValues(func() (*x509keys.File, error) {
@@ -88,11 +128,11 @@ var keyFile = sync.OnceValues(func() (*x509keys.File, error) {
 })
 
 var keyPath = sync.OnceValue(func() string {
-	return filepath.Join(xos.ConfigHome(), KeyFileName)
+	return filepath.Join(xos.ConfigHome(), ".vpn.key")
 })
 
 var subscriptionsFile = sync.OnceValues(func() (*x509certs.File, error) {
-	return certsFile(SubscriptionsFileName)
+	return certsFile("vpn.subscriptions")
 })
 
 func certsFile(subpath string) (*x509certs.File, error) {
@@ -111,34 +151,35 @@ func certsFile(subpath string) (*x509certs.File, error) {
 	return &x509certs.File{Path: state}, nil
 }
 
-func crtsvc(ctx context.Context, svc netip.AddrPort) (netip.AddrPort, error) {
+func crtsvc(ctx context.Context) error {
 	c, err := crtFile()
 	if err != nil {
-		return svc, err
+		return err
 	}
 	first := c.First()
 	if first == nil {
-		return svc, xerrors.Invalid(c.Path)
+		return xerrors.Invalid(c.Path)
 	} else if len(first.DNSNames) == 0 {
-		return svc, xerrors.Invalid(c.Path, "dns")
+		return xerrors.Invalid(c.Path, "dns")
 	}
 	if len(first.IPAddresses) > 0 {
 		ip0 := first.IPAddresses[0]
 		if a, ok := netip.AddrFromSlice(ip0); ok {
-			return netip.AddrPortFrom(a, svc.Port()), nil
+			opts.svc = netip.AddrPortFrom(a, opts.svc.Port())
+			return nil
 		}
-		return svc, xerrors.Invalid(c.Path, "ip")
+		return xerrors.Invalid(c.Path, "ip")
 	}
 	network := "ip4"
-	if svc.Addr().Is6() {
+	if opts.svc.Addr().Is6() {
 		network = "ip6"
 	}
 	dns0 := first.DNSNames[0]
 	ips, err := PatientLookupIP(ctx, network, dns0, 30*time.Second)
 	if err != nil {
-		return svc, err
+		return err
 	} else if len(ips) == 0 {
-		return svc, xerrors.Incomplete(c.Path, "ip")
+		return xerrors.Incomplete(c.Path, "ip")
 	}
 	for _, ip := range ips {
 		a, ok := netip.AddrFromSlice(ip)
@@ -147,7 +188,7 @@ func crtsvc(ctx context.Context, svc netip.AddrPort) (netip.AddrPort, error) {
 			continue
 		}
 		a = a.Unmap()
-		if svc.Addr().Is4() {
+		if opts.svc.Addr().Is4() {
 			if a.Is6() {
 				verbose.Println("skipped v6 address", a)
 				continue
@@ -156,10 +197,10 @@ func crtsvc(ctx context.Context, svc netip.AddrPort) (netip.AddrPort, error) {
 			verbose.Println("skipped v4 address", a)
 			continue
 		}
-		verbose.Println("selected address", a)
-		return netip.AddrPortFrom(a, svc.Port()), nil
+		opts.svc = netip.AddrPortFrom(a, opts.svc.Port())
+		return nil
 	}
-	return svc, fmt.Errorf("%s: no valid IP", c.Path)
+	return xerrors.Invalid(c.Path, "has no valid IPs")
 }
 
 func vpnName(dir string) string {

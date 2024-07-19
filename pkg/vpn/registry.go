@@ -26,7 +26,6 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/x509certs"
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xflag"
-	"github.com/platinasystems/goes/v2/pkg/xlog"
 	"github.com/platinasystems/goes/v2/pkg/xos"
 )
 
@@ -34,43 +33,20 @@ func registryDaemon(ctx context.Context, args []string) error {
 	var wg sync.WaitGroup
 	var reg registry
 
-	svc := netip.AddrPortFrom(netip.IPv4Unspecified(), 8003)
-
 	xflag.UsageTemplate(flag.CommandLine, `
 usage: {{.Name}} [flags]
+Ephemeral public key registry.
 
 {{flags .}}`)
 
-	qFlag := flag.Bool("q", false, "Quiet logging.")
-	vFlag := flag.Bool("v", false, "Verbose logging.")
-	flag.TextVar(&svc, "service", svc, "<addr>:<port>")
+	opts.svc = DefaultService()
 
-	err := flag.CommandLine.Parse(args)
+	err := parseOpts(ctx, args)
 	if err != nil {
 		return err
 	} else {
 		args = flag.Args()
 	}
-
-	if *qFlag {
-		errata = xlog.Mute(errata)
-	} else if *vFlag {
-		verbose = xlog.Unmute(verbose)
-	}
-
-	if svc.Addr().IsUnspecified() {
-		if svc, err = crtsvc(ctx, svc); err != nil {
-			return xerrors.Label(err, "service")
-		}
-	}
-
-	cctx, cancel := context.WithCancel(ctx)
-
-	verbose.Println("start", svc)
-	defer verbose.Println("stopped", svc)
-	defer wg.Wait()
-	defer cancel()
-	defer verbose.Println("stopping", svc, "...")
 
 	c, err := crtFile()
 	if err != nil {
@@ -81,12 +57,18 @@ usage: {{.Name}} [flags]
 		return err
 	}
 
-	// reg.subjectCommonName = first.Subject.CommonName
-
 	reg.vpn = make(map[string]*regVpn)
 
+	cctx, cancel := context.WithCancel(ctx)
+
+	verbose.Println("start", opts.svc)
+	defer verbose.Println("stopped", opts.svc)
+	defer wg.Wait()
+	defer cancel()
+	defer verbose.Println("stopping", opts.svc, "...")
+
 	reg.http = &http.Server{
-		Addr:    svc.String(),
+		Addr:    opts.svc.String(),
 		Handler: &reg,
 		TLSConfig: &tls.Config{
 			ClientAuth: tls.RequireAnyClientCert,
