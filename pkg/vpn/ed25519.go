@@ -10,11 +10,9 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"flag"
-	"io"
 	"os"
 	"time"
 
-	"github.com/platinasystems/goes/v2/pkg/x509keys"
 	"github.com/platinasystems/goes/v2/pkg/xflag"
 	"github.com/platinasystems/goes/v2/pkg/xpem"
 )
@@ -24,22 +22,19 @@ func generateEd25519Key(ctx context.Context, args []string) error {
 	const longest = 10 * year
 
 	xflag.UsageTemplate(flag.CommandLine, `
-usage: {{.Name}} [-]
+usage: {{.Name}} [flags}]
 Generate PEM encoded ed25519 key.
 
-The default output is “{{key}}”;
-use “-” for stdout.
-`)
-	xflag.UsageFuncs["key"] = keyPath
+{{flags .}}`)
+
+	opts.key = flag.String("key", defaultKey(),
+		"File name or “-” for stdout.")
+
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
 		return err
 	}
-	args = flag.Args()
-	k, _ := keyFile()
-	if len(args) > 0 {
-		k.Path = args[0]
-	}
+
 	_, priv, err := ed25519.GenerateKey(nil)
 	if err != nil {
 		return err
@@ -53,43 +48,31 @@ use “-” for stdout.
 		Headers: map[string]string{},
 		Bytes:   der,
 	}
-	if k.Path == "-" {
+	if *opts.key == "-" {
 		err = xpem.EncodeAll(os.Stdout, block)
 	} else {
-		err = xpem.Create(k.Path, 0600, block)
+		err = xpem.Create(*opts.key, 0600, block)
 	}
 	return err
 }
 
 func showEd25519Key(ctx context.Context, args []string) error {
-	var rc io.ReadCloser
 	xflag.UsageTemplate(flag.CommandLine, `
-usage: {{.Name}} [-]
+usage: {{.Name}} [flags]
 Print parsed key confirmation.
 
-The default output is “{{.Key}}”;
-use “-” for stdin.
-`)
-	xflag.UsageFuncs["key"] = keyPath
+{{flags .}}`)
+
+	opts.key = flag.String("key", defaultKey(),
+		"File name or “-” for stdin.")
+
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
 		return err
 	}
-	args = flag.Args()
-	path := keyPath()
-	if len(args) > 0 {
-		path = args[0]
-	}
-	if path == "-" {
-		rc = os.Stdin
-	} else if rc, err = os.Open(path); err != nil {
-		return err
-	} else {
-		defer rc.Close()
-	}
 
-	key := &x509keys.File{Path: path}
-	if _, err = key.ReadFrom(rc); err == nil {
+	key, err := keyFile()
+	if err == nil {
 		err = key.Show(os.Stdout)
 	}
 	return err

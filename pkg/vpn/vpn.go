@@ -11,12 +11,10 @@ package vpn
 import (
 	"context"
 	"flag"
-	"fmt"
 	"log"
 	"net/netip"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 	"time"
 
@@ -25,13 +23,6 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xlog"
 	"github.com/platinasystems/goes/v2/pkg/xos"
-)
-
-const (
-	AdminsFileName      = "vpn.admins"
-	HostsFileName       = "vpn.hosts"
-	PrefixFileName      = "vpn.prefix"
-	SubscribersFileName = "vpn.subscribers"
 )
 
 const RegistryURL = "https://<regisitry>[:<port>][/<vpn>]"
@@ -44,17 +35,17 @@ var DefaultService = func() netip.AddrPort {
 
 var Features = map[string]any{
 	"generate": map[string]any{
-		"certificate": generateX509Certificate,
-		"key":         generateEd25519Key,
+		"ed25519-key":      generateEd25519Key,
+		"x509-certificate": generateX509Certificate,
 	},
 	"show": map[string]any{
-		"certificate": showX509Certificate,
-		"key":         showX509Certificate,
+		"ed25519-key": showEd25519Key,
 		"vpn": map[string]any{
 			"admins":      restShow,
 			"pending":     restShow,
 			"subscribers": restShow,
 		},
+		"x509-certificate": showX509Certificate,
 	},
 	"vpn": map[string]any{
 		"approve":     restAdmin,
@@ -76,9 +67,16 @@ var verbose = xlog.Mute(log.New(os.Stdout, "", log.Lshortfile))
 
 var opts struct {
 	crt,
-	key,
-	subscriptions *string
+	key *string
 	svc netip.AddrPort
+}
+
+func defaultCrt() string {
+	return filepath.Join(xos.ConfigHome(), "vpn.crt")
+}
+
+func defaultKey() string {
+	return filepath.Join(xos.ConfigHome(), ".vpn.key")
 }
 
 func parseOpts(ctx context.Context, args []string) error {
@@ -86,15 +84,8 @@ func parseOpts(ctx context.Context, args []string) error {
 		"Quiet logging.")
 	v := flag.Bool("v", false,
 		"Verbose logging.")
-	opts.crt = flag.String("certificate",
-		filepath.Join(xos.ConfigHome(), "vpn.crt"),
-		"File name.")
-	opts.key = flag.String("key",
-		filepath.Join(xos.ConfigHome(), ".vpn.key"),
-		"File name.")
-	opts.subscriptions = flag.String("subscriptions",
-		filepath.Join(xos.StateHome(), "vpn.subscriptions"),
-		"File name.")
+	opts.crt = flag.String("certificate", defaultCrt(), "File name.")
+	opts.key = flag.String("key", defaultKey(), "File name.")
 	if opts.svc.IsValid() {
 		flag.TextVar(&opts.svc, "service", opts.svc, `<addr>:<port>
 If <addr> is 0.0.0.0 or [::], use the first ip address of
@@ -116,19 +107,11 @@ the certificate's primary DNS name.`)
 }
 
 var crtFile = sync.OnceValues(func() (*x509certs.File, error) {
-	return x509certs.NewFile(crtPath())
-})
-
-var crtPath = sync.OnceValue(func() string {
-	return filepath.Join(xos.ConfigHome(), "vpn.crt")
+	return x509certs.NewFile(*opts.crt)
 })
 
 var keyFile = sync.OnceValues(func() (*x509keys.File, error) {
-	return x509keys.NewFile(keyPath())
-})
-
-var keyPath = sync.OnceValue(func() string {
-	return filepath.Join(xos.ConfigHome(), ".vpn.key")
+	return x509keys.NewFile(*opts.key)
 })
 
 var subscriptionsFile = sync.OnceValues(func() (*x509certs.File, error) {
@@ -201,22 +184,4 @@ func crtsvc(ctx context.Context) error {
 		return nil
 	}
 	return xerrors.Invalid(c.Path, "has no valid IPs")
-}
-
-func vpnName(dir string) string {
-	const pathSeparatorString = string(filepath.Separator)
-	name := strings.TrimPrefix(dir, xos.ConfigHome())
-	return strings.TrimLeft(name, pathSeparatorString)
-}
-
-func vpnPrefix(path string) (netip.Prefix, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return netip.Prefix{}, err
-	}
-	prefix, err := netip.ParsePrefix(strings.TrimSpace(string(data)))
-	if err != nil {
-		return netip.Prefix{}, fmt.Errorf("%s: %w", path, err)
-	}
-	return prefix, nil
 }

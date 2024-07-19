@@ -13,10 +13,10 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"io/fs"
 	"net"
 	"net/http"
 	"net/netip"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -78,22 +78,14 @@ Ephemeral public key registry.
 		},
 	}
 
-	err = filepath.WalkDir(xos.ConfigHome(),
-		func(path string, de fs.DirEntry, err error) error {
-			return reg.walker(ctx, path, de, err)
-		})
-	if err != nil {
+	if err = reg.scan(); err != nil {
 		return err
 	}
 
 	wg.Add(1)
 	go reg.shutdown(cctx, &wg)
 
-	verbose.Print("start ", reg.http.Addr)
-	defer verbose.Print("stopped ", reg.http.Addr)
-
 	err = reg.http.ListenAndServeTLS(c.Path, k.Path)
-	cancel()
 	if errors.Is(err, http.ErrServerClosed) {
 		err = nil
 	}
@@ -149,11 +141,14 @@ func (reg *registry) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	peer0 := req.TLS.PeerCertificates[0]
 	qv := req.URL.Query()
 	op := qv.Get("op")
-	path := strings.TrimLeft(req.URL.Path, "/")
-	vpn := reg.vpnNamed(path)
+	name := strings.TrimLeft(req.URL.Path, "/")
+	if len(name) == 0 {
+		name = "vpn"
+	}
+	vpn := reg.vpnNamed(name)
 	if vpn == nil {
 		w.WriteHeader(http.StatusNotFound)
-		fmt.Fprint(w, path)
+		fmt.Fprint(w, name)
 		return
 	}
 	switch op {
@@ -251,20 +246,16 @@ func (reg *registry) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			fmt.Fprintln(w, "OK")
 		}
 	case "rescan":
-		if path != "" {
+		if name != "vpn" {
 			w.WriteHeader(http.StatusNotAcceptable)
-			fmt.Fprint(w, path, ": unacceptable")
+			fmt.Fprint(w, name, ": unacceptable")
 		} else if !vpn.isAuthorized(peer0) {
 			w.WriteHeader(http.StatusForbidden)
 			fmt.Fprint(w, peer0.Subject.CommonName)
 		} else if req.Method != http.MethodPut {
 			w.WriteHeader(http.StatusMethodNotAllowed)
 			fmt.Fprint(w, req.Method)
-		} else if err := filepath.WalkDir(xos.ConfigHome(),
-			func(path string, de fs.DirEntry, err error) error {
-				ctx := req.Context()
-				return reg.walker(ctx, path, de, err)
-			}); err != nil {
+		} else if err := reg.scan(); err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			fmt.Fprint(w, err)
 		} else {
@@ -288,8 +279,9 @@ func (reg *registry) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		} else if req.Method != http.MethodGet {
 			w.WriteHeader(http.StatusMethodNotAllowed)
 			fmt.Fprint(w, req.Method)
-		} else {
-			fmt.Fprint(w, vpn.admins)
+		} else if err := vpn.admins.Show(w); err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprint(w, err)
 		}
 	case "show-pending":
 		if !vpn.isAuthorized(peer0, vpn.subscribers) {
@@ -308,8 +300,9 @@ func (reg *registry) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		} else if req.Method != http.MethodGet {
 			w.WriteHeader(http.StatusMethodNotAllowed)
 			fmt.Fprint(w, req.Method)
-		} else {
-			fmt.Fprint(w, vpn.subscribers)
+		} else if err := vpn.subscribers.Show(w); err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprint(w, err)
 		}
 	case "subscribe":
 		if req.Method != http.MethodPut {
@@ -360,63 +353,56 @@ func (reg *registry) shutdown(ctx context.Context, wg *sync.WaitGroup) {
 	reg.http.Shutdown(cctx)
 }
 
-func (reg *registry) walker(
-	ctx context.Context, path string, de fs.DirEntry, err error,
-) error {
-	if err != nil {
-		verbose.Println("skipping", path, "b/c", err)
-		return fs.SkipDir
-	}
-	if de.IsDir() && strings.HasPrefix(de.Name(), ".") {
-		verbose.Println("skipping", path)
-		return fs.SkipDir
-	}
-	if de.Name() != PrefixFileName {
-		return nil
-	}
-	if err = ctx.Err(); err != nil {
-		return err
-	}
-
-	dir := filepath.Dir(path)
-	name := vpnName(dir)
-	if reg.vpnNamed(name) != nil {
-		verbose.Println(name, "exists")
-		return nil
-	}
-
-	vpn := &regVpn{
-		dir:  filepath.Join(xos.StateHome(), name),
-		name: name,
-	}
-
-	vpn.prefix, err = xerrors.MarkResult(vpnPrefix(path))
+func (reg *registry) scan() error {
+	pat := filepath.Join(xos.ConfigHome(), "*.prefix")
+	matches, err := filepath.Glob(pat)
 	if err != nil {
 		return err
 	}
+	for _, fn := range matches {
+		name := filepath.Base(strings.TrimSuffix(fn, ".prefix"))
+		if reg.vpnNamed(name) != nil {
+			verbose.Println(name, "exists")
+			continue
+		}
+		data, err := os.ReadFile(fn)
+		if err != nil {
+			return err
+		}
+		s := strings.TrimSpace(string(data))
+		prefix, err := netip.ParsePrefix(s)
+		if err != nil {
+			return err
+		}
+		vpn := &regVpn{
+			name:   name,
+			prefix: prefix,
+		}
 
-	vpn.block.addressed = make(map[netip.Addr]*pem.Block)
-	vpn.block.identified = make(map[int]*pem.Block)
-	vpn.block.named = make(map[string]*pem.Block)
+		vpn.block.addressed = make(map[netip.Addr]*pem.Block)
+		vpn.block.identified = make(map[int]*pem.Block)
+		vpn.block.named = make(map[string]*pem.Block)
 
-	afn := filepath.Join(name, AdminsFileName)
-	vpn.admins, err = xerrors.MarkResult(certsFile(afn))
-	if err != nil {
-		return err
+		s = fmt.Sprint(name, ".admins")
+		vpn.admins, err = certsFile(s)
+		if err != nil {
+			return err
+		}
+
+		s = fmt.Sprint(name, ".subscribers")
+		vpn.subscribers, err = certsFile(s)
+		if err != nil {
+			return err
+		}
+
+		s = fmt.Sprint(name, ".hosts")
+		vpn.hosts, err = newHostsFile(s, vpn.prefix)
+		if err != nil {
+			return err
+		}
+
+		reg.add(vpn)
 	}
-
-	sfn := filepath.Join(name, SubscribersFileName)
-	vpn.subscribers, err = xerrors.MarkResult(certsFile(sfn))
-	if err != nil {
-		return err
-	}
-
-	vpn.hosts, err = xerrors.MarkResult(newHostsFile(name, vpn.prefix))
-	if err != nil {
-		return err
-	}
-
-	reg.add(vpn)
 
 	return nil
 }

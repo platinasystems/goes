@@ -14,15 +14,12 @@ import (
 	"encoding/pem"
 	"flag"
 	"fmt"
-	"io"
 	"math"
 	"math/big"
 	"os"
 	"strings"
 	"time"
 
-	"github.com/platinasystems/goes/v2/pkg/x509certs"
-	"github.com/platinasystems/goes/v2/pkg/x509keys"
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xflag"
 	"github.com/platinasystems/goes/v2/pkg/xpem"
@@ -33,19 +30,15 @@ func generateX509Certificate(ctx context.Context, args []string) error {
 	const longest = 10 * year
 
 	xflag.UsageTemplate(flag.CommandLine, `
-usage: {{.Name}} [flags] [output [key]]
+usage: {{.Name}} [flags]
 Generate PEM encoded x509 certificate.
 
-The default <output> is "{{crt}}";
-use '-' for stdout.
-
-The default <key> is "{{key}}";
-use '-' for stdin.
-
-Flags:
 {{flags .}}`)
-	xflag.UsageFuncs["crt"] = crtPath
-	xflag.UsageFuncs["key"] = keyPath
+
+	opts.crt = flag.String("certificate", defaultCrt(),
+		"File name or “-” for stdout.")
+	opts.key = flag.String("key", defaultKey(),
+		"File name or “-” for stdin.")
 
 	hostname, _ := os.Hostname()
 
@@ -68,24 +61,7 @@ Flags:
 		return err
 	}
 
-	args = flag.Args()
-
-	path := crtPath()
-	if len(args) > 0 {
-		path = args[0]
-	}
-
-	var k *x509keys.File
-	if len(args) > 1 {
-		if args[1] == "-" {
-			k = &x509keys.File{Path: "-"}
-			_, err = k.ReadFrom(os.Stdin)
-		} else {
-			k, err = x509keys.NewFile(args[1])
-		}
-	} else {
-		k, err = keyFile()
-	}
+	k, err := keyFile()
 	if err != nil {
 		return err
 	}
@@ -153,42 +129,31 @@ Flags:
 		Headers: map[string]string{},
 		Bytes:   der,
 	}
-	if path == "-" {
+	if *opts.crt == "-" {
 		err = xpem.EncodeAll(os.Stdout, block)
 	} else {
-		err = xpem.Create(path, 0644, block)
+		err = xpem.Create(*opts.crt, 0644, block)
 	}
 	return err
 }
 
 func showX509Certificate(ctx context.Context, args []string) error {
-	var rc io.ReadCloser
 	xflag.UsageTemplate(flag.CommandLine, `
-usage: {{.Name}} [file]
-Print parsed certificate file.
+usage: {{.Name}} [flags]
+Print parsed certificate.
 
-The default file is “{{crt}}“;
-use “-“ for stdin.
-`)
-	xflag.UsageFuncs["crt"] = crtPath
+{{flags .}}`)
+
+	opts.crt = flag.String("certificate", defaultCrt(),
+		"File name or “-” for stdin.")
+
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
 		return err
 	}
-	args = flag.Args()
-	path := crtPath()
-	if len(args) > 0 {
-		path = args[0]
-	}
-	if path == "-" {
-		rc = os.Stdin
-	} else if rc, err = os.Open(path); err != nil {
-		return err
-	} else {
-		defer rc.Close()
-	}
-	crt := &x509certs.File{Path: path}
-	if _, err = crt.ReadFrom(rc); err == nil {
+
+	crt, err := crtFile()
+	if err == nil {
 		err = crt.Show(os.Stdout)
 	}
 	return err

@@ -22,12 +22,21 @@ type File struct {
 
 func NewFile(path string) (f *File, err error) {
 	f = &File{Path: path}
+	if path == "-" {
+		_, err = f.ReadFrom(os.Stdin)
+	} else {
+		err = f.ReadFile(path)
+	}
+	return
+}
+
+func (f *File) ReadFile(path string) error {
 	r, err := os.Open(path)
 	if err == nil {
 		defer r.Close()
 		_, err = f.ReadFrom(r)
 	}
-	return
+	return err
 }
 
 func (f *File) ReadFrom(r io.Reader) (int64, error) {

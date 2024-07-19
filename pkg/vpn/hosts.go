@@ -27,20 +27,22 @@ type hostsFile struct {
 	top    netip.Addr
 }
 
-func newHostsFile(vpn string, prefix netip.Prefix) (*hostsFile, error) {
-	vpnhosts := filepath.Join(vpn, HostsFileName)
+func newHostsFile(fn string, prefix netip.Prefix) (*hostsFile, error) {
+	state := filepath.Join(xos.StateHome(), fn)
 	h := &hostsFile{
-		path:   filepath.Join(xos.StateHome(), vpnhosts),
+		path:   state,
 		prefix: prefix,
 		addr:   make(map[string]netip.Addr),
 		name:   make(map[netip.Addr]string),
 	}
-	r, err := os.Open(h.path)
+	r, err := os.Open(state)
 	if err != nil {
-		config := filepath.Join(xos.ConfigHome(), vpnhosts)
-		if !os.IsNotExist(err) {
-			return h, err
-		} else if r, err = os.Open(config); err != nil {
+		if os.IsNotExist(err) {
+			config := filepath.Join(xos.ConfigHome(), fn)
+			if r, err = os.Open(config); err != nil {
+				return h, err
+			}
+		} else {
 			return h, err
 		}
 	}
