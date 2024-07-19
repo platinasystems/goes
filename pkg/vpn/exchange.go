@@ -29,7 +29,7 @@ Exchange ciphered packets between guests.
 
 {{flags .}}`)
 
-	opts.svc = DefaultService()
+	opts.svc = DefaultUDPService()
 
 	err := parseOpts(ctx, args)
 	if err != nil {
@@ -37,6 +37,7 @@ Exchange ciphered packets between guests.
 	} else if args = flag.Args(); len(args) == 0 {
 		return xerrors.Incomplete("registry")
 	}
+
 	reg := args[0]
 
 	ex.pem.addressed = make(map[netip.Addr]*pem.Block)
@@ -47,31 +48,34 @@ Exchange ciphered packets between guests.
 
 	ex.whoisResponseCh = make(chan *pem.Block)
 
-	if err = ex.register(ctx, reg, opts.svc); err != nil {
-		return err
-	}
-
 	cctx, cancel := context.WithCancel(ctx)
-
-	iex, vex := IdIndex(ex.id), IdVersion(ex.id)
-
-	id := fmt.Sprintf("(%d, %v)", iex, opts.svc)
-	verbose.Println("start", id)
-	defer verbose.Println("stopped", id, err)
-	defer wg.Wait()
-	defer cancel()
-	defer verbose.Println("stopping", id, "...")
 
 	udp, err := xerrors.MarkResult(net.ListenUDP("udp", &net.UDPAddr{
 		IP:   opts.svc.Addr().AsSlice(),
 		Port: int(opts.svc.Port()),
-		// Zone: FIXME,
 	}))
 	if err != nil {
 		return err
 	}
 
 	defer udp.Close()
+
+	lap, err := netip.ParseAddrPort(udp.LocalAddr().String())
+	if err != nil {
+		return err
+	}
+	if err = ex.register(ctx, reg, lap); err != nil {
+		return err
+	}
+
+	iex, vex := IdIndex(ex.id), IdVersion(ex.id)
+
+	svc := fmt.Sprintf("(%d, %v)", iex, lap)
+	verbose.Println("start", svc)
+	defer verbose.Println("stopped", svc, err)
+	defer wg.Wait()
+	defer cancel()
+	defer verbose.Println("stopping", svc, "...")
 
 	wg.Add(1)
 	go pktRxRoutine(cctx, &wg, udp, pktRxCh)

@@ -38,8 +38,7 @@ Create VPN tunnel.
 
 {{flags .}}`)
 
-	opts.svc = DefaultService()
-
+	opts.svc = DefaultUDPService()
 	unit := flag.Uint("u", 0, "Unit number.")
 
 	err := parseOpts(ctx, args)
@@ -48,26 +47,14 @@ Create VPN tunnel.
 	} else if args = flag.Args(); len(args) == 0 {
 		return xerrors.Incomplete("registry")
 	}
+
 	reg := args[0]
 
-	if err = g.register(ctx, reg); err != nil {
-		return err
-	}
-
 	cctx, cancel := context.WithCancel(ctx)
-
-	iguest := IdIndex(g.id)
-	id := fmt.Sprintf("(%d, %v)", iguest, opts.svc)
-	verbose.Println("start)", id)
-	defer verbose.Println("stopped", id, err)
-	defer wg.Wait()
-	defer cancel()
-	defer verbose.Println("stopping", id, "...")
 
 	udp, err := xerrors.MarkResult(net.ListenUDP("udp", &net.UDPAddr{
 		IP:   opts.svc.Addr().AsSlice(),
 		Port: int(opts.svc.Port()),
-		// Zone: FIXME,
 	}))
 	if err != nil {
 		return err
@@ -75,7 +62,23 @@ Create VPN tunnel.
 
 	defer udp.Close()
 
+	lap, err := netip.ParseAddrPort(udp.LocalAddr().String())
+	if err != nil {
+		return err
+	}
+	if err = g.register(ctx, reg); err != nil {
+		return err
+	}
+
+	iguest := IdIndex(g.id)
 	via := g.via[iguest]
+
+	svc := fmt.Sprintf("(%d via %d @ %v)", iguest, via, lap)
+	verbose.Println("start", svc)
+	defer verbose.Println("stopped", svc, err)
+	defer wg.Wait()
+	defer cancel()
+	defer verbose.Println("stopping", svc, "...")
 
 	viaBlk, err := httpWhoIsIdentified(cctx, g.registry, via)
 	if err != nil {

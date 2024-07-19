@@ -39,7 +39,7 @@ Ephemeral public key registry.
 
 {{flags .}}`)
 
-	port := flag.Uint("p", DefaultPort, "port")
+	port := flag.Uint("p", 8003, "Port number.")
 
 	err := parseOpts(ctx, args)
 	if err != nil {

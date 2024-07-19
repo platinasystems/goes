@@ -27,10 +27,8 @@ import (
 
 const RegistryURL = "https://<regisitry>[:<port>][/<vpn>]"
 
-const DefaultPort = 8003
-
-var DefaultService = func() netip.AddrPort {
-	return netip.AddrPortFrom(netip.IPv4Unspecified(), DefaultPort)
+var DefaultUDPService = func() netip.AddrPort {
+	return netip.AddrPortFrom(netip.IPv4Unspecified(), 0)
 }
 
 var Features = map[string]any{
@@ -86,11 +84,14 @@ func parseOpts(ctx context.Context, args []string) error {
 		"Verbose logging.")
 	opts.crt = flag.String("certificate", defaultCrt(), "File name.")
 	opts.key = flag.String("key", defaultKey(), "File name.")
-	if opts.svc.IsValid() {
-		flag.TextVar(&opts.svc, "service", opts.svc, `<addr>:<port>
-If <addr> is 0.0.0.0 or [::], use the first ip address of
-the certificate's primary DNS name.`)
+
+	if opts.svc.Addr().IsValid() {
+		flag.TextVar(&opts.svc, "service", opts.svc, `{addr}:{port}
+If “addr” is 0.0.0.0 or [::], use the first ip or ipv6 from the
+address lookup of the certificate's primary DNS name.  If “port”
+is 0, allocate from system.`)
 	}
+
 	err := flag.CommandLine.Parse(args)
 	if err == nil {
 		if *q {
@@ -99,7 +100,7 @@ the certificate's primary DNS name.`)
 			verbose = xlog.Unmute(verbose)
 		}
 		if opts.svc.Addr().IsUnspecified() {
-			err = crtsvc(ctx)
+			err = optsvc(ctx)
 		}
 	}
 	return err
@@ -134,7 +135,7 @@ func certsFile(subpath string) (*x509certs.File, error) {
 	return &x509certs.File{Path: state}, nil
 }
 
-func crtsvc(ctx context.Context) error {
+func optsvc(ctx context.Context) error {
 	c, err := crtFile()
 	if err != nil {
 		return err
