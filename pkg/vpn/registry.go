@@ -39,7 +39,7 @@ Ephemeral public key registry.
 
 {{flags .}}`)
 
-	opts.svc = DefaultService()
+	port := flag.Uint("p", DefaultPort, "port")
 
 	err := parseOpts(ctx, args)
 	if err != nil {
@@ -61,14 +61,16 @@ Ephemeral public key registry.
 
 	cctx, cancel := context.WithCancel(ctx)
 
-	verbose.Println("start", opts.svc)
-	defer verbose.Println("stopped", opts.svc)
+	svc := fmt.Sprint(":", *port)
+
+	verbose.Println("start", svc)
+	defer verbose.Println("stopped", svc)
 	defer wg.Wait()
 	defer cancel()
-	defer verbose.Println("stopping", opts.svc, "...")
+	defer verbose.Println("stopping", svc, "...")
 
 	reg.http = &http.Server{
-		Addr:    opts.svc.String(),
+		Addr:    svc,
 		Handler: &reg,
 		TLSConfig: &tls.Config{
 			ClientAuth: tls.RequireAnyClientCert,
