@@ -72,10 +72,18 @@ var restTransport = sync.OnceValues(func() (*http.Transport, error) {
 	return t, nil
 })
 
+func isLocalhost(req *http.Request) bool {
+	return strings.HasPrefix(req.URL.Host, "127.0.0.1") ||
+		strings.HasPrefix(req.URL.Host, "localhost")
+}
+
 func rest(req *http.Request) (*http.Response, error) {
 	transport, err := restTransport()
 	if err != nil {
 		return nil, err
+	}
+	if isLocalhost(req) {
+		transport.TLSClientConfig.InsecureSkipVerify = true
 	}
 	cl := &http.Client{Transport: transport}
 	resp, err := cl.Do(req)
