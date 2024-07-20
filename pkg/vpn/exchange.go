@@ -30,6 +30,9 @@ Exchange ciphered packets between guests.
 {{flags .}}`)
 
 	opts.svc = defaultUDPService()
+	nat := netip.IPv4Unspecified()
+	flag.TextVar(&nat, "nat", nat,
+		"External exchange address; ignored if 0.0.0.0 or [::].")
 
 	err := parseOpts(ctx, args)
 	if err != nil {
@@ -64,7 +67,11 @@ Exchange ciphered packets between guests.
 	if err != nil {
 		return err
 	}
-	if err = ex.register(ctx, reg, lap); err != nil {
+	sap := lap
+	if !nat.IsUnspecified() {
+		sap = netip.AddrPortFrom(nat, lap.Port())
+	}
+	if err = ex.register(ctx, reg, sap); err != nil {
 		return err
 	}
 
