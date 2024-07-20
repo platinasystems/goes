@@ -38,7 +38,7 @@ Create VPN tunnel.
 
 {{flags .}}`)
 
-	opts.svc = DefaultUDPService()
+	opts.svc = defaultUDPService()
 	unit := flag.Uint("u", 0, "Unit number.")
 
 	err := parseOpts(ctx, args)

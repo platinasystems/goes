@@ -25,7 +25,7 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xpem"
 )
 
-func generateX509Certificate(ctx context.Context, args []string) error {
+func newX509Certificate(ctx context.Context, args []string) error {
 	const year = 365 * 24 * time.Hour
 	const longest = 10 * year
 
@@ -35,10 +35,10 @@ Generate PEM encoded x509 certificate.
 
 {{flags .}}`)
 
-	opts.crt = flag.String("certificate", defaultCrt(),
-		"File name or “-” for stdout.")
-	opts.key = flag.String("key", defaultKey(),
-		"File name or “-” for stdin.")
+	opts.crt = flag.String("o", defaultCrt(),
+		"Output file name or “-” for stdout.")
+	opts.key = flag.String("k", defaultKey(),
+		"Key file name or “-” for stdin.")
 
 	hostname, _ := os.Hostname()
 
@@ -144,8 +144,8 @@ Print parsed certificate.
 
 {{flags .}}`)
 
-	opts.crt = flag.String("certificate", defaultCrt(),
-		"File name or “-” for stdin.")
+	opts.crt = flag.String("i", defaultCrt(),
+		"Input file name or “-” for stdin.")
 
 	err := flag.CommandLine.Parse(args)
 	if err != nil {

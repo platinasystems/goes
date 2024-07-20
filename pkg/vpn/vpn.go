@@ -10,6 +10,7 @@ package vpn
 
 import (
 	"context"
+	_ "embed"
 	"flag"
 	"log"
 	"net/netip"
@@ -27,23 +28,25 @@ import (
 
 const RegistryURL = "https://<regisitry>[:<port>][/<vpn>]"
 
-var DefaultUDPService = func() netip.AddrPort {
-	return netip.AddrPortFrom(netip.IPv4Unspecified(), 0)
-}
+//go:embed overview.txt
+var overview string
 
 var Features = map[string]any{
-	"generate": map[string]any{
-		"ed25519-key":      generateEd25519Key,
-		"x509-certificate": generateX509Certificate,
+	"new": map[string]any{
+		"vpn": map[string]any{
+			"certificate": newX509Certificate,
+			"ed25519-key": newEd25519Key,
+		},
 	},
 	"show": map[string]any{
-		"ed25519-key": showEd25519Key,
 		"vpn": map[string]any{
 			"admins":      restShow,
+			"certificate": showX509Certificate,
+			"ed25519-key": showEd25519Key,
 			"pending":     restShow,
+			"overview":    overview,
 			"subscribers": restShow,
 		},
-		"x509-certificate": showX509Certificate,
 	},
 	"vpn": map[string]any{
 		"approve":     restAdmin,
@@ -60,21 +63,10 @@ var Features = map[string]any{
 	},
 }
 
-var errata = xlog.Unmute(log.New(os.Stdout, "", log.Lshortfile))
-var verbose = xlog.Mute(log.New(os.Stdout, "", log.Lshortfile))
-
 var opts struct {
 	crt,
 	key *string
 	svc netip.AddrPort
-}
-
-func defaultCrt() string {
-	return filepath.Join(xos.ConfigHome(), "vpn.crt")
-}
-
-func defaultKey() string {
-	return filepath.Join(xos.ConfigHome(), ".vpn.key")
 }
 
 func parseOpts(ctx context.Context, args []string) error {
@@ -105,6 +97,21 @@ is 0, allocate from system.`)
 	}
 	return err
 
+}
+
+var errata = xlog.Unmute(log.New(os.Stdout, "", log.Lshortfile))
+var verbose = xlog.Mute(log.New(os.Stdout, "", log.Lshortfile))
+
+func defaultCrt() string {
+	return filepath.Join(xos.ConfigHome(), "vpn.crt")
+}
+
+func defaultKey() string {
+	return filepath.Join(xos.ConfigHome(), ".vpn.key")
+}
+
+var defaultUDPService = func() netip.AddrPort {
+	return netip.AddrPortFrom(netip.IPv4Unspecified(), 0)
 }
 
 var crtFile = sync.OnceValues(func() (*x509certs.File, error) {

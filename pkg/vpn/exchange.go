@@ -29,7 +29,7 @@ Exchange ciphered packets between guests.
 
 {{flags .}}`)
 
-	opts.svc = DefaultUDPService()
+	opts.svc = defaultUDPService()
 
 	err := parseOpts(ctx, args)
 	if err != nil {
