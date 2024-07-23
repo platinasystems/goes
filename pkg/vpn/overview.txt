@@ -1,4 +1,0 @@
-Vpn is a [goes] app providing daemons and utilities to implement and manage
-a secure, Virtual Private Network.
-
-[goes]: https://github.com/platinasystems/goes/v2/pkg/goes

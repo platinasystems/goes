@@ -2,18 +2,14 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-// Vpn is a [goes] app providing daemons and utilities to implement and manage
-// a secure, Virtual Private Network.
-//
-// [goes]: github.com/platinasystems/goes/v2/pkg/goes
 package vpn
 
 import (
 	"context"
-	_ "embed"
 	"flag"
 	"log"
 	"net/netip"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sync"
@@ -26,47 +22,46 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xos"
 )
 
-const RegistryURL = "https://<regisitry>[:<port>][/<vpn>]"
-
-//go:embed overview.txt
-var overview string
+const DefaultRegistry = "https://127.0.0.1:8003"
 
 var Features = map[string]any{
 	"new": map[string]any{
 		"vpn": map[string]any{
-			"certificate": newX509Certificate,
-			"ed25519-key": newEd25519Key,
+			"certificate": Certificate,
+			"ed25519":     Ed25519,
 		},
 	},
 	"show": map[string]any{
 		"vpn": map[string]any{
-			"admins":      restShow,
-			"certificate": showX509Certificate,
-			"ed25519-key": showEd25519Key,
-			"pending":     restShow,
-			"overview":    overview,
-			"subscribers": restShow,
+			string(Admins):      Admins.show,
+			"certificate":       Certificaté,
+			"signature":         Signature,
+			string(Pending):     Pending.show,
+			string(Subscribers): Subscribers.show,
+			"subscriptions":     Subscriptions,
 		},
 	},
 	"vpn": map[string]any{
-		"approve":     restAdmin,
-		"certify":     restCertify,
-		"deny":        restAdmin,
-		"disable":     restAdmin,
-		"enable":      restAdmin,
-		"exchange":    exchangeDaemon,
-		"guest":       guestDaemon,
-		"ping":        restPing,
-		"registry":    registryDaemon,
-		"subscribe":   restSubscribe,
-		"unsubscriba": restAdmin,
+		string(Approve):     Approve.admin,
+		string(Certify):     Certify.certify,
+		string(Deny):        Deny.admin,
+		string(Disable):     Disable.admin,
+		string(Enable):      Enable.admin,
+		"exchange":          Exchange,
+		"guest":             Guest,
+		string(Ping):        Ping.ping,
+		"registry":          Registry,
+		string(Subscribe):   Subscribe.subscribe,
+		string(Unsubscribe): Unsubscribe.admin,
 	},
 }
 
 var opts struct {
 	crt,
 	key *string
-	svc netip.AddrPort
+	reg    string
+	regurl *url.URL
+	svc    netip.AddrPort
 }
 
 func parseOpts(ctx context.Context, args []string) error {
@@ -74,8 +69,13 @@ func parseOpts(ctx context.Context, args []string) error {
 		"Quiet logging.")
 	v := flag.Bool("v", false,
 		"Verbose logging.")
-	opts.crt = flag.String("certificate", defaultCrt(), "File name.")
-	opts.key = flag.String("key", defaultKey(), "File name.")
+
+	opts.crt = flag.String("certificate", DefaultCrt(), "File name.")
+	opts.key = flag.String("key", DefaultKey(), "File name.")
+
+	if len(opts.reg) > 0 {
+		flag.StringVar(&opts.reg, "r", opts.reg, "Registry.")
+	}
 
 	if opts.svc.Addr().IsValid() {
 		flag.TextVar(&opts.svc, "service", opts.svc, `{addr}:{port}
@@ -91,6 +91,9 @@ is 0, allocate from system.`)
 		} else if *v {
 			verbose = xlog.Unmute(verbose)
 		}
+		if len(opts.reg) > 0 {
+			opts.regurl, err = url.Parse(opts.reg)
+		}
 		if opts.svc.Addr().IsUnspecified() {
 			err = optsvc(ctx)
 		}
@@ -102,15 +105,23 @@ is 0, allocate from system.`)
 var errata = xlog.Unmute(log.New(os.Stdout, "", log.Lshortfile))
 var verbose = xlog.Mute(log.New(os.Stdout, "", log.Lshortfile))
 
-func defaultCrt() string {
+// DefaultCrt is [xos.ConfigHome] + "/vpn.crt"
+func DefaultCrt() string {
 	return filepath.Join(xos.ConfigHome(), "vpn.crt")
 }
 
-func defaultKey() string {
+// DefaultCrt is [xos.ConfigHome] + ".vpn.key"
+func DefaultKey() string {
 	return filepath.Join(xos.ConfigHome(), ".vpn.key")
 }
 
-var defaultUDPService = func() netip.AddrPort {
+// DefaultSubscriptions is [xos.StateHome] + "vpn.subscriptions"
+func DefaultSubscriptions() string {
+	return filepath.Join(xos.StateHome(), "vpn.subscriptions")
+}
+
+// DefaultUDPService is 0.0.0.0:0
+var DefaultUDPService = func() netip.AddrPort {
 	return netip.AddrPortFrom(netip.IPv4Unspecified(), 0)
 }
 

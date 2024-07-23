@@ -12,7 +12,6 @@ import (
 	"encoding/pem"
 	"fmt"
 	"net/netip"
-	"net/url"
 	"time"
 
 	"github.com/platinasystems/goes/v2/pkg/box"
@@ -23,16 +22,17 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xnet/netph"
 )
 
+var ap0 netip.AddrPort
+
 // common to guest and exchange
 type client struct {
-	name     string
-	priv     *ecdh.PrivateKey
-	pub      *ecdh.PublicKey
-	pubder   []byte
-	nonce    [nonce.Size]byte
-	id       box.Id
-	registry *url.URL
-	addr     netip.Addr
+	name   string
+	priv   *ecdh.PrivateKey
+	pub    *ecdh.PublicKey
+	pubder []byte
+	nonce  [nonce.Size]byte
+	id     box.Id
+	addr   netip.Addr
 	hostPrefix,
 	vpnPrefix netip.Prefix
 	addressed map[netip.Addr]box.Id
@@ -42,22 +42,18 @@ type client struct {
 	via       map[int]box.Id
 }
 
-func (cl *client) register(
-	ctx context.Context, registry string, optsvc ...netip.AddrPort,
-) error {
+func (cl *client) register(ctx context.Context, optsvc netip.AddrPort) error {
 	crt, err := crtFile()
 	if err != nil {
 		return err
 	}
 	cl.name = crt.First().Subject.CommonName
 
-	if cl.registry, err = url.Parse(registry); err != nil {
-		return err
-	} else if len(cl.registry.Scheme) == 0 {
-		cl.registry.Scheme = "https"
+	if len(opts.regurl.Scheme) == 0 {
+		opts.regurl.Scheme = "https"
 	}
 
-	err = waitForDNS(ctx, "ip", cl.registry.Hostname())
+	err = waitForDNS(ctx, "ip", opts.regurl.Hostname())
 	if err != nil {
 		return err
 	}
@@ -88,7 +84,7 @@ func (cl *client) register(
 
 	var via box.Id
 	cl.id, via, cl.addr, cl.vpnPrefix, err =
-		httpCheckin(ctx, cl.registry, cl.pubder, cl.nonce[:], optsvc...)
+		restCheckin(ctx, cl.pubder, cl.nonce[:], optsvc)
 	if err != nil {
 		return err
 	}
@@ -96,9 +92,7 @@ func (cl *client) register(
 	if via != InvalidId {
 		cl.via[idi] = via
 	}
-	if len(optsvc) > 0 {
-		cl.service[idi] = optsvc[0]
-	}
+	cl.service[idi] = optsvc
 
 	verbose.Printf("id %d %v via %v prefix %v",
 		cl.id, cl.addr, via, cl.vpnPrefix)

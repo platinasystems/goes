@@ -302,6 +302,7 @@ spec:
     - "vpn"
     - "exchange"
     - "-v"
+    - "-r"
     - "https://registry.vpn.default.svc.cluster.local:8003"
     ports:
     - protocol: UDP
@@ -355,6 +356,7 @@ spec:
     - "vpn"
     - "guest"
     - "-v"
+    - "-r"
     - "https://registry.vpn.default.svc.cluster.local:8003"
     securityContext:
       allowPrivilegeEscalation: true
@@ -415,6 +417,7 @@ spec:
     - "vpn"
     - "guest"
     - "-v"
+    - "-r"
     - "https://registry.vpn.default.svc.cluster.local:8003"
     securityContext:
       allowPrivilegeEscalation: true
@@ -475,6 +478,7 @@ spec:
     - "vpn"
     - "guest"
     - "-v"
+    - "-r"
     - "https://registry.vpn.default.svc.cluster.local:8003"
     securityContext:
       allowPrivilegeEscalation: true

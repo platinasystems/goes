@@ -28,27 +28,26 @@ import (
 	"golang.org/x/exp/maps"
 )
 
-func guestDaemon(ctx context.Context, args []string) error {
+// Guest is a UDP server that forwards ciphered packets between an exchange
+// and a network tunnel interface.
+func Guest(ctx context.Context, args []string) error {
 	var wg sync.WaitGroup
 	var g guest
 
 	xflag.UsageTemplate(flag.CommandLine, `
-usage: {{.Name}} [flags] `+RegistryURL+`
-Create VPN tunnel.
+usage: {{.Name}} [flags]
+Forward ciphered packets between exchange and tunnel interface.
 
 {{flags .}}`)
 
-	opts.svc = defaultUDPService()
+	opts.reg = DefaultRegistry
+	opts.svc = DefaultUDPService()
 	unit := flag.Uint("u", 0, "Unit number.")
 
 	err := parseOpts(ctx, args)
 	if err != nil {
 		return err
-	} else if args = flag.Args(); len(args) == 0 {
-		return xerrors.Incomplete("registry")
 	}
-
-	reg := args[0]
 
 	cctx, cancel := context.WithCancel(ctx)
 
@@ -66,7 +65,7 @@ Create VPN tunnel.
 	if err != nil {
 		return err
 	}
-	if err = g.register(ctx, reg); err != nil {
+	if err = g.register(ctx, ap0); err != nil {
 		return err
 	}
 
@@ -80,7 +79,7 @@ Create VPN tunnel.
 	defer cancel()
 	defer verbose.Println("stopping", svc, "...")
 
-	viaBlk, err := httpWhoIsIdentified(cctx, g.registry, via)
+	viaBlk, err := restWhoIsIdentified(cctx, via)
 	if err != nil {
 		return err
 	} else if err = g.peer(viaBlk); err != nil {

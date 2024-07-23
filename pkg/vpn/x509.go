@@ -25,19 +25,20 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xpem"
 )
 
-func newX509Certificate(ctx context.Context, args []string) error {
+// Certificate creates a PEM encoded x509 certificate file.
+func Certificate(ctx context.Context, args []string) error {
 	const year = 365 * 24 * time.Hour
 	const longest = 10 * year
 
 	xflag.UsageTemplate(flag.CommandLine, `
 usage: {{.Name}} [flags]
-Generate PEM encoded x509 certificate.
+Create PEM encoded x509 certificate file.
 
 {{flags .}}`)
 
-	opts.crt = flag.String("o", defaultCrt(),
+	opts.crt = flag.String("o", DefaultCrt(),
 		"Output file name or “-” for stdout.")
-	opts.key = flag.String("k", defaultKey(),
+	opts.key = flag.String("k", DefaultKey(),
 		"Key file name or “-” for stdin.")
 
 	hostname, _ := os.Hostname()
@@ -137,14 +138,15 @@ Generate PEM encoded x509 certificate.
 	return err
 }
 
-func showX509Certificate(ctx context.Context, args []string) error {
+// Certificaté prints parsed certificate.
+func Certificaté(ctx context.Context, args []string) error {
 	xflag.UsageTemplate(flag.CommandLine, `
 usage: {{.Name}} [flags]
 Print parsed certificate.
 
 {{flags .}}`)
 
-	opts.crt = flag.String("i", defaultCrt(),
+	opts.crt = flag.String("i", DefaultCrt(),
 		"Input file name or “-” for stdin.")
 
 	err := flag.CommandLine.Parse(args)
@@ -155,6 +157,52 @@ Print parsed certificate.
 	crt, err := crtFile()
 	if err == nil {
 		err = crt.Show(os.Stdout)
+	}
+	return err
+}
+
+// Subscriptions prints parsed registry subscriptions.
+func Subscriptions(ctx context.Context, args []string) error {
+	xflag.UsageTemplate(flag.CommandLine, `
+usage: {{.Name}} [flags]
+Print parsed registry subscriptions.
+
+{{flags .}}`)
+
+	opts.crt = flag.String("i", DefaultSubscriptions(),
+		"Input file name or “-” for stdin.")
+
+	err := flag.CommandLine.Parse(args)
+	if err != nil {
+		return err
+	}
+
+	crt, err := crtFile()
+	if err == nil {
+		err = crt.Show(os.Stdout)
+	}
+	return err
+}
+
+// Signature prints algorithm.
+func Signature(ctx context.Context, args []string) error {
+	xflag.UsageTemplate(flag.CommandLine, `
+usage: {{.Name}} [flags]
+Print algorithm.
+
+{{flags .}}`)
+
+	opts.key = flag.String("i", DefaultKey(),
+		"Input file name or “-” for stdin.")
+
+	err := flag.CommandLine.Parse(args)
+	if err != nil {
+		return err
+	}
+
+	key, err := keyFile()
+	if err == nil {
+		err = key.Show(os.Stdout)
 	}
 	return err
 }

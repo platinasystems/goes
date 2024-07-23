@@ -29,13 +29,15 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xos"
 )
 
-func registryDaemon(ctx context.Context, args []string) error {
+// Registry is a web server providing a REST interface to persistent
+// files and ephemeral tables.
+func Registry(ctx context.Context, args []string) error {
 	var wg sync.WaitGroup
 	var reg registry
 
 	xflag.UsageTemplate(flag.CommandLine, `
 usage: {{.Name}} [flags]
-Ephemeral public key registry.
+A RESTful WWW server.
 
 {{flags .}}`)
 

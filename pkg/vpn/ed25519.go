@@ -17,17 +17,18 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xpem"
 )
 
-func newEd25519Key(ctx context.Context, args []string) error {
+// Ed25519 creates a PEM encoded ed25519 signature key file.
+func Ed25519(ctx context.Context, args []string) error {
 	const year = 365 * 24 * time.Hour
 	const longest = 10 * year
 
 	xflag.UsageTemplate(flag.CommandLine, `
 usage: {{.Name}} [flags]
-Generate PEM encoded ed25519 key.
+Create PEM encoded ed25519 signature key file.
 
 {{flags .}}`)
 
-	opts.key = flag.String("o", defaultKey(),
+	opts.key = flag.String("o", DefaultKey(),
 		"Output file name or “-” for stdout.")
 
 	err := flag.CommandLine.Parse(args)
@@ -52,28 +53,6 @@ Generate PEM encoded ed25519 key.
 		err = xpem.EncodeAll(os.Stdout, block)
 	} else {
 		err = xpem.Create(*opts.key, 0600, block)
-	}
-	return err
-}
-
-func showEd25519Key(ctx context.Context, args []string) error {
-	xflag.UsageTemplate(flag.CommandLine, `
-usage: {{.Name}} [flags]
-Print parsed key confirmation.
-
-{{flags .}}`)
-
-	opts.key = flag.String("i", defaultKey(),
-		"Input file name or “-” for stdin.")
-
-	err := flag.CommandLine.Parse(args)
-	if err != nil {
-		return err
-	}
-
-	key, err := keyFile()
-	if err == nil {
-		err = key.Show(os.Stdout)
 	}
 	return err
 }

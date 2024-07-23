@@ -17,6 +17,8 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xos"
 )
 
+// If not a /ko-app, execute feature as a detached process with output piped to
+// the system logger; otherwise, it perform within the current process context.
 func Start(ctx context.Context, complete bool, args []string) error {
 	xflag.UsageTemplate(flag.CommandLine, `
 usage: {{.Name}} <feature> [args]

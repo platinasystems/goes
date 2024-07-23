@@ -18,7 +18,6 @@ import (
 	"io"
 	"net/http"
 	"net/netip"
-	"net/url"
 	"os"
 	"strings"
 	"sync"
@@ -29,6 +28,44 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xflag"
 )
+
+type Rest string
+
+// Admins prints the names of authorized VPN administrators.
+const Admins Rest = "admins"
+
+// Approve VPN subscription.
+const Approve Rest = "approve"
+
+// Certify adds registry to subscriptions.
+const Certify Rest = "certify"
+
+// Deny VPN subscription.
+const Deny Rest = "deny"
+
+// Disable subscriber admin privilege.
+const Disable Rest = "disable"
+
+// Enable subscriber admin privilege.
+const Enable Rest = "enable"
+
+// Pending prints requesting subscriber certificates.
+const Pending Rest = "pending"
+
+// Ping registry.
+const Ping Rest = "ping"
+
+// Revoke VPN subscription.
+const Revoke Rest = "revoke"
+
+// Subscribe requests VPN subscription.
+const Subscribe Rest = "subscribe"
+
+// Subscribers prints the names of current subscribers.
+const Subscribers Rest = "subscribers"
+
+// Unsubscribe from VPN.
+const Unsubscribe Rest = "unsubscribe"
 
 const contextApplicationPKCS8 = "application/pkcs8"
 const dnsLookupTimeout = 30 * time.Second
@@ -111,41 +148,31 @@ func rest(req *http.Request) (*http.Response, error) {
 	return resp, err
 }
 
-func restAdmin(ctx context.Context, args []string) error {
+func (op Rest) admin(ctx context.Context, args []string) error {
 	xflag.UsageTemplate(flag.CommandLine, `
-usage: {{.Name}} [flags] `+RegistryURL+` <subscriber>
+usage: {{.Name}} [flags] <subscriber>
 RESTful registry administration.
 
 {{flags .}}`)
+
+	opts.reg = DefaultRegistry
+
 	err := parseOpts(ctx, args)
 	if err != nil {
 		return err
-	} else if args = flag.Args(); len(args) == 0 {
-		return xerrors.Incomplete("registry")
-	} else if len(args) == 1 {
+	} else if len(args) == 0 {
 		return xerrors.Incomplete("subscriber")
 	}
 
-	svr, err := url.Parse(args[0])
-	if err != nil {
-		return err
-	}
+	subscriber := args[0]
 
-	subscriber := args[1]
-
-	cname := flag.CommandLine.Name()
-	i := strings.LastIndex(cname, " ")
-	if i < 0 {
-		xerrors.Invalid("command name")
-	}
-	op := cname[i+1:]
-
-	q := svr.Query()
-	q.Set("op", op)
+	clone := *opts.regurl
+	q := clone.Query()
+	q.Set("op", string(op))
 	q.Set("subscriber", subscriber)
-	svr.RawQuery = q.Encode()
-	req, err := http.NewRequestWithContext(ctx, http.MethodPut,
-		svr.String(), nil)
+	clone.RawQuery = q.Encode()
+	req, err := http.
+		NewRequestWithContext(ctx, http.MethodPut, clone.String(), nil)
 	if err != nil {
 		return err
 	}
@@ -158,30 +185,28 @@ RESTful registry administration.
 	return err
 }
 
-func restCertify(ctx context.Context, args []string) error {
+// Rest.certify adds registry to subscriptions.
+func (op Rest) certify(ctx context.Context, args []string) error {
 	xflag.UsageTemplate(flag.CommandLine, `
-usage: {{.Name}} [flags] `+RegistryURL+`
+usage: {{.Name}} [flags]
 Add registry to subscriptions.
 
 {{flags .}}`)
+
+	opts.reg = DefaultRegistry
+
 	err := parseOpts(ctx, args)
 	if err != nil {
 		return err
-	} else if args = flag.Args(); len(args) == 0 {
-		return xerrors.Incomplete("registry")
 	}
 
-	svr, err := url.Parse(args[0])
-	if err != nil {
-		return err
-	}
+	clone := *opts.regurl
+	q := clone.Query()
+	q.Set("op", string(op))
+	clone.RawQuery = q.Encode()
 
-	q := svr.Query()
-	q.Set("op", "certify")
-	svr.RawQuery = q.Encode()
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet,
-		svr.String(), nil)
+	req, err := http.
+		NewRequestWithContext(ctx, http.MethodGet, clone.String(), nil)
 	if err != nil {
 		return err
 	}
@@ -193,10 +218,10 @@ Add registry to subscriptions.
 	defer resp.Body.Close()
 
 	if resp.TLS == nil {
-		return fmt.Errorf("%v: doesn't support TLS", svr)
+		return fmt.Errorf("%v: doesn't support TLS", clone)
 	}
 	if len(resp.TLS.PeerCertificates) == 0 {
-		return fmt.Errorf("%v: no certificates", svr)
+		return fmt.Errorf("%v: no certificates", clone)
 	}
 
 	r := bufio.NewReader(os.Stdin)
@@ -247,23 +272,22 @@ Add registry to subscriptions.
 	return err
 }
 
-func httpCheckin(
+func restCheckin(
 	ctx context.Context,
-	svr *url.URL,
 	pubder,
 	nonce []byte,
-	optsvc ...netip.AddrPort,
+	optsvc netip.AddrPort,
 ) (
 	id, via box.Id,
 	addr netip.Addr,
 	prefix netip.Prefix,
 	err error,
 ) {
-	clone := *svr
+	clone := *opts.regurl
 	q := clone.Query()
 	q.Set("op", "checkin")
-	if len(optsvc) > 0 {
-		q.Set("service", optsvc[0].String())
+	if optsvc.Addr().IsValid() {
+		q.Set("service", optsvc.String())
 	}
 	clone.RawQuery = q.Encode()
 	body := new(bytes.Buffer)
@@ -310,28 +334,26 @@ func httpCheckin(
 	return
 }
 
-func restPing(ctx context.Context, args []string) error {
+func (op Rest) ping(ctx context.Context, args []string) error {
 	xflag.UsageTemplate(flag.CommandLine, `
-usage: {{.Name}} [flags] `+RegistryURL+`
+usage: {{.Name}} [flags]
 RESTful ping registry.
 
 {{flags .}}`)
+
+	opts.reg = DefaultRegistry
+
 	err := parseOpts(ctx, args)
 	if err != nil {
 		return err
-	} else if args = flag.Args(); len(args) == 0 {
-		return xerrors.Incomplete("registry")
 	}
 
-	svr, err := url.Parse(args[0])
-	if err != nil {
-		return err
-	}
-	q := svr.Query()
-	q.Set("op", "ping")
-	svr.RawQuery = q.Encode()
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet,
-		svr.String(), nil)
+	clone := *opts.regurl
+	q := clone.Query()
+	q.Set("op", string(op))
+	clone.RawQuery = q.Encode()
+	req, err := http.
+		NewRequestWithContext(ctx, http.MethodGet, clone.String(), nil)
 	if err != nil {
 		return xerrors.Mark(err)
 	}
@@ -344,35 +366,28 @@ RESTful ping registry.
 	return err
 }
 
-func restShow(ctx context.Context, args []string) error {
+func (obj Rest) show(ctx context.Context, args []string) error {
 	xflag.UsageTemplate(flag.CommandLine, `
-usage: {{.Name}} [flags] `+RegistryURL+`
+usage: {{.Name}} [flags]
 RESTful query and print registry object.
 
 {{flags .}}`)
+
+	opts.reg = DefaultRegistry
+
 	err := parseOpts(ctx, args)
 	if err != nil {
 		return err
-	} else if args = flag.Args(); len(args) == 0 {
-		return xerrors.Incomplete("registry")
 	}
 
-	cname := flag.CommandLine.Name()
-	i := strings.LastIndex(cname, " ")
-	if i < 0 {
-		xerrors.Invalid("command name")
-	}
-	op := fmt.Sprint("show-", cname[i+1:])
+	op := fmt.Sprint("show-", string(obj))
 
-	svr, err := url.Parse(args[0])
-	if err != nil {
-		return err
-	}
-	q := svr.Query()
+	clone := *opts.regurl
+	q := clone.Query()
 	q.Set("op", op)
-	svr.RawQuery = q.Encode()
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet,
-		svr.String(), nil)
+	clone.RawQuery = q.Encode()
+	req, err := http.
+		NewRequestWithContext(ctx, http.MethodGet, clone.String(), nil)
 	if err != nil {
 		return xerrors.Mark(err)
 	}
@@ -385,25 +400,24 @@ RESTful query and print registry object.
 	return err
 }
 
-func restSubscribe(ctx context.Context, args []string) error {
+func (op Rest) subscribe(ctx context.Context, args []string) error {
 	xflag.UsageTemplate(flag.CommandLine, `
-usage: {{.Name}} [flags] `+RegistryURL+`
+usage: {{.Name}} [flags]
 RESTful subscribe to VPN.
 
 {{flags .}}`)
+
+	opts.reg = DefaultRegistry
+
 	err := parseOpts(ctx, args)
 	if err != nil {
 		return err
-	} else if args = flag.Args(); len(args) == 0 {
-		return xerrors.Incomplete("registry")
 	}
-	svr, err := url.Parse(args[0])
-	if err != nil {
-		return err
-	}
-	q := svr.Query()
-	q.Set("op", "subscribe")
-	svr.RawQuery = q.Encode()
+
+	clone := *opts.regurl
+	q := clone.Query()
+	q.Set("op", string(op))
+	clone.RawQuery = q.Encode()
 	buf := new(bytes.Buffer)
 	c, err := crtFile()
 	if err != nil {
@@ -412,8 +426,8 @@ RESTful subscribe to VPN.
 	if err = c.Dump(buf); err != nil {
 		return err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPut,
-		svr.String(), buf)
+	req, err := http.
+		NewRequestWithContext(ctx, http.MethodPut, clone.String(), buf)
 	if err != nil {
 		return xerrors.Mark(err)
 	}
@@ -440,15 +454,16 @@ RESTful subscribe to VPN.
 	return err
 }
 
-func httpWhoIs(ctx context.Context, svr *url.URL, qname, qvalue string) (
+func restWhoIs(ctx context.Context, qname, qvalue string) (
 	*pem.Block, error,
 ) {
-	q := svr.Query()
+	clone := *opts.regurl
+	q := clone.Query()
 	q.Set("op", "whois")
 	q.Set(qname, qvalue)
-	svr.RawQuery = q.Encode()
+	clone.RawQuery = q.Encode()
 	req, err := xerrors.MarkResult(http.
-		NewRequestWithContext(ctx, http.MethodGet, svr.String(), nil))
+		NewRequestWithContext(ctx, http.MethodGet, clone.String(), nil))
 	if err != nil {
 		return nil, err
 	}
@@ -468,15 +483,15 @@ func httpWhoIs(ctx context.Context, svr *url.URL, qname, qvalue string) (
 	return blk, nil
 }
 
-func httpWhoIsAddressed(ctx context.Context, svr *url.URL, addr netip.Addr) (
+func restWhoIsAddressed(ctx context.Context, addr netip.Addr) (
 	*pem.Block, error,
 ) {
-	return httpWhoIs(ctx, svr, "address", addr.String())
+	return restWhoIs(ctx, "address", addr.String())
 
 }
 
-func httpWhoIsIdentified(ctx context.Context, svr *url.URL, id box.Id) (
+func restWhoIsIdentified(ctx context.Context, id box.Id) (
 	*pem.Block, error,
 ) {
-	return httpWhoIs(ctx, svr, "id", fmt.Sprint(IdIndex(id)))
+	return restWhoIs(ctx, "id", fmt.Sprint(IdIndex(id)))
 }

@@ -10,7 +10,7 @@ import (
 )
 
 var Template = sync.OnceValues(func() (*template.Template, error) {
-	return template.New("certificates").Parse(`{{/*
+	return template.New("signatures").Parse(`{{/*
 */}}{{ $n := len .}}{{if eq $n 0}}# none
 {{else}}{{range .}}{{if .}}{{printf "# %T" .}}
 {{end}}{{end}}{{end}}`)

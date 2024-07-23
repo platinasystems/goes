@@ -19,17 +19,19 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xnet/netph"
 )
 
-func exchangeDaemon(ctx context.Context, args []string) error {
+// Exchange is a UDP server that forwards ciphered packets between guest's.
+func Exchange(ctx context.Context, args []string) error {
 	var wg sync.WaitGroup
 	var ex exchange
 
 	xflag.UsageTemplate(flag.CommandLine, `
-usage: {{.Name}} [flags] `+RegistryURL+`
+usage: {{.Name}} [flags]
 Exchange ciphered packets between guests.
 
 {{flags .}}`)
 
-	opts.svc = defaultUDPService()
+	opts.reg = DefaultRegistry
+	opts.svc = DefaultUDPService()
 	nat := netip.IPv4Unspecified()
 	flag.TextVar(&nat, "nat", nat,
 		"External exchange address; ignored if 0.0.0.0 or [::].")
@@ -37,11 +39,7 @@ Exchange ciphered packets between guests.
 	err := parseOpts(ctx, args)
 	if err != nil {
 		return err
-	} else if args = flag.Args(); len(args) == 0 {
-		return xerrors.Incomplete("registry")
 	}
-
-	reg := args[0]
 
 	ex.pem.addressed = make(map[netip.Addr]*pem.Block)
 	ex.pem.identified = make(map[int]*pem.Block)
@@ -71,7 +69,7 @@ Exchange ciphered packets between guests.
 	if !nat.IsUnspecified() {
 		sap = netip.AddrPortFrom(nat, lap.Port())
 	}
-	if err = ex.register(ctx, reg, sap); err != nil {
+	if err = ex.register(ctx, sap); err != nil {
 		return err
 	}
 
@@ -282,7 +280,7 @@ func (ex *exchange) whoisAddressedRoutine(
 ) {
 	defer wg.Done()
 	verbose.Println("whois", addr)
-	blk, err := httpWhoIsAddressed(ctx, ex.registry, addr)
+	blk, err := restWhoIsAddressed(ctx, addr)
 	if err != nil {
 		verbose.Println(err)
 	} else {
@@ -295,7 +293,7 @@ func (ex *exchange) whoisIdRoutine(
 ) {
 	defer wg.Done()
 	verbose.Println("whois", IdIndex(id))
-	blk, err := httpWhoIsIdentified(ctx, ex.registry, id)
+	blk, err := restWhoIsIdentified(ctx, id)
 	if err != nil {
 		verbose.Println(err)
 	} else {
