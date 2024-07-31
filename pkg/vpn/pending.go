@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/platinasystems/goes/v2/pkg/x509certs"
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 )
 
@@ -53,7 +52,7 @@ func (p *pending) Format(w fmt.State, verb rune) {
 	defer p.RUnlock()
 	if len(p.certs) == 0 {
 		fmt.Fprintln(w, "# none")
-	} else if t, err := x509certs.Template(); err != nil {
+	} else if t, err := CertificatesTemplate(); err != nil {
 		fmt.Fprintln(w, err)
 	} else {
 		t.Execute(w, p.certs)

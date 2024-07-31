@@ -6,9 +6,8 @@ package xutf8
 
 import (
 	"fmt"
+	"slices"
 	"testing"
-
-	"golang.org/x/exp/slices"
 )
 
 func TestAline(t *testing.T) {

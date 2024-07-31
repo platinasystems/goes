@@ -43,17 +43,17 @@ type client struct {
 }
 
 func (cl *client) register(ctx context.Context, optsvc netip.AddrPort) error {
-	crt, err := crtFile()
+	crt, err := Crt()
 	if err != nil {
 		return err
 	}
 	cl.name = crt.First().Subject.CommonName
 
-	if len(opts.regurl.Scheme) == 0 {
-		opts.regurl.Scheme = "https"
+	if len(Flags.Reg.URL.Scheme) == 0 {
+		Flags.Reg.URL.Scheme = "https"
 	}
 
-	err = waitForDNS(ctx, "ip", opts.regurl.Hostname())
+	err = waitForDNS(ctx, "ip", Flags.Reg.URL.Hostname())
 	if err != nil {
 		return err
 	}

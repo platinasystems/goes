@@ -30,13 +30,17 @@ Exchange ciphered packets between guests.
 
 {{flags .}}`)
 
-	opts.reg = DefaultRegistry
-	opts.svc = DefaultUDPService()
+	Flags.FN.Crt = DefaultCrt()
+	Flags.FN.Key = DefaultKey()
+	Flags.FN.Subscriptions = DefaultSubscriptions()
+	Flags.Reg.String = DefaultRegistry
+	Flags.Svc = DefaultUDPService()
+
 	nat := netip.IPv4Unspecified()
 	flag.TextVar(&nat, "nat", nat,
 		"External exchange address; ignored if 0.0.0.0 or [::].")
 
-	err := parseOpts(ctx, args)
+	err := AddAndParseFlags(ctx, args)
 	if err != nil {
 		return err
 	}
@@ -52,8 +56,8 @@ Exchange ciphered packets between guests.
 	cctx, cancel := context.WithCancel(ctx)
 
 	udp, err := xerrors.MarkResult(net.ListenUDP("udp", &net.UDPAddr{
-		IP:   opts.svc.Addr().AsSlice(),
-		Port: int(opts.svc.Port()),
+		IP:   Flags.Svc.Addr().AsSlice(),
+		Port: int(Flags.Svc.Port()),
 	}))
 	if err != nil {
 		return err

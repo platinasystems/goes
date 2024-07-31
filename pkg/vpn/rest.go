@@ -24,7 +24,6 @@ import (
 	"time"
 
 	"github.com/platinasystems/goes/v2/pkg/box"
-	"github.com/platinasystems/goes/v2/pkg/x509certs"
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xflag"
 )
@@ -42,12 +41,6 @@ const Certify Rest = "certify"
 
 // Deny VPN subscription.
 const Deny Rest = "deny"
-
-// Disable subscriber admin privilege.
-const Disable Rest = "disable"
-
-// Enable subscriber admin privilege.
-const Enable Rest = "enable"
 
 // Pending prints requesting subscriber certificates.
 const Pending Rest = "pending"
@@ -72,20 +65,28 @@ const dnsLookupTimeout = 30 * time.Second
 
 var restTransport = sync.OnceValues(func() (*http.Transport, error) {
 	var cert tls.Certificate
-	k, err := keyFile()
+
+	cs, err := Crt()
 	if err != nil {
 		return nil, err
 	}
-	cert.PrivateKey = k.First()
+
+	key, err := Key()
+	if err != nil {
+		return nil, err
+	}
+
+	subs, err := Subscriptions()
+	if err != nil {
+		return nil, err
+	}
+
+	cert.PrivateKey = key.First()
 	if cert.PrivateKey == nil {
-		return nil, xerrors.Invalid(k.Path)
+		return nil, xerrors.Invalid(key.String())
 	}
-	c, err := crtFile()
-	if err != nil {
-		return nil, err
-	}
-	if cert.Certificate = c.DERs(); cert.Certificate == nil {
-		return nil, xerrors.Invalid(c.Path)
+	if cert.Certificate = cs.DERs(); cert.Certificate == nil {
+		return nil, xerrors.Invalid(cs.String())
 	}
 
 	cfg := new(tls.Config)
@@ -95,14 +96,8 @@ var restTransport = sync.OnceValues(func() (*http.Transport, error) {
 		cfg.RootCAs = x509.NewCertPool()
 	}
 
-	c.Join(cfg.RootCAs)
-
-	subs, err := subscriptionsFile()
-	if err == nil {
-		subs.Join(cfg.RootCAs)
-	} else if !os.IsNotExist(err) && !ErrIsNOENT(err) {
-		return nil, err
-	}
+	cs.Join(cfg.RootCAs)
+	subs.Join(cfg.RootCAs)
 
 	t := http.DefaultTransport.(*http.Transport).Clone()
 	t.TLSClientConfig = cfg
@@ -143,7 +138,9 @@ func rest(req *http.Request) (*http.Response, error) {
 		} else {
 			err = fmt.Errorf("%s, %s", resp.Status, body)
 		}
-		resp = nil
+		if resp.StatusCode != http.StatusTooEarly {
+			resp = nil
+		}
 	}
 	return resp, err
 }
@@ -155,9 +152,12 @@ RESTful registry administration.
 
 {{flags .}}`)
 
-	opts.reg = DefaultRegistry
+	Flags.FN.Crt = DefaultCrt()
+	Flags.FN.Key = DefaultKey()
+	Flags.FN.Subscriptions = DefaultSubscriptions()
+	Flags.Reg.String = DefaultRegistry
 
-	err := parseOpts(ctx, args)
+	err := AddAndParseFlags(ctx, args)
 	if err != nil {
 		return err
 	} else if len(args) == 0 {
@@ -166,7 +166,7 @@ RESTful registry administration.
 
 	subscriber := args[0]
 
-	clone := *opts.regurl
+	clone := *Flags.Reg.URL
 	q := clone.Query()
 	q.Set("op", string(op))
 	q.Set("subscriber", subscriber)
@@ -193,14 +193,17 @@ Add registry to subscriptions.
 
 {{flags .}}`)
 
-	opts.reg = DefaultRegistry
+	Flags.FN.Crt = DefaultCrt()
+	Flags.FN.Key = DefaultKey()
+	Flags.FN.Subscriptions = DefaultSubscriptions()
+	Flags.Reg.String = DefaultRegistry
 
-	err := parseOpts(ctx, args)
+	err := AddAndParseFlags(ctx, args)
 	if err != nil {
 		return err
 	}
 
-	clone := *opts.regurl
+	clone := *Flags.Reg.URL
 	q := clone.Query()
 	q.Set("op", string(op))
 	clone.RawQuery = q.Encode()
@@ -227,8 +230,8 @@ Add registry to subscriptions.
 	r := bufio.NewReader(os.Stdin)
 	w := os.Stdout
 
-	subs, err := subscriptionsFile()
-	if err != nil && !os.IsNotExist(err) {
+	subs, err := Subscriptions()
+	if err != nil {
 		return err
 	}
 
@@ -243,13 +246,13 @@ Add registry to subscriptions.
 		return nil
 	}
 
-	t, err := x509certs.Template()
+	t, err := CertificatesTemplate()
 	if err != nil {
 		return err
 	}
 	t.Execute(w, peercerts)
 
-	fmt.Fprintf(w, `Enter "yes" to append above to %s: `, subs.Path)
+	fmt.Fprintf(w, `Enter "yes" to append above to %s: `, subs)
 	s, err := r.ReadString('\n')
 	if err != nil && strings.TrimSpace(s) != "yes" {
 		return err
@@ -283,7 +286,46 @@ func restCheckin(
 	prefix netip.Prefix,
 	err error,
 ) {
-	clone := *opts.regurl
+	const period = 5 * time.Second
+	for try := 1; true; try++ {
+		var resp *http.Response
+		verbose.Println("checkin try", try)
+		id, via, addr, prefix, resp, err = restCheckinResponse(
+			ctx, pubder, nonce, optsvc,
+		)
+		if err == nil {
+			verbose.Println("checkin:", "OK")
+			return
+		} else if resp == nil {
+			verbose.Println("checkin:", err)
+			return
+		} else if resp.StatusCode != http.StatusTooEarly {
+			verbose.Println("checkin:", err)
+			return
+		} else if try == 10 {
+			err = xerrors.Unavailable("exchange")
+			verbose.Println("checkin:", err)
+			return
+		}
+		verbose.Println("retry exchange assignment in", period)
+		time.Sleep(period)
+	}
+	return
+}
+
+func restCheckinResponse(
+	ctx context.Context,
+	pubder,
+	nonce []byte,
+	optsvc netip.AddrPort,
+) (
+	id, via box.Id,
+	addr netip.Addr,
+	prefix netip.Prefix,
+	resp *http.Response,
+	err error,
+) {
+	clone := *Flags.Reg.URL
 	q := clone.Query()
 	q.Set("op", "checkin")
 	if optsvc.Addr().IsValid() {
@@ -307,8 +349,7 @@ func restCheckin(
 		return
 	}
 	req.Header.Set("Content-Type", contextApplicationPKCS8)
-	resp, err := rest(req)
-	if err != nil {
+	if resp, err = rest(req); err != nil {
 		return
 	}
 	defer resp.Body.Close()
@@ -341,14 +382,17 @@ RESTful ping registry.
 
 {{flags .}}`)
 
-	opts.reg = DefaultRegistry
+	Flags.FN.Crt = DefaultCrt()
+	Flags.FN.Key = DefaultKey()
+	Flags.FN.Subscriptions = DefaultSubscriptions()
+	Flags.Reg.String = DefaultRegistry
 
-	err := parseOpts(ctx, args)
+	err := AddAndParseFlags(ctx, args)
 	if err != nil {
 		return err
 	}
 
-	clone := *opts.regurl
+	clone := *Flags.Reg.URL
 	q := clone.Query()
 	q.Set("op", string(op))
 	clone.RawQuery = q.Encode()
@@ -373,16 +417,19 @@ RESTful query and print registry object.
 
 {{flags .}}`)
 
-	opts.reg = DefaultRegistry
+	Flags.FN.Crt = DefaultCrt()
+	Flags.FN.Key = DefaultKey()
+	Flags.FN.Subscriptions = DefaultSubscriptions()
+	Flags.Reg.String = DefaultRegistry
 
-	err := parseOpts(ctx, args)
+	err := AddAndParseFlags(ctx, args)
 	if err != nil {
 		return err
 	}
 
 	op := fmt.Sprint("show-", string(obj))
 
-	clone := *opts.regurl
+	clone := *Flags.Reg.URL
 	q := clone.Query()
 	q.Set("op", op)
 	clone.RawQuery = q.Encode()
@@ -407,19 +454,22 @@ RESTful subscribe to VPN.
 
 {{flags .}}`)
 
-	opts.reg = DefaultRegistry
+	Flags.FN.Crt = DefaultCrt()
+	Flags.FN.Key = DefaultKey()
+	Flags.FN.Subscriptions = DefaultSubscriptions()
+	Flags.Reg.String = DefaultRegistry
 
-	err := parseOpts(ctx, args)
+	err := AddAndParseFlags(ctx, args)
 	if err != nil {
 		return err
 	}
 
-	clone := *opts.regurl
+	clone := *Flags.Reg.URL
 	q := clone.Query()
 	q.Set("op", string(op))
 	clone.RawQuery = q.Encode()
 	buf := new(bytes.Buffer)
-	c, err := crtFile()
+	c, err := Crt()
 	if err != nil {
 		return err
 	}
@@ -457,7 +507,7 @@ RESTful subscribe to VPN.
 func restWhoIs(ctx context.Context, qname, qvalue string) (
 	*pem.Block, error,
 ) {
-	clone := *opts.regurl
+	clone := *Flags.Reg.URL
 	q := clone.Query()
 	q.Set("op", "whois")
 	q.Set(qname, qvalue)

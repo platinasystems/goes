@@ -11,6 +11,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"maps"
 	"net"
 	"net/netip"
 	"os"
@@ -25,7 +26,6 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xnet"
 	"github.com/platinasystems/goes/v2/pkg/xnet/netpdu"
 	"github.com/platinasystems/goes/v2/pkg/xnet/netph"
-	"golang.org/x/exp/maps"
 )
 
 // Guest is a UDP server that forwards ciphered packets between an exchange
@@ -40,11 +40,15 @@ Forward ciphered packets between exchange and tunnel interface.
 
 {{flags .}}`)
 
-	opts.reg = DefaultRegistry
-	opts.svc = DefaultUDPService()
+	Flags.FN.Crt = DefaultCrt()
+	Flags.FN.Key = DefaultKey()
+	Flags.FN.Subscriptions = DefaultSubscriptions()
+	Flags.Reg.String = DefaultRegistry
+	Flags.Svc = DefaultUDPService()
+
 	unit := flag.Uint("u", 0, "Unit number.")
 
-	err := parseOpts(ctx, args)
+	err := AddAndParseFlags(ctx, args)
 	if err != nil {
 		return err
 	}
@@ -52,8 +56,8 @@ Forward ciphered packets between exchange and tunnel interface.
 	cctx, cancel := context.WithCancel(ctx)
 
 	udp, err := xerrors.MarkResult(net.ListenUDP("udp", &net.UDPAddr{
-		IP:   opts.svc.Addr().AsSlice(),
-		Port: int(opts.svc.Port()),
+		IP:   Flags.Svc.Addr().AsSlice(),
+		Port: int(Flags.Svc.Port()),
 	}))
 	if err != nil {
 		return err
@@ -86,23 +90,24 @@ Forward ciphered packets between exchange and tunnel interface.
 		return err
 	}
 
-	dst, err := xerrors.MarkResult(addressHeader(viaBlk))
+	dst, err := addressHeader(viaBlk)
 	if err != nil {
-		return err
+		return xerrors.Label(err, "address")
 	}
 
 	ha := netif.NewHardwareAddr()
-	if err = xerrors.Mark(ha.Rand()); err != nil {
-		return err
+	if err = ha.Rand(); err != nil {
+		return xerrors.Label(err, "rand_")
 	}
+
 	const (
 		istap   = false
 		persist = false
 		owner   = -1
 		group   = -1
 	)
-	tun, err := xerrors.MarkResult(nettun.
-		New(*unit, istap, persist, owner, group, ha))
+
+	tun, err := nettun.New(*unit, istap, persist, owner, group, ha)
 	if err != nil {
 		return err
 	}
@@ -113,16 +118,16 @@ Forward ciphered packets between exchange and tunnel interface.
 		return xerrors.NotFound(tun.Name())
 	}
 
-	err = xerrors.Mark(nif.Add(cctx, g.hostPrefix, dst,
-		"up", "mtu", fmt.Sprintf("%d", box.ContentMTU)))
+	mtu := fmt.Sprintf("%d", box.ContentMTU)
+	err = nif.Add(cctx, g.hostPrefix, dst, "up", "mtu", mtu)
 	if err != nil {
-		return err
+		return xerrors.Label(err, "ifconfig", nif.Name,
+			g.hostPrefix.String(), "mtu", mtu)
 	}
 
-	err = xerrors.Mark(routeAdd(cctx, g.vpnPrefix, dst),
-		"route add", g.vpnPrefix, "via", dst, "through", nif.Name)
+	err = routeAdd(cctx, g.vpnPrefix, dst)
 	if err != nil {
-		return err
+		return xerrors.Label(err, "route", "add", g.vpnPrefix.String())
 	}
 	defer routeDelete(cctx, g.vpnPrefix, dst)
 

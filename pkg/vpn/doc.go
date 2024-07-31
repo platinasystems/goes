@@ -6,9 +6,11 @@ secure, Virtual Private Network.
 
   - [Certificate] creates a PEM encoded x509 certificate file.
 
+    <goes> new vpn certificate [flags]
+
   - [Ed25519] creates a PEM encoded ed25519 signature key file.
 
-    <goes> new vpn <prerequisite> [flags]
+    <goes> new vpn ed25519 [flags]
 
 # Daemons
 
@@ -27,10 +29,6 @@ secure, Virtual Private Network.
   - [Approve] VPN subscription.
 
   - [Deny] VPN subscription.
-
-  - [Disable] subscriber admin privilege.
-
-  - [Enable] subscriber admin privilege.
 
   - [Ping] registry.
 

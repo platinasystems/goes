@@ -30,31 +30,31 @@ metadata:
   name: vpn
 type: Opaque
 stringData:
-  registry.key: |
+  registry.pk8: |
     -----BEGIN PRIVATE KEY-----
     MC4CAQAwBQYDK2VwBCIEIDDVRrX6dNC03w/uF5Ce7sY4KvEMWUhlgjyeMxVkshiO
     -----END PRIVATE KEY-----
-  exchange0.key: |
+  exchange0.pk8: |
     -----BEGIN PRIVATE KEY-----
     MC4CAQAwBQYDK2VwBCIEIPvT0Mvd90IQW3Pgp+IuY/eZID9XxHUEi8cIiwHV8D95
     -----END PRIVATE KEY-----
-  exchange1.key: |
+  exchange1.pk8: |
     -----BEGIN PRIVATE KEY-----
     MC4CAQAwBQYDK2VwBCIEICQ0BD6LTiDvjI9eHzgaaiuQyq6pf8rFKt1Ki7joRk/J
     -----END PRIVATE KEY-----
-  exchange2.key: |
+  exchange2.pk8: |
     -----BEGIN PRIVATE KEY-----
     MC4CAQAwBQYDK2VwBCIEIK3Op5w66jxolZ3ioW9IWhaoCsXmItJixdCULSnatH29
     -----END PRIVATE KEY-----
-  hosta.key: |
+  hosta.pk8: |
     -----BEGIN PRIVATE KEY-----
     MC4CAQAwBQYDK2VwBCIEIPvh9JiiTf5+a/3ezk7a2ky1c34FirvHoP4iIUvhQUoC
     -----END PRIVATE KEY-----
-  hostb.key: |
+  hostb.pk8: |
     -----BEGIN PRIVATE KEY-----
     MC4CAQAwBQYDK2VwBCIEIIiKZwJ9mmrVkVCPqwS16pw0yrWnLh6YfZYNQI3oMdDh
     -----END PRIVATE KEY-----
-  hostc.key: |
+  hostc.pk8: |
     -----BEGIN PRIVATE KEY-----
     MC4CAQAwBQYDK2VwBCIEIHPKQS91IyAafjs6vdqq6SkKv0IEaEBII3cUup+sNFTR
     -----END PRIVATE KEY-----
@@ -64,15 +64,18 @@ kind: ConfigMap
 metadata:
   name: vpn
 data:
-  hosts: |
-    10.99.98.1 hosta
-    10.99.98.2 hostb
-    10.99.98.3 hostc
-    10.99.98.10 exchange0  
-    10.99.98.11 exchange1  
-    10.99.98.12 exchange2  
-  prefix: "10.99.98.0/24"
-  registry.crt: |
+  vpn.yaml: |
+    vpn:
+      prefix: 10.99.98.0/24
+      address:
+        hosta: 10.99.98.1
+        hostb: 10.99.98.2
+        hostc: 10.99.98.3
+        exchange0: 10.99.98.10
+        exchange1: 10.99.98.11
+        exchange2: 10.99.98.12
+      subscribers: /etc/goes
+  registry.pem: |
     -----BEGIN CERTIFICATE-----
     MIIBszCCAWWgAwIBAgIBATAFBgMrZXAwQTEgMA4GA1UEChMHUGxhdGluYTAOBgNV
     BAoTB1N5c3RlbXMxETAPBgNVBAMTCHJlZ2lzdHJ5MQowCAYDVQQFEwExMB4XDTI0
@@ -85,7 +88,7 @@ data:
     9r+qaDkpx44PNvCBqHFmABkUFE5z3sIu15hzy5xjpP2lTDRUN7cwIU2ErJGBhgCl
     fhoqrENQCA==
     -----END CERTIFICATE-----
-  exchange0.crt: |
+  exchange0.pem: |
     -----BEGIN CERTIFICATE-----
     MIIBtzCCAWmgAwIBAgIBATAFBgMrZXAwQjEgMA4GA1UEChMHUGxhdGluYTAOBgNV
     BAoTB1N5c3RlbXMxEjAQBgNVBAMTCWV4Y2hhbmdlMDEKMAgGA1UEBRMBMTAeFw0y
@@ -98,7 +101,7 @@ data:
     zKAjxq3KFcrmpvbXLu61pUO20garswThTJBorXxkJHrDbujsM16Pq4zdm62yd6N6
     OUo0wjIsjNRgaQk=
     -----END CERTIFICATE-----
-  exchange1.crt: |
+  exchange1.pem: |
     -----BEGIN CERTIFICATE-----
     MIIBtzCCAWmgAwIBAgIBATAFBgMrZXAwQjEgMA4GA1UEChMHUGxhdGluYTAOBgNV
     BAoTB1N5c3RlbXMxEjAQBgNVBAMTCWV4Y2hhbmdlMTEKMAgGA1UEBRMBMTAeFw0y
@@ -111,7 +114,7 @@ data:
     6UAKAYzbwpWrbpVvFwXiLkrxngsAk2fWZovinCJ51zaD78rowR9ZEWAmf0buv8Bv
     j3A6NrVUxuppLgM=
     -----END CERTIFICATE-----
-  exchange2.crt: |
+  exchange2.pem: |
     -----BEGIN CERTIFICATE-----
     MIIBtzCCAWmgAwIBAgIBATAFBgMrZXAwQjEgMA4GA1UEChMHUGxhdGluYTAOBgNV
     BAoTB1N5c3RlbXMxEjAQBgNVBAMTCWV4Y2hhbmdlMjEKMAgGA1UEBRMBMTAeFw0y
@@ -124,7 +127,7 @@ data:
     KzDYkgQDvMoEN+xphLoox5T873BOXBrYK3a2N/T/yvHM9MFBKOY+feQhD9WzBjdt
     Pu5SweHkfrUsJg0=
     -----END CERTIFICATE-----
-  hosta.crt: |
+  hosta.pem: |
     -----BEGIN CERTIFICATE-----
     MIIBqTCCAVugAwIBAgIBATAFBgMrZXAwPjEgMA4GA1UEChMHUGxhdGluYTAOBgNV
     BAoTB1N5c3RlbXMxDjAMBgNVBAMTBWhvc3RhMQowCAYDVQQFEwExMB4XDTI0MDQx
@@ -136,7 +139,7 @@ data:
     QHBsYXRpbmFzeXN0ZW1zLmNvbTAFBgMrZXADQQA4bWuVCV05BaxwsQGs17mMilEl
     rCxXdKWjfZ1/oKbAIfbvCzjuy4kurBp/3i6u2vqCF2aqBiIyAvBYrZl1fkcE
     -----END CERTIFICATE-----
-  hostb.crt: |
+  hostb.pem: |
     -----BEGIN CERTIFICATE-----
     MIIBqTCCAVugAwIBAgIBATAFBgMrZXAwPjEgMA4GA1UEChMHUGxhdGluYTAOBgNV
     BAoTB1N5c3RlbXMxDjAMBgNVBAMTBWhvc3RiMQowCAYDVQQFEwExMB4XDTI0MDQx
@@ -148,77 +151,7 @@ data:
     QHBsYXRpbmFzeXN0ZW1zLmNvbTAFBgMrZXADQQDchnAY9N0MrJxFrrKaAdzeJFB7
     U9h1Zjf/4wOeSgP5TVTj1YCs+b3cd76JRWdpkxrFFPJK+hZx1UmNY7EaD/8H
     -----END CERTIFICATE-----
-  hostc.crt: |
-    -----BEGIN CERTIFICATE-----
-    MIIBqTCCAVugAwIBAgIBATAFBgMrZXAwPjEgMA4GA1UEChMHUGxhdGluYTAOBgNV
-    BAoTB1N5c3RlbXMxDjAMBgNVBAMTBWhvc3RjMQowCAYDVQQFEwExMB4XDTI0MDQx
-    OTAwNTUwOFoXDTM0MDQxNzAwNTUwOFowPjEgMA4GA1UEChMHUGxhdGluYTAOBgNV
-    BAoTB1N5c3RlbXMxDjAMBgNVBAMTBWhvc3RjMQowCAYDVQQFEwExMCowBQYDK2Vw
-    AyEA5DatFIt5LJXRi9E5r9X9Cmhi3+1lV7BfCNm44B0cuAqjfjB8MA4GA1UdDwEB
-    /wQEAwIChDAdBgNVHQ4EFgQU0i4lsQ6JrZ/1L/YODUZ2lx4GaIAwSwYDVR0RBEQw
-    QoIjaG9zdGMudnBuLmRlZmF1bHQuc3ZjLmNsdXN0ZXIubG9jYWyBG3RncmVubmFu
-    QHBsYXRpbmFzeXN0ZW1zLmNvbTAFBgMrZXADQQB/bTs5UehKafm2/9L0RrJkzIjJ
-    4XwUPaIdpGqblfcqbsGNshNGZgw8x3rNlAx3vS6AGzYxQiJfY9J7a5jZVbUB
-    -----END CERTIFICATE-----
-  subscribers.crt: |
-    -----BEGIN CERTIFICATE-----
-    MIIBtzCCAWmgAwIBAgIBATAFBgMrZXAwQjEgMA4GA1UEChMHUGxhdGluYTAOBgNV
-    BAoTB1N5c3RlbXMxEjAQBgNVBAMTCWV4Y2hhbmdlMDEKMAgGA1UEBRMBMTAeFw0y
-    NDA1MTcxNjIyNTJaFw0zNDA1MTUxNjIyNTJaMEIxIDAOBgNVBAoTB1BsYXRpbmEw
-    DgYDVQQKEwdTeXN0ZW1zMRIwEAYDVQQDEwlleGNoYW5nZTAxCjAIBgNVBAUTATEw
-    KjAFBgMrZXADIQACcPfAPdRFZXCYA9Z8t3jBxHKIngvIF+uadun2GiY/MaOBgzCB
-    gDAOBgNVHQ8BAf8EBAMCAoQwHQYDVR0OBBYEFMOufzh8QKTwbS9uR2QtzlnrQpvF
-    ME8GA1UdEQRIMEaCJ2V4Y2hhbmdlMC52cG4uZGVmYXVsdC5zdmMuY2x1c3Rlci5s
-    b2NhbIEbdGdyZW5uYW5AcGxhdGluYXN5c3RlbXMuY29tMAUGAytlcANBAD4M/p0t
-    zKAjxq3KFcrmpvbXLu61pUO20garswThTJBorXxkJHrDbujsM16Pq4zdm62yd6N6
-    OUo0wjIsjNRgaQk=
-    -----END CERTIFICATE-----
-    -----BEGIN CERTIFICATE-----
-    MIIBtzCCAWmgAwIBAgIBATAFBgMrZXAwQjEgMA4GA1UEChMHUGxhdGluYTAOBgNV
-    BAoTB1N5c3RlbXMxEjAQBgNVBAMTCWV4Y2hhbmdlMTEKMAgGA1UEBRMBMTAeFw0y
-    NDA1MTcxNjIyNTJaFw0zNDA1MTUxNjIyNTJaMEIxIDAOBgNVBAoTB1BsYXRpbmEw
-    DgYDVQQKEwdTeXN0ZW1zMRIwEAYDVQQDEwlleGNoYW5nZTExCjAIBgNVBAUTATEw
-    KjAFBgMrZXADIQAv/ZsFREfzWM6jTLU3R5SnVvy7ss0x2fwmY2VTbfq5SqOBgzCB
-    gDAOBgNVHQ8BAf8EBAMCAoQwHQYDVR0OBBYEFDwrCiZCO7J9rPm6gvl9QRaLxpuE
-    ME8GA1UdEQRIMEaCJ2V4Y2hhbmdlMS52cG4uZGVmYXVsdC5zdmMuY2x1c3Rlci5s
-    b2NhbIEbdGdyZW5uYW5AcGxhdGluYXN5c3RlbXMuY29tMAUGAytlcANBAMbWn+NK
-    6UAKAYzbwpWrbpVvFwXiLkrxngsAk2fWZovinCJ51zaD78rowR9ZEWAmf0buv8Bv
-    j3A6NrVUxuppLgM=
-    -----END CERTIFICATE-----
-    -----BEGIN CERTIFICATE-----
-    MIIBtzCCAWmgAwIBAgIBATAFBgMrZXAwQjEgMA4GA1UEChMHUGxhdGluYTAOBgNV
-    BAoTB1N5c3RlbXMxEjAQBgNVBAMTCWV4Y2hhbmdlMjEKMAgGA1UEBRMBMTAeFw0y
-    NDA1MTcxNjIyNTJaFw0zNDA1MTUxNjIyNTJaMEIxIDAOBgNVBAoTB1BsYXRpbmEw
-    DgYDVQQKEwdTeXN0ZW1zMRIwEAYDVQQDEwlleGNoYW5nZTIxCjAIBgNVBAUTATEw
-    KjAFBgMrZXADIQAFRAKdp2m/hTybO0q3yl/O/Y6brAolSAlyFp4FGdQAXqOBgzCB
-    gDAOBgNVHQ8BAf8EBAMCAoQwHQYDVR0OBBYEFGghvWKa7UVw7TXLh4RcaxtRegeU
-    ME8GA1UdEQRIMEaCJ2V4Y2hhbmdlMi52cG4uZGVmYXVsdC5zdmMuY2x1c3Rlci5s
-    b2NhbIEbdGdyZW5uYW5AcGxhdGluYXN5c3RlbXMuY29tMAUGAytlcANBAIcA5dCo
-    KzDYkgQDvMoEN+xphLoox5T873BOXBrYK3a2N/T/yvHM9MFBKOY+feQhD9WzBjdt
-    Pu5SweHkfrUsJg0=
-    -----END CERTIFICATE-----
-    -----BEGIN CERTIFICATE-----
-    MIIBqTCCAVugAwIBAgIBATAFBgMrZXAwPjEgMA4GA1UEChMHUGxhdGluYTAOBgNV
-    BAoTB1N5c3RlbXMxDjAMBgNVBAMTBWhvc3RhMQowCAYDVQQFEwExMB4XDTI0MDQx
-    OTAwNTQzOVoXDTM0MDQxNzAwNTQzOVowPjEgMA4GA1UEChMHUGxhdGluYTAOBgNV
-    BAoTB1N5c3RlbXMxDjAMBgNVBAMTBWhvc3RhMQowCAYDVQQFEwExMCowBQYDK2Vw
-    AyEAFv3u3iP3Roi0AzJLG34yszrBHXQHHPwKADUVn9eFDfSjfjB8MA4GA1UdDwEB
-    /wQEAwIChDAdBgNVHQ4EFgQUnYyGd2Ov6LroYI9Vr7FIl+5witcwSwYDVR0RBEQw
-    QoIjaG9zdGEudnBuLmRlZmF1bHQuc3ZjLmNsdXN0ZXIubG9jYWyBG3RncmVubmFu
-    QHBsYXRpbmFzeXN0ZW1zLmNvbTAFBgMrZXADQQA4bWuVCV05BaxwsQGs17mMilEl
-    rCxXdKWjfZ1/oKbAIfbvCzjuy4kurBp/3i6u2vqCF2aqBiIyAvBYrZl1fkcE
-    -----END CERTIFICATE-----
-    -----BEGIN CERTIFICATE-----
-    MIIBqTCCAVugAwIBAgIBATAFBgMrZXAwPjEgMA4GA1UEChMHUGxhdGluYTAOBgNV
-    BAoTB1N5c3RlbXMxDjAMBgNVBAMTBWhvc3RiMQowCAYDVQQFEwExMB4XDTI0MDQx
-    OTAwNTQyMFoXDTM0MDQxNzAwNTQyMFowPjEgMA4GA1UEChMHUGxhdGluYTAOBgNV
-    BAoTB1N5c3RlbXMxDjAMBgNVBAMTBWhvc3RiMQowCAYDVQQFEwExMCowBQYDK2Vw
-    AyEAHKvgZm/IpE6CyE256C+wPYgSktPrGB5NuXMWsIx5PBOjfjB8MA4GA1UdDwEB
-    /wQEAwIChDAdBgNVHQ4EFgQUkLLRf3iwgLiE+vHVcxKBQFUdBqQwSwYDVR0RBEQw
-    QoIjaG9zdGIudnBuLmRlZmF1bHQuc3ZjLmNsdXN0ZXIubG9jYWyBG3RncmVubmFu
-    QHBsYXRpbmFzeXN0ZW1zLmNvbTAFBgMrZXADQQDchnAY9N0MrJxFrrKaAdzeJFB7
-    U9h1Zjf/4wOeSgP5TVTj1YCs+b3cd76JRWdpkxrFFPJK+hZx1UmNY7EaD/8H
-    -----END CERTIFICATE-----
+  hostc.pem: |
     -----BEGIN CERTIFICATE-----
     MIIBqTCCAVugAwIBAgIBATAFBgMrZXAwPjEgMA4GA1UEChMHUGxhdGluYTAOBgNV
     BAoTB1N5c3RlbXMxDjAMBgNVBAMTBWhvc3RjMQowCAYDVQQFEwExMB4XDTI0MDQx
@@ -245,7 +178,15 @@ spec:
   - name: goes
     imagePullPolicy: IfNotPresent
     image: ko://github.com/platinasystems/goes/v2
-    args: ["start", "vpn", "registry", "-v"]
+    args:
+    - "start"
+    - "vpn"
+    - "registry"
+    - "-v"
+    - "-k"
+    - "/etc/goes/registry.pk8"
+    - "-x"
+    - "/etc/goes/registry.pem"
     ports:
     - protocol: TCP
       containerPort: 8003
@@ -261,20 +202,8 @@ spec:
       sources:
       - secret:
           name: vpn
-          items:
-          - key: registry.key
-            path: .vpn.key
       - configMap:
           name: vpn
-          items:
-          - key: registry.crt
-            path: vpn.crt
-          - key: hosts
-            path: vpn.hosts
-          - key: prefix
-            path: vpn.prefix
-          - key: subscribers.crt
-            path: vpn.subscribers
   - name: state
     emptyDir:
       medium: Memory
@@ -302,6 +231,12 @@ spec:
     - "vpn"
     - "exchange"
     - "-v"
+    - "-k"
+    - "/etc/goes/exchange0.pk8"
+    - "-x"
+    - "/etc/goes/exchange0.pem"
+    - "-R"
+    - "/etc/goes/registry.pem"
     - "-r"
     - "https://registry.vpn.default.svc.cluster.local:8003"
     ports:
@@ -311,28 +246,14 @@ spec:
     - name: config
       mountPath: "/etc/goes"
       readOnly: true
-    - name: state
-      mountPath: "/var/lib/goes"
   volumes:
   - name: config
     projected:
       sources:
       - secret:
           name: vpn
-          items:
-          - key: exchange0.key
-            path: .vpn.key
       - configMap:
           name: vpn
-          items:
-          - key: exchange0.crt
-            path: vpn.crt
-          - key: registry.crt
-            path: vpn.subscriptions
-  - name: state
-    emptyDir:
-      medium: Memory
-      sizeLimit: 10Mi
 ---
 apiVersion: v1
 kind: Pod
@@ -356,6 +277,12 @@ spec:
     - "vpn"
     - "guest"
     - "-v"
+    - "-k"
+    - "/etc/goes/hosta.pk8"
+    - "-x"
+    - "/etc/goes/hosta.pem"
+    - "-R"
+    - "/etc/goes/registry.pem"
     - "-r"
     - "https://registry.vpn.default.svc.cluster.local:8003"
     securityContext:
@@ -372,28 +299,14 @@ spec:
     - name: config
       mountPath: "/etc/goes"
       readOnly: true
-    - name: state
-      mountPath: "/var/lib/goes"
   volumes:
   - name: config
     projected:
       sources:
       - secret:
           name: vpn
-          items:
-          - key: hosta.key
-            path: .vpn.key
       - configMap:
           name: vpn
-          items:
-          - key: hosta.crt
-            path: vpn.crt
-          - key: registry.crt
-            path: vpn.subscriptions
-  - name: state
-    emptyDir:
-      medium: Memory
-      sizeLimit: 10Mi
 ---
 apiVersion: v1
 kind: Pod
@@ -417,6 +330,12 @@ spec:
     - "vpn"
     - "guest"
     - "-v"
+    - "-k"
+    - "/etc/goes/hostb.pk8"
+    - "-x"
+    - "/etc/goes/hostb.pem"
+    - "-R"
+    - "/etc/goes/registry.pem"
     - "-r"
     - "https://registry.vpn.default.svc.cluster.local:8003"
     securityContext:
@@ -433,28 +352,14 @@ spec:
     - name: config
       mountPath: "/etc/goes"
       readOnly: true
-    - name: state
-      mountPath: "/var/lib/goes"
   volumes:
   - name: config
     projected:
       sources:
       - secret:
           name: vpn
-          items:
-          - key: hostb.key
-            path: .vpn.key
       - configMap:
           name: vpn
-          items:
-          - key: hostb.crt
-            path: vpn.crt
-          - key: registry.crt
-            path: vpn.subscriptions
-  - name: state
-    emptyDir:
-      medium: Memory
-      sizeLimit: 10Mi
 ---
 apiVersion: v1
 kind: Pod
@@ -478,6 +383,12 @@ spec:
     - "vpn"
     - "guest"
     - "-v"
+    - "-k"
+    - "/etc/goes/hostc.pk8"
+    - "-x"
+    - "/etc/goes/hostc.pem"
+    - "-R"
+    - "/etc/goes/registry.pem"
     - "-r"
     - "https://registry.vpn.default.svc.cluster.local:8003"
     securityContext:
@@ -494,26 +405,12 @@ spec:
     - name: config
       mountPath: "/etc/goes"
       readOnly: true
-    - name: state
-      mountPath: "/var/lib/goes"
   volumes:
   - name: config
     projected:
       sources:
       - secret:
           name: vpn
-          items:
-          - key: hostc.key
-            path: .vpn.key
       - configMap:
           name: vpn
-          items:
-          - key: hostc.crt
-            path: vpn.crt
-          - key: registry.crt
-            path: vpn.subscriptions
-  - name: state
-    emptyDir:
-      medium: Memory
-      sizeLimit: 10Mi
 ---

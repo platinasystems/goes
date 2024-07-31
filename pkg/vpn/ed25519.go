@@ -14,11 +14,10 @@ import (
 	"time"
 
 	"github.com/platinasystems/goes/v2/pkg/xflag"
-	"github.com/platinasystems/goes/v2/pkg/xpem"
 )
 
-// Ed25519 creates a PEM encoded ed25519 signature key file.
-func Ed25519(ctx context.Context, args []string) error {
+// NewEd25519 creates a PEM encoded ed25519 signature key file.
+func NewEd25519(ctx context.Context, args []string) error {
 	const year = 365 * 24 * time.Hour
 	const longest = 10 * year
 
@@ -28,10 +27,9 @@ Create PEM encoded ed25519 signature key file.
 
 {{flags .}}`)
 
-	opts.key = flag.String("o", DefaultKey(),
-		"Output file name or “-” for stdout.")
+	Flags.FN.Key = DefaultKey()
 
-	err := flag.CommandLine.Parse(args)
+	err := AddAndParseFlags(ctx, args)
 	if err != nil {
 		return err
 	}
@@ -44,15 +42,18 @@ Create PEM encoded ed25519 signature key file.
 	if err != nil {
 		return err
 	}
-	block := &pem.Block{
+	blk := &pem.Block{
 		Type:    "PRIVATE KEY",
 		Headers: map[string]string{},
 		Bytes:   der,
 	}
-	if *opts.key == "-" {
-		err = xpem.EncodeAll(os.Stdout, block)
-	} else {
-		err = xpem.Create(*opts.key, 0600, block)
+	if Flags.FN.Key == "-" {
+		return pem.Encode(os.Stdout, blk)
 	}
-	return err
+	w, err := os.OpenFile(Flags.FN.Key, oCreate, 0600)
+	if err != nil {
+		return err
+	}
+	defer w.Close()
+	return pem.Encode(w, blk)
 }
