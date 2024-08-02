@@ -12,14 +12,32 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
+	"github.com/platinasystems/goes/v2/pkg/xdg"
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xlog"
-	"github.com/platinasystems/goes/v2/pkg/xos"
+	"github.com/platinasystems/goes/v2/pkg/xprogram"
 )
 
-const DefaultRegistry = "https://127.0.0.1:8003"
+const (
+	DefaultRegistry = "https://127.0.0.1:8003"
+	DefaultCfg      = "config.yaml"
+	DefaultCrt      = "crt.pem"
+	DefaultKey      = ".key"
+
+	DefaultSubscriptions = "subscriptions.pem"
+)
+
+// DefaultUDPService is 0.0.0.0:0
+var DefaultUDPService = func() netip.AddrPort {
+	return netip.AddrPortFrom(netip.IPv4Unspecified(), 0)
+}
+
+var ConfigHome = sync.OnceValue(func() string {
+	return filepath.Join(xdg.ConfigHome(), xprogram.MainName(), "vpn")
+})
 
 const (
 	oAppend = os.O_WRONLY | os.O_CREATE | os.O_APPEND
@@ -126,31 +144,6 @@ is 0, allocate from system.`)
 	}
 	return err
 
-}
-
-// DefaultCfg is [xos.ConfigHome] + "/vpn.yaml"
-func DefaultCfg() string {
-	return filepath.Join(xos.ConfigHome(), "vpn.yaml")
-}
-
-// DefaultCrt is [xos.ConfigHome] + "/vpn.pem"
-func DefaultCrt() string {
-	return filepath.Join(xos.ConfigHome(), "vpn.pem")
-}
-
-// DefaultKey is [xos.ConfigHome] + "/.vpn"
-func DefaultKey() string {
-	return filepath.Join(xos.ConfigHome(), ".vpn")
-}
-
-// DefaultSubscriptions is [xos.ConfigHome] + "/vpn-subscriptions.pem"
-func DefaultSubscriptions() string {
-	return filepath.Join(xos.ConfigHome(), "vpn-subscriptions.pem")
-}
-
-// DefaultUDPService is 0.0.0.0:0
-var DefaultUDPService = func() netip.AddrPort {
-	return netip.AddrPortFrom(netip.IPv4Unspecified(), 0)
 }
 
 func SvcLookup(ctx context.Context) error {

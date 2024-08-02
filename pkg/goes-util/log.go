@@ -17,6 +17,7 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xflag"
 	"github.com/platinasystems/goes/v2/pkg/xos"
+	"github.com/platinasystems/goes/v2/pkg/xprogram"
 )
 
 func Log(ctx context.Context, complete bool, args []string) error {
@@ -51,7 +52,7 @@ Execute feature with output piped to syslog, or if GOOS == darwin, oslog.
 	}
 	defer outLog.Close()
 
-	cmd := exec.CommandContext(ctx, xos.Program(), args...)
+	cmd := exec.CommandContext(ctx, xprogram.Path(), args...)
 	cmd.Stdin = os.Stdin
 
 	errPipe, err := cmd.StderrPipe()

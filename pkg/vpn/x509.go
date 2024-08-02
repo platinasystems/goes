@@ -87,8 +87,8 @@ Create PEM encoded x509 certificate file.
 
 {{flags .}}`)
 
-	Flags.FN.Crt = DefaultCrt()
-	Flags.FN.Key = DefaultKey()
+	Flags.FN.Crt = filepath.Join(ConfigHome(), DefaultCrt)
+	Flags.FN.Key = filepath.Join(ConfigHome(), DefaultKey)
 
 	hostname, _ := os.Hostname()
 
@@ -198,7 +198,7 @@ Print parsed certificate.
 
 {{flags .}}`)
 
-	Flags.FN.Crt = DefaultCrt()
+	Flags.FN.Crt = filepath.Join(ConfigHome(), DefaultCrt)
 
 	err := AddAndParseFlags(ctx, args)
 	if err != nil {

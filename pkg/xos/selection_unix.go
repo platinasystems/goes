@@ -2,6 +2,8 @@
 // Use of this source code is governed by the BSD-style license
 // described in the golang/LICENSE file.
 
+//go:build unix
+
 package xos
 
 import (

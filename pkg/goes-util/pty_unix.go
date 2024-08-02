@@ -20,7 +20,7 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xexec"
 	"github.com/platinasystems/goes/v2/pkg/xflag"
-	"github.com/platinasystems/goes/v2/pkg/xos"
+	"github.com/platinasystems/goes/v2/pkg/xprogram"
 	"golang.org/x/sys/unix"
 )
 
@@ -77,7 +77,7 @@ Execute feature in an allocated TTY.
 		wg.Done()
 	}()
 
-	cmd := exec.CommandContext(ctx, xos.Program(), args...)
+	cmd := exec.CommandContext(ctx, xprogram.Path(), args...)
 	cmd.Stdin = tty
 	cmd.Stdout = tty
 	cmd.Stderr = tty

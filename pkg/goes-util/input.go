@@ -13,7 +13,7 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/goes"
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xflag"
-	"github.com/platinasystems/goes/v2/pkg/xos"
+	"github.com/platinasystems/goes/v2/pkg/xprogram"
 )
 
 func Input(ctx context.Context, complete bool, args []string) error {
@@ -42,7 +42,7 @@ Executes feature with file input.
 	}
 	defer r.Close()
 
-	cmd := exec.CommandContext(ctx, xos.Program(), args[1:]...)
+	cmd := exec.CommandContext(ctx, xprogram.Path(), args[1:]...)
 	cmd.Stdin = r
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr

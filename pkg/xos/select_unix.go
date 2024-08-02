@@ -2,7 +2,7 @@
 // Use of this source code is governed by the BSD-style license
 // described in the golang/LICENSE file.
 
-//go:build !android && !linux
+//go:build unix && !android && !linux
 
 package xos
 

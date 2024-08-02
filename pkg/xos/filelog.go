@@ -7,32 +7,39 @@
 package xos
 
 import (
-	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 )
 
-func OpenErrorLog() (io.WriteCloser, error) {
-	return openFile(fmt.Sprint(Arg0Base(), "_error.log"))
-}
+type LogFile string
 
-func OpenNoticeLog() (io.WriteCloser, error) {
-	return openFile(fmt.Sprint(Arg0Base(), ".log"))
-}
+const PathSeparatorString = string(os.PathSeparator)
 
-func OpenInfoLog() (io.WriteCloser, error) {
-	return openFile(fmt.Sprint(Arg0Base(), "_info.log"))
-}
+var (
+	ErrorLogFile  LogFile = "goes_error.log"
+	InfoLogFile   LogFile = "goes_info.log"
+	NoticeLogFile LogFile = "goes.log"
+)
 
-// If directory exists, create ~/Library/Logs/FN; otherwise, TMPDIR/FN.
-func openFile(fn string) (io.WriteCloser, error) {
+var (
+	OpenErrorLog  = ErrorLogFile.Create
+	OpenInfoLog   = InfoLogFile.Create
+	OpenNoticeLog = NoticeLogFile.Create
+)
+
+// If not super user and directory exists, create ~/Library/Logs/FN;
+// otherwise, TMPDIR/FN.
+func (lf LogFile) Create() (io.WriteCloser, error) {
 	dn := os.TempDir()
-	if h, err := os.UserHomeDir(); err == nil {
-		hl := filepath.Join(h, "/Library/Logs")
-		if fi, err := os.Stat(hl); err == nil && fi.IsDir() {
-			dn = hl
+	if os.Geteuid() > 0 {
+		if h, err := os.UserHomeDir(); err == nil {
+			h += PathSeparatorString + "Library"
+			h += PathSeparatorString + "Logs"
+			fi, err := os.Stat(h)
+			if err == nil && fi.IsDir() {
+				dn = h
+			}
 		}
 	}
-	return os.Create(filepath.Join(dn, fn))
+	return os.Create(dn + PathSeparatorString + string(lf))
 }

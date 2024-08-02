@@ -4,6 +4,16 @@
 
 package goes_util
 
+import (
+	"errors"
+	"golang/buildid"
+	"os"
+
+	"github.com/platinasystems/goes/v2/pkg/xprogram"
+)
+
+var ErrUnavailable = errors.New("unavailable")
+
 var Features = map[string]any{
 	"command": Command,
 	"cutoff":  Cutoff,
@@ -17,18 +27,34 @@ var Features = map[string]any{
 	"show": map[string]any{
 		"build": map[string]any{
 			"id": func() (any, error) {
-				return BuildId()
+				return buildid.ReadFile(os.Args[0])
 			},
 			"info": func() (any, error) {
-				return BuildInfo()
+				var err error
+				bi := xprogram.BuildInfo()
+				if bi == nil {
+					err = ErrUnavailable
+				}
+				return bi, err
 			},
 		},
 		"main": map[string]any{
+			"name": func() (any, error) {
+				return xprogram.MainName(), nil
+			},
 			"reference": func() (any, error) {
-				return MainReference()
+				m := xprogram.MainModule()
+				if m == nil {
+					return "", ErrUnavailable
+				}
+				return m.Path + "@" + m.Version, nil
 			},
 			"version": func() (any, error) {
-				return MainVersion()
+				m := xprogram.MainModule()
+				if m == nil {
+					return "", ErrUnavailable
+				}
+				return m.Version, nil
 			},
 		},
 	},

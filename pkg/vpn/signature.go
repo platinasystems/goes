@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 
@@ -37,7 +38,7 @@ Print algorithm.
 
 {{flags .}}`)
 
-	Flags.FN.Key = DefaultKey()
+	Flags.FN.Key = filepath.Join(ConfigHome(), DefaultKey)
 
 	err := AddAndParseFlags(ctx, args)
 	if err != nil {

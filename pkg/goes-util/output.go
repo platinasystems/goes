@@ -14,7 +14,7 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/goes"
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xflag"
-	"github.com/platinasystems/goes/v2/pkg/xos"
+	"github.com/platinasystems/goes/v2/pkg/xprogram"
 )
 
 func Output(ctx context.Context, complete bool, args []string) error {
@@ -63,7 +63,7 @@ Execute feature with output written to file.
 	}
 	defer f.Close()
 
-	cmd := exec.CommandContext(ctx, xos.Program(), args[1:]...)
+	cmd := exec.CommandContext(ctx, xprogram.Path(), args[1:]...)
 	cmd.Stdin = os.Stdin
 
 	if *tFlag {

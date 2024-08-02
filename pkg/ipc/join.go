@@ -4,12 +4,8 @@
 
 package ipc
 
-import (
-	"fmt"
-
-	"github.com/platinasystems/goes/v2/pkg/xos"
-)
+import "fmt"
 
 func join(prefix string, args []any) string {
-	return fmt.Sprint(prefix, xos.Arg0Base(), fmt.Sprint(args...))
+	return fmt.Sprint(prefix, fmt.Sprint(args...))
 }

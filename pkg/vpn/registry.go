@@ -23,9 +23,9 @@ import (
 	"time"
 
 	"github.com/platinasystems/goes/v2/pkg/box"
+	"github.com/platinasystems/goes/v2/pkg/xdg"
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xflag"
-	"github.com/platinasystems/goes/v2/pkg/xos"
 	"gopkg.in/yaml.v3"
 )
 
@@ -92,9 +92,9 @@ A RESTful WWW server.
 
 {{flags .}}`)
 
-	Flags.FN.Cfg = DefaultCfg()
-	Flags.FN.Crt = DefaultCrt()
-	Flags.FN.Key = DefaultKey()
+	Flags.FN.Cfg = filepath.Join(ConfigHome(), DefaultCfg)
+	Flags.FN.Crt = filepath.Join(ConfigHome(), DefaultCrt)
+	Flags.FN.Key = filepath.Join(ConfigHome(), DefaultKey)
 	port := flag.Uint("p", 8003, "Port number.")
 
 	err := AddAndParseFlags(ctx, args)
@@ -421,7 +421,7 @@ func (reg *registry) reload() error {
 
 		dfn := cfg.Subscribers
 		if len(dfn) == 0 {
-			dfn = filepath.Join(xos.StateHome(),
+			dfn = filepath.Join(xdg.StateHome(),
 				fmt.Sprint(name, "-subscribers.pem"))
 		}
 		vpn.subscribers, err = NewCertificates(dfn)

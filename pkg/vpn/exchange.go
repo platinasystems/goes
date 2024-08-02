@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"net"
 	"net/netip"
+	"path/filepath"
 	"sync"
 
 	"github.com/platinasystems/goes/v2/pkg/box"
@@ -30,9 +31,10 @@ Exchange ciphered packets between guests.
 
 {{flags .}}`)
 
-	Flags.FN.Crt = DefaultCrt()
-	Flags.FN.Key = DefaultKey()
-	Flags.FN.Subscriptions = DefaultSubscriptions()
+	Flags.FN.Crt = filepath.Join(ConfigHome(), DefaultCrt)
+	Flags.FN.Key = filepath.Join(ConfigHome(), DefaultKey)
+	Flags.FN.Subscriptions = filepath.
+		Join(ConfigHome(), DefaultSubscriptions)
 	Flags.Reg.String = DefaultRegistry
 	Flags.Svc = DefaultUDPService()
 

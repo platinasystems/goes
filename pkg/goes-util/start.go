@@ -11,10 +11,11 @@ import (
 	"os/exec"
 
 	"github.com/platinasystems/goes/v2/pkg/goes"
+	"github.com/platinasystems/goes/v2/pkg/xdg"
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xexec"
 	"github.com/platinasystems/goes/v2/pkg/xflag"
-	"github.com/platinasystems/goes/v2/pkg/xos"
+	"github.com/platinasystems/goes/v2/pkg/xprogram"
 )
 
 // If not a /ko-app, execute feature as a detached process with output piped to
@@ -35,13 +36,13 @@ the system logger; otherwise, it perform within the current process context.
 	}
 
 	var cmd *exec.Cmd
-	if xos.ProgramIsKoApp() {
-		cmd = exec.Command(xos.Program(), args...)
+	if xdg.IsKoApp() {
+		cmd = exec.Command(xprogram.Path(), args...)
 		cmd.Stdin = os.Stdin
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 	} else {
-		cmd := exec.Command(xos.Program(),
+		cmd := exec.Command(xprogram.Path(),
 			append([]string{"log"}, args...)...)
 		cmd.Stdin = nil
 		cmd.Stdout = nil
@@ -49,7 +50,7 @@ the system logger; otherwise, it perform within the current process context.
 	}
 
 	cmd.Env = DaemonEnv()
-	cmd.Dir = xos.RunTimeDir()
+	cmd.Dir = xdg.RunTimeDir()
 	if _, err = os.Stat(cmd.Dir); err != nil {
 		if !os.IsNotExist(err) {
 			return err
@@ -57,7 +58,7 @@ the system logger; otherwise, it perform within the current process context.
 		cmd.Dir = os.TempDir()
 		err = nil
 	}
-	if !xos.ProgramIsKoApp() {
+	if !xdg.IsKoApp() {
 		cmd.SysProcAttr, err = xexec.DaemonSysProcAttr()
 		if err == nil {
 			err = cmd.Start()

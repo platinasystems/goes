@@ -11,6 +11,7 @@ import (
 	"encoding/pem"
 	"flag"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/platinasystems/goes/v2/pkg/xflag"
@@ -27,7 +28,7 @@ Create PEM encoded ed25519 signature key file.
 
 {{flags .}}`)
 
-	Flags.FN.Key = DefaultKey()
+	Flags.FN.Key = filepath.Join(ConfigHome(), DefaultKey)
 
 	err := AddAndParseFlags(ctx, args)
 	if err != nil {

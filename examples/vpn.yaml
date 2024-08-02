@@ -64,7 +64,7 @@ kind: ConfigMap
 metadata:
   name: vpn
 data:
-  vpn.yaml: |
+  config.yaml: |
     vpn:
       prefix: 10.99.98.0/24
       address:
@@ -74,7 +74,7 @@ data:
         exchange0: 10.99.98.10
         exchange1: 10.99.98.11
         exchange2: 10.99.98.12
-      subscribers: /etc/goes
+      subscribers: /etc/goes/vpn
   registry.pem: |
     -----BEGIN CERTIFICATE-----
     MIIBszCCAWWgAwIBAgIBATAFBgMrZXAwQTEgMA4GA1UEChMHUGxhdGluYTAOBgNV
@@ -184,18 +184,18 @@ spec:
     - "registry"
     - "-v"
     - "-k"
-    - "/etc/goes/registry.pk8"
+    - "/etc/goes/vpn/registry.pk8"
     - "-x"
-    - "/etc/goes/registry.pem"
+    - "/etc/goes/vpn/registry.pem"
     ports:
     - protocol: TCP
       containerPort: 8003
     volumeMounts:
     - name: config
-      mountPath: "/etc/goes"
+      mountPath: "/etc/goes/vpn"
       readOnly: true
     - name: state
-      mountPath: "/var/lib/goes"
+      mountPath: "/var/lib/goes/vpn"
   volumes:
   - name: config
     projected:
@@ -232,11 +232,11 @@ spec:
     - "exchange"
     - "-v"
     - "-k"
-    - "/etc/goes/exchange0.pk8"
+    - "/etc/goes/vpn/exchange0.pk8"
     - "-x"
-    - "/etc/goes/exchange0.pem"
+    - "/etc/goes/vpn/exchange0.pem"
     - "-R"
-    - "/etc/goes/registry.pem"
+    - "/etc/goes/vpn/registry.pem"
     - "-r"
     - "https://registry.vpn.default.svc.cluster.local:8003"
     ports:
@@ -244,7 +244,7 @@ spec:
       containerPort: 8003
     volumeMounts:
     - name: config
-      mountPath: "/etc/goes"
+      mountPath: "/etc/goes/vpn"
       readOnly: true
   volumes:
   - name: config
@@ -278,11 +278,11 @@ spec:
     - "guest"
     - "-v"
     - "-k"
-    - "/etc/goes/hosta.pk8"
+    - "/etc/goes/vpn/hosta.pk8"
     - "-x"
-    - "/etc/goes/hosta.pem"
+    - "/etc/goes/vpn/hosta.pem"
     - "-R"
-    - "/etc/goes/registry.pem"
+    - "/etc/goes/vpn/registry.pem"
     - "-r"
     - "https://registry.vpn.default.svc.cluster.local:8003"
     securityContext:
@@ -297,7 +297,7 @@ spec:
       containerPort: 8003
     volumeMounts:
     - name: config
-      mountPath: "/etc/goes"
+      mountPath: "/etc/goes/vpn"
       readOnly: true
   volumes:
   - name: config
@@ -331,11 +331,11 @@ spec:
     - "guest"
     - "-v"
     - "-k"
-    - "/etc/goes/hostb.pk8"
+    - "/etc/goes/vpn/hostb.pk8"
     - "-x"
-    - "/etc/goes/hostb.pem"
+    - "/etc/goes/vpn/hostb.pem"
     - "-R"
-    - "/etc/goes/registry.pem"
+    - "/etc/goes/vpn/registry.pem"
     - "-r"
     - "https://registry.vpn.default.svc.cluster.local:8003"
     securityContext:
@@ -350,7 +350,7 @@ spec:
       containerPort: 8003
     volumeMounts:
     - name: config
-      mountPath: "/etc/goes"
+      mountPath: "/etc/goes/vpn"
       readOnly: true
   volumes:
   - name: config
@@ -384,11 +384,11 @@ spec:
     - "guest"
     - "-v"
     - "-k"
-    - "/etc/goes/hostc.pk8"
+    - "/etc/goes/vpn/hostc.pk8"
     - "-x"
-    - "/etc/goes/hostc.pem"
+    - "/etc/goes/vpn/hostc.pem"
     - "-R"
-    - "/etc/goes/registry.pem"
+    - "/etc/goes/vpn/registry.pem"
     - "-r"
     - "https://registry.vpn.default.svc.cluster.local:8003"
     securityContext:
@@ -403,7 +403,7 @@ spec:
       containerPort: 8003
     volumeMounts:
     - name: config
-      mountPath: "/etc/goes"
+      mountPath: "/etc/goes/vpn"
       readOnly: true
   volumes:
   - name: config

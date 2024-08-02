@@ -14,7 +14,7 @@ import (
 
 	"github.com/platinasystems/goes/v2/pkg/goes"
 	"github.com/platinasystems/goes/v2/pkg/xflag"
-	"github.com/platinasystems/goes/v2/pkg/xos"
+	"github.com/platinasystems/goes/v2/pkg/xprogram"
 )
 
 func Env(ctx context.Context, complete bool, args []string) error {
@@ -61,7 +61,7 @@ Set environment and perform named feature, or print environment.
 		return nil
 	}
 
-	cmd := exec.CommandContext(ctx, xos.Program(), args...)
+	cmd := exec.CommandContext(ctx, xprogram.Path(), args...)
 	cmd.Env = environ
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout

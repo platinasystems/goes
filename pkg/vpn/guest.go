@@ -15,6 +15,7 @@ import (
 	"net"
 	"net/netip"
 	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -40,9 +41,10 @@ Forward ciphered packets between exchange and tunnel interface.
 
 {{flags .}}`)
 
-	Flags.FN.Crt = DefaultCrt()
-	Flags.FN.Key = DefaultKey()
-	Flags.FN.Subscriptions = DefaultSubscriptions()
+	Flags.FN.Crt = filepath.Join(ConfigHome(), DefaultCrt)
+	Flags.FN.Key = filepath.Join(ConfigHome(), DefaultKey)
+	Flags.FN.Subscriptions = filepath.
+		Join(ConfigHome(), DefaultSubscriptions)
 	Flags.Reg.String = DefaultRegistry
 	Flags.Svc = DefaultUDPService()
 

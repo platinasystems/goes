@@ -19,6 +19,7 @@ import (
 	"net/http"
 	"net/netip"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -152,9 +153,10 @@ RESTful registry administration.
 
 {{flags .}}`)
 
-	Flags.FN.Crt = DefaultCrt()
-	Flags.FN.Key = DefaultKey()
-	Flags.FN.Subscriptions = DefaultSubscriptions()
+	Flags.FN.Crt = filepath.Join(ConfigHome(), DefaultCrt)
+	Flags.FN.Key = filepath.Join(ConfigHome(), DefaultKey)
+	Flags.FN.Subscriptions = filepath.
+		Join(ConfigHome(), DefaultSubscriptions)
 	Flags.Reg.String = DefaultRegistry
 
 	err := AddAndParseFlags(ctx, args)
@@ -193,9 +195,10 @@ Add registry to subscriptions.
 
 {{flags .}}`)
 
-	Flags.FN.Crt = DefaultCrt()
-	Flags.FN.Key = DefaultKey()
-	Flags.FN.Subscriptions = DefaultSubscriptions()
+	Flags.FN.Crt = filepath.Join(ConfigHome(), DefaultCrt)
+	Flags.FN.Key = filepath.Join(ConfigHome(), DefaultKey)
+	Flags.FN.Subscriptions = filepath.
+		Join(ConfigHome(), DefaultSubscriptions)
 	Flags.Reg.String = DefaultRegistry
 
 	err := AddAndParseFlags(ctx, args)
@@ -382,9 +385,10 @@ RESTful ping registry.
 
 {{flags .}}`)
 
-	Flags.FN.Crt = DefaultCrt()
-	Flags.FN.Key = DefaultKey()
-	Flags.FN.Subscriptions = DefaultSubscriptions()
+	Flags.FN.Crt = filepath.Join(ConfigHome(), DefaultCrt)
+	Flags.FN.Key = filepath.Join(ConfigHome(), DefaultKey)
+	Flags.FN.Subscriptions = filepath.
+		Join(ConfigHome(), DefaultSubscriptions)
 	Flags.Reg.String = DefaultRegistry
 
 	err := AddAndParseFlags(ctx, args)
@@ -417,9 +421,10 @@ RESTful query and print registry object.
 
 {{flags .}}`)
 
-	Flags.FN.Crt = DefaultCrt()
-	Flags.FN.Key = DefaultKey()
-	Flags.FN.Subscriptions = DefaultSubscriptions()
+	Flags.FN.Crt = filepath.Join(ConfigHome(), DefaultCrt)
+	Flags.FN.Key = filepath.Join(ConfigHome(), DefaultKey)
+	Flags.FN.Subscriptions = filepath.
+		Join(ConfigHome(), DefaultSubscriptions)
 	Flags.Reg.String = DefaultRegistry
 
 	err := AddAndParseFlags(ctx, args)
@@ -454,9 +459,10 @@ RESTful subscribe to VPN.
 
 {{flags .}}`)
 
-	Flags.FN.Crt = DefaultCrt()
-	Flags.FN.Key = DefaultKey()
-	Flags.FN.Subscriptions = DefaultSubscriptions()
+	Flags.FN.Crt = filepath.Join(ConfigHome(), DefaultCrt)
+	Flags.FN.Key = filepath.Join(ConfigHome(), DefaultKey)
+	Flags.FN.Subscriptions = filepath.
+		Join(ConfigHome(), DefaultSubscriptions)
 	Flags.Reg.String = DefaultRegistry
 
 	err := AddAndParseFlags(ctx, args)
