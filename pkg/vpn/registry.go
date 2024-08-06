@@ -128,6 +128,7 @@ A RESTful WWW server.
 		Addr:    svc,
 		Handler: &reg,
 		TLSConfig: &tls.Config{
+			MinVersion: tls.VersionTLS13,
 			ClientAuth: tls.RequireAnyClientCert,
 		},
 		BaseContext: func(net.Listener) context.Context {
@@ -154,7 +155,7 @@ A RESTful WWW server.
 func (reg *registry) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	defer req.Body.Close()
 	if !req.TLS.HandshakeComplete {
-		verbose.Println("imcomplete handshake")
+		verbose.Println("incomplete handshake")
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
