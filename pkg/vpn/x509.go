@@ -341,19 +341,11 @@ func (cs *Certificates) First() *x509.Certificate {
 }
 
 func (cs *Certificates) Has(peer *x509.Certificate) bool {
-	for _, bc := range cs.BCs {
-		if bc.Cert != nil && bc.Cert.Equal(peer) {
-			err := bc.Cert.CheckSignature(peer.SignatureAlgorithm,
-				peer.RawTBSCertificate,
-				peer.Signature)
-			if err != nil {
-				verbose.Println(peer.Subject.CommonName, err)
-				return false
-			}
-			return true
-		}
+	bc, found := cs.Named[peer.Subject.CommonName]
+	if !found {
+		return false
 	}
-	return false
+	return peer.Equal(bc.Cert)
 }
 
 func (cs *Certificates) Join(pool *x509.CertPool) {
