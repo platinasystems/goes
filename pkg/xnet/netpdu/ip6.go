@@ -29,18 +29,25 @@ var IP6NextHeaders = map[uint8]func([]byte) fmt.Formatter{
 
 type IP6 []byte
 
-func (pdu IP6) Format(w fmt.State, verb rune) {
-	var h netph.IP6
+func (pdu IP6) Parse() (header netph.IP6, data []byte, err error) {
 	buf := bytes.NewBuffer(pdu)
+	if _, err = header.ReadFrom(buf); err == nil {
+		data = buf.Bytes()
+	}
+	return
+}
+
+func (pdu IP6) Format(w fmt.State, verb rune) {
 	fmt.Fprint(w, "ip6 ")
-	if _, err := h.ReadFrom(buf); err != nil {
+	header, data, err := pdu.Parse()
+	if err != nil {
 		fmt.Fprint(w, err)
+		return
+	}
+	fmt.Fprint(w, net.IP(header.DA[:]), " <- ", net.IP(header.SA[:]))
+	if f, ok := IP6NextHeaders[header.NextHeader]; ok {
+		fmt.Fprint(w, Mark, f(data))
 	} else {
-		fmt.Fprint(w, net.IP(h.DA[:]), " <- ", net.IP(h.SA[:]))
-		if f, ok := IP6NextHeaders[h.NextHeader]; ok {
-			fmt.Fprint(w, Mark, f(buf.Bytes()))
-		} else {
-			fmt.Fprintf(w, " next[%#x]", h.NextHeader)
-		}
+		fmt.Fprintf(w, " next[%#x]", header.NextHeader)
 	}
 }

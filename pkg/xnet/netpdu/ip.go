@@ -26,19 +26,29 @@ var IPprotocols = map[uint8]func([]byte) fmt.Formatter{
 
 type IP []byte
 
-func (pdu IP) Format(w fmt.State, verb rune) {
-	var h netph.IP
+func (pdu IP) Parse() (header netph.IP, data []byte, err error) {
 	buf := bytes.NewBuffer(pdu)
-	fmt.Fprint(w, "ip ")
-	if _, err := h.ReadFrom(buf); err != nil {
-		fmt.Fprint(w, err)
-	} else {
-		fmt.Fprint(w, net.IP(h.DA[:]), " <- ", net.IP(h.SA[:]))
-		i := h.IHL() * 4
-		if f, ok := IPprotocols[h.Protocol]; ok && i < len(pdu) {
-			fmt.Fprint(w, Mark, f(buf.Bytes()))
-		} else {
-			fmt.Fprintf(w, ", protocol[%#x]", h.Protocol)
+	if _, err = header.ReadFrom(buf); err == nil {
+		i := header.IHL() << 2
+		if n := len(pdu); i > n {
+			i = n
 		}
+		data = []byte(pdu[i:])
+	}
+	return
+}
+
+func (pdu IP) Format(w fmt.State, verb rune) {
+	fmt.Fprint(w, "ip ")
+	header, data, err := pdu.Parse()
+	if err != nil {
+		fmt.Fprint(w, err)
+		return
+	}
+	fmt.Fprint(w, net.IP(header.DA[:]), " <- ", net.IP(header.SA[:]))
+	if f, ok := IPprotocols[header.Protocol]; ok {
+		fmt.Fprint(w, Mark, f(data))
+	} else {
+		fmt.Fprintf(w, ", protocol[%#x]", header.Protocol)
 	}
 }

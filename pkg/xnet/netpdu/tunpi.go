@@ -22,15 +22,21 @@ var TunPIprotos = map[uint16]func([]byte) fmt.Formatter{
 
 type TunPI []byte
 
-func (pdu TunPI) Format(w fmt.State, verb rune) {
-	var h netph.TunPI
+func (pdu TunPI) Parse() (header netph.TunPI, data []byte, err error) {
 	buf := bytes.NewBuffer(pdu)
+	if _, err = header.ReadFrom(buf); err == nil {
+		data = buf.Bytes()
+	}
+	return
+}
+
+func (pdu TunPI) Format(w fmt.State, verb rune) {
 	fmt.Fprint(w, "tun")
-	if _, err := h.ReadFrom(buf); err != nil {
-		fmt.Fprint(w, err)
-	} else if f, ok := TunPIprotos[h.Proto]; ok {
-		fmt.Fprint(w, Mark, f(buf.Bytes()))
+	if header, data, err := pdu.Parse(); err != nil {
+		fmt.Fprint(w, " ", err)
+	} else if f, ok := TunPIprotos[header.Proto]; ok {
+		fmt.Fprint(w, Mark, f(data))
 	} else {
-		fmt.Fprintf(w, " proto[%#x]", h.Proto)
+		fmt.Fprintf(w, " proto[%#x]", header.Proto)
 	}
 }

@@ -120,6 +120,7 @@ Forward ciphered packets between exchange and tunnel interface.
 		return xerrors.NotFound(tun.Name())
 	}
 
+	is6 := g.hostPrefix.Addr().Is6()
 	mtu := fmt.Sprintf("%d", box.ContentMTU)
 	err = nif.Add(cctx, g.hostPrefix, dst, "up", "mtu", mtu)
 	if err != nil {
@@ -146,7 +147,7 @@ Forward ciphered packets between exchange and tunnel interface.
 	go pktTxRoutine(cctx, &wg, udp, pktTxCh)
 	defer close(pktTxCh)
 	wg.Add(1)
-	go tunReadRoutine(cctx, &wg, tun.Name(), tun, tunReadCh)
+	go tunReadRoutine(cctx, &wg, tun.Name(), tun, tunReadCh, is6)
 	wg.Add(1)
 	go tunWriteRoutine(cctx, &wg, tun.Name(), tun, tunWriteCh)
 	defer close(tunWriteCh)
@@ -161,6 +162,11 @@ Forward ciphered packets between exchange and tunnel interface.
 	verbose.Printf("start (%s, %v)", nif.Name, g.hostPrefix)
 	defer verbose.Printf("stopped (%s, %v)", nif.Name, g.hostPrefix)
 
+	var (
+		tunpdu netpdu.TunPI
+		tunph  netph.TunPI
+		data   []byte
+	)
 guestLoop:
 	for {
 		select {
@@ -282,31 +288,46 @@ guestLoop:
 				bx.Return()
 				continue guestLoop
 			}
-			var pi netph.TunPI
-			if _, err = pi.ReadFrom(bx); err != nil {
-				verbose.Print("underrun")
+			tunpdu = netpdu.TunPI(bx.Contents)
+			if tunph, data, err = tunpdu.Parse(); err != nil {
+				verbose.Println(err)
 				bx.Return()
 				continue guestLoop
 			}
-			switch pi.Proto {
+			switch tunph.Proto {
 			case VPN_P_HELLO:
 				verbose.Print(xerrors.FIXME("re-checkin"))
 				// re-checkin if registry era mismatch
 				// else re-query exchange from registry
 				// if that era is mismatched
 			case VPN_P_PUBLIC_KEY:
-				blk, _ := pem.Decode(bx.Contents)
+				blk, _ := pem.Decode(data)
 				if blk == nil {
 					verbose.Println("encoding")
 				} else if err = g.peer(blk); err != nil {
 					verbose.Println(err)
 				}
 				bx.Return()
-			case netpdu.ETH_P_IP, netpdu.ETH_P_IPV6:
-				bx.Rewind()
-				tunWriteCh <- bx
+			case netpdu.ETH_P_IP:
+				if !is6 {
+					bx.Rewind()
+					tunWriteCh <- bx
+				} else {
+					verbose.Println("dropped:",
+						netpdu.IP(data))
+					bx.Return()
+				}
+			case netpdu.ETH_P_IPV6:
+				if is6 {
+					bx.Rewind()
+					tunWriteCh <- bx
+				} else {
+					verbose.Println("dropped:",
+						netpdu.IP6(data))
+					bx.Return()
+				}
 			default:
-				verbose.Printf("unknown %#x\n", pi.Proto)
+				verbose.Printf("proto[%#x]", tunph.Proto)
 				bx.Return()
 			}
 		}
@@ -319,24 +340,20 @@ type guest struct {
 }
 
 func (*guest) toWhom(bx *box.Box) netip.Addr {
-	var pi netph.TunPI
-	defer bx.Rewind()
-	if _, err := pi.ReadFrom(bx); err != nil {
-		return zaddr
-	}
-	switch pi.Proto {
-	case netpdu.ETH_P_IP:
-		var ip netph.IP
-		if _, err := ip.ReadFrom(bx); err == nil {
-			return netip.AddrFrom4([4]byte(ip.DA))
+	addr := zaddr
+	pi, d, err := netpdu.TunPI(bx.Contents).Parse()
+	switch {
+	case err != nil:
+	case pi.Proto == netpdu.ETH_P_IP:
+		if ip, _, err := netpdu.IP(d).Parse(); err == nil {
+			addr = netip.AddrFrom4([4]byte(ip.DA))
 		}
-	case netpdu.ETH_P_IPV6:
-		var ip6 netph.IP6
-		if _, err := ip6.ReadFrom(bx); err == nil {
-			return netip.AddrFrom16([16]byte(ip6.DA))
+	case pi.Proto == netpdu.ETH_P_IPV6:
+		if ip6, _, err := netpdu.IP6(d).Parse(); err == nil {
+			addr = netip.AddrFrom16([16]byte(ip6.DA))
 		}
 	}
-	return zaddr
+	return addr
 }
 
 func (g *guest) whoisAddressed(ch chan<- *box.Box, addr netip.Addr) {
@@ -392,20 +409,41 @@ func tunReadRoutine(
 	name string,
 	r io.Reader,
 	ch chan<- *box.Box,
+	is6 bool,
 ) {
+	var (
+		bx     *box.Box
+		tunpdu netpdu.TunPI
+		tunph  netph.TunPI
+		data   []byte
+		err    error
+	)
 	defer wg.Done()
 	verbose.Println("start", name, "read routine")
 	defer verbose.Println("stopped", name, "read routine")
 	for ctx.Err() == nil {
-		bx, err := box.NewReadContents(r)
-		if err != nil {
+		if bx, err = box.NewReadContents(r); err != nil {
 			if !errors.Is(err, os.ErrClosed) {
 				verbose.Print(err)
 			}
 			return
 		}
-		verbose.Print(netpdu.TunPI(bx.Contents))
-		ch <- bx
+		tunpdu = netpdu.TunPI(bx.Contents)
+		if tunph, data, err = tunpdu.Parse(); err != nil {
+			verbose.Print(err)
+			bx.Return()
+			continue
+		}
+		if tunph.Proto == netpdu.ETH_P_IP && is6 {
+			verbose.Print("tun dropped: ", netpdu.IP(data))
+			bx.Return()
+		} else if tunph.Proto == netpdu.ETH_P_IPV6 && !is6 {
+			verbose.Print("tun dropped: ", netpdu.IP6(data))
+			bx.Return()
+		} else {
+			verbose.Print(tunpdu)
+			ch <- bx
+		}
 	}
 }
 
@@ -416,6 +454,10 @@ func tunWriteRoutine(
 	w io.Writer,
 	ch <-chan *box.Box,
 ) {
+	var (
+		tunpdu netpdu.TunPI
+		err    error
+	)
 	defer wg.Done()
 	verbose.Println("start", name, "write routine")
 	defer verbose.Println("stopped", name, "write routine")
@@ -429,12 +471,11 @@ func tunWriteRoutine(
 				verbose.Println("tun write ch closed")
 				return
 			}
-			if len(bx.Contents) == 0 {
-				verbose.Print("no content")
-			} else if _, err := bx.WriteTo(w); err != nil {
+			tunpdu = netpdu.TunPI(bx.Contents)
+			if _, err = bx.WriteTo(w); err != nil {
 				verbose.Print(err)
 			} else {
-				verbose.Print(netpdu.TunPI(bx.Contents))
+				verbose.Print(tunpdu)
 			}
 			bx.Return()
 		}
