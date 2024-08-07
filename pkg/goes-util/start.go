@@ -42,7 +42,7 @@ the system logger; otherwise, it perform within the current process context.
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 	} else {
-		cmd := exec.Command(xprogram.Path(),
+		cmd = exec.Command(xprogram.Path(),
 			append([]string{"log"}, args...)...)
 		cmd.Stdin = nil
 		cmd.Stdout = nil
