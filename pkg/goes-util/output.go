@@ -64,6 +64,7 @@ Execute feature with output written to file.
 	defer f.Close()
 
 	cmd := exec.CommandContext(ctx, xprogram.Path(), args[1:]...)
+	cmd.Args[0] = xprogram.MainName()
 	cmd.Stdin = os.Stdin
 
 	if *tFlag {

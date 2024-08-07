@@ -49,6 +49,7 @@ the system logger; otherwise, it perform within the current process context.
 		cmd.Stderr = nil
 	}
 
+	cmd.Args[0] = xprogram.MainName()
 	cmd.Env = DaemonEnv()
 	cmd.Dir = xdg.RunTimeDir()
 	if _, err = os.Stat(cmd.Dir); err != nil {

@@ -43,6 +43,7 @@ Executes feature with file input.
 	defer r.Close()
 
 	cmd := exec.CommandContext(ctx, xprogram.Path(), args[1:]...)
+	cmd.Args[0] = xprogram.MainName()
 	cmd.Stdin = r
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr

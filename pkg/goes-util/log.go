@@ -54,6 +54,7 @@ Execute feature with output piped to syslog, or if GOOS == darwin, oslog.
 	defer outLog.Close()
 
 	cmd := exec.CommandContext(ctx, xprogram.Path(), args...)
+	cmd.Args[0] = xprogram.MainName()
 	cmd.Stdin = os.Stdin
 
 	errPipe, err := cmd.StderrPipe()

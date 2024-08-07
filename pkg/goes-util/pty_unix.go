@@ -78,6 +78,7 @@ Execute feature in an allocated TTY.
 	}()
 
 	cmd := exec.CommandContext(ctx, xprogram.Path(), args...)
+	cmd.Args[0] = xprogram.MainName()
 	cmd.Stdin = tty
 	cmd.Stdout = tty
 	cmd.Stderr = tty

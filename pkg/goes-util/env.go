@@ -62,6 +62,7 @@ Set environment and perform named feature, or print environment.
 	}
 
 	cmd := exec.CommandContext(ctx, xprogram.Path(), args...)
+	cmd.Args[0] = xprogram.MainName()
 	cmd.Env = environ
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
