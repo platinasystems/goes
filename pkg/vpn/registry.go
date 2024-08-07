@@ -501,7 +501,7 @@ func (vpn *regVpn) checkin(w http.ResponseWriter, req *http.Request) error {
 		verbose.Printf("new quest %s via %d", cn, IdIndex(via))
 	}
 
-	data, err := xerrors.MarkResult(io.ReadAll(req.Body))
+	data, err := io.ReadAll(req.Body)
 	if err != nil {
 		return err
 	}
@@ -598,9 +598,6 @@ func (vpn *regVpn) dumpSubscribers(w io.Writer) error {
 }
 
 func (vpn *regVpn) lease(name string) (netip.Addr, error) {
-	vpn.mutex.Lock()
-	defer vpn.mutex.Unlock()
-
 	addr := vpn.addr.top.Next()
 	if !addr.IsValid() {
 		return addr, xerrors.Invalid("top")
