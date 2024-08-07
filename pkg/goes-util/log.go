@@ -6,6 +6,7 @@ package goes_util
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"flag"
 	"fmt"
@@ -67,18 +68,22 @@ Execute feature with output piped to syslog, or if GOOS == darwin, oslog.
 	}
 	defer outPipe.Close()
 
+	cp := func(w io.Writer, r io.Reader) {
+		var b []byte
+		for sc := bufio.NewScanner(r); sc.Scan(); {
+			b = bytes.TrimSpace(sc.Bytes())
+			if len(b) > 0 {
+				w.Write(b)
+			}
+		}
+	}
+
+	go cp(outLog, outPipe)
+	go cp(errLog, errPipe)
+
 	if err = cmd.Start(); err != nil {
 		return err
 	}
-
-	go func(w io.Writer, r io.Reader) {
-		for sc := bufio.NewScanner(r); sc.Scan(); {
-			w.Write(sc.Bytes())
-		}
-	}(outLog, outPipe)
-
-	errData, err := io.ReadAll(errPipe)
-	errLog.Write(errData)
 
 	err = cmd.Wait()
 	return err
