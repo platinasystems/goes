@@ -201,3 +201,7 @@ func PrintMatchingKeys(m map[string]any, prefixes ...string) {
 		fmt.Println(k)
 	}
 }
+
+func Reselect(ctx context.Context, args []string) error {
+	return ImpliedSelect(ctx, None, Features, args)
+}

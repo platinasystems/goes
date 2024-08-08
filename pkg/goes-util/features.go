@@ -38,6 +38,7 @@ var Features = map[string]any{
 				return bi, err
 			},
 		},
+		"daemons": ShowDaemons,
 		"main": map[string]any{
 			"name": func() (any, error) {
 				return xprogram.MainName(), nil
@@ -59,5 +60,6 @@ var Features = map[string]any{
 		},
 	},
 	"standby": Standby,
-	"start":   Start,
+	"start":   StartDaemon,
+	"stop":    StopDaemons,
 }

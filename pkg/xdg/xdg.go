@@ -18,8 +18,6 @@ var (
 	Etc    = filepath.FromSlash("/etc")
 	EtcOpt = filepath.FromSlash("/etc/opt")
 
-	KoApp = filepath.FromSlash("/ko-app")
-
 	Opt      = filepath.FromSlash("/opt")
 	OptShare = filepath.FromSlash("/opt/share")
 
@@ -52,10 +50,6 @@ func (dirs Dirs) Search(fn string) (os.FileInfo, error) {
 	return nil, os.ErrNotExist
 }
 
-func IsKoApp() bool {
-	return strings.HasPrefix(xprogram.Path(), KoApp)
-}
-
 func IsOpt() bool {
 	return strings.HasPrefix(xprogram.Path(), Opt)
 }
@@ -73,7 +67,7 @@ var CacheHome = sync.OnceValue(func() string {
 	if s := os.Getenv("XDG_CACHE_HOME"); len(s) > 0 {
 		return s
 	}
-	if IsKoApp() || IsSuperUser() {
+	if xprogram.IsKoApp() || IsSuperUser() {
 		for _, s := range []string{
 			VarCache,
 			VarRun,
@@ -94,7 +88,7 @@ var CacheDirs = sync.OnceValue(func() (dirs Dirs) {
 	if s := os.Getenv("XDG_CACHE_HOME"); len(s) > 0 {
 		dirs = append(dirs, filepath.Join(s, name))
 		dirs = append(dirs, s)
-	} else if IsKoApp() || IsSuperUser() {
+	} else if xprogram.IsKoApp() || IsSuperUser() {
 		dirs = append(dirs, filepath.Join(VarCache, name))
 		dirs = append(dirs, VarCache)
 		dirs = append(dirs, filepath.Join(VarRun, name))
@@ -114,7 +108,7 @@ var ConfigHome = sync.OnceValue(func() string {
 	if s := os.Getenv("XDG_CACHE_HOME"); len(s) > 0 {
 		return s
 	}
-	if IsKoApp() || IsSuperUser() {
+	if xprogram.IsKoApp() || IsSuperUser() {
 		if IsOpt() {
 			return EtcOpt
 		}
@@ -131,7 +125,7 @@ var ConfigDirs = sync.OnceValue(func() (dirs Dirs) {
 			dirs = append(dirs, filepath.Join(ss, name))
 			dirs = append(dirs, ss)
 		}
-	} else if IsKoApp() || IsSuperUser() {
+	} else if xprogram.IsKoApp() || IsSuperUser() {
 		if IsOpt() {
 			dirs = append(dirs, filepath.Join(EtcOpt, name))
 			dirs = append(dirs, EtcOpt)
@@ -151,7 +145,7 @@ var DataHome = sync.OnceValue(func() string {
 	if s := os.Getenv("XDG_DATA_HOME"); len(s) > 0 {
 		return s
 	}
-	if IsKoApp() || IsSuperUser() {
+	if xprogram.IsKoApp() || IsSuperUser() {
 		if IsUsrLocal() {
 			return UsrLocalShare
 		} else if IsOpt() {
@@ -175,7 +169,7 @@ var DataDirs = sync.OnceValue(func() (dirs Dirs) {
 			dirs = append(dirs, filepath.Join(ss, name))
 			dirs = append(dirs, ss)
 		}
-	} else if IsKoApp() || IsSuperUser() {
+	} else if xprogram.IsKoApp() || IsSuperUser() {
 		if IsUsrLocal() {
 			dirs = append(dirs, filepath.Join(UsrLocalShare, name))
 			dirs = append(dirs, UsrLocalShare)
@@ -203,7 +197,7 @@ var RunTimeDir = sync.OnceValue(func() string {
 	if s := os.Getenv("XDG_RUNTIME_DIR"); len(s) > 0 {
 		return s
 	}
-	if IsKoApp() || IsSuperUser() {
+	if xprogram.IsKoApp() || IsSuperUser() {
 		for _, s := range []string{
 			VarRun,
 		} {
@@ -232,7 +226,7 @@ var RunTimeDirs = sync.OnceValue(func() (dirs Dirs) {
 	if s := os.Getenv("XDG_RUNTIME_DIR"); len(s) > 0 {
 		dirs = append(dirs, filepath.Join(s, name))
 		dirs = append(dirs, s)
-	} else if IsKoApp() || IsSuperUser() {
+	} else if xprogram.IsKoApp() || IsSuperUser() {
 		dirs = append(dirs, filepath.Join(VarRun, name))
 		dirs = append(dirs, VarRun)
 	} else if h, err := os.UserHomeDir(); err == nil {
@@ -257,7 +251,7 @@ var StateHome = sync.OnceValue(func() string {
 	if s := os.Getenv("XDG_STATE_HOME"); len(s) > 0 {
 		return s
 	}
-	if IsKoApp() {
+	if xprogram.IsKoApp() {
 		return VarLib
 	}
 	if IsSuperUser() {
@@ -278,7 +272,7 @@ var StateDirs = sync.OnceValue(func() (dirs Dirs) {
 	if s := os.Getenv("XDG_STATE_HOME"); len(s) > 0 {
 		dirs = append(dirs, filepath.Join(s, name))
 		dirs = append(dirs, s)
-	} else if IsKoApp() {
+	} else if xprogram.IsKoApp() {
 		dirs = append(dirs, filepath.Join(VarLib, name))
 		dirs = append(dirs, VarLib)
 	} else if IsSuperUser() {
