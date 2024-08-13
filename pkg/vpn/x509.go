@@ -17,6 +17,7 @@ import (
 	"io"
 	"math"
 	"math/big"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -35,6 +36,8 @@ var CertificatesTemplate = sync.OnceValues(func() (*template.Template, error) {
   email_addresses:{{range .EmailAddresses}}
   - {{.}}{{end}}
   ip_addresses: {{range .IPAddresses}}
+  - {{.}}{{end}}
+  uris:{{range .URIs}}
   - {{.}}{{end}}
   serial_number: {{.SerialNumber}}
   not_before: {{.NotBefore}}
@@ -64,8 +67,16 @@ var CertificatesTemplate = sync.OnceValues(func() (*template.Template, error) {
 `[1:])
 })
 
-// NewCertificate creates a PEM encoded x509 certificate file.
-func NewCertificate(ctx context.Context, args []string) error {
+type CF string
+
+const (
+	RegistryCF CF = "registry"
+	ExchangeCF CF = "exchange"
+	GuestCF    CF = "guest"
+)
+
+// Create a PEM encoded x509 certificate file.
+func (cf CF) Create(ctx context.Context, args []string) error {
 	const year = 365 * 24 * time.Hour
 	const longest = 10 * year
 
@@ -76,7 +87,8 @@ Create PEM encoded x509 certificate file.
 {{flags .}}`)
 
 	kflag := KeyFlag()
-	xflag := X509Flag()
+	dfn := filepath.Join(ConfigHome(), fmt.Sprint(cf, ".pem"))
+	oflag := flag.String("o", dfn, "Output file name, “-” for stdout.")
 
 	hostname, _ := os.Hostname()
 
@@ -93,6 +105,7 @@ Create PEM encoded x509 certificate file.
 	province := flag.String("province", "", "aka. state.")
 	country := flag.String("country", "", "")
 	postalCode := flag.String("postal-code", "", "aka. zip.")
+	uris := flag.String("uri", "", "Comma separated URLs.")
 
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
@@ -139,6 +152,17 @@ Create PEM encoded x509 certificate file.
 	if len(*email) > 0 {
 		t.EmailAddresses = strings.Split(*email, ",")
 	}
+
+	if len(*uris) > 0 {
+		for _, s := range strings.Split(*uris, ",") {
+			u, err := url.Parse(s)
+			if err != nil {
+				return err
+			}
+			t.URIs = append(t.URIs, u)
+		}
+	}
+
 	parent := &t
 
 	random := rand.Reader
@@ -166,10 +190,15 @@ Create PEM encoded x509 certificate file.
 		Headers: map[string]string{},
 		Bytes:   der,
 	}
-	if *xflag == "-" {
+	if *oflag == "-" {
 		return pem.Encode(os.Stdout, blk)
 	}
-	w, err := os.OpenFile(*xflag, oCreate, 0644)
+	if _, err = os.Stat(*oflag); err == nil {
+		return fmt.Errorf("%s: exists", *oflag)
+	} else if !os.IsNotExist(err) {
+		return err
+	}
+	w, err := os.OpenFile(*oflag, oCreate, 0644)
 	if err != nil {
 		return err
 	}
@@ -177,22 +206,24 @@ Create PEM encoded x509 certificate file.
 	return pem.Encode(w, blk)
 }
 
-// Show Certificate prints parsed certificate(s).
-func ShowCertificate(ctx context.Context, args []string) error {
+// Print parsed certificate(s).
+func (cf CF) Show(ctx context.Context, args []string) error {
 	xflag.UsageTemplate(flag.CommandLine, `
 usage: {{.Name}} [flags]
 Print parsed certificate.
 
 {{flags .}}`)
 
-	xflag := X509Flag()
+	dfn := filepath.Join(ConfigHome(), fmt.Sprint(cf, ".pem"))
+	iflag := flag.String("i", dfn,
+		"X509 certificate file name, “-” for stdin.")
 
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
 		return err
 	}
 
-	if local.crt, err = NewCertificates(*xflag); err == nil {
+	if local.crt, err = NewCertificates(*iflag); err == nil {
 		err = local.crt.Show(os.Stdout)
 	}
 	return err

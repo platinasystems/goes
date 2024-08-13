@@ -39,16 +39,20 @@ var ConfigHome = sync.OnceValue(func() string {
 var Features = map[string]any{
 	"new": map[string]any{
 		"vpn": map[string]any{
-			"certificate": NewCertificate,
-			"ed25519":     NewEd25519,
+			string(ExchangeCF): ExchangeCF.Create,
+			string(GuestCF):    GuestCF.Create,
+			string(RegistryCF): RegistryCF.Create,
+			"signature":        NewEd25519,
 		},
 	},
 	"show": map[string]any{
 		"vpn": map[string]any{
 			string(Admins):      Admins.show,
-			"certificate":       ShowCertificate,
-			"signature":         ShowSignature,
+			string(ExchangeCF):  ExchangeCF.Show,
+			string(GuestCF):     GuestCF.Show,
 			string(Pending):     Pending.show,
+			string(RegistryCF):  RegistryCF.Show,
+			"signature":         ShowSignature,
 			string(Subscribers): Subscribers.show,
 		},
 	},
@@ -140,9 +144,12 @@ func GuestFlag() *string {
 		"Guest certificate file name, “-” for stdio.")
 }
 
+func DefaultKey() string {
+	return filepath.Join(ConfigHome(), ".key")
+}
+
 func KeyFlag() *string {
-	dfn := filepath.Join(ConfigHome(), ".key")
-	return flag.String("k", dfn, "Key file name, “-” for stdio.")
+	return flag.String("k", DefaultKey(), "Key file name, “-” for stdio.")
 }
 
 func NatFlag() *netip.AddrPort {
@@ -180,12 +187,6 @@ func TunnelFlag() *uint {
 func UrlFlag() *string {
 	return flag.String("u", "https://127.0.0.1:8003",
 		"Registry URL. (https://<host>[:port][/<vpn>])")
-}
-
-func X509Flag() *string {
-	dfn := filepath.Join(ConfigHome(), "guest.pem")
-	return flag.String("e", dfn,
-		"X509 certificate file name, “-” for stdio.")
 }
 
 func SvcLookup(ctx context.Context) error {

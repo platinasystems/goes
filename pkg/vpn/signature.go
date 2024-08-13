@@ -32,14 +32,15 @@ Print algorithm.
 
 {{flags .}}`)
 
-	kflag := KeyFlag()
+	iflag := flag.String("i", DefaultKey(),
+		"Input file name, “-” for stdout.")
 
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
 		return err
 	}
 
-	key, err := NewSignatures(*kflag)
+	key, err := NewSignatures(*iflag)
 	if err == nil {
 		err = key.Show(os.Stdout)
 	}
