@@ -12,6 +12,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"net/netip"
+	"net/url"
 	"time"
 
 	"github.com/platinasystems/goes/v2/pkg/box"
@@ -42,22 +43,54 @@ type client struct {
 	via       map[int]box.Id
 }
 
-func (cl *client) register(ctx context.Context, optsvc netip.AddrPort) error {
-	crt, err := Crt()
+func (cl *client) flags(
+	ctx context.Context,
+	xflag *string,
+	args []string,
+) error {
+	kflag := KeyFlag()
+	rflag := RegistryFlag()
+	sflag := ServiceFlag()
+	uflag := UrlFlag()
+
+	err := qvflags(args)
 	if err != nil {
 		return err
 	}
-	cl.name = crt.First().Subject.CommonName
 
-	if len(Flags.Reg.URL.Scheme) == 0 {
-		Flags.Reg.URL.Scheme = "https"
+	if local.crt, err = NewCertificates(*xflag); err != nil {
+		return err
+	}
+	if local.sig, err = NewSignatures(*kflag); err != nil {
+		return err
+	}
+	if local.svc = *sflag; local.svc.Addr().IsUnspecified() {
+		SvcLookup(ctx)
 	}
 
-	err = waitForDNS(ctx, "ip", Flags.Reg.URL.Hostname())
+	if remote.crt, err = NewCertificates(*rflag); err != nil {
+		return err
+	}
+	if remote.url, err = url.Parse(*uflag); err != nil {
+		return err
+	} else if len(remote.url.Scheme) == 0 {
+		remote.url.Scheme = "https"
+	}
+
+	mkTransport()
+	return nil
+}
+
+func (cl *client) register(
+	ctx context.Context,
+	optsvc netip.AddrPort,
+) error {
+	err := waitForDNS(ctx, "ip", remote.url.Hostname())
 	if err != nil {
 		return err
 	}
 
+	cl.name = local.crt.First().Subject.CommonName
 	cl.addressed = make(map[netip.Addr]box.Id)
 	cl.gcm = make(map[int]*gcm.Cipher)
 	cl.service = make(map[int]netip.AddrPort)

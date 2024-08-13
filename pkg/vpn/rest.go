@@ -8,7 +8,6 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"crypto/tls"
 	"crypto/x509"
 	"encoding/hex"
 	"encoding/pem"
@@ -18,10 +17,9 @@ import (
 	"io"
 	"net/http"
 	"net/netip"
+	"net/url"
 	"os"
-	"path/filepath"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/platinasystems/goes/v2/pkg/box"
@@ -64,57 +62,43 @@ const Unsubscribe Rest = "unsubscribe"
 const contextApplicationPKCS8 = "application/pkcs8"
 const dnsLookupTimeout = 30 * time.Second
 
-var restTransport = sync.OnceValues(func() (*http.Transport, error) {
-	var cert tls.Certificate
-
-	cs, err := Crt()
-	if err != nil {
-		return nil, err
-	}
-
-	key, err := Key()
-	if err != nil {
-		return nil, err
-	}
-
-	subs, err := Subscriptions()
-	if err != nil {
-		return nil, err
-	}
-
-	cert.PrivateKey = key.First()
-	if cert.PrivateKey == nil {
-		return nil, xerrors.Invalid(key.String())
-	}
-	if cert.Certificate = cs.DERs(); cert.Certificate == nil {
-		return nil, xerrors.Invalid(cs.String())
-	}
-
-	cfg := new(tls.Config)
-	cfg.Certificates = append(cfg.Certificates, cert)
-
-	if cfg.RootCAs, err = x509.SystemCertPool(); err != nil {
-		cfg.RootCAs = x509.NewCertPool()
-	}
-
-	cs.Join(cfg.RootCAs)
-	subs.Join(cfg.RootCAs)
-
-	t := http.DefaultTransport.(*http.Transport).Clone()
-	t.TLSClientConfig = cfg
-	return t, nil
-})
-
 func isLocalhost(req *http.Request) bool {
 	return strings.HasPrefix(req.URL.Host, "127.0.0.1") ||
 		strings.HasPrefix(req.URL.Host, "localhost")
 }
 
-func rest(req *http.Request) (*http.Response, error) {
-	transport, err := restTransport()
+func (op Rest) flags(xflag *string, args []string) error {
+	kflag := KeyFlag()
+	rflag := RegistryFlag()
+	uflag := UrlFlag()
+
+	err := qvflags(args)
 	if err != nil {
-		return nil, err
+		return err
 	}
+
+	if local.crt, err = NewCertificates(*xflag); err != nil {
+		return err
+	}
+	if local.sig, err = NewSignatures(*kflag); err != nil {
+		return err
+	}
+	if remote.crt, err = NewCertificates(*rflag); err != nil {
+		if op != "certify" || !os.IsNotExist(err) {
+			return err
+		}
+	}
+	if remote.url, err = url.Parse(*uflag); err != nil {
+		return err
+	} else if len(remote.url.Scheme) == 0 {
+		remote.url.Scheme = "https"
+	}
+
+	mkTransport()
+	return nil
+}
+
+func rest(req *http.Request) (*http.Response, error) {
 	if isLocalhost(req) {
 		transport.TLSClientConfig.InsecureSkipVerify = true
 	}
@@ -153,25 +137,18 @@ RESTful registry administration.
 
 {{flags .}}`)
 
-	Flags.FN.Crt = filepath.Join(ConfigHome(), DefaultCrt)
-	Flags.FN.Key = filepath.Join(ConfigHome(), DefaultKey)
-	Flags.FN.Subscriptions = filepath.
-		Join(ConfigHome(), DefaultSubscriptions)
-	Flags.Reg.String = DefaultRegistry
-
-	err := AddAndParseFlags(ctx, args)
+	err := op.flags(AdminFlag(), args)
 	if err != nil {
 		return err
-	} else if len(args) == 0 {
+	}
+	if args = flag.Args(); len(args) == 0 {
 		return xerrors.Incomplete("subscriber")
 	}
 
-	subscriber := args[0]
-
-	clone := *Flags.Reg.URL
+	clone := *remote.url
 	q := clone.Query()
 	q.Set("op", string(op))
-	q.Set("subscriber", subscriber)
+	q.Set("subscriber", args[0])
 	clone.RawQuery = q.Encode()
 	req, err := http.
 		NewRequestWithContext(ctx, http.MethodPut, clone.String(), nil)
@@ -187,26 +164,20 @@ RESTful registry administration.
 	return err
 }
 
-// Rest.certify adds registry to subscriptions.
+// Rest.certify adds the peer certificate to CONFIG_HOME/registry.pem.
 func (op Rest) certify(ctx context.Context, args []string) error {
 	xflag.UsageTemplate(flag.CommandLine, `
 usage: {{.Name}} [flags]
-Add registry to subscriptions.
+Import registry certificate.
 
 {{flags .}}`)
 
-	Flags.FN.Crt = filepath.Join(ConfigHome(), DefaultCrt)
-	Flags.FN.Key = filepath.Join(ConfigHome(), DefaultKey)
-	Flags.FN.Subscriptions = filepath.
-		Join(ConfigHome(), DefaultSubscriptions)
-	Flags.Reg.String = DefaultRegistry
-
-	err := AddAndParseFlags(ctx, args)
+	err := op.flags(GuestFlag(), args)
 	if err != nil {
 		return err
 	}
 
-	clone := *Flags.Reg.URL
+	clone := *remote.url
 	q := clone.Query()
 	q.Set("op", string(op))
 	clone.RawQuery = q.Encode()
@@ -233,14 +204,9 @@ Add registry to subscriptions.
 	r := bufio.NewReader(os.Stdin)
 	w := os.Stdout
 
-	subs, err := Subscriptions()
-	if err != nil {
-		return err
-	}
-
 	var peercerts []*x509.Certificate
 	for _, peer := range resp.TLS.PeerCertificates {
-		if !subs.Has(peer) {
+		if !remote.crt.Has(peer) {
 			peercerts = append(peercerts, peer)
 		}
 	}
@@ -255,7 +221,7 @@ Add registry to subscriptions.
 	}
 	t.Execute(w, peercerts)
 
-	fmt.Fprintf(w, `Enter "yes" to append above to %s: `, subs)
+	fmt.Fprintf(w, `Enter "yes" to append above to %s: `, remote.crt)
 	s, err := r.ReadString('\n')
 	if err != nil && strings.TrimSpace(s) != "yes" {
 		return err
@@ -267,7 +233,7 @@ Add registry to subscriptions.
 			Headers: map[string]string{},
 			Bytes:   peer.Raw,
 		}
-		if err = subs.Add(pb, peer); err != nil {
+		if err = remote.crt.Add(pb, peer); err != nil {
 			break
 		} else {
 			io.Copy(w, resp.Body)
@@ -328,7 +294,7 @@ func restCheckinResponse(
 	resp *http.Response,
 	err error,
 ) {
-	clone := *Flags.Reg.URL
+	clone := *remote.url
 	q := clone.Query()
 	q.Set("op", "checkin")
 	if optsvc.Addr().IsValid() {
@@ -385,18 +351,12 @@ RESTful ping registry.
 
 {{flags .}}`)
 
-	Flags.FN.Crt = filepath.Join(ConfigHome(), DefaultCrt)
-	Flags.FN.Key = filepath.Join(ConfigHome(), DefaultKey)
-	Flags.FN.Subscriptions = filepath.
-		Join(ConfigHome(), DefaultSubscriptions)
-	Flags.Reg.String = DefaultRegistry
-
-	err := AddAndParseFlags(ctx, args)
+	err := op.flags(AdminFlag(), args)
 	if err != nil {
 		return err
 	}
 
-	clone := *Flags.Reg.URL
+	clone := *remote.url
 	q := clone.Query()
 	q.Set("op", string(op))
 	clone.RawQuery = q.Encode()
@@ -421,22 +381,15 @@ RESTful query and print registry object.
 
 {{flags .}}`)
 
-	Flags.FN.Crt = filepath.Join(ConfigHome(), DefaultCrt)
-	Flags.FN.Key = filepath.Join(ConfigHome(), DefaultKey)
-	Flags.FN.Subscriptions = filepath.
-		Join(ConfigHome(), DefaultSubscriptions)
-	Flags.Reg.String = DefaultRegistry
-
-	err := AddAndParseFlags(ctx, args)
+	op := "show-" + obj
+	err := op.flags(AdminFlag(), args)
 	if err != nil {
 		return err
 	}
 
-	op := fmt.Sprint("show-", string(obj))
-
-	clone := *Flags.Reg.URL
+	clone := *remote.url
 	q := clone.Query()
-	q.Set("op", op)
+	q.Set("op", string(op))
 	clone.RawQuery = q.Encode()
 	req, err := http.
 		NewRequestWithContext(ctx, http.MethodGet, clone.String(), nil)
@@ -459,27 +412,17 @@ RESTful subscribe to VPN.
 
 {{flags .}}`)
 
-	Flags.FN.Crt = filepath.Join(ConfigHome(), DefaultCrt)
-	Flags.FN.Key = filepath.Join(ConfigHome(), DefaultKey)
-	Flags.FN.Subscriptions = filepath.
-		Join(ConfigHome(), DefaultSubscriptions)
-	Flags.Reg.String = DefaultRegistry
-
-	err := AddAndParseFlags(ctx, args)
+	err := op.flags(GuestFlag(), args)
 	if err != nil {
 		return err
 	}
 
-	clone := *Flags.Reg.URL
+	clone := *remote.url
 	q := clone.Query()
 	q.Set("op", string(op))
 	clone.RawQuery = q.Encode()
 	buf := new(bytes.Buffer)
-	c, err := Crt()
-	if err != nil {
-		return err
-	}
-	if err = c.Dump(buf); err != nil {
+	if err = local.crt.Dump(buf); err != nil {
 		return err
 	}
 	req, err := http.
@@ -488,10 +431,6 @@ RESTful subscribe to VPN.
 		return xerrors.Mark(err)
 	}
 	req.Header.Set("Content-Type", "application/x-pem-file")
-	transport, err := restTransport()
-	if err != nil {
-		return err
-	}
 	transport.TLSClientConfig.InsecureSkipVerify = true
 	cl := &http.Client{Transport: transport}
 	resp, err := cl.Do(req)
@@ -513,7 +452,7 @@ RESTful subscribe to VPN.
 func restWhoIs(ctx context.Context, qname, qvalue string) (
 	*pem.Block, error,
 ) {
-	clone := *Flags.Reg.URL
+	clone := *remote.url
 	q := clone.Query()
 	q.Set("op", "whois")
 	q.Set(qname, qvalue)

@@ -13,9 +13,7 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"strings"
-	"sync"
 
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xflag"
@@ -26,10 +24,6 @@ type Privater interface {
 	Equal(x crypto.PrivateKey) bool
 }
 
-var Key = sync.OnceValues(func() (*Signatures, error) {
-	return NewSignatures(Flags.FN.Key)
-})
-
 // ShowSignature prints algorithm.
 func ShowSignature(ctx context.Context, args []string) error {
 	xflag.UsageTemplate(flag.CommandLine, `
@@ -38,14 +32,14 @@ Print algorithm.
 
 {{flags .}}`)
 
-	Flags.FN.Key = filepath.Join(ConfigHome(), DefaultKey)
+	kflag := KeyFlag()
 
-	err := AddAndParseFlags(ctx, args)
+	err := flag.CommandLine.Parse(args)
 	if err != nil {
 		return err
 	}
 
-	key, err := Key()
+	key, err := NewSignatures(*kflag)
 	if err == nil {
 		err = key.Show(os.Stdout)
 	}

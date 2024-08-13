@@ -31,6 +31,9 @@ import (
 
 type registry struct {
 	mutex sync.RWMutex
+	cfg   *string
+	sig   *Signatures
+	crt   *Certificates
 	http  *http.Server
 	vpn   map[string]*regVpn
 	wg    sync.WaitGroup
@@ -48,9 +51,10 @@ type regVpn struct {
 		top   netip.Addr
 	}
 
-	admin       map[string]bool
+	admin map[string]bool
+	reg,
 	subscribers *Certificates
-	pending     pending
+	pending pending
 
 	block struct {
 		addressed  map[netip.Addr]*pem.Block
@@ -92,25 +96,23 @@ A RESTful WWW server.
 
 {{flags .}}`)
 
-	Flags.FN.Cfg = filepath.Join(ConfigHome(), DefaultCfg)
-	Flags.FN.Crt = filepath.Join(ConfigHome(), DefaultCrt)
-	Flags.FN.Key = filepath.Join(ConfigHome(), DefaultKey)
-	port := flag.Uint("p", 8003, "Port number.")
+	reg.cfg = ConfigFlag()
+	kflag := KeyFlag()
+	pflag := PortFlag()
+	rflag := RegistryFlag()
 
-	err := AddAndParseFlags(ctx, args)
+	err := qvflags(args)
 	if err != nil {
 		return err
-	} else {
-		args = flag.Args()
 	}
 
-	if _, err = os.Stat(Flags.FN.Cfg); err != nil {
+	if _, err = os.Stat(*reg.cfg); err != nil {
 		return err
 	}
-	if _, err = os.Stat(Flags.FN.Crt); err != nil {
+	if reg.sig, err = NewSignatures(*kflag); err != nil {
 		return err
 	}
-	if _, err = os.Stat(Flags.FN.Key); err != nil {
+	if reg.crt, err = NewCertificates(*rflag); err != nil {
 		return err
 	}
 
@@ -122,7 +124,7 @@ A RESTful WWW server.
 
 	cctx, cancel := context.WithCancel(ctx)
 
-	svc := fmt.Sprint(":", *port)
+	svc := fmt.Sprint(":", *pflag)
 
 	reg.http = &http.Server{
 		Addr:    svc,
@@ -145,7 +147,7 @@ A RESTful WWW server.
 	wg.Add(1)
 	go reg.shutdown(cctx, &wg)
 
-	err = reg.http.ListenAndServeTLS(Flags.FN.Crt, Flags.FN.Key)
+	err = reg.http.ListenAndServeTLS(*rflag, *kflag)
 	if errors.Is(err, http.ErrServerClosed) {
 		err = nil
 	}
@@ -375,7 +377,7 @@ func (reg *registry) shutdown(ctx context.Context, wg *sync.WaitGroup) {
 }
 
 func (reg *registry) reload() error {
-	data, err := os.ReadFile(Flags.FN.Cfg)
+	data, err := os.ReadFile(*reg.cfg)
 	if err != nil {
 		return err
 	}
@@ -389,6 +391,7 @@ func (reg *registry) reload() error {
 		if !found {
 			vpn = &regVpn{
 				name: name,
+				reg:  reg.crt,
 			}
 
 			vpn.addr.name = make(map[netip.Addr]string)
@@ -422,18 +425,15 @@ func (reg *registry) reload() error {
 
 		dfn := cfg.Subscribers
 		if len(dfn) == 0 {
-			dfn = filepath.Join(xdg.StateHome(),
-				fmt.Sprint(name, "-subscribers.pem"))
+			if name == "vpn" {
+				dfn = xdg.ConfigHome()
+			} else {
+				dfn = filepath.Join(xdg.ConfigHome(), name)
+			}
 		}
 		vpn.subscribers, err = NewCertificates(dfn)
 		if err != nil && !os.IsNotExist(err) {
 			return err
-		}
-		verbose.Println("subscribers...")
-		for _, bc := range vpn.subscribers.BCs {
-			if bc.Cert != nil {
-				verbose.Println(bc.Cert.Subject.CommonName)
-			}
 		}
 	}
 
@@ -612,9 +612,7 @@ func (vpn *regVpn) lease(name string) (netip.Addr, error) {
 }
 
 func (vpn *regVpn) selfOrAdmin(cn string) error {
-	if me, err := Crt(); err != nil {
-		return err
-	} else if me.First().Subject.CommonName == cn {
+	if vpn.reg.First().Subject.CommonName == cn {
 		return nil
 	}
 	vpn.mutex.RLock()
@@ -629,9 +627,7 @@ func (vpn *regVpn) selfOrSubscriber(peer *x509.Certificate) error {
 	if peer == nil {
 		return xerrors.Invalid("peer")
 	}
-	if me, err := Crt(); err != nil {
-		return err
-	} else if me.Has(peer) {
+	if vpn.reg.Has(peer) {
 		return nil
 	}
 

@@ -6,8 +6,11 @@ package vpn
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"flag"
 	"log"
+	"net/http"
 	"net/netip"
 	"net/url"
 	"os"
@@ -22,30 +25,16 @@ import (
 )
 
 const (
-	DefaultRegistry = "https://127.0.0.1:8003"
-	DefaultCfg      = "config.yaml"
-	DefaultCrt      = "crt.pem"
-	DefaultKey      = ".key"
-
-	DefaultSubscriptions = "subscriptions.pem"
-)
-
-// DefaultUDPService is 0.0.0.0:0
-var DefaultUDPService = func() netip.AddrPort {
-	return netip.AddrPortFrom(netip.IPv4Unspecified(), 0)
-}
-
-var ConfigHome = sync.OnceValue(func() string {
-	return filepath.Join(xdg.ConfigHome(), xprogram.MainName(), "vpn")
-})
-
-const (
 	oAppend = os.O_WRONLY | os.O_CREATE | os.O_APPEND
 	oCreate = os.O_WRONLY | os.O_CREATE | os.O_TRUNC
 )
 
 var errata = xlog.Unmute(log.New(os.Stdout, "", log.Lshortfile))
 var verbose = xlog.Mute(log.New(os.Stdout, "", log.Lshortfile))
+
+var ConfigHome = sync.OnceValue(func() string {
+	return filepath.Join(xdg.ConfigHome(), xprogram.MainName(), "vpn")
+})
 
 var Features = map[string]any{
 	"new": map[string]any{
@@ -76,97 +65,146 @@ var Features = map[string]any{
 	},
 }
 
-var Flags struct {
-	// If len(Flags.FN.*) > 0, add respective [flag.StringVar] to
-	// [flag.CommandLine].
-	FN struct {
-		Cfg,
-		Crt,
-		Key,
-		Subscriptions string
-	}
-	// If len(Flags.Reg.String) > 0, add  [flag.StringVar] to
-	// [flag.CommandLine] and parse [Flags.Reg.URL] after
-	// [flag.CommandLine.Parse].
-	Reg struct {
-		String string
-		URL    *url.URL
-	}
-	// If valid, and [flag.TextVar] to [flag.CommandLine].
-	Svc netip.AddrPort
+var local struct {
+	crt *Certificates
+	sig *Signatures
+	svc netip.AddrPort
 }
 
-func AddAndParseFlags(ctx context.Context, args []string) error {
-	q := flag.Bool("q", false, "Quiet logging.")
-	v := flag.Bool("v", false, "Verbose logging.")
+var remote struct {
+	crt *Certificates
+	url *url.URL
+}
 
-	if len(Flags.FN.Cfg) > 0 {
-		flag.StringVar(&Flags.FN.Cfg, "c", Flags.FN.Cfg,
-			"Configuration file name.")
-	}
-	if len(Flags.FN.Crt) > 0 {
-		flag.StringVar(&Flags.FN.Crt, "x", Flags.FN.Crt,
-			"X509 certificate file name, “-” for stdio.")
-	}
-	if len(Flags.FN.Key) > 0 {
-		flag.StringVar(&Flags.FN.Key, "k", Flags.FN.Key,
-			"Signature key file name, “-” for stdio.")
-	}
-	if len(Flags.FN.Subscriptions) > 0 {
-		flag.StringVar(&Flags.FN.Subscriptions, "R",
-			Flags.FN.Subscriptions, "Registry certificate(s).")
-	}
-	if len(Flags.Reg.String) > 0 {
-		flag.StringVar(&Flags.Reg.String, "r", Flags.Reg.String,
-			"Registry URL.")
-	}
-	if Flags.Svc.Addr().IsValid() {
-		flag.TextVar(&Flags.Svc, "ap", Flags.Svc,
-			`Service {addr}:{port}.
-If “addr” is 0.0.0.0 or [::], use the first ip or ipv6 from the
-address lookup of the certificate's primary DNS name.  If “port”
-is 0, allocate from system.`)
-	}
+var transport *http.Transport
 
+func qvflags(args []string) error {
+	qflag := flag.Bool("q", false, "Quiet logging.")
+	vflag := flag.Bool("v", false, "Verbose logging.")
 	err := flag.CommandLine.Parse(args)
-	if err == nil {
-		if *q {
-			errata = xlog.Mute(errata)
-		} else if *v {
-			verbose = xlog.Unmute(verbose)
-		}
-		if len(Flags.Reg.String) > 0 {
-			Flags.Reg.URL, err = url.Parse(Flags.Reg.String)
-		}
-		if Flags.Svc.Addr().IsUnspecified() {
-			err = SvcLookup(ctx)
-		}
-	}
-	return err
-
-}
-
-func SvcLookup(ctx context.Context) error {
-	c, err := Crt()
 	if err != nil {
 		return err
 	}
-	first := c.First()
+	if *qflag {
+		errata = xlog.Mute(errata)
+	} else if *vflag {
+		verbose = xlog.Unmute(verbose)
+	}
+	return nil
+}
+
+func mkTransport() {
+	cfg := &tls.Config{
+		Certificates: []tls.Certificate{
+			{
+				Certificate: local.crt.DERs(),
+				PrivateKey:  local.sig.First(),
+			},
+		},
+	}
+
+	if rcas, err := x509.SystemCertPool(); err != nil {
+		cfg.RootCAs = x509.NewCertPool()
+	} else {
+		cfg.RootCAs = rcas
+	}
+
+	local.crt.Join(cfg.RootCAs)
+	if remote.crt != nil {
+		remote.crt.Join(cfg.RootCAs)
+	}
+
+	transport = http.DefaultTransport.(*http.Transport).Clone()
+	transport.TLSClientConfig = cfg
+}
+
+func AdminFlag() *string {
+	dfn := filepath.Join(ConfigHome(), "registry.pem")
+	return flag.String("a", dfn, "Admin ertificate.")
+}
+
+func ConfigFlag() *string {
+	dfn := filepath.Join(ConfigHome(), "config.yaml")
+	return flag.String("c", dfn, "Configuration file name.")
+}
+
+func ExchangeFlag() *string {
+	dfn := filepath.Join(ConfigHome(), "exchange.pem")
+	return flag.String("e", dfn,
+		"Exchange certificate file name, “-” for stdio.")
+}
+
+func GuestFlag() *string {
+	dfn := filepath.Join(ConfigHome(), "guest.pem")
+	return flag.String("g", dfn,
+		"Guest certificate file name, “-” for stdio.")
+}
+
+func KeyFlag() *string {
+	dfn := filepath.Join(ConfigHome(), ".key")
+	return flag.String("k", dfn, "Key file name, “-” for stdio.")
+}
+
+func NatFlag() *netip.AddrPort {
+	ap := new(netip.AddrPort)
+	dap := netip.AddrPortFrom(netip.IPv4Unspecified(), 0)
+	flag.TextVar(ap, "n", dap, `NAT'd service {addr}:{port}.
+Ignored if 0.0.0.0:0.`)
+	return ap
+}
+
+func PortFlag() *uint {
+	return flag.Uint("p", 8003, "Port number of registry.")
+}
+
+func RegistryFlag() *string {
+	dfn := filepath.Join(ConfigHome(), "registry.pem")
+	return flag.String("r", dfn,
+		"Registry certificate file name, “-” for stdio.")
+}
+
+func ServiceFlag() *netip.AddrPort {
+	ap := new(netip.AddrPort)
+	dap := netip.AddrPortFrom(netip.IPv4Unspecified(), 0)
+	flag.TextVar(ap, "s", dap, `Service {addr}:{port}.
+If “addr” is 0.0.0.0 or [::], use the first ip or ipv6 from the
+address lookup of the certificate's primary DNS name.  If “port”
+is 0, allocate from system.`)
+	return ap
+}
+
+func TunnelFlag() *uint {
+	return flag.Uint("t", 0, "Tunnel unit number.")
+}
+
+func UrlFlag() *string {
+	return flag.String("u", "https://127.0.0.1:8003",
+		"Registry URL. (https://<host>[:port][/<vpn>])")
+}
+
+func X509Flag() *string {
+	dfn := filepath.Join(ConfigHome(), "guest.pem")
+	return flag.String("e", dfn,
+		"X509 certificate file name, “-” for stdio.")
+}
+
+func SvcLookup(ctx context.Context) error {
+	first := local.crt.First()
 	if first == nil {
-		return xerrors.Invalid(c.String())
+		return xerrors.Invalid(local.crt.String())
 	} else if len(first.DNSNames) == 0 {
-		return xerrors.Invalid(c.String(), "dns")
+		return xerrors.Invalid(local.crt.String(), "dns")
 	}
 	if len(first.IPAddresses) > 0 {
 		ip0 := first.IPAddresses[0]
 		if a, ok := netip.AddrFromSlice(ip0); ok {
-			Flags.Svc = netip.AddrPortFrom(a, Flags.Svc.Port())
+			local.svc = netip.AddrPortFrom(a, local.svc.Port())
 			return nil
 		}
-		return xerrors.Invalid(c.String(), "ip")
+		return xerrors.Invalid(local.svc.String(), "ip")
 	}
 	network := "ip4"
-	if Flags.Svc.Addr().Is6() {
+	if local.svc.Addr().Is6() {
 		network = "ip6"
 	}
 	dns0 := first.DNSNames[0]
@@ -174,7 +212,7 @@ func SvcLookup(ctx context.Context) error {
 	if err != nil {
 		return err
 	} else if len(ips) == 0 {
-		return xerrors.Incomplete(c.String(), "ip")
+		return xerrors.Incomplete(local.crt.String(), "ip")
 	}
 	for _, ip := range ips {
 		a, ok := netip.AddrFromSlice(ip)
@@ -183,7 +221,7 @@ func SvcLookup(ctx context.Context) error {
 			continue
 		}
 		a = a.Unmap()
-		if Flags.Svc.Addr().Is4() {
+		if local.svc.Addr().Is4() {
 			if a.Is6() {
 				verbose.Println("skipped v6 address", a)
 				continue
@@ -192,8 +230,8 @@ func SvcLookup(ctx context.Context) error {
 			verbose.Println("skipped v4 address", a)
 			continue
 		}
-		Flags.Svc = netip.AddrPortFrom(a, Flags.Svc.Port())
+		local.svc = netip.AddrPortFrom(a, local.svc.Port())
 		return nil
 	}
-	return xerrors.Invalid(c.String(), "has no valid IPs")
+	return xerrors.Invalid(local.crt.String(), "has no valid IPs")
 }

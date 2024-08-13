@@ -11,7 +11,6 @@ import (
 	"encoding/pem"
 	"flag"
 	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/platinasystems/goes/v2/pkg/xflag"
@@ -28,9 +27,9 @@ Create PEM encoded ed25519 signature key file.
 
 {{flags .}}`)
 
-	Flags.FN.Key = filepath.Join(ConfigHome(), DefaultKey)
+	kflag := KeyFlag()
 
-	err := AddAndParseFlags(ctx, args)
+	err := flag.CommandLine.Parse(args)
 	if err != nil {
 		return err
 	}
@@ -48,10 +47,10 @@ Create PEM encoded ed25519 signature key file.
 		Headers: map[string]string{},
 		Bytes:   der,
 	}
-	if Flags.FN.Key == "-" {
+	if *kflag == "-" {
 		return pem.Encode(os.Stdout, blk)
 	}
-	w, err := os.OpenFile(Flags.FN.Key, oCreate, 0600)
+	w, err := os.OpenFile(*kflag, oCreate, 0600)
 	if err != nil {
 		return err
 	}

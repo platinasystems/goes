@@ -15,7 +15,6 @@ import (
 	"net"
 	"net/netip"
 	"os"
-	"path/filepath"
 	"sync"
 	"time"
 
@@ -41,16 +40,9 @@ Forward ciphered packets between exchange and tunnel interface.
 
 {{flags .}}`)
 
-	Flags.FN.Crt = filepath.Join(ConfigHome(), DefaultCrt)
-	Flags.FN.Key = filepath.Join(ConfigHome(), DefaultKey)
-	Flags.FN.Subscriptions = filepath.
-		Join(ConfigHome(), DefaultSubscriptions)
-	Flags.Reg.String = DefaultRegistry
-	Flags.Svc = DefaultUDPService()
+	tflag := TunnelFlag()
 
-	unit := flag.Uint("u", 0, "Unit number.")
-
-	err := AddAndParseFlags(ctx, args)
+	err := g.flags(ctx, GuestFlag(), args)
 	if err != nil {
 		return err
 	}
@@ -58,8 +50,8 @@ Forward ciphered packets between exchange and tunnel interface.
 	cctx, cancel := context.WithCancel(ctx)
 
 	udp, err := xerrors.MarkResult(net.ListenUDP("udp", &net.UDPAddr{
-		IP:   Flags.Svc.Addr().AsSlice(),
-		Port: int(Flags.Svc.Port()),
+		IP:   local.svc.Addr().AsSlice(),
+		Port: int(local.svc.Port()),
 	}))
 	if err != nil {
 		return err
@@ -80,7 +72,7 @@ Forward ciphered packets between exchange and tunnel interface.
 
 	svc := fmt.Sprintf("(%d via %d @ %v)", iguest, via, lap)
 	verbose.Println("start", svc)
-	defer verbose.Println("stopped", svc, err)
+	defer verbose.Println("stopped", svc)
 	defer wg.Wait()
 	defer cancel()
 	defer verbose.Println("stopping", svc, "...")
@@ -109,7 +101,7 @@ Forward ciphered packets between exchange and tunnel interface.
 		group   = -1
 	)
 
-	tun, err := nettun.New(*unit, istap, persist, owner, group, ha)
+	tun, err := nettun.New(*tflag, istap, persist, owner, group, ha)
 	if err != nil {
 		return err
 	}

@@ -185,7 +185,7 @@ spec:
     - "-v"
     - "-k"
     - "/etc/goes/vpn/registry.pk8"
-    - "-x"
+    - "-r"
     - "/etc/goes/vpn/registry.pem"
     ports:
     - protocol: TCP
@@ -233,11 +233,11 @@ spec:
     - "-v"
     - "-k"
     - "/etc/goes/vpn/exchange0.pk8"
-    - "-x"
+    - "-e"
     - "/etc/goes/vpn/exchange0.pem"
-    - "-R"
-    - "/etc/goes/vpn/registry.pem"
     - "-r"
+    - "/etc/goes/vpn/registry.pem"
+    - "-u"
     - "https://registry.vpn.default.svc.cluster.local:8003"
     ports:
     - protocol: UDP
@@ -279,11 +279,11 @@ spec:
     - "-v"
     - "-k"
     - "/etc/goes/vpn/hosta.pk8"
-    - "-x"
+    - "-g"
     - "/etc/goes/vpn/hosta.pem"
-    - "-R"
-    - "/etc/goes/vpn/registry.pem"
     - "-r"
+    - "/etc/goes/vpn/registry.pem"
+    - "-u"
     - "https://registry.vpn.default.svc.cluster.local:8003"
     securityContext:
       allowPrivilegeEscalation: true
@@ -332,11 +332,11 @@ spec:
     - "-v"
     - "-k"
     - "/etc/goes/vpn/hostb.pk8"
-    - "-x"
+    - "-g"
     - "/etc/goes/vpn/hostb.pem"
-    - "-R"
-    - "/etc/goes/vpn/registry.pem"
     - "-r"
+    - "/etc/goes/vpn/registry.pem"
+    - "-u"
     - "https://registry.vpn.default.svc.cluster.local:8003"
     securityContext:
       allowPrivilegeEscalation: true
@@ -385,11 +385,11 @@ spec:
     - "-v"
     - "-k"
     - "/etc/goes/vpn/hostc.pk8"
-    - "-x"
+    - "-g"
     - "/etc/goes/vpn/hostc.pem"
-    - "-R"
-    - "/etc/goes/vpn/registry.pem"
     - "-r"
+    - "/etc/goes/vpn/registry.pem"
+    - "-u"
     - "https://registry.vpn.default.svc.cluster.local:8003"
     securityContext:
       allowPrivilegeEscalation: true

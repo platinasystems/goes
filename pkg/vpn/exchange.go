@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"net"
 	"net/netip"
-	"path/filepath"
 	"sync"
 
 	"github.com/platinasystems/goes/v2/pkg/box"
@@ -26,23 +25,14 @@ func Exchange(ctx context.Context, args []string) error {
 	var ex exchange
 
 	xflag.UsageTemplate(flag.CommandLine, `
-usage: {{.Name}} [flags]
+usage: {{.Name}} [flags] <registry>
 Exchange ciphered packets between guests.
 
 {{flags .}}`)
 
-	Flags.FN.Crt = filepath.Join(ConfigHome(), DefaultCrt)
-	Flags.FN.Key = filepath.Join(ConfigHome(), DefaultKey)
-	Flags.FN.Subscriptions = filepath.
-		Join(ConfigHome(), DefaultSubscriptions)
-	Flags.Reg.String = DefaultRegistry
-	Flags.Svc = DefaultUDPService()
+	nflag := NatFlag()
 
-	nat := netip.IPv4Unspecified()
-	flag.TextVar(&nat, "nat", nat,
-		"External exchange address; ignored if 0.0.0.0 or [::].")
-
-	err := AddAndParseFlags(ctx, args)
+	err := ex.flags(ctx, ExchangeFlag(), args)
 	if err != nil {
 		return err
 	}
@@ -58,8 +48,8 @@ Exchange ciphered packets between guests.
 	cctx, cancel := context.WithCancel(ctx)
 
 	udp, err := xerrors.MarkResult(net.ListenUDP("udp", &net.UDPAddr{
-		IP:   Flags.Svc.Addr().AsSlice(),
-		Port: int(Flags.Svc.Port()),
+		IP:   local.svc.Addr().AsSlice(),
+		Port: int(local.svc.Port()),
 	}))
 	if err != nil {
 		return err
@@ -72,8 +62,8 @@ Exchange ciphered packets between guests.
 		return err
 	}
 	sap := lap
-	if !nat.IsUnspecified() {
-		sap = netip.AddrPortFrom(nat, lap.Port())
+	if !(*nflag).Addr().IsUnspecified() {
+		sap = *nflag
 	}
 	if err = ex.register(ctx, sap); err != nil {
 		return err
@@ -83,7 +73,7 @@ Exchange ciphered packets between guests.
 
 	svc := fmt.Sprintf("(%d, %v)", iex, lap)
 	verbose.Println("start", svc)
-	defer verbose.Println("stopped", svc, err)
+	defer verbose.Println("stopped", svc)
 	defer wg.Wait()
 	defer cancel()
 	defer verbose.Println("stopping", svc, "...")

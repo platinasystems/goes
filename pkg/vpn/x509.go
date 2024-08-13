@@ -64,18 +64,6 @@ var CertificatesTemplate = sync.OnceValues(func() (*template.Template, error) {
 `[1:])
 })
 
-var Crt = sync.OnceValues(func() (*Certificates, error) {
-	return NewCertificates(Flags.FN.Crt)
-})
-
-var Subscriptions = sync.OnceValues(func() (*Certificates, error) {
-	subs, err := NewCertificates(Flags.FN.Subscriptions)
-	if err == nil {
-		verbose.Println(subs, "has", len(subs.BCs), "BCs")
-	}
-	return subs, err
-})
-
 // NewCertificate creates a PEM encoded x509 certificate file.
 func NewCertificate(ctx context.Context, args []string) error {
 	const year = 365 * 24 * time.Hour
@@ -87,8 +75,8 @@ Create PEM encoded x509 certificate file.
 
 {{flags .}}`)
 
-	Flags.FN.Crt = filepath.Join(ConfigHome(), DefaultCrt)
-	Flags.FN.Key = filepath.Join(ConfigHome(), DefaultKey)
+	kflag := KeyFlag()
+	xflag := X509Flag()
 
 	hostname, _ := os.Hostname()
 
@@ -106,23 +94,22 @@ Create PEM encoded x509 certificate file.
 	country := flag.String("country", "", "")
 	postalCode := flag.String("postal-code", "", "aka. zip.")
 
-	err := AddAndParseFlags(ctx, args)
+	err := flag.CommandLine.Parse(args)
 	if err != nil {
 		return err
 	}
 
-	key, err := Key()
-	if err != nil {
+	if local.sig, err = NewSignatures(*kflag); err != nil {
 		return err
 	}
 
-	priv := key.First()
+	priv := local.sig.First()
 	if priv == nil {
-		return xerrors.Incomplete(key.String())
+		return xerrors.Incomplete(local.sig.String())
 	}
 
 	if *dur > longest {
-		return xerrors.Invalid(key.String())
+		return xerrors.Invalid(dur.String())
 	}
 
 	now := time.Now()
@@ -179,10 +166,10 @@ Create PEM encoded x509 certificate file.
 		Headers: map[string]string{},
 		Bytes:   der,
 	}
-	if Flags.FN.Crt == "-" {
+	if *xflag == "-" {
 		return pem.Encode(os.Stdout, blk)
 	}
-	w, err := os.OpenFile(Flags.FN.Crt, oCreate, 0644)
+	w, err := os.OpenFile(*xflag, oCreate, 0644)
 	if err != nil {
 		return err
 	}
@@ -198,16 +185,15 @@ Print parsed certificate.
 
 {{flags .}}`)
 
-	Flags.FN.Crt = filepath.Join(ConfigHome(), DefaultCrt)
+	xflag := X509Flag()
 
-	err := AddAndParseFlags(ctx, args)
+	err := flag.CommandLine.Parse(args)
 	if err != nil {
 		return err
 	}
 
-	crt, err := Crt()
-	if err == nil {
-		err = crt.Show(os.Stdout)
+	if local.crt, err = NewCertificates(*xflag); err == nil {
+		err = local.crt.Show(os.Stdout)
 	}
 	return err
 }
@@ -243,9 +229,7 @@ func NewCertificates(dfn string) (*Certificates, error) {
 	} else if strings.HasSuffix(dfn, ".pem") {
 		data, err := os.ReadFile(dfn)
 		if err == nil {
-			if err = c.parse(data); err == nil {
-				verbose.Println("parsed:", dfn)
-			}
+			err = c.parse(data)
 		}
 		return c, err
 	}
@@ -260,7 +244,6 @@ func NewCertificates(dfn string) (*Certificates, error) {
 		} else if err = c.parse(data); err != nil {
 			return c, xerrors.Label(err, fn)
 		}
-		verbose.Println("parsed:", fn)
 	}
 	return c, nil
 }
