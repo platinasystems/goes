@@ -305,6 +305,7 @@ func (cs *Certificates) parse(data []byte) error {
 	return nil
 }
 
+// FIXME prepend updates
 func (cs *Certificates) Add(blk *pem.Block, x *x509.Certificate) error {
 	cn := x.Subject.CommonName
 	if _, ok := cs.Named[cn]; ok {
@@ -316,7 +317,7 @@ func (cs *Certificates) Add(blk *pem.Block, x *x509.Certificate) error {
 	if cs.dfn == "-" {
 		return pem.Encode(os.Stdout, blk)
 	}
-	if strings.HasSuffix(cs.dfn, ".pem") {
+	if strings.Index(cs.dfn, ".") >= 0 {
 		w, err := os.OpenFile(cs.dfn, oAppend, 0644)
 		if err != nil {
 			return err
