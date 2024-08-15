@@ -34,6 +34,7 @@ const (
 var errata = xlog.Unmute(log.New(os.Stdout, "", log.Lshortfile))
 var verbose = xlog.Mute(log.New(os.Stdout, "", log.Lshortfile))
 
+// [os.UserConfigDir]/GOES/vpn
 var ConfigHome = sync.OnceValue(func() string {
 	return filepath.Join(xdg.ConfigHome(), xprogram.MainName(), "vpn")
 })
