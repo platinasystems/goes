@@ -16,6 +16,7 @@ import (
 	"net"
 	"net/http"
 	"net/netip"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -34,6 +35,7 @@ type registry struct {
 	cfg   *string
 	sig   *Signatures
 	crt   *Certificates
+	url   *url.URL
 	http  *http.Server
 	vpn   map[string]*regVpn
 	wg    sync.WaitGroup
@@ -97,11 +99,10 @@ A RESTful WWW server.
 {{flags .}}`)
 
 	reg.cfg = ConfigFlag()
-	kflag := KeyFlag()
-	pflag := PortFlag()
-	rflag := RegistryFlag()
+	kFlag := KeyFlag()
+	rFlag := RegistryFlag()
 
-	err := qvflags(args)
+	err := qvFlags(args)
 	if err != nil {
 		return err
 	}
@@ -109,11 +110,21 @@ A RESTful WWW server.
 	if _, err = os.Stat(*reg.cfg); err != nil {
 		return err
 	}
-	if reg.sig, err = NewSignatures(*kflag); err != nil {
+	if reg.sig, err = NewSignatures(*kFlag); err != nil {
 		return err
 	}
-	if reg.crt, err = NewCertificates(*rflag); err != nil {
+	if reg.crt, err = NewCertificates(*rFlag); err != nil {
 		return err
+	}
+	if reg.crt == nil || len(reg.crt.BCs) == 0 {
+		return xerrors.Invalid(*rFlag)
+	}
+
+	svc := ":8003"
+	if len(reg.crt.BCs[0].Cert.URIs) > 0 {
+		if s := reg.crt.BCs[0].Cert.URIs[0].Port(); len(s) > 0 {
+			svc = ":" + s
+		}
 	}
 
 	reg.vpn = make(map[string]*regVpn)
@@ -123,9 +134,6 @@ A RESTful WWW server.
 	}
 
 	cctx, cancel := context.WithCancel(ctx)
-
-	svc := fmt.Sprint(":", *pflag)
-
 	reg.http = &http.Server{
 		Addr:    svc,
 		Handler: &reg,
@@ -147,7 +155,7 @@ A RESTful WWW server.
 	wg.Add(1)
 	go reg.shutdown(cctx, &wg)
 
-	err = reg.http.ListenAndServeTLS(*rflag, *kflag)
+	err = reg.http.ListenAndServeTLS(*rFlag, *kFlag)
 	if errors.Is(err, http.ErrServerClosed) {
 		err = nil
 	}

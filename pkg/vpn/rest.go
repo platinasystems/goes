@@ -67,33 +67,33 @@ func isLocalhost(req *http.Request) bool {
 		strings.HasPrefix(req.URL.Host, "localhost")
 }
 
-func (op Rest) flags(xflag *string, args []string) error {
-	kflag := KeyFlag()
-	rflag := RegistryFlag()
-	uflag := UrlFlag()
+func (op Rest) flags(xFlag *string, args []string) error {
+	kFlag := KeyFlag()
+	rFlag := RegistryFlag()
+	vpnFlag := VpnFlag()
 
-	err := qvflags(args)
+	err := qvFlags(args)
 	if err != nil {
 		return err
 	}
 
-	if local.crt, err = NewCertificates(*xflag); err != nil {
+	if local.crt, err = NewCertificates(*xFlag); err != nil {
 		return err
 	}
-	if local.sig, err = NewSignatures(*kflag); err != nil {
+	if local.sig, err = NewSignatures(*kFlag); err != nil {
 		return err
 	}
-	if remote.crt, err = NewCertificates(*rflag); err != nil {
+	if regcrt, err = NewCertificates(*rFlag); err != nil {
 		if op != "certify" || !os.IsNotExist(err) {
 			return err
 		}
 	}
-	if remote.url, err = url.Parse(*uflag); err != nil {
+	if err = xregurl(); err != nil {
 		return err
-	} else if len(remote.url.Scheme) == 0 {
-		remote.url.Scheme = "https"
 	}
-
+	if len(*vpnFlag) > 0 {
+		regurl = regurl.JoinPath(*vpnFlag)
+	}
 	mkTransport()
 	return nil
 }
@@ -145,7 +145,7 @@ RESTful registry administration.
 		return xerrors.Incomplete("subscriber")
 	}
 
-	clone := *remote.url
+	clone := *regurl
 	q := clone.Query()
 	q.Set("op", string(op))
 	q.Set("subscriber", args[0])
@@ -167,7 +167,7 @@ RESTful registry administration.
 // Rest.certify adds the peer certificate to CONFIG_HOME/registry.pem.
 func (op Rest) certify(ctx context.Context, args []string) error {
 	xflag.UsageTemplate(flag.CommandLine, `
-usage: {{.Name}} [flags]
+usage: {{.Name}} [flags] https://<host>[:port]
 Import registry certificate.
 
 {{flags .}}`)
@@ -176,8 +176,17 @@ Import registry certificate.
 	if err != nil {
 		return err
 	}
+	args = flag.Args()
+	if len(args) == 0 {
+		return xerrors.Incomplete("registry")
+	}
+	regurl, err = url.Parse(args[0])
+	if err != nil {
+		return err
+	}
+	transport.TLSClientConfig.InsecureSkipVerify = true
 
-	clone := *remote.url
+	clone := *regurl
 	q := clone.Query()
 	q.Set("op", string(op))
 	clone.RawQuery = q.Encode()
@@ -206,12 +215,12 @@ Import registry certificate.
 
 	var peercerts []*x509.Certificate
 	for _, peer := range resp.TLS.PeerCertificates {
-		if !remote.crt.Has(peer) {
+		if !regcrt.Has(peer) {
 			peercerts = append(peercerts, peer)
 		}
 	}
 	if len(peercerts) == 0 {
-		fmt.Fprintln(w, "no new certificates")
+		fmt.Fprintln(w, "has no new certificates")
 		return nil
 	}
 
@@ -219,9 +228,11 @@ Import registry certificate.
 	if err != nil {
 		return err
 	}
-	t.Execute(w, peercerts)
+	for _, pc := range peercerts {
+		t.Execute(w, pc)
+	}
 
-	fmt.Fprintf(w, `Enter "yes" to append above to %s: `, remote.crt)
+	fmt.Fprintf(w, `Enter "yes" to append above to %s: `, regcrt)
 	s, err := r.ReadString('\n')
 	if err != nil && strings.TrimSpace(s) != "yes" {
 		return err
@@ -233,7 +244,7 @@ Import registry certificate.
 			Headers: map[string]string{},
 			Bytes:   peer.Raw,
 		}
-		if err = remote.crt.Add(pb, peer); err != nil {
+		if err = regcrt.Add(pb, peer); err != nil {
 			break
 		} else {
 			io.Copy(w, resp.Body)
@@ -294,7 +305,7 @@ func restCheckinResponse(
 	resp *http.Response,
 	err error,
 ) {
-	clone := *remote.url
+	clone := *regurl
 	q := clone.Query()
 	q.Set("op", "checkin")
 	if optsvc.Addr().IsValid() {
@@ -356,7 +367,7 @@ RESTful ping registry.
 		return err
 	}
 
-	clone := *remote.url
+	clone := *regurl
 	q := clone.Query()
 	q.Set("op", string(op))
 	clone.RawQuery = q.Encode()
@@ -387,7 +398,7 @@ RESTful query and print registry object.
 		return err
 	}
 
-	clone := *remote.url
+	clone := *regurl
 	q := clone.Query()
 	q.Set("op", string(op))
 	clone.RawQuery = q.Encode()
@@ -417,7 +428,7 @@ RESTful subscribe to VPN.
 		return err
 	}
 
-	clone := *remote.url
+	clone := *regurl
 	q := clone.Query()
 	q.Set("op", string(op))
 	clone.RawQuery = q.Encode()
@@ -431,7 +442,6 @@ RESTful subscribe to VPN.
 		return xerrors.Mark(err)
 	}
 	req.Header.Set("Content-Type", "application/x-pem-file")
-	transport.TLSClientConfig.InsecureSkipVerify = true
 	cl := &http.Client{Transport: transport}
 	resp, err := cl.Do(req)
 	if err != nil {
@@ -452,7 +462,7 @@ RESTful subscribe to VPN.
 func restWhoIs(ctx context.Context, qname, qvalue string) (
 	*pem.Block, error,
 ) {
-	clone := *remote.url
+	clone := *regurl
 	q := clone.Query()
 	q.Set("op", "whois")
 	q.Set(qname, qvalue)

@@ -12,7 +12,6 @@ import (
 	"encoding/pem"
 	"fmt"
 	"net/netip"
-	"net/url"
 	"time"
 
 	"github.com/platinasystems/goes/v2/pkg/box"
@@ -45,38 +44,38 @@ type client struct {
 
 func (cl *client) flags(
 	ctx context.Context,
-	xflag *string,
+	xFlag *string,
 	args []string,
 ) error {
-	kflag := KeyFlag()
-	rflag := RegistryFlag()
-	sflag := ServiceFlag()
-	uflag := UrlFlag()
+	kFlag := KeyFlag()
+	rFlag := RegistryFlag()
+	sFlag := ServiceFlag()
+	vpnFlag := VpnFlag()
 
-	err := qvflags(args)
+	err := qvFlags(args)
 	if err != nil {
 		return err
 	}
 
-	if local.crt, err = NewCertificates(*xflag); err != nil {
+	if local.crt, err = NewCertificates(*xFlag); err != nil {
 		return err
 	}
-	if local.sig, err = NewSignatures(*kflag); err != nil {
+	if local.sig, err = NewSignatures(*kFlag); err != nil {
 		return err
 	}
-	if local.svc = *sflag; local.svc.Addr().IsUnspecified() {
+	if local.svc = *sFlag; local.svc.Addr().IsUnspecified() {
 		SvcLookup(ctx)
 	}
 
-	if remote.crt, err = NewCertificates(*rflag); err != nil {
+	if regcrt, err = NewCertificates(*rFlag); err != nil {
 		return err
 	}
-	if remote.url, err = url.Parse(*uflag); err != nil {
+	if err = xregurl(); err != nil {
 		return err
-	} else if len(remote.url.Scheme) == 0 {
-		remote.url.Scheme = "https"
 	}
-
+	if len(*vpnFlag) > 0 {
+		regurl = regurl.JoinPath(*vpnFlag)
+	}
 	mkTransport()
 	return nil
 }
@@ -85,7 +84,7 @@ func (cl *client) register(
 	ctx context.Context,
 	optsvc netip.AddrPort,
 ) error {
-	err := waitForDNS(ctx, "ip", remote.url.Hostname())
+	err := waitForDNS(ctx, "ip", regurl.Hostname())
 	if err != nil {
 		return err
 	}

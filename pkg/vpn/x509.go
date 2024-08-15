@@ -223,8 +223,9 @@ Print parsed certificate.
 		return err
 	}
 
-	if local.crt, err = NewCertificates(*iflag); err == nil {
-		err = local.crt.Show(os.Stdout)
+	crt, err := NewCertificates(*iflag)
+	if err == nil {
+		err = crt.Show(os.Stdout)
 	}
 	return err
 }
@@ -257,15 +258,19 @@ func NewCertificates(dfn string) (*Certificates, error) {
 			err = c.parse(data)
 		}
 		return c, err
-	} else if strings.HasSuffix(dfn, ".pem") {
+	}
+	fi, err := os.Stat(dfn)
+	if err != nil {
+		return c, err
+	}
+	if !fi.IsDir() {
 		data, err := os.ReadFile(dfn)
 		if err == nil {
 			err = c.parse(data)
 		}
 		return c, err
 	}
-	fns, err := filepath.Glob(filepath.Join(dfn,
-		filepath.FromSlash("/*.pem")))
+	fns, err := filepath.Glob(filepath.Join(dfn, "*.pem"))
 	if err != nil {
 		return c, err
 	}

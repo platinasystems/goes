@@ -5,10 +5,12 @@
 package vpn
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"flag"
+	"fmt"
 	"log"
 	"net/http"
 	"net/netip"
@@ -75,23 +77,48 @@ var local struct {
 	svc netip.AddrPort
 }
 
-var remote struct {
-	crt *Certificates
-	url *url.URL
-}
+var regcrt *Certificates
+var regurl *url.URL
 
 var transport *http.Transport
 
-func qvflags(args []string) error {
-	qflag := flag.Bool("q", false, "Quiet logging.")
-	vflag := flag.Bool("v", false, "Verbose logging.")
+// eXtract regurl from regcrt
+func xregurl() error {
+	if regcrt == nil {
+		return xerrors.Unavailable("registry certificate")
+	}
+	if len(regcrt.BCs) == 0 {
+		return xerrors.Incomplete(regcrt.dfn)
+	}
+	if len(regcrt.BCs[0].Cert.URIs) > 0 {
+		regurl = regcrt.BCs[0].Cert.URIs[0]
+		if len(regurl.Scheme) == 0 {
+			regurl.Scheme = "https"
+		}
+		return nil
+	}
+	if len(regcrt.BCs[0].Cert.DNSNames) == 0 {
+		var b bytes.Buffer
+		regcrt.Show(&b)
+		verbose.Print(b)
+		return xerrors.Invalid(regcrt.dfn)
+	}
+	var err error
+	s := fmt.Sprint("https://", regcrt.BCs[0].Cert.DNSNames[0], ":8003")
+	regurl, err = url.Parse(s)
+	return err
+}
+
+func qvFlags(args []string) error {
+	qFlag := flag.Bool("q", false, "Quiet logging.")
+	vFlag := flag.Bool("v", false, "Verbose logging.")
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
 		return err
 	}
-	if *qflag {
+	if *qFlag {
 		errata = xlog.Mute(errata)
-	} else if *vflag {
+	} else if *vFlag {
 		verbose = xlog.Unmute(verbose)
 	}
 	return nil
@@ -114,8 +141,8 @@ func mkTransport() {
 	}
 
 	local.crt.Join(cfg.RootCAs)
-	if remote.crt != nil {
-		remote.crt.Join(cfg.RootCAs)
+	if regcrt != nil {
+		regcrt.Join(cfg.RootCAs)
 	}
 
 	transport = http.DefaultTransport.(*http.Transport).Clone()
@@ -124,7 +151,7 @@ func mkTransport() {
 
 func AdminFlag() *string {
 	dfn := filepath.Join(ConfigHome(), "registry.pem")
-	return flag.String("a", dfn, "Admin ertificate.")
+	return flag.String("a", dfn, "Admin certificate.")
 }
 
 func ConfigFlag() *string {
@@ -160,10 +187,6 @@ Ignored if 0.0.0.0:0.`)
 	return ap
 }
 
-func PortFlag() *uint {
-	return flag.Uint("p", 8003, "Port number of registry.")
-}
-
 func RegistryFlag() *string {
 	dfn := filepath.Join(ConfigHome(), "registry.pem")
 	return flag.String("r", dfn,
@@ -184,9 +207,9 @@ func TunnelFlag() *uint {
 	return flag.Uint("t", 0, "Tunnel unit number.")
 }
 
-func UrlFlag() *string {
-	return flag.String("u", "https://127.0.0.1:8003",
-		"Registry URL. (https://<host>[:port][/<vpn>])")
+func VpnFlag() *string {
+	return flag.String("vpn", "",
+		"Named VPN, default unnamed.")
 }
 
 func SvcLookup(ctx context.Context) error {

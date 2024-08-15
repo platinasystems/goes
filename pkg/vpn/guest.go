@@ -35,7 +35,7 @@ func Guest(ctx context.Context, args []string) error {
 	var g guest
 
 	xflag.UsageTemplate(flag.CommandLine, `
-usage: {{.Name}} [flags]
+usage: {{.Name}} [flags] [vpn]
 Forward ciphered packets between exchange and tunnel interface.
 
 {{flags .}}`)

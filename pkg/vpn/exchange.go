@@ -25,7 +25,7 @@ func Exchange(ctx context.Context, args []string) error {
 	var ex exchange
 
 	xflag.UsageTemplate(flag.CommandLine, `
-usage: {{.Name}} [flags] <registry>
+usage: {{.Name}} [flags] [vpn]
 Exchange ciphered packets between guests.
 
 {{flags .}}`)
