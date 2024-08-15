@@ -94,6 +94,11 @@ func (op Rest) flags(xFlag *string, args []string) error {
 	if len(*vpnFlag) > 0 {
 		regurl = regurl.JoinPath(*vpnFlag)
 	}
+
+	verbose.Println("crt file:", local.crt)
+	verbose.Println("sig file:", local.sig)
+	verbose.Println("url file:", regurl)
+
 	mkTransport()
 	return nil
 }
