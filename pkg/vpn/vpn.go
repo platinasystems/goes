@@ -152,8 +152,14 @@ func mkTransport() {
 }
 
 func AdminFlag() *string {
-	dfn := filepath.Join(ConfigHome(), "registry.pem")
-	return flag.String("a", dfn, "Admin certificate.")
+	var dfn string
+	for _, s := range []string{"guest", "exchange", "registry"} {
+		dfn = filepath.Join(ConfigHome(), s+".pem")
+		if _, err := os.Stat(dfn); err == nil {
+			break
+		}
+	}
+	return flag.String("a", dfn, "Certificate file.")
 }
 
 func ConfigFlag() *string {
