@@ -105,7 +105,7 @@ var CacheDirs = sync.OnceValue(func() (dirs Dirs) {
 
 // ConfigHome has persistent configuration.
 var ConfigHome = sync.OnceValue(func() string {
-	if s := os.Getenv("XDG_CACHE_HOME"); len(s) > 0 {
+	if s := os.Getenv("XDG_CONFIG_HOME"); len(s) > 0 {
 		return s
 	}
 	if xprogram.IsKoApp() || IsSuperUser() {
