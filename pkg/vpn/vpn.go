@@ -126,6 +126,7 @@ func qvFlags(args []string) error {
 
 func mkTransport() {
 	cfg := &tls.Config{
+		MinVersion: tls.VersionTLS13,
 		Certificates: []tls.Certificate{
 			{
 				Certificate: local.crt.DERs(),
