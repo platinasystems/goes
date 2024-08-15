@@ -82,7 +82,7 @@ var ConfigByName map[string]*struct {
 	Admins []string
 	// Optional directory or ``.pem'' extensioned file containing
 	// certificates of approved subscribers.
-	// (default: StateHome/VPN-subscribers/)
+	// (default: ConfigHome/)
 	Subscribers string
 }
 
@@ -307,8 +307,9 @@ func (reg *registry) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			w.WriteHeader(http.StatusMethodNotAllowed)
 			fmt.Fprint(w, req.Method)
 		} else {
+			fmt.Fprintf(w, "%s.admins:\n", name)
 			for _, s := range ConfigByName[name].Admins {
-				fmt.Println(w, s)
+				fmt.Fprintln(w, "-", s)
 			}
 		}
 	case "show-pending":
@@ -411,6 +412,8 @@ func (reg *registry) reload() error {
 
 			reg.vpn[name] = vpn
 		}
+
+		verbose.Printf("%s.admins: %v\n", name, cfg.Admins)
 
 		if !cfg.Prefix.IsValid() {
 			return xerrors.Invalid(name, "prefix")
