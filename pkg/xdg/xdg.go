@@ -2,14 +2,13 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-// See https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html
+// See https://specifications.freedesktop.org/basedir-spec/latest/
 package xdg
 
 import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 
 	"github.com/platinasystems/goes/v2/pkg/xprogram"
 )
@@ -35,21 +34,6 @@ var (
 	PathListSeparatorString = string(os.PathListSeparator)
 )
 
-type Dirs []string
-
-func (dirs Dirs) Search(fn string) (os.FileInfo, error) {
-	for _, s := range dirs {
-		if len(fn) > 0 && fn != "." {
-			s = filepath.Join(s, fn)
-		}
-		fi, err := os.Stat(s)
-		if err == nil {
-			return fi, nil
-		}
-	}
-	return nil, os.ErrNotExist
-}
-
 func IsOpt() bool {
 	return strings.HasPrefix(xprogram.Path(), Opt)
 }
@@ -62,184 +46,73 @@ func IsSuperUser() bool {
 	return os.Geteuid() == 0
 }
 
-// CacheHome has non-essential, ephemeral data.
-var CacheHome = sync.OnceValue(func() string {
-	if s := os.Getenv("XDG_CACHE_HOME"); len(s) > 0 {
-		return s
-	}
-	if xprogram.IsKoApp() || IsSuperUser() {
-		for _, s := range []string{
-			VarCache,
-			VarRun,
-		} {
-			fi, err := os.Stat(s)
-			if err == nil && fi.IsDir() {
-				return s
-			}
+// Returns [os.TempDir] if none of the “dirs” exist.
+func FirstExistingDir(dirs ...string) string {
+	for _, dir := range dirs {
+		if len(dir) == 0 {
+			continue
 		}
-	} else if s, err := os.UserCacheDir(); err == nil {
-		return s
+		if fi, err := os.Stat(dir); err == nil && fi.IsDir() {
+			return dir
+		}
 	}
 	return os.TempDir()
-})
+}
 
-var CacheDirs = sync.OnceValue(func() (dirs Dirs) {
-	name := xprogram.MainName()
-	if s := os.Getenv("XDG_CACHE_HOME"); len(s) > 0 {
-		dirs = append(dirs, filepath.Join(s, name))
-		dirs = append(dirs, s)
-	} else if xprogram.IsKoApp() || IsSuperUser() {
-		dirs = append(dirs, filepath.Join(VarCache, name))
-		dirs = append(dirs, VarCache)
-		dirs = append(dirs, filepath.Join(VarRun, name))
-		dirs = append(dirs, VarRun)
-	} else if s, err := os.UserCacheDir(); err == nil {
-		dirs = append(dirs, filepath.Join(s, name))
-		dirs = append(dirs, s)
+// CacheHome has non-essential, ephemeral data.
+func CacheHome() string {
+	s := os.Getenv("XDG_CACHE_HOME")
+	if len(s) == 0 {
+		s = goosCacheHome()
 	}
-	tmp := os.TempDir()
-	dirs = append(dirs, filepath.Join(tmp, name))
-	dirs = append(dirs, tmp)
+	return s
+}
+
+func ConfigDirs() (dirs []string) {
+	if s := os.Getenv("XDG_CONFIG_DIRS"); len(s) > 0 {
+		dirs = strings.Split(s, PathListSeparatorString)
+	} else {
+		dirs = goosConfigDirs()
+	}
 	return
-})
+}
 
 // ConfigHome has persistent configuration.
-var ConfigHome = sync.OnceValue(func() string {
-	if s := os.Getenv("XDG_CONFIG_HOME"); len(s) > 0 {
-		return s
+func ConfigHome() string {
+	s := os.Getenv("XDG_CONFIG_HOME")
+	if len(s) == 0 {
+		s = goosConfigHome()
 	}
-	if xprogram.IsKoApp() || IsSuperUser() {
-		if IsOpt() {
-			return EtcOpt
-		}
-	} else if s, err := os.UserConfigDir(); err == nil {
-		return s
-	}
-	return Etc
-})
+	return s
+}
 
-var ConfigDirs = sync.OnceValue(func() (dirs Dirs) {
-	name := xprogram.MainName()
-	if s := os.Getenv("XDG_CONFIG_DIRS"); len(s) == 0 {
-		for _, ss := range strings.Split(s, PathListSeparatorString) {
-			dirs = append(dirs, filepath.Join(ss, name))
-			dirs = append(dirs, ss)
-		}
-	} else if xprogram.IsKoApp() || IsSuperUser() {
-		if IsOpt() {
-			dirs = append(dirs, filepath.Join(EtcOpt, name))
-			dirs = append(dirs, EtcOpt)
-		} else {
-			dirs = append(dirs, filepath.Join(Etc, name))
-			dirs = append(dirs, Etc)
-		}
-	} else if s, err := os.UserConfigDir(); err == nil {
-		dirs = append(dirs, filepath.Join(s, name))
-		dirs = append(dirs, s)
+func DataDirs() (dirs []string) {
+	if s := os.Getenv("XDG_DATA_DIRS"); len(s) > 0 {
+		dirs = strings.Split(s, PathListSeparatorString)
+	} else {
+		dirs = goosDataDirs()
 	}
 	return
-})
+}
 
 // DataHome has essential, persistent data.
-var DataHome = sync.OnceValue(func() string {
-	if s := os.Getenv("XDG_DATA_HOME"); len(s) > 0 {
-		return s
+func DataHome() string {
+	s := os.Getenv("XDG_DATA_HOME")
+	if len(s) == 0 {
+		s = goosDataHome()
 	}
-	if xprogram.IsKoApp() || IsSuperUser() {
-		if IsUsrLocal() {
-			return UsrLocalShare
-		} else if IsOpt() {
-			return OptShare
-		}
-		return UsrShare
-	} else if h, err := os.UserHomeDir(); err == nil {
-		hls := filepath.Join(h, ".local", "share")
-		if _, err = os.Stat(hls); err == nil {
-			return hls
-		}
-		return h
-	}
-	return os.TempDir()
-})
-
-var DataDirs = sync.OnceValue(func() (dirs Dirs) {
-	name := xprogram.MainName()
-	if s := os.Getenv("XDG_DATA_DIRS"); len(s) > 0 {
-		for _, ss := range strings.Split(s, PathListSeparatorString) {
-			dirs = append(dirs, filepath.Join(ss, name))
-			dirs = append(dirs, ss)
-		}
-	} else if xprogram.IsKoApp() || IsSuperUser() {
-		if IsUsrLocal() {
-			dirs = append(dirs, filepath.Join(UsrLocalShare, name))
-			dirs = append(dirs, UsrLocalShare)
-		} else if IsOpt() {
-			dirs = append(dirs, filepath.Join(OptShare, name))
-			dirs = append(dirs, OptShare)
-		} else {
-			dirs = append(dirs, filepath.Join(UsrShare, name))
-			dirs = append(dirs, UsrShare)
-		}
-	} else if h, err := os.UserHomeDir(); err == nil {
-		hls := filepath.Join(h, ".local", "share")
-		dirs = append(dirs, filepath.Join(hls, name))
-		dirs = append(dirs, hls)
-	}
-	tmp := os.TempDir()
-	dirs = append(dirs, filepath.Join(tmp, name))
-	dirs = append(dirs, tmp)
-	return
-})
+	return s
+}
 
 // RunTimeDir has non-essential, ephemeral runtime files and other objects,
 // such as sockets and named pipes.
-var RunTimeDir = sync.OnceValue(func() string {
-	if s := os.Getenv("XDG_RUNTIME_DIR"); len(s) > 0 {
-		return s
+func RunTimeDir() string {
+	s := os.Getenv("XDG_RUNTIME_DIR")
+	if len(s) == 0 {
+		s = goosRunTimeDir()
 	}
-	if xprogram.IsKoApp() || IsSuperUser() {
-		for _, s := range []string{
-			VarRun,
-		} {
-			fi, err := os.Stat(s)
-			if err == nil && fi.IsDir() {
-				return s
-			}
-		}
-	} else if h, err := os.UserHomeDir(); err == nil {
-		for _, s := range []string{
-			filepath.Join(h, ".local", "run"),
-			filepath.Join(h, ".local"),
-			h,
-		} {
-			fi, err := os.Stat(s)
-			if err == nil && fi.IsDir() {
-				return s
-			}
-		}
-	}
-	return os.TempDir()
-})
-
-var RunTimeDirs = sync.OnceValue(func() (dirs Dirs) {
-	name := xprogram.MainName()
-	if s := os.Getenv("XDG_RUNTIME_DIR"); len(s) > 0 {
-		dirs = append(dirs, filepath.Join(s, name))
-		dirs = append(dirs, s)
-	} else if xprogram.IsKoApp() || IsSuperUser() {
-		dirs = append(dirs, filepath.Join(VarRun, name))
-		dirs = append(dirs, VarRun)
-	} else if h, err := os.UserHomeDir(); err == nil {
-		dirs = append(dirs, filepath.Join(h, ".local", "run", name))
-		dirs = append(dirs, filepath.Join(h, ".local", name))
-		dirs = append(dirs, filepath.Join(h, ".local", "run"))
-		dirs = append(dirs, filepath.Join(h, ".local"))
-	}
-	tmp := os.TempDir()
-	dirs = append(dirs, filepath.Join(tmp, name))
-	dirs = append(dirs, tmp)
-	return
-})
+	return s
+}
 
 // StateHome persists between application restarts,
 //
@@ -247,52 +120,10 @@ var RunTimeDirs = sync.OnceValue(func() (dirs Dirs) {
 //
 //   - current state of the application that can be reused on a restart
 //     (view, layout, open files, undo history, …)
-var StateHome = sync.OnceValue(func() string {
-	if s := os.Getenv("XDG_STATE_HOME"); len(s) > 0 {
-		return s
+func StateHome() string {
+	s := os.Getenv("XDG_STATE_HOME")
+	if len(s) == 0 {
+		s = goosStateHome()
 	}
-	if xprogram.IsKoApp() {
-		return VarLib
-	}
-	if IsSuperUser() {
-		if IsUsrLocal() {
-			return VarLocal
-		} else if IsOpt() {
-			return VarOpt
-		}
-		return VarLib
-	} else if h, err := os.UserHomeDir(); err == nil {
-		return filepath.Join(h, ".local", "state")
-	}
-	return os.TempDir()
-})
-
-var StateDirs = sync.OnceValue(func() (dirs Dirs) {
-	name := xprogram.MainName()
-	if s := os.Getenv("XDG_STATE_HOME"); len(s) > 0 {
-		dirs = append(dirs, filepath.Join(s, name))
-		dirs = append(dirs, s)
-	} else if xprogram.IsKoApp() {
-		dirs = append(dirs, filepath.Join(VarLib, name))
-		dirs = append(dirs, VarLib)
-	} else if IsSuperUser() {
-		if IsUsrLocal() {
-			dirs = append(dirs, filepath.Join(VarLocal, name))
-			dirs = append(dirs, VarLocal)
-		} else if IsOpt() {
-			dirs = append(dirs, filepath.Join(VarOpt, name))
-			dirs = append(dirs, VarOpt)
-		} else {
-			dirs = append(dirs, filepath.Join(VarLib, name))
-			dirs = append(dirs, VarLib)
-		}
-	} else if h, err := os.UserHomeDir(); err == nil {
-		hls := filepath.Join(h, ".local", "state")
-		dirs = append(dirs, filepath.Join(hls, name))
-		dirs = append(dirs, hls)
-	}
-	tmp := os.TempDir()
-	dirs = append(dirs, filepath.Join(tmp, name))
-	dirs = append(dirs, tmp)
-	return
-})
+	return s
+}
