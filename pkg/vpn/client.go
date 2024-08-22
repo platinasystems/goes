@@ -26,7 +26,10 @@ var ap0 netip.AddrPort
 
 // common to guest and exchange
 type client struct {
-	name   string
+	name,
+	udpv string
+	rest
+	sap    *netip.AddrPort
 	priv   *ecdh.PrivateKey
 	pub    *ecdh.PublicKey
 	pubder []byte
@@ -45,38 +48,22 @@ type client struct {
 func (cl *client) flags(
 	ctx context.Context,
 	xFlag *string,
+	defport uint16,
 	args []string,
 ) error {
-	kFlag := KeyFlag()
-	rFlag := RegistryFlag()
-	sFlag := ServiceFlag()
-	vpnFlag := VpnFlag()
+	cl.sap = ServiceFlag(defport)
 
-	err := qvFlags(args)
+	err := cl.rest.flags(xFlag, args)
 	if err != nil {
 		return err
 	}
-
-	if local.crt, err = NewCertificates(*xFlag); err != nil {
-		return err
+	sa := cl.sap.Addr()
+	cl.udpv = "udp"
+	if sa.Is4() {
+		cl.udpv = "udp4"
+	} else if sa.Is6() {
+		cl.udpv = "udp6"
 	}
-	if local.sig, err = NewSignatures(*kFlag); err != nil {
-		return err
-	}
-	if local.svc = *sFlag; local.svc.Addr().IsUnspecified() {
-		SvcLookup(ctx)
-	}
-
-	if regcrt, err = NewCertificates(*rFlag); err != nil {
-		return err
-	}
-	if err = xregurl(); err != nil {
-		return err
-	}
-	if len(*vpnFlag) > 0 {
-		regurl = regurl.JoinPath(*vpnFlag)
-	}
-	mkTransport()
 	return nil
 }
 
@@ -84,39 +71,39 @@ func (cl *client) register(
 	ctx context.Context,
 	optsvc netip.AddrPort,
 ) error {
-	err := waitForDNS(ctx, "ip", regurl.Hostname())
+	err := cl.waitForDNS(ctx)
 	if err != nil {
 		return err
 	}
 
-	cl.name = local.crt.First().Subject.CommonName
+	cl.name = cl.crt.First().Subject.CommonName
 	cl.addressed = make(map[netip.Addr]box.Id)
 	cl.gcm = make(map[int]*gcm.Cipher)
 	cl.service = make(map[int]netip.AddrPort)
 	cl.via = make(map[int]box.Id)
 	cl.ver = make(map[int]uint8)
 
-	cl.priv, err = xerrors.MarkResult(ecdh.X25519().GenerateKey(rand.Reader))
+	cl.priv, err = ecdh.X25519().GenerateKey(rand.Reader)
 	if err != nil {
-		return err
+		return xerrors.Label(err, "GenerateX25519Key")
 	}
 
 	cl.pub = cl.priv.PublicKey()
-	cl.pubder, err = xerrors.MarkResult(x509.MarshalPKIXPublicKey(cl.pub))
+	cl.pubder, err = x509.MarshalPKIXPublicKey(cl.pub)
 	if err != nil {
-		return err
+		return xerrors.Label(err, "MarshalPublicKey")
 	}
 
-	n, err := xerrors.MarkResult(rand.Read(cl.nonce[:]))
+	n, err := rand.Read(cl.nonce[:])
 	if err != nil {
-		return err
+		return xerrors.Label(err, "ReadNonce")
 	} else if n != nonce.Size {
-		return xerrors.Invalid("local", "nonce")
+		return xerrors.Invalid("LocalNonce")
 	}
 
 	var via box.Id
 	cl.id, via, cl.addr, cl.vpnPrefix, err =
-		restCheckin(ctx, cl.pubder, cl.nonce[:], optsvc)
+		cl.checkin(ctx, cl.pubder, cl.nonce[:], optsvc)
 	if err != nil {
 		return err
 	}
@@ -126,7 +113,7 @@ func (cl *client) register(
 	}
 	cl.service[idi] = optsvc
 
-	verbose.Printf("id %d %v via %v prefix %v",
+	verbose.Printf("assigned: id %d, %v, via %v, prefix %v",
 		cl.id, cl.addr, via, cl.vpnPrefix)
 
 	if cl.addr.Is4() {
@@ -175,39 +162,39 @@ func (cl *client) hello(ch chan<- *box.Box, to box.Id, now time.Time) error {
 }
 
 func (cl *client) peer(blk *pem.Block) error {
-	pub, err := xerrors.MarkResult(ecdhPublicKey(blk))
+	pub, err := ecdhPublicKey(blk)
 	if err != nil {
-		return err
+		return xerrors.Label(err, "PeerPubKey")
 	}
 
-	remNonce, err := xerrors.MarkResult(nonceHeader(blk))
+	remNonce, err := nonceHeader(blk)
 	if err != nil {
-		return err
+		return xerrors.Label(err, "PeerNonce")
 	} else if len(remNonce) != nonce.Size {
-		return xerrors.Invalid("remote", "nonce")
+		return xerrors.Invalid("PeerNonce")
 	}
 
-	id, err := xerrors.MarkResult(idHeader(blk))
+	id, err := idHeader(blk)
 	if err != nil {
-		return err
+		return xerrors.Label(err, "AssignedId")
 	}
 
 	idi := IdIndex(id)
 	cl.ver[idi] = IdVersion(id)
 
-	addr, err := xerrors.MarkResult(addressHeader(blk))
+	addr, err := addressHeader(blk)
 	if err != nil {
-		return err
+		return xerrors.Label(err, "PeerAddress")
 	}
 	cl.addressed[addr] = id
 
 	if _, ok := blk.Headers["service"]; ok {
-		cl.service[idi], err = xerrors.MarkResult(serviceHeader(blk))
+		cl.service[idi], err = serviceHeader(blk)
 		if err != nil {
-			return err
+			return xerrors.Label(err, "PeerService")
 		}
-	} else if via, err := xerrors.MarkResult(viaHeader(blk)); err != nil {
-		return err
+	} else if via, err := viaHeader(blk); err != nil {
+		return xerrors.Label(err, "PeerVia")
 	} else {
 		cl.via[idi] = via
 	}
@@ -216,17 +203,10 @@ func (cl *client) peer(blk *pem.Block) error {
 	return err
 }
 
-func waitForDNS(ctx context.Context, network, hostname string) error {
+func (cl *client) waitForDNS(ctx context.Context) error {
 	const timeout = 60 * time.Second
-	switch network {
-	case "udp":
-		network = "ip"
-	case "udp4":
-		network = "ip4"
-	case "udp6":
-		network = "ip6"
-	}
-	ips, err := PatientLookupIP(ctx, network, hostname, timeout)
+	hostname := cl.url.Hostname()
+	ips, err := PatientLookupIP(ctx, "ip", hostname, timeout)
 	if err == nil {
 		verbose.Println(hostname, ips)
 	}

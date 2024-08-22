@@ -21,6 +21,7 @@ import (
 
 // Exchange is a UDP server that forwards ciphered packets between guest's.
 func Exchange(ctx context.Context, args []string) error {
+	const defport = 8003
 	var wg sync.WaitGroup
 	var ex exchange
 
@@ -32,7 +33,7 @@ Exchange ciphered packets between guests.
 
 	nflag := NatFlag()
 
-	err := ex.flags(ctx, ExchangeFlag(), args)
+	err := ex.flags(ctx, ExchangeFlag(), defport, args)
 	if err != nil {
 		return err
 	}
@@ -47,19 +48,19 @@ Exchange ciphered packets between guests.
 
 	cctx, cancel := context.WithCancel(ctx)
 
-	udp, err := xerrors.MarkResult(net.ListenUDP("udp", &net.UDPAddr{
-		IP:   local.svc.Addr().AsSlice(),
-		Port: int(local.svc.Port()),
-	}))
+	udp, err := net.ListenUDP(ex.udpv, &net.UDPAddr{
+		IP:   ex.sap.Addr().AsSlice(),
+		Port: int(ex.sap.Port()),
+	})
 	if err != nil {
-		return err
+		return xerrors.Label(err, "ListenUDP")
 	}
 
 	defer udp.Close()
 
 	lap, err := netip.ParseAddrPort(udp.LocalAddr().String())
 	if err != nil {
-		return err
+		return xerrors.Label(err, "LocalAddr")
 	}
 	sap := lap
 	if !(*nflag).Addr().IsUnspecified() {
@@ -71,7 +72,7 @@ Exchange ciphered packets between guests.
 
 	iex, vex := IdIndex(ex.id), IdVersion(ex.id)
 
-	svc := fmt.Sprintf("(%d, %v)", iex, lap)
+	svc := fmt.Sprintf("(%d, %v)", iex, sap)
 	verbose.Println("start", svc)
 	defer verbose.Println("stopped", svc)
 	defer wg.Wait()
@@ -276,7 +277,7 @@ func (ex *exchange) whoisAddressedRoutine(
 ) {
 	defer wg.Done()
 	verbose.Println("whois", addr)
-	blk, err := restWhoIsAddressed(ctx, addr)
+	blk, err := ex.whoisAddressed(ctx, addr)
 	if err != nil {
 		verbose.Println(err)
 	} else {
@@ -289,7 +290,7 @@ func (ex *exchange) whoisIdRoutine(
 ) {
 	defer wg.Done()
 	verbose.Println("whois", IdIndex(id))
-	blk, err := restWhoIsIdentified(ctx, id)
+	blk, err := ex.whoisIdentified(ctx, id)
 	if err != nil {
 		verbose.Println(err)
 	} else {
@@ -298,13 +299,13 @@ func (ex *exchange) whoisIdRoutine(
 }
 
 func (ex *exchange) whoisResponse(blk *pem.Block) error {
-	addr, err := xerrors.MarkResult(addressHeader(blk))
+	addr, err := addressHeader(blk)
 	if err != nil {
-		return err
+		return xerrors.Label(err, "HeaderAddress")
 	}
-	id, err := xerrors.MarkResult(idHeader(blk))
+	id, err := idHeader(blk)
 	if err != nil {
-		return err
+		return xerrors.Label(err, "HeaderId")
 	}
 	idi := IdIndex(id)
 	if err = ex.peer(blk); err != nil {

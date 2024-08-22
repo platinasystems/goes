@@ -8,6 +8,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"crypto/tls"
 	"crypto/x509"
 	"encoding/hex"
 	"encoding/pem"
@@ -27,87 +28,295 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xflag"
 )
 
-type Rest string
-
-// Admins prints the names of authorized VPN administrators.
-const Admins Rest = "admins"
-
-// Approve VPN subscription.
-const Approve Rest = "approve"
-
-// Certify adds registry to subscriptions.
-const Certify Rest = "certify"
-
-// Deny VPN subscription.
-const Deny Rest = "deny"
-
-// Pending prints requesting subscriber certificates.
-const Pending Rest = "pending"
-
-// Ping registry.
-const Ping Rest = "ping"
-
-// Revoke VPN subscription.
-const Revoke Rest = "revoke"
-
-// Subscribe requests VPN subscription.
-const Subscribe Rest = "subscribe"
-
-// Subscribers prints the names of current subscribers.
-const Subscribers Rest = "subscribers"
-
-// Unsubscribe from VPN.
-const Unsubscribe Rest = "unsubscribe"
-
 const contextApplicationPKCS8 = "application/pkcs8"
 const dnsLookupTimeout = 30 * time.Second
 
-func isLocalhost(req *http.Request) bool {
-	return strings.HasPrefix(req.URL.Host, "127.0.0.1") ||
-		strings.HasPrefix(req.URL.Host, "localhost")
+func RestAdmin(ctx context.Context, args []string) error {
+	var rest rest
+
+	xflag.UsageTemplate(flag.CommandLine, `
+usage: {{.Name}} [flags] <subscriber>
+RESTful registry administration.
+
+{{flags .}}`)
+
+	err := rest.flags(AdminFlag(), args)
+	if err != nil {
+		return err
+	}
+	if args = flag.Args(); len(args) == 0 {
+		return xerrors.Incomplete("subscriber")
+	}
+
+	clone := *rest.url
+	q := clone.Query()
+	q.Set("op", xflag.LastName(flag.CommandLine))
+	q.Set("subscriber", args[0])
+	clone.RawQuery = q.Encode()
+	req, err := http.
+		NewRequestWithContext(ctx, http.MethodPut, clone.String(), nil)
+	if err != nil {
+		return err
+	}
+	resp, err := rest.do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	_, err = io.Copy(os.Stdout, resp.Body)
+	return err
 }
 
-func (op Rest) flags(xFlag *string, args []string) error {
-	kFlag := KeyFlag()
-	rFlag := RegistryFlag()
-	vpnFlag := VpnFlag()
+// Rest.certify adds the peer certificate to CONFIG_HOME/registry.pem.
+func RestCertify(ctx context.Context, args []string) error {
+	var rest rest
 
-	err := qvFlags(args)
+	xflag.UsageTemplate(flag.CommandLine, `
+usage: {{.Name}} [flags] https://<host>[:port]
+Import registry certificate.
+
+{{flags .}}`)
+
+	err := rest.flags(GuestFlag(), args)
+	if err != nil {
+		return err
+	}
+	args = flag.Args()
+	if len(args) == 0 {
+		return xerrors.Incomplete("registry")
+	}
+	rest.url, err = url.Parse(args[0])
+	if err != nil {
+		return err
+	}
+	rest.tp.TLSClientConfig.InsecureSkipVerify = true
+
+	clone := *rest.url
+	q := clone.Query()
+	q.Set("op", xflag.LastName(flag.CommandLine))
+	clone.RawQuery = q.Encode()
+
+	req, err := http.
+		NewRequestWithContext(ctx, http.MethodGet, clone.String(), nil)
 	if err != nil {
 		return err
 	}
 
-	if local.crt, err = NewCertificates(*xFlag); err != nil {
+	resp, err := rest.do(req)
+	if err != nil {
 		return err
 	}
-	if local.sig, err = NewSignatures(*kFlag); err != nil {
-		return err
+	defer resp.Body.Close()
+
+	if resp.TLS == nil {
+		return fmt.Errorf("%v: doesn't support TLS", clone)
 	}
-	if regcrt, err = NewCertificates(*rFlag); err != nil {
-		if op != "certify" || !os.IsNotExist(err) {
-			return err
+	if len(resp.TLS.PeerCertificates) == 0 {
+		return fmt.Errorf("%v: no certificates", clone)
+	}
+
+	r := bufio.NewReader(os.Stdin)
+	w := os.Stdout
+
+	var peercerts []*x509.Certificate
+	for _, peer := range resp.TLS.PeerCertificates {
+		if !rest.reg.Has(peer) {
+			peercerts = append(peercerts, peer)
 		}
 	}
-	if err = xregurl(); err != nil {
+	if len(peercerts) == 0 {
+		fmt.Fprintln(w, "has no new certificates")
+		return nil
+	}
+
+	t, err := CertificatesTemplate()
+	if err != nil {
 		return err
 	}
-	if len(*vpnFlag) > 0 {
-		regurl = regurl.JoinPath(*vpnFlag)
+	for _, pc := range peercerts {
+		t.Execute(w, pc)
 	}
 
-	verbose.Println("crt file:", local.crt)
-	verbose.Println("sig file:", local.sig)
-	verbose.Println("url file:", regurl)
+	fmt.Fprintf(w, `Enter "yes" to append above to %s: `, rest.reg)
+	s, err := r.ReadString('\n')
+	if err != nil && strings.TrimSpace(s) != "yes" {
+		return err
+	}
 
-	mkTransport()
-	return nil
+	for _, peer := range peercerts {
+		pb := &pem.Block{
+			Type:    "CERTIFICATE",
+			Headers: map[string]string{},
+			Bytes:   peer.Raw,
+		}
+		if err = rest.reg.Add(pb, peer); err != nil {
+			break
+		} else {
+			io.Copy(w, resp.Body)
+			break
+		}
+	}
+
+	return err
 }
 
-func rest(req *http.Request) (*http.Response, error) {
-	if isLocalhost(req) {
-		transport.TLSClientConfig.InsecureSkipVerify = true
+func RestPing(ctx context.Context, args []string) error {
+	var rest rest
+
+	xflag.UsageTemplate(flag.CommandLine, `
+usage: {{.Name}} [flags]
+RESTful ping registry.
+
+{{flags .}}`)
+
+	err := rest.flags(AdminFlag(), args)
+	if err != nil {
+		return err
 	}
-	cl := &http.Client{Transport: transport}
+
+	clone := *rest.url
+	q := clone.Query()
+	q.Set("op", xflag.LastName(flag.CommandLine))
+	clone.RawQuery = q.Encode()
+	req, err := http.
+		NewRequestWithContext(ctx, http.MethodGet, clone.String(), nil)
+	if err != nil {
+		return xerrors.Mark(err)
+	}
+	resp, err := rest.do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	_, err = io.Copy(os.Stdout, resp.Body)
+	return err
+}
+
+func RestShow(ctx context.Context, args []string) error {
+	var rest rest
+
+	xflag.UsageTemplate(flag.CommandLine, `
+usage: {{.Name}} [flags]
+RESTful query and print registry object.
+
+{{flags .}}`)
+
+	err := rest.flags(AdminFlag(), args)
+	if err != nil {
+		return err
+	}
+
+	clone := *rest.url
+	q := clone.Query()
+	q.Set("op", "show")
+	q.Set("obj", xflag.LastName(flag.CommandLine))
+	clone.RawQuery = q.Encode()
+	req, err := http.
+		NewRequestWithContext(ctx, http.MethodGet, clone.String(), nil)
+	if err != nil {
+		return xerrors.Mark(err)
+	}
+	resp, err := rest.do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	_, err = io.Copy(os.Stdout, resp.Body)
+	return err
+}
+
+func RestSubscribe(ctx context.Context, args []string) error {
+	var rest rest
+
+	xflag.UsageTemplate(flag.CommandLine, `
+usage: {{.Name}} [flags]
+RESTful subscribe to VPN.
+
+{{flags .}}`)
+
+	err := rest.flags(GuestFlag(), args)
+	if err != nil {
+		return err
+	}
+
+	clone := *rest.url
+	q := clone.Query()
+	q.Set("op", xflag.LastName(flag.CommandLine))
+	clone.RawQuery = q.Encode()
+	buf := new(bytes.Buffer)
+	if err = rest.crt.Dump(buf); err != nil {
+		return err
+	}
+	req, err := http.
+		NewRequestWithContext(ctx, http.MethodPut, clone.String(), buf)
+	if err != nil {
+		return xerrors.Mark(err)
+	}
+	req.Header.Set("Content-Type", "application/x-pem-file")
+	cl := &http.Client{Transport: rest.tp}
+	resp, err := cl.Do(req)
+	if err != nil {
+		return err
+	}
+	if resp == nil {
+		return xerrors.Incomplete("response")
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		err = errors.New(resp.Status)
+	} else {
+		_, err = io.Copy(os.Stdout, resp.Body)
+	}
+	return err
+}
+
+type rest struct {
+	crt,
+	reg *Certificates
+	sig *Signatures
+	url *url.URL
+	tp  *http.Transport
+}
+
+func (rest *rest) checkin(
+	ctx context.Context,
+	pubder,
+	nonce []byte,
+	optsvc netip.AddrPort,
+) (
+	id, via box.Id,
+	addr netip.Addr,
+	prefix netip.Prefix,
+	err error,
+) {
+	const period = 5 * time.Second
+	for try := 1; true; try++ {
+		var resp *http.Response
+		verbose.Println("checkin try", try)
+		id, via, addr, prefix, resp, err = rest.tryCheckin(
+			ctx, pubder, nonce, optsvc,
+		)
+		if err == nil {
+			return
+		} else if resp == nil {
+			return
+		} else if resp.StatusCode != http.StatusTooEarly {
+			return
+		} else if try == 10 {
+			err = xerrors.Unavailable("exchange")
+			return
+		}
+		time.Sleep(period)
+	}
+	return
+}
+
+func (rest *rest) do(req *http.Request) (*http.Response, error) {
+	if strings.HasPrefix(req.URL.Host, "127.0.0.1") ||
+		strings.HasPrefix(req.URL.Host, "localhost") {
+		rest.tp.TLSClientConfig.InsecureSkipVerify = true
+	}
+	cl := &http.Client{Transport: rest.tp}
 	resp, err := cl.Do(req)
 	if err != nil {
 		if resp != nil {
@@ -135,170 +344,66 @@ func rest(req *http.Request) (*http.Response, error) {
 	return resp, err
 }
 
-func (op Rest) admin(ctx context.Context, args []string) error {
-	xflag.UsageTemplate(flag.CommandLine, `
-usage: {{.Name}} [flags] <subscriber>
-RESTful registry administration.
+func (rest *rest) flags(xFlag *string, args []string) error {
+	kFlag := KeyFlag()
+	rFlag := RegistryFlag()
+	vpnFlag := VpnFlag()
 
-{{flags .}}`)
-
-	err := op.flags(AdminFlag(), args)
+	err := qvFlags(args)
 	if err != nil {
 		return err
 	}
-	if args = flag.Args(); len(args) == 0 {
-		return xerrors.Incomplete("subscriber")
+
+	if rest.crt, err = NewCertificates(*xFlag); err != nil {
+		return err
+	}
+	if rest.sig, err = NewSignatures(*kFlag); err != nil {
+		return err
+	}
+	if rest.reg, err = NewCertificates(*rFlag); err != nil {
+		if !strings.HasSuffix(flag.CommandLine.Name(), "certify") ||
+			!os.IsNotExist(err) {
+			return err
+		}
+	}
+	if err = rest.xregurl(); err != nil {
+		return err
+	}
+	if len(*vpnFlag) > 0 {
+		rest.url = rest.url.JoinPath(*vpnFlag)
 	}
 
-	clone := *regurl
-	q := clone.Query()
-	q.Set("op", string(op))
-	q.Set("subscriber", args[0])
-	clone.RawQuery = q.Encode()
-	req, err := http.
-		NewRequestWithContext(ctx, http.MethodPut, clone.String(), nil)
-	if err != nil {
-		return err
+	verbose.Println("crt file:", rest.crt)
+	verbose.Println("sig file:", rest.sig)
+	verbose.Println("url file:", rest.url)
+
+	cfg := &tls.Config{
+		MinVersion: tls.VersionTLS13,
+		Certificates: []tls.Certificate{
+			{
+				Certificate: rest.crt.DERs(),
+				PrivateKey:  rest.sig.First(),
+			},
+		},
 	}
-	resp, err := rest(req)
-	if err != nil {
-		return err
+
+	if rcas, err := x509.SystemCertPool(); err != nil {
+		cfg.RootCAs = x509.NewCertPool()
+	} else {
+		cfg.RootCAs = rcas
 	}
-	defer resp.Body.Close()
-	_, err = io.Copy(os.Stdout, resp.Body)
-	return err
+
+	rest.crt.Join(cfg.RootCAs)
+	if rest.reg != nil {
+		rest.reg.Join(cfg.RootCAs)
+	}
+
+	rest.tp = http.DefaultTransport.(*http.Transport).Clone()
+	rest.tp.TLSClientConfig = cfg
+	return nil
 }
 
-// Rest.certify adds the peer certificate to CONFIG_HOME/registry.pem.
-func (op Rest) certify(ctx context.Context, args []string) error {
-	xflag.UsageTemplate(flag.CommandLine, `
-usage: {{.Name}} [flags] https://<host>[:port]
-Import registry certificate.
-
-{{flags .}}`)
-
-	err := op.flags(GuestFlag(), args)
-	if err != nil {
-		return err
-	}
-	args = flag.Args()
-	if len(args) == 0 {
-		return xerrors.Incomplete("registry")
-	}
-	regurl, err = url.Parse(args[0])
-	if err != nil {
-		return err
-	}
-	transport.TLSClientConfig.InsecureSkipVerify = true
-
-	clone := *regurl
-	q := clone.Query()
-	q.Set("op", string(op))
-	clone.RawQuery = q.Encode()
-
-	req, err := http.
-		NewRequestWithContext(ctx, http.MethodGet, clone.String(), nil)
-	if err != nil {
-		return err
-	}
-
-	resp, err := rest(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.TLS == nil {
-		return fmt.Errorf("%v: doesn't support TLS", clone)
-	}
-	if len(resp.TLS.PeerCertificates) == 0 {
-		return fmt.Errorf("%v: no certificates", clone)
-	}
-
-	r := bufio.NewReader(os.Stdin)
-	w := os.Stdout
-
-	var peercerts []*x509.Certificate
-	for _, peer := range resp.TLS.PeerCertificates {
-		if !regcrt.Has(peer) {
-			peercerts = append(peercerts, peer)
-		}
-	}
-	if len(peercerts) == 0 {
-		fmt.Fprintln(w, "has no new certificates")
-		return nil
-	}
-
-	t, err := CertificatesTemplate()
-	if err != nil {
-		return err
-	}
-	for _, pc := range peercerts {
-		t.Execute(w, pc)
-	}
-
-	fmt.Fprintf(w, `Enter "yes" to append above to %s: `, regcrt)
-	s, err := r.ReadString('\n')
-	if err != nil && strings.TrimSpace(s) != "yes" {
-		return err
-	}
-
-	for _, peer := range peercerts {
-		pb := &pem.Block{
-			Type:    "CERTIFICATE",
-			Headers: map[string]string{},
-			Bytes:   peer.Raw,
-		}
-		if err = regcrt.Add(pb, peer); err != nil {
-			break
-		} else {
-			io.Copy(w, resp.Body)
-			break
-		}
-	}
-
-	return err
-}
-
-func restCheckin(
-	ctx context.Context,
-	pubder,
-	nonce []byte,
-	optsvc netip.AddrPort,
-) (
-	id, via box.Id,
-	addr netip.Addr,
-	prefix netip.Prefix,
-	err error,
-) {
-	const period = 5 * time.Second
-	for try := 1; true; try++ {
-		var resp *http.Response
-		verbose.Println("checkin try", try)
-		id, via, addr, prefix, resp, err = restCheckinResponse(
-			ctx, pubder, nonce, optsvc,
-		)
-		if err == nil {
-			verbose.Println("checkin:", "OK")
-			return
-		} else if resp == nil {
-			verbose.Println("checkin:", err)
-			return
-		} else if resp.StatusCode != http.StatusTooEarly {
-			verbose.Println("checkin:", err)
-			return
-		} else if try == 10 {
-			err = xerrors.Unavailable("exchange")
-			verbose.Println("checkin:", err)
-			return
-		}
-		verbose.Println("retry exchange assignment in", period)
-		time.Sleep(period)
-	}
-	return
-}
-
-func restCheckinResponse(
+func (rest *rest) tryCheckin(
 	ctx context.Context,
 	pubder,
 	nonce []byte,
@@ -310,7 +415,7 @@ func restCheckinResponse(
 	resp *http.Response,
 	err error,
 ) {
-	clone := *regurl
+	clone := *rest.url
 	q := clone.Query()
 	q.Set("op", "checkin")
 	if optsvc.Addr().IsValid() {
@@ -334,7 +439,7 @@ func restCheckinResponse(
 		return
 	}
 	req.Header.Set("Content-Type", contextApplicationPKCS8)
-	if resp, err = rest(req); err != nil {
+	if resp, err = rest.do(req); err != nil {
 		return
 	}
 	defer resp.Body.Close()
@@ -360,114 +465,10 @@ func restCheckinResponse(
 	return
 }
 
-func (op Rest) ping(ctx context.Context, args []string) error {
-	xflag.UsageTemplate(flag.CommandLine, `
-usage: {{.Name}} [flags]
-RESTful ping registry.
-
-{{flags .}}`)
-
-	err := op.flags(AdminFlag(), args)
-	if err != nil {
-		return err
-	}
-
-	clone := *regurl
-	q := clone.Query()
-	q.Set("op", string(op))
-	clone.RawQuery = q.Encode()
-	req, err := http.
-		NewRequestWithContext(ctx, http.MethodGet, clone.String(), nil)
-	if err != nil {
-		return xerrors.Mark(err)
-	}
-	resp, err := rest(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	_, err = io.Copy(os.Stdout, resp.Body)
-	return err
-}
-
-func (obj Rest) show(ctx context.Context, args []string) error {
-	xflag.UsageTemplate(flag.CommandLine, `
-usage: {{.Name}} [flags]
-RESTful query and print registry object.
-
-{{flags .}}`)
-
-	op := "show-" + obj
-	err := op.flags(AdminFlag(), args)
-	if err != nil {
-		return err
-	}
-
-	clone := *regurl
-	q := clone.Query()
-	q.Set("op", string(op))
-	clone.RawQuery = q.Encode()
-	req, err := http.
-		NewRequestWithContext(ctx, http.MethodGet, clone.String(), nil)
-	if err != nil {
-		return xerrors.Mark(err)
-	}
-	resp, err := rest(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	_, err = io.Copy(os.Stdout, resp.Body)
-	return err
-}
-
-func (op Rest) subscribe(ctx context.Context, args []string) error {
-	xflag.UsageTemplate(flag.CommandLine, `
-usage: {{.Name}} [flags]
-RESTful subscribe to VPN.
-
-{{flags .}}`)
-
-	err := op.flags(GuestFlag(), args)
-	if err != nil {
-		return err
-	}
-
-	clone := *regurl
-	q := clone.Query()
-	q.Set("op", string(op))
-	clone.RawQuery = q.Encode()
-	buf := new(bytes.Buffer)
-	if err = local.crt.Dump(buf); err != nil {
-		return err
-	}
-	req, err := http.
-		NewRequestWithContext(ctx, http.MethodPut, clone.String(), buf)
-	if err != nil {
-		return xerrors.Mark(err)
-	}
-	req.Header.Set("Content-Type", "application/x-pem-file")
-	cl := &http.Client{Transport: transport}
-	resp, err := cl.Do(req)
-	if err != nil {
-		return err
-	}
-	if resp == nil {
-		return xerrors.Incomplete("response")
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		err = errors.New(resp.Status)
-	} else {
-		_, err = io.Copy(os.Stdout, resp.Body)
-	}
-	return err
-}
-
-func restWhoIs(ctx context.Context, qname, qvalue string) (
+func (rest *rest) whois(ctx context.Context, qname, qvalue string) (
 	*pem.Block, error,
 ) {
-	clone := *regurl
+	clone := *rest.url
 	q := clone.Query()
 	q.Set("op", "whois")
 	q.Set(qname, qvalue)
@@ -477,7 +478,7 @@ func restWhoIs(ctx context.Context, qname, qvalue string) (
 	if err != nil {
 		return nil, err
 	}
-	resp, err := rest(req)
+	resp, err := rest.do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -493,15 +494,42 @@ func restWhoIs(ctx context.Context, qname, qvalue string) (
 	return blk, nil
 }
 
-func restWhoIsAddressed(ctx context.Context, addr netip.Addr) (
+func (rest *rest) whoisAddressed(ctx context.Context, addr netip.Addr) (
 	*pem.Block, error,
 ) {
-	return restWhoIs(ctx, "address", addr.String())
+	return rest.whois(ctx, "address", addr.String())
 
 }
 
-func restWhoIsIdentified(ctx context.Context, id box.Id) (
+func (rest *rest) whoisIdentified(ctx context.Context, id box.Id) (
 	*pem.Block, error,
 ) {
-	return restWhoIs(ctx, "id", fmt.Sprint(IdIndex(id)))
+	return rest.whois(ctx, "id", fmt.Sprint(IdIndex(id)))
+}
+
+// eXtract registry url from its certificate.
+func (rest *rest) xregurl() error {
+	if rest.reg == nil {
+		return xerrors.Unavailable("registry certificate")
+	}
+	if len(rest.reg.BCs) == 0 {
+		return xerrors.Incomplete(rest.reg.dfn)
+	}
+	if len(rest.crt.BCs[0].Cert.URIs) > 0 {
+		rest.url = rest.reg.BCs[0].Cert.URIs[0]
+		if len(rest.url.Scheme) == 0 {
+			rest.url.Scheme = "https"
+		}
+		return nil
+	}
+	if len(rest.crt.BCs[0].Cert.DNSNames) == 0 {
+		var b bytes.Buffer
+		rest.reg.Show(&b)
+		verbose.Print(b)
+		return xerrors.Invalid(rest.reg.dfn)
+	}
+	var err error
+	s := fmt.Sprint("https://", rest.reg.BCs[0].Cert.DNSNames[0], ":8003")
+	rest.url, err = url.Parse(s)
+	return err
 }

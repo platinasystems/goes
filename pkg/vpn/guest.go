@@ -31,6 +31,7 @@ import (
 // Guest is a UDP server that forwards ciphered packets between an exchange
 // and a network tunnel interface.
 func Guest(ctx context.Context, args []string) error {
+	const defport = 0
 	var wg sync.WaitGroup
 	var g guest
 
@@ -42,26 +43,26 @@ Forward ciphered packets between exchange and tunnel interface.
 
 	tflag := TunnelFlag()
 
-	err := g.flags(ctx, GuestFlag(), args)
+	err := g.flags(ctx, GuestFlag(), defport, args)
 	if err != nil {
 		return err
 	}
 
 	cctx, cancel := context.WithCancel(ctx)
 
-	udp, err := xerrors.MarkResult(net.ListenUDP("udp", &net.UDPAddr{
-		IP:   local.svc.Addr().AsSlice(),
-		Port: int(local.svc.Port()),
-	}))
+	udp, err := net.ListenUDP(g.udpv, &net.UDPAddr{
+		IP:   g.sap.Addr().AsSlice(),
+		Port: int(g.sap.Port()),
+	})
 	if err != nil {
-		return err
+		return xerrors.Label(err, "ListenUDP")
 	}
 
 	defer udp.Close()
 
 	lap, err := netip.ParseAddrPort(udp.LocalAddr().String())
 	if err != nil {
-		return err
+		return xerrors.Label(err, "LocalAddr")
 	}
 	if err = g.register(ctx, ap0); err != nil {
 		return err
@@ -77,7 +78,7 @@ Forward ciphered packets between exchange and tunnel interface.
 	defer cancel()
 	defer verbose.Println("stopping", svc, "...")
 
-	viaBlk, err := restWhoIsIdentified(cctx, via)
+	viaBlk, err := g.whoisIdentified(cctx, via)
 	if err != nil {
 		return err
 	} else if err = g.peer(viaBlk); err != nil {

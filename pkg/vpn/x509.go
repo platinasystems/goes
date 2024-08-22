@@ -112,13 +112,14 @@ Create PEM encoded x509 certificate file.
 		return err
 	}
 
-	if local.sig, err = NewSignatures(*kflag); err != nil {
+	sig, err := NewSignatures(*kflag)
+	if err != nil {
 		return err
 	}
 
-	priv := local.sig.First()
+	priv := sig.First()
 	if priv == nil {
-		return xerrors.Incomplete(local.sig.String())
+		return xerrors.Incomplete(sig.String())
 	}
 
 	if *dur > longest {

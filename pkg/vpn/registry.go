@@ -178,6 +178,7 @@ func (reg *registry) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	cn := peer0.Subject.CommonName
 	qv := req.URL.Query()
 	op := qv.Get("op")
+	obj := qv.Get("obj")
 	name := strings.TrimLeft(req.URL.Path, "/")
 	if len(name) == 0 {
 		name = "vpn"
@@ -251,16 +252,21 @@ func (reg *registry) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		} else {
 			fmt.Fprintln(w, "OK")
 		}
-	case "dump-subscribers":
-		if err = vpn.selfOrSubscriber(peer0); err != nil {
-			w.WriteHeader(http.StatusForbidden)
-			fmt.Fprint(w, cn)
-		} else if req.Method != http.MethodGet {
-			w.WriteHeader(http.StatusMethodNotAllowed)
-			fmt.Fprint(w, req.Method)
-		} else if err = vpn.dumpSubscribers(w); err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			fmt.Fprint(w, err)
+	case "dump":
+		switch obj {
+		case "subscribers":
+			if err = vpn.selfOrSubscriber(peer0); err != nil {
+				w.WriteHeader(http.StatusForbidden)
+				fmt.Fprint(w, cn)
+			} else if req.Method != http.MethodGet {
+				w.WriteHeader(http.StatusMethodNotAllowed)
+				fmt.Fprint(w, req.Method)
+			} else if err = vpn.dumpSubscribers(w); err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				fmt.Fprint(w, err)
+			}
+		default:
+			w.WriteHeader(http.StatusBadRequest)
 		}
 	case "ping":
 		if err = vpn.selfOrSubscriber(peer0); err != nil {
@@ -288,50 +294,55 @@ func (reg *registry) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		} else {
 			fmt.Fprintln(w, "OK")
 		}
-	case "show-active":
-		if err = vpn.selfOrSubscriber(peer0); err != nil {
-			w.WriteHeader(http.StatusForbidden)
-			fmt.Fprint(w, cn)
-		} else if req.Method != http.MethodGet {
-			w.WriteHeader(http.StatusMethodNotAllowed)
-			fmt.Fprint(w, req.Method)
-		} else if err := vpn.showActive(w); err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			fmt.Fprint(w, err)
-		}
-	case "show-admins":
-		if err = vpn.selfOrSubscriber(peer0); err != nil {
-			w.WriteHeader(http.StatusForbidden)
-			fmt.Fprint(w, cn)
-		} else if req.Method != http.MethodGet {
-			w.WriteHeader(http.StatusMethodNotAllowed)
-			fmt.Fprint(w, req.Method)
-		} else {
-			fmt.Fprintf(w, "%s.admins:\n", name)
-			for _, s := range ConfigByName[name].Admins {
-				fmt.Fprintln(w, "-", s)
+	case "show":
+		switch obj {
+		case "active":
+			if err = vpn.selfOrSubscriber(peer0); err != nil {
+				w.WriteHeader(http.StatusForbidden)
+				fmt.Fprint(w, cn)
+			} else if req.Method != http.MethodGet {
+				w.WriteHeader(http.StatusMethodNotAllowed)
+				fmt.Fprint(w, req.Method)
+			} else if err := vpn.showActive(w); err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				fmt.Fprint(w, err)
 			}
-		}
-	case "show-pending":
-		if err = vpn.selfOrSubscriber(peer0); err != nil {
-			w.WriteHeader(http.StatusForbidden)
-			fmt.Fprint(w, cn)
-		} else if req.Method != http.MethodGet {
-			w.WriteHeader(http.StatusMethodNotAllowed)
-			fmt.Fprint(w, req.Method)
-		} else {
-			vpn.showPending(w)
-		}
-	case "show-subscribers":
-		if err = vpn.selfOrSubscriber(peer0); err != nil {
-			w.WriteHeader(http.StatusForbidden)
-			fmt.Fprint(w, cn)
-		} else if req.Method != http.MethodGet {
-			w.WriteHeader(http.StatusMethodNotAllowed)
-			fmt.Fprint(w, req.Method)
-		} else if err := vpn.subscribers.Show(w); err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			fmt.Fprint(w, err)
+		case "admins":
+			if err = vpn.selfOrSubscriber(peer0); err != nil {
+				w.WriteHeader(http.StatusForbidden)
+				fmt.Fprint(w, cn)
+			} else if req.Method != http.MethodGet {
+				w.WriteHeader(http.StatusMethodNotAllowed)
+				fmt.Fprint(w, req.Method)
+			} else {
+				fmt.Fprintf(w, "%s.admins:\n", name)
+				for _, s := range ConfigByName[name].Admins {
+					fmt.Fprintln(w, "-", s)
+				}
+			}
+		case "pending":
+			if err = vpn.selfOrSubscriber(peer0); err != nil {
+				w.WriteHeader(http.StatusForbidden)
+				fmt.Fprint(w, cn)
+			} else if req.Method != http.MethodGet {
+				w.WriteHeader(http.StatusMethodNotAllowed)
+				fmt.Fprint(w, req.Method)
+			} else {
+				vpn.showPending(w)
+			}
+		case "subscribers":
+			if err = vpn.selfOrSubscriber(peer0); err != nil {
+				w.WriteHeader(http.StatusForbidden)
+				fmt.Fprint(w, cn)
+			} else if req.Method != http.MethodGet {
+				w.WriteHeader(http.StatusMethodNotAllowed)
+				fmt.Fprint(w, req.Method)
+			} else if err := vpn.subscribers.Show(w); err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				fmt.Fprint(w, err)
+			}
+		default:
+			w.WriteHeader(http.StatusBadRequest)
 		}
 	case "subscribe":
 		if req.Method != http.MethodPut {
@@ -485,10 +496,9 @@ func (vpn *regVpn) checkin(w http.ResponseWriter, req *http.Request) error {
 		id,
 		via box.Id
 		addr netip.Addr
-		ap   netip.AddrPort
+		svc  netip.AddrPort
 		err  error
 		ok   bool
-		svc  string
 	)
 
 	defer req.Body.Close()
@@ -500,12 +510,18 @@ func (vpn *regVpn) checkin(w http.ResponseWriter, req *http.Request) error {
 	cn := req.TLS.PeerCertificates[0].Subject.CommonName
 
 	if qv.Has("service") {
-		svc = qv.Get("service")
-		if ap, err = netip.ParseAddrPort(svc); err != nil {
+		svc, err = netip.ParseAddrPort(qv.Get("service"))
+		if err != nil {
 			return xerrors.Label(err, "service")
-		} else {
-			verbose.Printf("new service %s @ %v", cn, ap)
 		}
+		if svc.Addr().IsUnspecified() {
+			rap, err := netip.ParseAddrPort(req.RemoteAddr)
+			if err != nil {
+				return xerrors.Label(err, "remote-addr-port")
+			}
+			svc = netip.AddrPortFrom(rap.Addr(), svc.Port())
+		}
+		verbose.Printf("new service %s @ %v", cn, svc)
 	} else if via, err = vpn.exchange.Next(); err != nil {
 		return err
 	} else {
@@ -540,12 +556,12 @@ func (vpn *regVpn) checkin(w http.ResponseWriter, req *http.Request) error {
 		}
 		id = BumpIdVersion(id)
 		entry.Headers["id"] = fmt.Sprint(id)
-		if len(svc) > 0 {
+		if svc.IsValid() {
 			err = vpn.exchange.Update(id)
 			if err != nil {
 				return xerrors.Label(err, "exchange_id")
 			}
-			entry.Headers["service"] = svc
+			entry.Headers["service"] = svc.String()
 		} else {
 			via, err = vpn.exchange.Next()
 			if err != nil {
@@ -565,9 +581,9 @@ func (vpn *regVpn) checkin(w http.ResponseWriter, req *http.Request) error {
 
 		id = vpn.idbook.New()
 		blk.Headers["id"] = fmt.Sprint(id)
-		if len(svc) > 0 {
+		if svc.IsValid() {
 			vpn.exchange.Append(id)
-			blk.Headers["service"] = svc
+			blk.Headers["service"] = svc.String()
 		} else if via, err = vpn.exchange.Next(); err != nil {
 			return xerrors.Label(err, "exchange_id")
 		} else {
@@ -582,7 +598,7 @@ func (vpn *regVpn) checkin(w http.ResponseWriter, req *http.Request) error {
 	fmt.Fprintln(w, "id:", id)
 	fmt.Fprintln(w, "address:", addr)
 	fmt.Fprintln(w, "prefix:", ConfigByName[vpn.name].Prefix)
-	if len(svc) == 0 {
+	if !svc.IsValid() {
 		fmt.Fprintln(w, "via:", via)
 		verbose.Printf("%s assigned %d @ %v via %v\n",
 			cn, id, addr, via)

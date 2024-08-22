@@ -11,13 +11,12 @@ import (
 	"text/template"
 )
 
-var UsageFuncs = template.FuncMap{
-	"flags": SprintDefaults,
-}
-
-// These results are passed to the usage template execution.
-var UsageData = func(flags *flag.FlagSet) any {
-	return flags
+func LastName(flags *flag.FlagSet) string {
+	name := flags.Name()
+	if i := strings.LastIndex(name, " "); i > 0 {
+		name = name[i+1:]
+	}
+	return name
 }
 
 // [flag.FlagSet.Init] wht new name but current [flag.ErrorHandling].
@@ -33,6 +32,16 @@ func SprintDefaults(flags *flag.FlagSet) string {
 	flags.SetOutput(&sb)
 	flags.PrintDefaults()
 	return sb.String()
+}
+
+// These results are passed to the usage template execution.
+var UsageData = func(flags *flag.FlagSet) any {
+	return flags
+}
+
+// The usage template will include these functions.
+var UsageFuncs = template.FuncMap{
+	"flags": SprintDefaults,
 }
 
 // Assign [flag.FlagSet.Usage] to a closure that creates a new [text/template]
