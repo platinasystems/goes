@@ -13,6 +13,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"sync"
 
 	"github.com/platinasystems/goes/v2/pkg/goes"
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
@@ -69,17 +70,23 @@ Execute feature with output piped to syslog, or if GOOS == darwin, oslog.
 	}
 	defer outPipe.Close()
 
+	var wg sync.WaitGroup
 	cp := func(w io.Writer, r io.Reader) {
 		var b []byte
-		for sc := bufio.NewScanner(r); sc.Scan(); {
-			b = bytes.TrimSpace(sc.Bytes())
+		defer wg.Done()
+		sc := bufio.NewScanner(r)
+		for sc.Scan() {
+			b = sc.Bytes()
+			b = bytes.TrimSpace(b)
 			if len(b) > 0 {
 				w.Write(b)
 			}
 		}
 	}
 
+	wg.Add(1)
 	go cp(outLog, outPipe)
+	wg.Add(1)
 	go cp(errLog, errPipe)
 
 	if err = cmd.Start(); err != nil {
@@ -87,5 +94,6 @@ Execute feature with output piped to syslog, or if GOOS == darwin, oslog.
 	}
 
 	err = cmd.Wait()
+	wg.Wait()
 	return err
 }
