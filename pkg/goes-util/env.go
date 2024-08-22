@@ -77,6 +77,9 @@ Set environment and perform named feature, or print environment.
 //   - LocalAppData
 //   - home
 //   - HOME
+//   - SUDO_USER
+//   - SUDO_UID
+//   - SUDO_GID
 //   - TMPDIR
 //   - USERPROFILE
 //   - XDG_CACHE_HOME
@@ -95,6 +98,9 @@ func DaemonEnv() []string {
 		"LocalAppData",
 		"home",
 		"HOME",
+		"SUDO_USER",
+		"SUDO_UID",
+		"SUDO_GID",
 		"TMPDIR",
 		"USERPROFILE",
 		"XDG_CACHE_HOME",
