@@ -72,7 +72,7 @@ Exchange ciphered packets between guests.
 
 	iex, vex := IdIndex(ex.id), IdVersion(ex.id)
 
-	svc := fmt.Sprintf("(%d, %v)", iex, sap)
+	svc := fmt.Sprintf("%d @ %v", iex, sap)
 	verbose.Println("start", svc)
 	defer verbose.Println("stopped", svc)
 	defer wg.Wait()
@@ -122,14 +122,14 @@ pktRxLoop:
 			ex.service[ifrom] = afrom
 			cfrom, ok := ex.gcm[ifrom]
 			if !ok {
-				verbose.Printf("(%d, %v) who?", ifrom, afrom)
+				verbose.Printf("%d @ %v who?", ifrom, afrom)
 				wg.Add(1)
 				go ex.whoisIdRoutine(cctx, &wg, from)
 				bx.Return()
 				continue pktRxLoop
 			}
 			if err := bx.UnsealWith(cfrom); err != nil {
-				verbose.Printf("(%d, %v) unseal %v",
+				verbose.Printf("%d @ %v unseal %v",
 					ifrom, afrom, err)
 				bx.Return()
 				continue pktRxLoop
@@ -138,14 +138,14 @@ pktRxLoop:
 			ito, vto := IdIndex(to), IdVersion(to)
 			if ito == iex {
 				if vto != vex {
-					verbose.Printf("(%d, %v) "+
+					verbose.Printf("%d @ %v "+
 						"FIXME prompt exchange update",
 						ifrom, afrom)
 					bx.Return()
 				} else {
 					err = bx.OpenWith(cfrom)
 					if err != nil {
-						verbose.Printf("(%d, %v) "+
+						verbose.Printf("%d @ %v "+
 							"open %v",
 							ifrom, afrom, err)
 						bx.Return()
@@ -154,21 +154,21 @@ pktRxLoop:
 					}
 				}
 			} else if vto != ex.ver[ito] {
-				verbose.Printf("(%d, %v) "+
+				verbose.Printf("%d @ %v "+
 					"FIXME prompt host %d update",
 					ifrom, afrom, ito)
 				bx.Return()
 			} else if ato, ok := ex.service[ito]; !ok {
-				verbose.Printf("(%d, %v) no service to %d",
+				verbose.Printf("%d @ %v no service to %d",
 					ifrom, afrom, ito)
 				bx.Return()
 			} else if cto, ok := ex.gcm[ito]; !ok {
-				verbose.Printf("(%d, %v) not peered with %d",
+				verbose.Printf("%d @ %v not peered with %d",
 					ifrom, afrom, ito)
 				bx.Return()
 			} else {
-				verbose.Printf("(%d, %v) reseal and send to "+
-					"(%d, %v)", ifrom, afrom, ito, ato)
+				verbose.Printf("%d @ %v reseal and send to "+
+					"%d @ %v", ifrom, afrom, ito, ato)
 				bx.AddrPort = ato
 				bx.SealWith(cto)
 				bx.NonBlockingPut(pktTxCh)
@@ -208,22 +208,22 @@ func (ex *exchange) rx(
 	cfrom := ex.gcm[ifrom]
 	_, err := pi.ReadFrom(bx)
 	if err != nil {
-		verbose.Println("rx (%d, %v) pi %v", ifrom, afrom, err)
+		verbose.Println("rx %d @ %v pi %v", ifrom, afrom, err)
 		bx.Return()
 		return
 	}
 	switch pi.Proto {
 	case VPN_P_HELLO:
-		verbose.Printf("rx (%d, %v) hello %v",
+		verbose.Printf("rx %d @ %v hello %v",
 			ifrom, afrom, VpnHelloTimeSpan(bx))
-		bx.Return()
+		ex.ack(pktTxCh, bx)
 	case VPN_P_WHOIS_ADDRESSED:
 		if addr := VpnWhoisAddress(bx); !addr.IsValid() {
-			verbose.Printf("rx (%d, %v) whois %v",
+			verbose.Printf("rx %d @ %v whois %v",
 				ifrom, afrom, "underrun")
 			bx.Return()
 		} else if blk := ex.pem.addressed[addr]; blk == nil {
-			verbose.Printf("rc (%d, %v) whois %v",
+			verbose.Printf("rc %d @ %v whois %v",
 				ifrom, afrom, addr)
 			bx.Return()
 			wg.Add(1)
@@ -241,11 +241,11 @@ func (ex *exchange) rx(
 		}
 	case VPN_P_WHOIS_IDENTIFIED:
 		if id, ok := VpnWhoisId(bx); !ok {
-			verbose.Printf("rx (%d, %v) whois %v",
+			verbose.Printf("rx %d @ %v whois %v",
 				ifrom, afrom, "underrun")
 			bx.Return()
 		} else if blk := ex.pem.identified[IdIndex(id)]; blk == nil {
-			verbose.Printf("rx (%d, %v) whois %d",
+			verbose.Printf("rx %d @ %v whois %d",
 				ifrom, afrom, id)
 			bx.Return()
 			wg.Add(1)
@@ -262,11 +262,11 @@ func (ex *exchange) rx(
 			bx.NonBlockingPut(pktTxCh)
 		}
 	case VPN_P_WHOIS_SERVICE:
-		verbose.Printf("rx (%d, %v) whois-service %v",
+		verbose.Printf("rx %d @ %v whois-service %v",
 			ifrom, afrom, VpnWhoisService(bx))
 		bx.Return()
 	default:
-		verbose.Printf("rx (%d, %v) unknown proto %#x",
+		verbose.Printf("rx %d @ %v unknown proto %#x",
 			ifrom, afrom, pi.Proto)
 		bx.Return()
 	}

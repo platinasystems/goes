@@ -142,6 +142,11 @@ func (box *Box) CloseWith(v Sealer) {
 	box.Contents = v.Seal(box.Contents[:0], zip, box.Contents, nil)
 }
 
+// Reset contents.
+func (box *Box) Empty() {
+	box.Contents = box.data[Content:Content]
+}
+
 func (box *Box) From(from Id) { SetId(box.data[From:], from) }
 func (box *Box) FromWhom() Id { return GetId(box.data[From:]) }
 

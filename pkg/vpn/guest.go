@@ -192,14 +192,14 @@ guestLoop:
 			ito := IdIndex(to)
 			cto, ok := g.gcm[ito]
 			if !ok {
-				verbose.Printf("no guest cipher %d, %v",
+				verbose.Printf("no guest cipher %d @ %v",
 					ito, ato)
 				bx.Return()
 				continue guestLoop
 			}
 			via, ok := g.via[ito]
 			if !ok {
-				errata.Println("no guest exchange %d, %v",
+				errata.Println("no guest exchange %d @ %v",
 					ito, ato)
 				bx.Return()
 				continue guestLoop
@@ -248,6 +248,7 @@ guestLoop:
 				bx.Return()
 				continue guestLoop
 			}
+			afrom := bx.AddrPort
 			from := bx.FromWhom()
 			ifrom, vfrom := IdIndex(from), IdVersion(from)
 			ver, ok := g.ver[ifrom]
@@ -289,8 +290,10 @@ guestLoop:
 			}
 			switch tunph.Proto {
 			case VPN_P_HELLO:
-				verbose.Print(xerrors.FIXME("re-checkin"))
-				// re-checkin if registry era mismatch
+				verbose.Printf("rx %d @ %v hello %v",
+					ifrom, afrom, VpnHelloTimeSpan(bx))
+				bx.Return()
+				// FIXME re-checkin if registry era mismatch
 				// else re-query exchange from registry
 				// if that era is mismatched
 			case VPN_P_PUBLIC_KEY:

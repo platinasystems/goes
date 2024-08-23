@@ -113,7 +113,7 @@ func (cl *client) register(
 	}
 	cl.service[idi] = optsvc
 
-	verbose.Printf("assigned: id %d, %v, via %v, prefix %v",
+	verbose.Printf("assigned: id %d @ %v, via %v, prefix %v",
 		cl.id, cl.addr, via, cl.vpnPrefix)
 
 	if cl.addr.Is4() {
@@ -123,6 +123,25 @@ func (cl *client) register(
 	}
 
 	return nil
+}
+
+func (cl *client) ack(ch chan<- *box.Box, bx *box.Box) {
+	ap := bx.AddrPort
+	peer := bx.FromWhom()
+	ipeer := IdIndex(peer)
+	cpeer := cl.gcm[ipeer]
+	bx.Empty()
+	netph.TunPI{
+		Proto: VPN_P_HELLO,
+	}.WriteTo(bx)
+	xnet.BigEndianValue(time.Now().UnixMicro()).WriteTo(bx)
+	bx.AddrPort = ap
+	bx.From(cl.id)
+	bx.To(peer)
+	bx.CloseWith(cpeer)
+	bx.SealWith(cpeer)
+	bx.NonBlockingPut(ch)
+	verbose.Printf("ack %d @ %v", ipeer, ap)
 }
 
 func (cl *client) hello(ch chan<- *box.Box, to box.Id, now time.Time) error {
