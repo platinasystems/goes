@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime/debug"
+	"strings"
 	"sync"
 )
 
@@ -30,6 +31,14 @@ func BuildInfo() *debug.BuildInfo {
 		bi = nil
 	}
 	return bi
+}
+
+func IsOpt() bool {
+	return strings.HasPrefix(Path(), filepath.FromSlash("/opt"))
+}
+
+func IsUsrLocal() bool {
+	return strings.HasPrefix(Path(), filepath.FromSlash("/usr/local"))
 }
 
 func MainModule() *debug.Module {

@@ -67,16 +67,8 @@ var CertificatesTemplate = sync.OnceValues(func() (*template.Template, error) {
 `[1:])
 })
 
-type CF string
-
-const (
-	RegistryCF CF = "registry"
-	ExchangeCF CF = "exchange"
-	GuestCF    CF = "guest"
-)
-
-// Create a PEM encoded x509 certificate file.
-func (cf CF) Create(ctx context.Context, args []string) error {
+// CreateCertificate a PEM encoded x509 certificate file.
+func CreateCertificate(ctx context.Context, args []string) error {
 	const year = 365 * 24 * time.Hour
 	const longest = 10 * year
 
@@ -86,8 +78,9 @@ Create PEM encoded x509 certificate file.
 
 {{flags .}}`)
 
+	cf := xflag.LastName(flag.CommandLine)
 	kflag := KeyFlag()
-	dfn := filepath.Join(ConfigHome(), fmt.Sprint(cf, ".pem"))
+	dfn := filepath.Join(ConfigDir(), fmt.Sprint(cf, ".pem"))
 	oflag := flag.String("o", dfn, "Output file name, “-” for stdout.")
 
 	hostname, _ := os.Hostname()
@@ -208,14 +201,15 @@ Create PEM encoded x509 certificate file.
 }
 
 // Print parsed certificate(s).
-func (cf CF) Show(ctx context.Context, args []string) error {
+func ShowCertificate(ctx context.Context, args []string) error {
 	xflag.UsageTemplate(flag.CommandLine, `
 usage: {{.Name}} [flags]
 Print parsed certificate.
 
 {{flags .}}`)
 
-	dfn := filepath.Join(ConfigHome(), fmt.Sprint(cf, ".pem"))
+	cf := xflag.LastName(flag.CommandLine)
+	dfn := filepath.Join(ConfigDir(), fmt.Sprint(cf, ".pem"))
 	iflag := flag.String("i", dfn,
 		"X509 certificate file name, “-” for stdin.")
 

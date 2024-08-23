@@ -7,72 +7,75 @@ package xdg
 
 import (
 	"os"
+	"os/user"
 	"path/filepath"
+	"runtime"
 	"strings"
+	"sync"
 
 	"github.com/platinasystems/goes/v2/pkg/xprogram"
 )
 
-var (
-	Etc    = filepath.FromSlash("/etc")
-	EtcOpt = filepath.FromSlash("/etc/opt")
-
-	Opt      = filepath.FromSlash("/opt")
-	OptShare = filepath.FromSlash("/opt/share")
-
-	UsrLocal      = filepath.FromSlash("/usr/local")
-	UsrLocalShare = filepath.FromSlash("/usr/local/share")
-
-	UsrShare = filepath.FromSlash("/usr/share")
-
-	VarCache = filepath.FromSlash("/var/cache")
-	VarLocal = filepath.FromSlash("/var/local")
-	VarLib   = filepath.FromSlash("/var/lib")
-	VarOpt   = filepath.FromSlash("/var/opt")
-	VarRun   = filepath.FromSlash("/var/run")
-
-	PathListSeparatorString = string(os.PathListSeparator)
-)
-
-func IsOpt() bool {
-	return strings.HasPrefix(xprogram.Path(), Opt)
-}
-
-func IsUsrLocal() bool {
-	return strings.HasPrefix(xprogram.Path(), UsrLocal)
-}
-
-func IsSuperUser() bool {
-	return os.Geteuid() == 0
-}
-
-// Returns [os.TempDir] if none of the “dirs” exist.
-func FirstExistingDir(dirs ...string) string {
-	for _, dir := range dirs {
-		if len(dir) == 0 {
-			continue
-		}
-		if fi, err := os.Stat(dir); err == nil && fi.IsDir() {
-			return dir
-		}
-	}
-	return os.TempDir()
-}
+const PathListSeparatorString = string(os.PathListSeparator)
 
 // CacheHome has non-essential, ephemeral data.
 func CacheHome() string {
 	s := os.Getenv("XDG_CACHE_HOME")
-	if len(s) == 0 {
-		s = goosCacheHome()
+	if len(s) > 0 {
+		return s
+	}
+	switch runtime.GOOS {
+	case "darwin", "ios":
+		if s = SudoUserHome(); len(s) > 0 {
+			s = filepath.Join(s, "Library/Caches")
+		}
+	case "plan9":
+		if s = os.Getenv("home"); len(s) > 0 {
+			s = filepath.Join(s, "lib", "cache")
+		}
+	case "windows":
+		if s = WindowsAppDataLocal(); len(s) > 0 {
+			s = filepath.Join(s, "cache")
+		}
+	default:
+		if s = SudoUserHome(); len(s) > 0 {
+			s = filepath.Join(s, ".cache")
+		}
 	}
 	return s
 }
 
 func ConfigDirs() (dirs []string) {
-	if s := os.Getenv("XDG_CONFIG_DIRS"); len(s) > 0 {
+	s := os.Getenv("XDG_CONFIG_DIRS")
+	if len(s) > 0 {
 		dirs = strings.Split(s, PathListSeparatorString)
 	} else {
-		dirs = goosConfigDirs()
+		switch runtime.GOOS {
+		case "darwin", "ios":
+			dirs = append(dirs,
+				"/Library/Application Support",
+				"/Library/Preferences",
+			)
+		case "plan9":
+			dirs = append(dirs, "/lib")
+		case "windows":
+			var dirs []string
+			if s = WindowsProgramData(); len(s) > 0 {
+				dirs = append(dirs, s)
+			}
+			if s = WindowsAppDataRoaming(); len(s) > 0 {
+				dirs = append(dirs, s)
+			}
+			if len(dirs) > 0 {
+				return dirs
+			}
+		default:
+			if xprogram.IsOpt() {
+				dirs = append(dirs, "/etc/opt")
+			} else {
+				dirs = append(dirs, "/etc")
+			}
+		}
 	}
 	return
 }
@@ -80,17 +83,54 @@ func ConfigDirs() (dirs []string) {
 // ConfigHome has persistent configuration.
 func ConfigHome() string {
 	s := os.Getenv("XDG_CONFIG_HOME")
-	if len(s) == 0 {
-		s = goosConfigHome()
+	if len(s) > 0 {
+		return s
+	}
+	switch runtime.GOOS {
+	case "darwin", "ios":
+		if s = SudoUserHome(); len(s) > 0 {
+			s = filepath.Join(s, "Library/Application Support")
+		}
+	case "plan9":
+		if s = os.Getenv("home"); len(s) > 0 {
+			s = filepath.Join(s, "lib")
+		}
+	case "windows":
+		s = WindowsAppDataLocal()
+	default:
+		if s = SudoUserHome(); len(s) > 0 {
+			s = filepath.Join(s, ".config")
+		}
 	}
 	return s
 }
 
 func DataDirs() (dirs []string) {
-	if s := os.Getenv("XDG_DATA_DIRS"); len(s) > 0 {
+	s := os.Getenv("XDG_DATA_DIRS")
+	if len(s) > 0 {
 		dirs = strings.Split(s, PathListSeparatorString)
 	} else {
-		dirs = goosDataDirs()
+		switch runtime.GOOS {
+		case "darwin", "ios":
+			dirs = append(dirs, "/Library/Application Support")
+		case "plan9":
+			dirs = append(dirs, "/lib")
+		case "windows":
+			if s := WindowsAppDataRoaming(); len(s) > 0 {
+				dirs = append(dirs, s)
+			}
+			if s := WindowsProgramData(); len(s) > 0 {
+				dirs = append(dirs, s)
+			}
+		default:
+			if xprogram.IsUsrLocal() {
+				dirs = append(dirs, "/usr/local")
+			} else if xprogram.IsOpt() {
+				dirs = append(dirs, "/opt/share")
+			} else {
+				dirs = append(dirs, "/usr/share")
+			}
+		}
 	}
 	return
 }
@@ -98,8 +138,24 @@ func DataDirs() (dirs []string) {
 // DataHome has essential, persistent data.
 func DataHome() string {
 	s := os.Getenv("XDG_DATA_HOME")
-	if len(s) == 0 {
-		s = goosDataHome()
+	if len(s) > 0 {
+		return s
+	}
+	switch runtime.GOOS {
+	case "darwin", "ios":
+		if s = SudoUserHome(); len(s) > 0 {
+			s = filepath.Join(s, "Library/Application Support")
+		}
+	case "plan9":
+		if s = os.Getenv("home"); len(s) > 0 {
+			s = filepath.Join(s, "lib")
+		}
+	case "windows":
+		s = WindowsAppDataLocal()
+	default:
+		if s = SudoUserHome(); len(s) > 0 {
+			s = filepath.Join(s, ".local/share")
+		}
 	}
 	return s
 }
@@ -108,8 +164,21 @@ func DataHome() string {
 // such as sockets and named pipes.
 func RunTimeDir() string {
 	s := os.Getenv("XDG_RUNTIME_DIR")
-	if len(s) == 0 {
-		s = goosRunTimeDir()
+	if len(s) > 0 {
+		return s
+	}
+	switch runtime.GOOS {
+	case "darwin", "ios":
+		if s = SudoUserHome(); len(s) > 0 {
+			return filepath.Join(s, "Library/Application Support")
+		}
+	case "plan9":
+	case "windows":
+		s = WindowsAppDataLocal()
+	default:
+		if s = SudoUserHome(); len(s) > 0 {
+			s = filepath.Join(s, ".local/run")
+		}
 	}
 	return s
 }
@@ -122,8 +191,72 @@ func RunTimeDir() string {
 //     (view, layout, open files, undo history, …)
 func StateHome() string {
 	s := os.Getenv("XDG_STATE_HOME")
-	if len(s) == 0 {
-		s = goosStateHome()
+	if len(s) > 0 {
+		return s
+	}
+	switch runtime.GOOS {
+	case "darwin", "ios":
+		if s = SudoUserHome(); len(s) > 0 {
+			s = filepath.Join(s, "Library/Application Support")
+		}
+	case "plan9":
+		if s = os.Getenv("home"); len(s) > 0 {
+			s = filepath.Join(s, "lib", "state")
+		}
+	case "windows":
+		s = WindowsAppDataLocal()
+	default:
+		if s = SudoUserHome(); len(s) > 0 {
+			s = filepath.Join(s, ".local/state")
+		}
+	}
+	return s
+}
+
+// If “$SUDO_USER” isn't empty, return its home instead of current user.
+var SudoUserHome = sync.OnceValue(func() string {
+	if uname := os.Getenv("SUDO_USER"); len(uname) > 0 {
+		if u, err := user.Lookup(uname); err == nil {
+			return u.HomeDir
+		}
+	} else if u, err := user.Current(); err == nil {
+		return u.HomeDir
+	}
+	return os.Getenv("HOME")
+})
+
+func WindowsAppDataLocal() string {
+	s := os.Getenv("LocalAppData")
+	if len(s) > 0 {
+		return s
+	}
+	if u, err := user.Current(); err == nil {
+		s = filepath.Join(u.HomeDir, "AppData", "Local")
+	}
+	return s
+}
+
+func WindowsAppDataRoaming() string {
+	s := os.Getenv("AppData")
+	if len(s) > 0 {
+		return s
+	}
+	if u, err := user.Current(); err == nil {
+		s = filepath.Join(u.HomeDir, "AppData", "Roaming")
+	}
+	return s
+}
+
+func WindowsProgramData() string {
+	s := os.Getenv("ProgramData")
+	if len(s) > 0 {
+		return s
+	}
+	if s = os.Getenv("ALLUSERSPROFILE"); len(s) > 0 {
+		return s
+	}
+	if s = os.Getenv("SystemDrive"); len(s) > 0 {
+		s = filepath.Join(s, "ProgramData")
 	}
 	return s
 }

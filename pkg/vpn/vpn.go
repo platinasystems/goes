@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"sync"
 
+	"github.com/platinasystems/goes/v2/pkg/fhs"
 	"github.com/platinasystems/goes/v2/pkg/xdg"
 	"github.com/platinasystems/goes/v2/pkg/xlog"
 	"github.com/platinasystems/goes/v2/pkg/xprogram"
@@ -25,29 +26,41 @@ const (
 var errata = xlog.Unmute(log.New(os.Stdout, "", log.Lshortfile))
 var verbose = xlog.Mute(log.New(os.Stdout, "", log.Lshortfile))
 
-// [xdg.ConfigHome]/GOES/vpn
-var ConfigHome = sync.OnceValue(func() string {
-	return filepath.Join(xdg.ConfigHome(), xprogram.MainName(), "vpn")
+// [xdg.ConfigHome] or [fhs.Config] + GOES/vpn
+var ConfigDir = sync.OnceValue(func() string {
+	mn := xprogram.MainName()
+	sys := filepath.Join(fhs.Config(), mn, "vpn")
+	if s := xdg.ConfigHome(); len(s) > 0 {
+		s = filepath.Join(s, mn, "vpn")
+		if fi, err := os.Stat(s); err == nil && fi.IsDir() {
+			return s
+		} else if fi, err = os.Stat(sys); err == nil && fi.IsDir() {
+			return sys
+		} else if os.Geteuid() != 0 {
+			return s
+		}
+	}
+	return sys
 })
 
 var Features = map[string]any{
 	"new": map[string]any{
 		"vpn": map[string]any{
-			string(ExchangeCF): ExchangeCF.Create,
-			string(GuestCF):    GuestCF.Create,
-			string(RegistryCF): RegistryCF.Create,
-			"signature":        NewEd25519,
+			"exchange":  CreateCertificate,
+			"guest":     CreateCertificate,
+			"registry":  CreateCertificate,
+			"signature": NewEd25519,
 		},
 	},
 	"show": map[string]any{
 		"vpn": map[string]any{
-			"admins":           RestShow,
-			string(ExchangeCF): ExchangeCF.Show,
-			string(GuestCF):    GuestCF.Show,
-			"pending":          RestShow,
-			string(RegistryCF): RegistryCF.Show,
-			"signature":        ShowSignature,
-			"subscribers":      RestShow,
+			"admins":      RestShow,
+			"exchange":    ShowCertificate,
+			"guest":       ShowCertificate,
+			"pending":     RestShow,
+			"registry":    ShowCertificate,
+			"signature":   ShowSignature,
+			"subscribers": RestShow,
 		},
 	},
 	"vpn": map[string]any{
@@ -66,7 +79,7 @@ var Features = map[string]any{
 func AdminFlag() *string {
 	var dfn string
 	for _, s := range []string{"guest", "exchange", "registry"} {
-		dfn = filepath.Join(ConfigHome(), s+".pem")
+		dfn = filepath.Join(ConfigDir(), s+".pem")
 		if _, err := os.Stat(dfn); err == nil {
 			break
 		}
@@ -75,24 +88,22 @@ func AdminFlag() *string {
 }
 
 func ConfigFlag() *string {
-	dfn := filepath.Join(ConfigHome(), "config.yaml")
-	return flag.String("c", dfn, "Configuration file name.")
+	return flag.String("c", filepath.Join(ConfigDir(), "config.yaml"),
+		"Configuration file name.")
 }
 
 func ExchangeFlag() *string {
-	dfn := filepath.Join(ConfigHome(), "exchange.pem")
-	return flag.String("e", dfn,
+	return flag.String("e", filepath.Join(ConfigDir(), "exchange.pem"),
 		"Exchange certificate file name, “-” for stdio.")
 }
 
 func GuestFlag() *string {
-	dfn := filepath.Join(ConfigHome(), "guest.pem")
-	return flag.String("g", dfn,
+	return flag.String("g", filepath.Join(ConfigDir(), "guest.pem"),
 		"Guest certificate file name, “-” for stdio.")
 }
 
 func DefaultKey() string {
-	return filepath.Join(ConfigHome(), ".key")
+	return filepath.Join(ConfigDir(), ".key")
 }
 
 func KeyFlag() *string {
@@ -108,8 +119,7 @@ Ignored if 0.0.0.0:0.`)
 }
 
 func RegistryFlag() *string {
-	dfn := filepath.Join(ConfigHome(), "registry.pem")
-	return flag.String("r", dfn,
+	return flag.String("r", filepath.Join(ConfigDir(), "registry.pem"),
 		"Registry certificate file name, “-” for stdio.")
 }
 
