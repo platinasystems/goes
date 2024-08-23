@@ -2,7 +2,7 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-//go:build !linux && !netbsd
+//go:build !android && !linux && !darwin && !ios && !netbsd && !openbsd
 
 package goes_util
 

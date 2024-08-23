@@ -2,7 +2,7 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-//go:build linux || netbsd
+//go:build android || linux || netbsd
 
 package goes_util
 
@@ -18,13 +18,16 @@ import (
 
 func Daemons() ([]int, error) {
 	var pids []int
+
 	thisPid := os.Getpid()
 	thisProg := xprogram.Path()
 	isKoApp := xprogram.IsKoApp()
+
 	procexes, err := filepath.Glob("/proc/*/exe")
 	if err != nil {
 		return pids, xerrors.Label(err, "glob")
 	}
+
 	for _, procexe := range procexes {
 		var pid int
 		var s string
