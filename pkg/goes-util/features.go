@@ -7,7 +7,6 @@ package goes_util
 import (
 	"errors"
 	"golang/buildid"
-	"os"
 
 	"github.com/platinasystems/goes/v2/pkg/xprogram"
 )
@@ -27,7 +26,7 @@ var Features = map[string]any{
 	"show": map[string]any{
 		"build": map[string]any{
 			"id": func() (any, error) {
-				return buildid.ReadFile(os.Args[0])
+				return buildid.ReadFile(xprogram.Path())
 			},
 			"info": func() (any, error) {
 				var err error
