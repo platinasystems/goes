@@ -102,7 +102,7 @@ func NewReadContents(r io.Reader) (*Box, error) {
 	} else {
 		box.Contents = box.data[Content : Content+n]
 	}
-	return box, nil
+	return box, err
 }
 
 // Receive labelled box.
