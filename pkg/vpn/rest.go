@@ -196,7 +196,7 @@ func RestShow(ctx context.Context, args []string) error {
 	var rest rest
 
 	xflag.UsageTemplate(flag.CommandLine, `
-usage: {{.Name}} [flags]
+usage: {{.Name}} [flags] [args]
 RESTful query and print registry object.
 
 {{flags .}}`)
@@ -210,6 +210,9 @@ RESTful query and print registry object.
 	q := clone.Query()
 	q.Set("op", "show")
 	q.Set("obj", xflag.LastName(flag.CommandLine))
+	for i, arg := range flag.Args() {
+		q.Set(fmt.Sprint("arg", i), arg)
+	}
 	clone.RawQuery = q.Encode()
 	req, err := http.
 		NewRequestWithContext(ctx, http.MethodGet, clone.String(), nil)

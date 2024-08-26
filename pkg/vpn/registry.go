@@ -19,6 +19,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -163,6 +164,7 @@ A RESTful WWW server.
 }
 
 func (reg *registry) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	var err error
 	defer req.Body.Close()
 	if !req.TLS.HandshakeComplete {
 		verbose.Println("incomplete handshake")
@@ -189,7 +191,6 @@ func (reg *registry) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		fmt.Fprint(w, name)
 		return
 	}
-	var err error
 	defer func() {
 		if err != nil {
 			verbose.Print(op, ": ", err, "\n")
@@ -295,54 +296,35 @@ func (reg *registry) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			fmt.Fprintln(w, "OK")
 		}
 	case "show":
-		switch obj {
-		case "active":
-			if err = vpn.selfOrSubscriber(peer0); err != nil {
-				w.WriteHeader(http.StatusForbidden)
-				fmt.Fprint(w, cn)
-			} else if req.Method != http.MethodGet {
-				w.WriteHeader(http.StatusMethodNotAllowed)
-				fmt.Fprint(w, req.Method)
-			} else if err := vpn.showActive(w); err != nil {
-				w.WriteHeader(http.StatusInternalServerError)
-				fmt.Fprint(w, err)
-			}
-		case "admins":
-			if err = vpn.selfOrSubscriber(peer0); err != nil {
-				w.WriteHeader(http.StatusForbidden)
-				fmt.Fprint(w, cn)
-			} else if req.Method != http.MethodGet {
-				w.WriteHeader(http.StatusMethodNotAllowed)
-				fmt.Fprint(w, req.Method)
-			} else {
-				fmt.Fprintf(w, "%s.admins:\n", name)
+		if err = vpn.selfOrSubscriber(peer0); err != nil {
+			w.WriteHeader(http.StatusForbidden)
+			fmt.Fprint(w, cn)
+		} else if req.Method != http.MethodGet {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			fmt.Fprint(w, req.Method)
+		} else {
+			switch obj {
+			case "active":
+				err = vpn.showActive(w)
+			case "address":
+				err = vpn.showAddress(w, qv)
+			case "admins":
 				for _, s := range ConfigByName[name].Admins {
 					fmt.Fprintln(w, "-", s)
 				}
-			}
-		case "pending":
-			if err = vpn.selfOrSubscriber(peer0); err != nil {
-				w.WriteHeader(http.StatusForbidden)
-				fmt.Fprint(w, cn)
-			} else if req.Method != http.MethodGet {
-				w.WriteHeader(http.StatusMethodNotAllowed)
-				fmt.Fprint(w, req.Method)
-			} else {
+			case "pending":
 				vpn.showPending(w)
+			case "subscribers":
+				err = vpn.subscribers.Show(w)
+			case "tenant":
+				err = vpn.showTenant(w, qv)
+			default:
+				w.WriteHeader(http.StatusBadRequest)
 			}
-		case "subscribers":
-			if err = vpn.selfOrSubscriber(peer0); err != nil {
-				w.WriteHeader(http.StatusForbidden)
-				fmt.Fprint(w, cn)
-			} else if req.Method != http.MethodGet {
-				w.WriteHeader(http.StatusMethodNotAllowed)
-				fmt.Fprint(w, req.Method)
-			} else if err := vpn.subscribers.Show(w); err != nil {
+			if err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
 				fmt.Fprint(w, err)
 			}
-		default:
-			w.WriteHeader(http.StatusBadRequest)
 		}
 	case "subscribe":
 		if req.Method != http.MethodPut {
@@ -695,10 +677,53 @@ func (vpn *regVpn) showActive(w http.ResponseWriter) error {
 	return nil
 }
 
+func (vpn *regVpn) showAddress(w http.ResponseWriter, qv url.Values) error {
+	vpn.mutex.RLock()
+	defer vpn.mutex.RUnlock()
+
+	if qv.Has("arg0") {
+		name := qv.Get("arg0")
+		addr, ok := vpn.addr.named[name]
+		if !ok {
+			return xerrors.Unknown(name)
+		}
+		fmt.Fprintln(w, addr)
+	} else {
+		names := make([]string, 0, len(vpn.addr.named))
+		for name := range vpn.addr.named {
+			names = append(names, name)
+		}
+		sort.Strings(names)
+		for _, name := range names {
+			fmt.Fprintf(w, "%s: %v\n", name, vpn.addr.named[name])
+		}
+	}
+	return nil
+}
+
 func (vpn *regVpn) showPending(w io.Writer) {
 	vpn.mutex.RLock()
 	defer vpn.mutex.RUnlock()
 	fmt.Fprint(w, &vpn.pending)
+}
+
+func (vpn *regVpn) showTenant(w http.ResponseWriter, qv url.Values) error {
+	vpn.mutex.RLock()
+	defer vpn.mutex.RUnlock()
+
+	if !qv.Has("arg0") {
+		return xerrors.Incomplete("address")
+	}
+	addr, err := netip.ParseAddr(qv.Get("arg0"))
+	if err != nil {
+		return xerrors.Label(err, "address")
+	}
+	name, ok := vpn.addr.name[addr]
+	if !ok {
+		return xerrors.NotFound(addr.String())
+	}
+	fmt.Fprintln(w, name)
+	return nil
 }
 
 // This has an empty response.  The client will retrieve the server cert

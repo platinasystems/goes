@@ -54,6 +54,7 @@ var Features = map[string]any{
 	},
 	"show": map[string]any{
 		"vpn": map[string]any{
+			"address":     RestShow,
 			"admins":      RestShow,
 			"exchange":    ShowCertificate,
 			"guest":       ShowCertificate,
@@ -61,6 +62,7 @@ var Features = map[string]any{
 			"registry":    ShowCertificate,
 			"signature":   ShowSignature,
 			"subscribers": RestShow,
+			"tenant":      RestShow,
 		},
 	},
 	"vpn": map[string]any{
