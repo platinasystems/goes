@@ -314,8 +314,8 @@ func (reg *registry) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 				}
 			case "pending":
 				vpn.showPending(w)
-			case "subscribers":
-				err = vpn.subscribers.Show(w)
+			case "subscriber":
+				err = vpn.showSubscriber(w, qv)
 			case "tenant":
 				err = vpn.showTenant(w, qv)
 			default:
@@ -705,6 +705,25 @@ func (vpn *regVpn) showPending(w io.Writer) {
 	vpn.mutex.RLock()
 	defer vpn.mutex.RUnlock()
 	fmt.Fprint(w, &vpn.pending)
+}
+
+func (vpn *regVpn) showSubscriber(w http.ResponseWriter, qv url.Values) error {
+	vpn.mutex.RLock()
+	defer vpn.mutex.RUnlock()
+
+	if !qv.Has("arg0") {
+		return xerrors.Incomplete("name")
+	}
+	name := qv.Get("arg0")
+	sub, ok := vpn.subscribers.Named[name]
+	if !ok {
+		return xerrors.NotFound(name)
+	}
+	t, err := CertificatesTemplate()
+	if err != nil {
+		return err
+	}
+	return t.Execute(w, sub.Cert)
 }
 
 func (vpn *regVpn) showTenant(w http.ResponseWriter, qv url.Values) error {
