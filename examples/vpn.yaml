@@ -286,7 +286,6 @@ spec:
       capabilities:
         add:
         - NET_ADMIN
-        - SYS_ADMIN
       privileged: true
     ports:
     - protocol: UDP
