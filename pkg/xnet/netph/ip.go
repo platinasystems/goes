@@ -5,9 +5,8 @@
 package netph
 
 import (
+	"encoding/binary"
 	"io"
-
-	"github.com/platinasystems/goes/v2/pkg/xnet"
 )
 
 // https://en.wikipedia.org/wiki/IPv4
@@ -31,31 +30,11 @@ const (
 )
 
 func (p *IP) ReadFrom(r io.Reader) (int64, error) {
-	xnet.BytePointer(&p.VIHL).ReadFrom(r)
-	xnet.BytePointer(&p.TOS).ReadFrom(r)
-	xnet.BigEndianPointer(&p.TL).ReadFrom(r)
-	xnet.BigEndianPointer(&p.ID).ReadFrom(r)
-	xnet.BigEndianPointer(&p.FFO).ReadFrom(r)
-	xnet.BytePointer(&p.TTL).ReadFrom(r)
-	xnet.BytePointer(&p.Protocol).ReadFrom(r)
-	xnet.BigEndianPointer(&p.Checksum).ReadFrom(r)
-	r.Read(p.SA[:])
-	_, err := r.Read(p.DA[:])
-	return SizeofIP, err
+	return SizeofIP, binary.Read(r, binary.BigEndian, p)
 }
 
 func (v IP) WriteTo(w io.Writer) (int64, error) {
-	xnet.ByteValue(v.VIHL).WriteTo(w)
-	xnet.ByteValue(v.TOS).WriteTo(w)
-	xnet.BigEndianValue(v.TL).WriteTo(w)
-	xnet.BigEndianValue(v.ID).WriteTo(w)
-	xnet.BigEndianValue(v.FFO).WriteTo(w)
-	xnet.ByteValue(v.TTL).WriteTo(w)
-	xnet.ByteValue(v.Protocol).WriteTo(w)
-	xnet.BigEndianValue(v.Checksum).WriteTo(w)
-	w.Write(v.SA[:])
-	_, err := w.Write(v.DA[:])
-	return SizeofIP, err
+	return SizeofIP, binary.Write(w, binary.BigEndian, v)
 }
 
 func (p *IP) Version() uint8 { return p.VIHL >> 4 }

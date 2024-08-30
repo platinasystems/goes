@@ -5,9 +5,8 @@
 package netph
 
 import (
+	"encoding/binary"
 	"io"
-
-	"github.com/platinasystems/goes/v2/pkg/xnet"
 )
 
 // https://en.wikipedia.org/wiki/IEEE_802.1Q
@@ -17,15 +16,11 @@ type IEEE8021Q struct {
 }
 
 func (p *IEEE8021Q) ReadFrom(r io.Reader) (int64, error) {
-	xnet.BigEndianPointer(&p.TCI).ReadFrom(r)
-	_, err := xnet.BigEndianPointer(&p.Type).ReadFrom(r)
-	return SizeofIEEE8021Q, err
+	return SizeofIEEE8021Q, binary.Read(r, binary.BigEndian, p)
 }
 
 func (v IEEE8021Q) WriteTo(w io.Writer) (int64, error) {
-	xnet.BigEndianValue(v.TCI).WriteTo(w)
-	_, err := xnet.BigEndianValue(v.Type).WriteTo(w)
-	return SizeofIEEE8021Q, err
+	return SizeofIEEE8021Q, binary.Write(w, binary.BigEndian, v)
 }
 
 func (p *IEEE8021Q) PCP() uint8  { return uint8(p.TCI >> (1 + 12)) }

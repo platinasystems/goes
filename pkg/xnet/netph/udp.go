@@ -5,9 +5,8 @@
 package netph
 
 import (
+	"encoding/binary"
 	"io"
-
-	"github.com/platinasystems/goes/v2/pkg/xnet"
 )
 
 // https://en.wikipedia.org/wiki/User_Datagram_Protocol
@@ -19,17 +18,9 @@ type UDP struct {
 }
 
 func (p *UDP) ReadFrom(r io.Reader) (int64, error) {
-	xnet.BigEndianPointer(&p.SP).ReadFrom(r)
-	xnet.BigEndianPointer(&p.DP).ReadFrom(r)
-	xnet.BigEndianPointer(&p.Len).ReadFrom(r)
-	_, err := xnet.BigEndianPointer(&p.Sum).ReadFrom(r)
-	return SizeofUDP, err
+	return SizeofUDP, binary.Read(r, binary.BigEndian, p)
 }
 
 func (v UDP) WriteTo(w io.Writer) (int64, error) {
-	xnet.BigEndianValue(v.SP).WriteTo(w)
-	xnet.BigEndianValue(v.DP).WriteTo(w)
-	xnet.BigEndianValue(v.Len).WriteTo(w)
-	_, err := xnet.BigEndianValue(v.Sum).WriteTo(w)
-	return SizeofUDP, err
+	return SizeofUDP, binary.Write(w, binary.BigEndian, v)
 }

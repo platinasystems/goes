@@ -5,9 +5,8 @@
 package netph
 
 import (
+	"encoding/binary"
 	"io"
-
-	"github.com/platinasystems/goes/v2/pkg/xnet"
 )
 
 // https://en.wikipedia.org/wiki/Ethernet_frame
@@ -18,17 +17,11 @@ type Eth struct {
 }
 
 func (p *Eth) ReadFrom(r io.Reader) (int64, error) {
-	r.Read(p.DMAC[:])
-	r.Read(p.SMAC[:])
-	_, err := xnet.BigEndianPointer(&p.Type).ReadFrom(r)
-	return SizeofEth, err
+	return SizeofEth, binary.Read(r, binary.BigEndian, p)
 }
 
 func (v Eth) WriteTo(w io.Writer) (int64, error) {
-	w.Write(v.DMAC[:])
-	w.Write(v.SMAC[:])
-	_, err := xnet.BigEndianValue(v.Type).WriteTo(w)
-	return SizeofEth, err
+	return SizeofEth, binary.Write(w, binary.BigEndian, v)
 }
 
 func (p *Eth) IsUnicast() bool   { return (p.DMAC[0] & 1) == 0 }

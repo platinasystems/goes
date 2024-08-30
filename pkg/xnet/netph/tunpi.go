@@ -5,9 +5,8 @@
 package netph
 
 import (
+	"encoding/binary"
 	"io"
-
-	"github.com/platinasystems/goes/v2/pkg/xnet"
 )
 
 type TunPI struct {
@@ -16,13 +15,9 @@ type TunPI struct {
 }
 
 func (p *TunPI) ReadFrom(r io.Reader) (int64, error) {
-	xnet.BigEndianPointer(&p.Flags).ReadFrom(r)
-	_, err := xnet.BigEndianPointer(&p.Proto).ReadFrom(r)
-	return SizeofTunPI, err
+	return SizeofTunPI, binary.Read(r, binary.BigEndian, p)
 }
 
 func (v TunPI) WriteTo(w io.Writer) (int64, error) {
-	xnet.BigEndianValue(v.Flags).WriteTo(w)
-	_, err := xnet.BigEndianValue(v.Proto).WriteTo(w)
-	return SizeofTunPI, err
+	return SizeofTunPI, binary.Write(w, binary.BigEndian, v)
 }

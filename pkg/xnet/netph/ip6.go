@@ -5,9 +5,8 @@
 package netph
 
 import (
+	"encoding/binary"
 	"io"
-
-	"github.com/platinasystems/goes/v2/pkg/xnet"
 )
 
 // https://en.wikipedia.org/wiki/IPv6
@@ -23,23 +22,11 @@ type IP6 struct {
 const IP6FlowMask = ((1 << 20) - 1)
 
 func (p *IP6) ReadFrom(r io.Reader) (int64, error) {
-	xnet.BigEndianPointer(&p.VCF).ReadFrom(r)
-	xnet.BigEndianPointer(&p.LEN).ReadFrom(r)
-	xnet.BytePointer(&p.NextHeader).ReadFrom(r)
-	xnet.BytePointer(&p.HopLimit).ReadFrom(r)
-	r.Read(p.SA[:])
-	_, err := r.Read(p.DA[:])
-	return SizeofIP6, err
+	return SizeofIP6, binary.Read(r, binary.BigEndian, p)
 }
 
 func (v IP6) WriteTo(w io.Writer) (int64, error) {
-	xnet.BigEndianValue(v.VCF).WriteTo(w)
-	xnet.BigEndianValue(v.LEN).WriteTo(w)
-	xnet.ByteValue(v.NextHeader).WriteTo(w)
-	xnet.ByteValue(v.HopLimit).WriteTo(w)
-	w.Write(v.SA[:])
-	_, err := w.Write(v.DA[:])
-	return SizeofIP6, err
+	return SizeofIP6, binary.Write(w, binary.BigEndian, v)
 }
 
 func (p *IP6) Version() uint8 { return uint8(p.VCF >> 28) }

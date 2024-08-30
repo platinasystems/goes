@@ -5,9 +5,8 @@
 package netph
 
 import (
+	"encoding/binary"
 	"io"
-
-	"github.com/platinasystems/goes/v2/pkg/xnet"
 )
 
 // https://en.wikipedia.org/wiki/Internet_Control_Message_Protocol
@@ -18,15 +17,9 @@ type ICMP struct {
 }
 
 func (p *ICMP) ReadFrom(r io.Reader) (int64, error) {
-	xnet.BytePointer(&p.Type).ReadFrom(r)
-	xnet.BytePointer(&p.Code).ReadFrom(r)
-	_, err := xnet.BigEndianPointer(&p.Sum).ReadFrom(r)
-	return SizeofICMP, err
+	return SizeofICMP, binary.Read(r, binary.BigEndian, p)
 }
 
 func (v ICMP) WriteTo(w io.Writer) (int64, error) {
-	xnet.ByteValue(v.Type).WriteTo(w)
-	xnet.ByteValue(v.Code).WriteTo(w)
-	_, err := xnet.BigEndianValue(v.Sum).WriteTo(w)
-	return SizeofICMP, err
+	return SizeofICMP, binary.Write(w, binary.BigEndian, v)
 }

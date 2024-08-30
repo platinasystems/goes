@@ -5,9 +5,8 @@
 package netph
 
 import (
+	"encoding/binary"
 	"io"
-
-	"github.com/platinasystems/goes/v2/pkg/xnet"
 )
 
 // https://en.wikipedia.org/wiki/Transmission_Control_Protocol
@@ -22,25 +21,11 @@ type TCP struct {
 }
 
 func (p *TCP) ReadFrom(r io.Reader) (int64, error) {
-	xnet.BigEndianPointer(&p.SP).ReadFrom(r)
-	xnet.BigEndianPointer(&p.DP).ReadFrom(r)
-	xnet.BigEndianPointer(&p.Seq).ReadFrom(r)
-	xnet.BigEndianPointer(&p.Ack).ReadFrom(r)
-	xnet.BigEndianPointer(&p.Flags).ReadFrom(r)
-	xnet.BigEndianPointer(&p.Sum).ReadFrom(r)
-	_, err := xnet.BigEndianPointer(&p.UP).ReadFrom(r)
-	return SizeofTCP, err
+	return SizeofTCP, binary.Read(r, binary.BigEndian, p)
 }
 
 func (v TCP) WriteTo(w io.Writer) (int64, error) {
-	xnet.BigEndianValue(v.SP).WriteTo(w)
-	xnet.BigEndianValue(v.DP).WriteTo(w)
-	xnet.BigEndianValue(v.Seq).WriteTo(w)
-	xnet.BigEndianValue(v.Ack).WriteTo(w)
-	xnet.BigEndianValue(v.Flags).WriteTo(w)
-	xnet.BigEndianValue(v.Sum).WriteTo(w)
-	_, err := xnet.BigEndianValue(v.UP).WriteTo(w)
-	return SizeofTCP, err
+	return SizeofTCP, binary.Write(w, binary.BigEndian, v)
 }
 
 func (p *TCP) DataOffset() uint8 { return uint8(p.Flags >> 28) }

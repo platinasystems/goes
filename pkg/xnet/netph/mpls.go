@@ -5,22 +5,19 @@
 package netph
 
 import (
+	"encoding/binary"
 	"io"
-
-	"github.com/platinasystems/goes/v2/pkg/xnet"
 )
 
 // https://en.wikipedia.org/wiki/Multiprotocol_Label_Switching
 type MPLS uint32
 
 func (p *MPLS) ReadFrom(r io.Reader) (int64, error) {
-	_, err := xnet.BigEndianPointer(p).ReadFrom(r)
-	return SizeofMPLS, err
+	return SizeofMPLS, binary.Read(r, binary.BigEndian, p)
 }
 
 func (v MPLS) WriteTo(w io.Writer) (int64, error) {
-	_, err := xnet.BigEndianValue(v).WriteTo(w)
-	return SizeofMPLS, err
+	return SizeofMPLS, binary.Write(w, binary.BigEndian, v)
 }
 
 func (v MPLS) Label() uint32 { return uint32(v) >> (3 + 1 + 8) }

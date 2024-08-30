@@ -5,9 +5,8 @@
 package netph
 
 import (
+	"encoding/binary"
 	"io"
-
-	"github.com/platinasystems/goes/v2/pkg/xnet"
 )
 
 // https://en.wikipedia.org/wiki/ICMPv6
@@ -18,15 +17,9 @@ type ICMP6 struct {
 }
 
 func (p *ICMP6) ReadFrom(r io.Reader) (int64, error) {
-	xnet.BytePointer(&p.Type).ReadFrom(r)
-	xnet.BytePointer(&p.Code).ReadFrom(r)
-	_, err := xnet.BigEndianPointer(&p.Sum).ReadFrom(r)
-	return SizeofICMP6, err
+	return SizeofICMP6, binary.Read(r, binary.BigEndian, p)
 }
 
 func (v ICMP6) WriteTo(w io.Writer) (int64, error) {
-	xnet.ByteValue(v.Type).WriteTo(w)
-	xnet.ByteValue(v.Code).WriteTo(w)
-	_, err := xnet.BigEndianValue(v.Sum).WriteTo(w)
-	return SizeofICMP6, err
+	return SizeofICMP6, binary.Write(w, binary.BigEndian, v)
 }

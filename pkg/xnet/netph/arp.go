@@ -5,9 +5,8 @@
 package netph
 
 import (
+	"encoding/binary"
 	"io"
-
-	"github.com/platinasystems/goes/v2/pkg/xnet"
 )
 
 // https://en.wikipedia.org/wiki/Address_Resolution_Protocol
@@ -24,27 +23,9 @@ type ARP struct {
 }
 
 func (p *ARP) ReadFrom(r io.Reader) (int64, error) {
-	xnet.BigEndianPointer(&p.HTYPE).ReadFrom(r)
-	xnet.BigEndianPointer(&p.PTYPE).ReadFrom(r)
-	xnet.BytePointer(&p.HLEN).ReadFrom(r)
-	xnet.BytePointer(&p.PLEN).ReadFrom(r)
-	xnet.BigEndianPointer(&p.OPER).ReadFrom(r)
-	r.Read(p.SHA[:])
-	r.Read(p.SPA[:])
-	r.Read(p.THA[:])
-	_, err := r.Read(p.TPA[:])
-	return SizeofARP, err
+	return SizeofARP, binary.Read(r, binary.BigEndian, p)
 }
 
 func (v ARP) WriteTo(w io.Writer) (int64, error) {
-	xnet.BigEndianValue(v.HTYPE).WriteTo(w)
-	xnet.BigEndianValue(v.PTYPE).WriteTo(w)
-	xnet.ByteValue(v.HLEN).WriteTo(w)
-	xnet.ByteValue(v.PLEN).WriteTo(w)
-	xnet.BigEndianValue(v.OPER).WriteTo(w)
-	w.Write(v.SHA[:])
-	w.Write(v.SPA[:])
-	w.Write(v.THA[:])
-	_, err := w.Write(v.TPA[:])
-	return SizeofARP, err
+	return SizeofARP, binary.Write(w, binary.BigEndian, v)
 }

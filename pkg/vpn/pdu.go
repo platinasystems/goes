@@ -6,6 +6,7 @@ package vpn
 
 import (
 	"bytes"
+	"encoding/binary"
 	"encoding/pem"
 	"fmt"
 	"io"
@@ -14,7 +15,6 @@ import (
 
 	"github.com/platinasystems/goes/v2/pkg/box"
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
-	"github.com/platinasystems/goes/v2/pkg/xnet"
 )
 
 const (
@@ -37,7 +37,7 @@ var PacketName = map[uint16]string{
 
 func VpnHelloTimeSpan(r io.Reader) time.Duration {
 	var sent int64
-	xnet.BigEndianPointer(&sent).ReadFrom(r)
+	binary.Read(r, binary.BigEndian, &sent)
 	now := time.Now().UnixMicro()
 	return time.Microsecond * time.Duration(now-sent)
 }
@@ -54,7 +54,7 @@ func VpnWhoisAddress(r io.Reader) netip.Addr {
 }
 
 func VpnWhoisId(r io.Reader) (id box.Id, ok bool) {
-	_, err := xnet.BigEndianPointer(&id).ReadFrom(r)
+	err := binary.Read(r, binary.BigEndian, &id)
 	ok = err == nil
 	return
 }
@@ -62,7 +62,7 @@ func VpnWhoisId(r io.Reader) (id box.Id, ok bool) {
 func VpnWhoisService(r io.Reader) netip.AddrPort {
 	var port uint16
 	addr := VpnWhoisAddress(r)
-	xnet.BigEndianPointer(&port).ReadFrom(r)
+	binary.Read(r, binary.BigEndian, &port)
 	return netip.AddrPortFrom(addr, port)
 }
 
@@ -134,7 +134,7 @@ func WriteAddrTo(w io.Writer, addr netip.Addr) (int64, error) {
 func WriteAddrPortTo(w io.Writer, ap netip.AddrPort) (int64, error) {
 	n, err := WriteAddrTo(w, ap.Addr())
 	if err == nil {
-		_, err = xnet.BigEndianValue(ap.Port()).WriteTo(w)
+		err = binary.Write(w, binary.BigEndian, ap.Port())
 		if err == nil {
 			n += 2
 		}
