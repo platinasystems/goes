@@ -23,8 +23,17 @@ const (
 	oCreate = os.O_WRONLY | os.O_CREATE | os.O_TRUNC
 )
 
-var errata = xlog.Unmute(log.New(os.Stdout, "", log.Lshortfile))
-var verbose = xlog.Mute(log.New(os.Stdout, "", log.Lshortfile))
+var (
+	mutable = log.New(os.Stdout, "", log.Lshortfile)
+
+	errata  = xlog.Unmute(mutable)
+	verbose = xlog.Mute(mutable)
+
+	udpRxTrace = xlog.Mute(mutable)
+	udpTxTrace = xlog.Mute(mutable)
+
+	goRoutineTrace = xlog.Mute(mutable)
+)
 
 // [xdg.ConfigHome] or [fhs.Config] + GOES/vpn
 var ConfigDir = sync.OnceValue(func() string {

@@ -4,10 +4,7 @@
 
 package netph
 
-import (
-	"encoding/binary"
-	"io"
-)
+import "unsafe"
 
 // https://en.wikipedia.org/wiki/IPv4
 type IP struct {
@@ -23,19 +20,13 @@ type IP struct {
 	DA       [4]byte
 }
 
+const SizeofIP = int(unsafe.Sizeof(IP{}))
+
 const (
 	IP4MFbit    = 13
 	IP4DFbit    = 14
 	IP4FlagMask = ((1 << IP4MFbit) - 1)
 )
-
-func (p *IP) ReadFrom(r io.Reader) (int64, error) {
-	return SizeofIP, binary.Read(r, binary.BigEndian, p)
-}
-
-func (v IP) WriteTo(w io.Writer) (int64, error) {
-	return SizeofIP, binary.Write(w, binary.BigEndian, v)
-}
 
 func (p *IP) Version() uint8 { return p.VIHL >> 4 }
 func (p *IP) IHL() int       { return int(p.VIHL & 0xf) }

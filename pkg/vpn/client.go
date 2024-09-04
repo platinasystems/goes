@@ -126,15 +126,25 @@ func (cl *client) register(
 }
 
 func (cl *client) ack(ch chan<- *box.Box, bx *box.Box) {
+	var err error
 	ap := bx.AddrPort
 	peer := bx.FromWhom()
 	ipeer := IdIndex(peer)
 	cpeer := cl.gcm[ipeer]
 	bx.Empty()
-	netph.TunPI{
+	if bx.Contents, err = xnet.Add(bx.Contents, netph.TunPI{
 		Proto: VPN_P_HELLO,
-	}.WriteTo(bx)
-	xnet.BigEndianValue(time.Now().UnixMicro()).WriteTo(bx)
+	}); err != nil {
+		errata.Print(err)
+		bx.Return()
+		return
+	}
+	if bx.Contents, err = xnet.Add(bx.Contents,
+		time.Now().UnixMicro()); err != nil {
+		errata.Print(err)
+		bx.Return()
+		return
+	}
 	bx.AddrPort = ap
 	bx.From(cl.id)
 	bx.To(peer)
@@ -145,6 +155,7 @@ func (cl *client) ack(ch chan<- *box.Box, bx *box.Box) {
 }
 
 func (cl *client) hello(ch chan<- *box.Box, to box.Id, now time.Time) error {
+	var err error
 	ifrom := IdIndex(cl.id)
 	ito := IdIndex(to)
 	cto, ok := cl.gcm[ito]
@@ -165,10 +176,17 @@ func (cl *client) hello(ch chan<- *box.Box, to box.Id, now time.Time) error {
 		return fmt.Errorf("%d: no exchange service", ivia)
 	}
 	bx := box.New()
-	netph.TunPI{
+	if bx.Contents, err = xnet.Add(bx.Contents, netph.TunPI{
 		Proto: VPN_P_HELLO,
-	}.WriteTo(bx)
-	xnet.BigEndianValue(now.UnixMicro()).WriteTo(bx)
+	}); err != nil {
+		bx.Return()
+		return err
+	}
+	if bx.Contents, err = xnet.Add(bx.Contents,
+		now.UnixMicro()); err != nil {
+		bx.Return()
+		return err
+	}
 	bx.AddrPort = svc
 	bx.From(cl.id)
 	bx.To(to)

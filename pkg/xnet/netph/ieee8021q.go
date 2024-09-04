@@ -4,28 +4,19 @@
 
 package netph
 
-import (
-	"encoding/binary"
-	"io"
-)
+import "unsafe"
 
 // https://en.wikipedia.org/wiki/IEEE_802.1Q
-type IEEE8021Q struct {
+type IEEE8021 struct {
 	TCI  uint16
 	Type uint16
 }
 
-func (p *IEEE8021Q) ReadFrom(r io.Reader) (int64, error) {
-	return SizeofIEEE8021Q, binary.Read(r, binary.BigEndian, p)
-}
+const SizeofIEEE8021 = int(unsafe.Sizeof(IEEE8021{}))
 
-func (v IEEE8021Q) WriteTo(w io.Writer) (int64, error) {
-	return SizeofIEEE8021Q, binary.Write(w, binary.BigEndian, v)
-}
-
-func (p *IEEE8021Q) PCP() uint8  { return uint8(p.TCI >> (1 + 12)) }
-func (p *IEEE8021Q) DEI() bool   { return (p.TCI & (1 << 12)) != 0 }
-func (p *IEEE8021Q) VID() uint16 { return p.TCI & ((1 << 12) - 1) }
+func (p *IEEE8021) PCP() uint8  { return uint8(p.TCI >> (1 + 12)) }
+func (p *IEEE8021) DEI() bool   { return (p.TCI & (1 << 12)) != 0 }
+func (p *IEEE8021) VID() uint16 { return p.TCI & ((1 << 12) - 1) }
 
 func ConstructTCI(pcp uint8, dei bool, vid uint16) uint16 {
 	vid &= (1 << 12) - 1

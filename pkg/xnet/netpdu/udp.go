@@ -5,19 +5,29 @@
 package netpdu
 
 import (
-	"bytes"
 	"fmt"
 
+	"github.com/platinasystems/goes/v2/pkg/xnet"
 	"github.com/platinasystems/goes/v2/pkg/xnet/netph"
 )
 
 type UDP []byte
 
+func (pdu UDP) Header() (h netph.UDP, err error) {
+	_, err = xnet.Subtract(pdu, &h)
+	return
+}
+
+func (pdu UDP) Data() (d []byte) {
+	if len(pdu) >= netph.SizeofUDP {
+		d = []byte(pdu)[netph.SizeofUDP:]
+	}
+	return
+}
+
 func (pdu UDP) Format(w fmt.State, verb rune) {
-	var h netph.UDP
-	buf := bytes.NewBuffer(pdu)
 	fmt.Fprint(w, "udp ")
-	if _, err := h.ReadFrom(buf); err != nil {
+	if h, err := pdu.Header(); err != nil {
 		fmt.Fprint(w, err)
 	} else {
 		fmt.Fprint(w, "port ", h.DP, " <- ", h.SP)

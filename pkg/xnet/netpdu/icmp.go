@@ -5,9 +5,9 @@
 package netpdu
 
 import (
-	"bytes"
 	"fmt"
 
+	"github.com/platinasystems/goes/v2/pkg/xnet"
 	"github.com/platinasystems/goes/v2/pkg/xnet/netph"
 )
 
@@ -21,11 +21,21 @@ var ICMPTypeCodes = map[uint8]func(uint8) string{
 
 type ICMP []byte
 
+func (pdu ICMP) Header() (h netph.ICMP, err error) {
+	_, err = xnet.Subtract(pdu, &h)
+	return
+}
+
+func (pdu ICMP) Data() (d []byte) {
+	if len(pdu) >= netph.SizeofICMP {
+		d = []byte(pdu)[netph.SizeofICMP:]
+	}
+	return
+}
+
 func (pdu ICMP) Format(w fmt.State, verb rune) {
-	var h netph.ICMP
-	buf := bytes.NewBuffer(pdu)
 	fmt.Fprint(w, "icmp ")
-	if _, err := h.ReadFrom(buf); err != nil {
+	if h, err := pdu.Header(); err != nil {
 		fmt.Fprint(w, err)
 	} else if typename := ICMPTypeName(h.Type); len(typename) == 0 {
 		typename = "unknown"

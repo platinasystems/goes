@@ -5,9 +5,9 @@
 package netpdu
 
 import (
-	"bytes"
 	"fmt"
 
+	"github.com/platinasystems/goes/v2/pkg/xnet"
 	"github.com/platinasystems/goes/v2/pkg/xnet/netph"
 )
 
@@ -22,21 +22,25 @@ var TunPIprotos = map[uint16]func([]byte) fmt.Formatter{
 
 type TunPI []byte
 
-func (pdu TunPI) Parse() (header netph.TunPI, data []byte, err error) {
-	buf := bytes.NewBuffer(pdu)
-	if _, err = header.ReadFrom(buf); err == nil {
-		data = buf.Bytes()
+func (pdu TunPI) Header() (h netph.TunPI, err error) {
+	_, err = xnet.Subtract(pdu, &h)
+	return
+}
+
+func (pdu TunPI) Data() (d []byte) {
+	if len(pdu) >= netph.SizeofTunPI {
+		d = []byte(pdu)[netph.SizeofTunPI:]
 	}
 	return
 }
 
 func (pdu TunPI) Format(w fmt.State, verb rune) {
 	fmt.Fprint(w, "tun")
-	if header, data, err := pdu.Parse(); err != nil {
+	if h, err := pdu.Header(); err != nil {
 		fmt.Fprint(w, " ", err)
-	} else if f, ok := TunPIprotos[header.Proto]; ok {
-		fmt.Fprint(w, Mark, f(data))
+	} else if f, ok := TunPIprotos[h.Proto]; ok {
+		fmt.Fprint(w, Mark, f(pdu.Data()))
 	} else {
-		fmt.Fprintf(w, " proto[%#x]", header.Proto)
+		fmt.Fprintf(w, " proto[%#x]", h.Proto)
 	}
 }

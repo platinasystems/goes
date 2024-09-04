@@ -5,20 +5,30 @@
 package netpdu
 
 import (
-	"bytes"
 	"fmt"
 	"net"
 
+	"github.com/platinasystems/goes/v2/pkg/xnet"
 	"github.com/platinasystems/goes/v2/pkg/xnet/netph"
 )
 
 type ARP []byte
 
+func (pdu ARP) Header() (h netph.ARP, err error) {
+	_, err = xnet.Subtract(pdu, &h)
+	return
+}
+
+func (pdu ARP) Data() (d []byte) {
+	if len(pdu) >= netph.SizeofARP {
+		d = []byte(pdu)[netph.SizeofARP:]
+	}
+	return
+}
+
 func (pdu ARP) Format(w fmt.State, verb rune) {
-	var h netph.ARP
-	buf := bytes.NewBuffer(pdu)
 	fmt.Fprint(w, "arp: ")
-	if _, err := h.ReadFrom(buf); err != nil {
+	if h, err := pdu.Header(); err != nil {
 		fmt.Fprint(w, err)
 	} else {
 		switch h.OPER {

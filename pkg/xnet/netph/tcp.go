@@ -4,10 +4,7 @@
 
 package netph
 
-import (
-	"encoding/binary"
-	"io"
-)
+import "unsafe"
 
 // https://en.wikipedia.org/wiki/Transmission_Control_Protocol
 type TCP struct {
@@ -20,13 +17,7 @@ type TCP struct {
 	UP    uint16
 }
 
-func (p *TCP) ReadFrom(r io.Reader) (int64, error) {
-	return SizeofTCP, binary.Read(r, binary.BigEndian, p)
-}
-
-func (v TCP) WriteTo(w io.Writer) (int64, error) {
-	return SizeofTCP, binary.Write(w, binary.BigEndian, v)
-}
+const SizeofTCP = int(unsafe.Sizeof(TCP{}))
 
 func (p *TCP) DataOffset() uint8 { return uint8(p.Flags >> 28) }
 

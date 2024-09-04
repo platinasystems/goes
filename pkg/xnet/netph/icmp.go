@@ -4,10 +4,7 @@
 
 package netph
 
-import (
-	"encoding/binary"
-	"io"
-)
+import "unsafe"
 
 // https://en.wikipedia.org/wiki/Internet_Control_Message_Protocol
 type ICMP struct {
@@ -16,10 +13,4 @@ type ICMP struct {
 	Sum  uint16
 }
 
-func (p *ICMP) ReadFrom(r io.Reader) (int64, error) {
-	return SizeofICMP, binary.Read(r, binary.BigEndian, p)
-}
-
-func (v ICMP) WriteTo(w io.Writer) (int64, error) {
-	return SizeofICMP, binary.Write(w, binary.BigEndian, v)
-}
+const SizeofICMP = int(unsafe.Sizeof(ICMP{}))

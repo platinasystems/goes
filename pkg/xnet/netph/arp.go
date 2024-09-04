@@ -4,10 +4,7 @@
 
 package netph
 
-import (
-	"encoding/binary"
-	"io"
-)
+import "unsafe"
 
 // https://en.wikipedia.org/wiki/Address_Resolution_Protocol
 type ARP struct {
@@ -22,10 +19,4 @@ type ARP struct {
 	TPA   [4]byte
 }
 
-func (p *ARP) ReadFrom(r io.Reader) (int64, error) {
-	return SizeofARP, binary.Read(r, binary.BigEndian, p)
-}
-
-func (v ARP) WriteTo(w io.Writer) (int64, error) {
-	return SizeofARP, binary.Write(w, binary.BigEndian, v)
-}
+const SizeofARP = int(unsafe.Sizeof(ARP{}))

@@ -5,10 +5,10 @@
 package netpdu
 
 import (
-	"bytes"
 	"fmt"
 	"net"
 
+	"github.com/platinasystems/goes/v2/pkg/xnet"
 	"github.com/platinasystems/goes/v2/pkg/xnet/netph"
 )
 
@@ -26,29 +26,43 @@ var IPprotocols = map[uint8]func([]byte) fmt.Formatter{
 
 type IP []byte
 
-func (pdu IP) Parse() (header netph.IP, data []byte, err error) {
-	buf := bytes.NewBuffer(pdu)
-	if _, err = header.ReadFrom(buf); err == nil {
-		i := header.IHL() << 2
-		if n := len(pdu); i > n {
-			i = n
+func (pdu IP) Header() (h netph.IP, err error) {
+	_, err = xnet.Subtract(pdu, &h)
+	return
+}
+
+func (pdu IP) Data() (d []byte) {
+	if len(pdu) >= 1 {
+		n := int(pdu[0]&0xf) * 4
+		if len(pdu) > n {
+			d = []byte(pdu)[n:]
 		}
-		data = []byte(pdu[i:])
+	}
+	return
+}
+
+func (pdu IP) Options() (d []byte) {
+	if len(pdu) >= 1 {
+		n := int(pdu[0]&0xf) * 4
+		if len(pdu) > 20 {
+			d = []byte(pdu)[20:n]
+		}
 	}
 	return
 }
 
 func (pdu IP) Format(w fmt.State, verb rune) {
 	fmt.Fprint(w, "ip ")
-	header, data, err := pdu.Parse()
+	h, err := pdu.Header()
 	if err != nil {
 		fmt.Fprint(w, err)
 		return
 	}
-	fmt.Fprint(w, net.IP(header.DA[:]), " <- ", net.IP(header.SA[:]))
-	if f, ok := IPprotocols[header.Protocol]; ok {
-		fmt.Fprint(w, Mark, f(data))
+	d := pdu.Data()
+	fmt.Fprint(w, net.IP(h.DA[:]), " <- ", net.IP(h.SA[:]))
+	if f, ok := IPprotocols[h.Protocol]; ok {
+		fmt.Fprint(w, Mark, f(d))
 	} else {
-		fmt.Fprintf(w, ", protocol[%#x]", header.Protocol)
+		fmt.Fprintf(w, ", protocol[%#x]", h.Protocol)
 	}
 }

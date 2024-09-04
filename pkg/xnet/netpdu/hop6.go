@@ -5,9 +5,9 @@
 package netpdu
 
 import (
-	"bytes"
 	"fmt"
 
+	"github.com/platinasystems/goes/v2/pkg/xnet"
 	"github.com/platinasystems/goes/v2/pkg/xnet/netph"
 )
 
@@ -25,11 +25,21 @@ var HOP6Types = map[uint8]func([]byte) fmt.Formatter{
 
 type HOP6 []byte
 
+func (pdu HOP6) Header() (h netph.HOP6, err error) {
+	_, err = xnet.Subtract(pdu, &h)
+	return
+}
+
+func (pdu HOP6) Data() (d []byte) {
+	if len(pdu) >= netph.SizeofHOP6 {
+		d = []byte(pdu)[netph.SizeofHOP6:]
+	}
+	return
+}
+
 func (pdu HOP6) Format(w fmt.State, verb rune) {
-	var h netph.HOP6
-	buf := bytes.NewBuffer(pdu)
 	fmt.Fprint(w, "hop6 ")
-	if _, err := h.ReadFrom(buf); err != nil {
+	if h, err := pdu.Header(); err != nil {
 		fmt.Fprint(w, err)
 	} else if s, ok := map[uint8]string{
 		0:   "hop-by-hop",
@@ -44,10 +54,10 @@ func (pdu HOP6) Format(w fmt.State, verb rune) {
 	}[h.Type]; ok {
 		fmt.Fprintf(w, "%s[%d]", s, h.Len)
 		if h.Type != 59 {
-			fmt.Fprint(w, Mark, HOP6(buf.Bytes()))
+			fmt.Fprint(w, Mark, HOP6(pdu.Data()))
 		}
 	} else if f, ok := HOP6Types[h.Type]; ok {
-		fmt.Fprint(w, Mark, f(buf.Bytes()))
+		fmt.Fprint(w, Mark, f(pdu.Data()))
 	} else {
 		fmt.Fprintf(w, "type[%#x]", h.Type)
 	}

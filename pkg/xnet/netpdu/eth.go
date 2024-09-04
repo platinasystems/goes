@@ -5,10 +5,10 @@
 package netpdu
 
 import (
-	"bytes"
 	"fmt"
 	"net"
 
+	"github.com/platinasystems/goes/v2/pkg/xnet"
 	"github.com/platinasystems/goes/v2/pkg/xnet/netph"
 )
 
@@ -38,17 +38,27 @@ var EthTypes = map[uint16]func([]byte) fmt.Formatter{
 
 type Eth []byte
 
+func (pdu Eth) Header() (h netph.Eth, err error) {
+	_, err = xnet.Subtract(pdu, &h)
+	return
+}
+
+func (pdu Eth) Data() (d []byte) {
+	if len(pdu) >= netph.SizeofEth {
+		d = []byte(pdu)[netph.SizeofEth:]
+	}
+	return
+}
+
 func (pdu Eth) Format(w fmt.State, verb rune) {
-	var h netph.Eth
-	buf := bytes.NewBuffer(pdu)
 	fmt.Fprint(w, "eth: ")
-	if _, err := h.ReadFrom(buf); err != nil {
+	if h, err := pdu.Header(); err != nil {
 		fmt.Fprint(w, err)
 	} else {
 		fmt.Fprint(w, net.HardwareAddr(h.DMAC[:]), " <- ",
 			net.HardwareAddr(h.SMAC[:]))
 		if f, ok := EthTypes[h.Type]; ok {
-			fmt.Fprint(w, Mark, f(buf.Bytes()))
+			fmt.Fprint(w, Mark, f(pdu.Data()))
 		} else {
 			fmt.Fprintf(w, ", type[%#x]", h.Type)
 		}

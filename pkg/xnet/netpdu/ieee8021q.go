@@ -5,9 +5,9 @@
 package netpdu
 
 import (
-	"bytes"
 	"fmt"
 
+	"github.com/platinasystems/goes/v2/pkg/xnet"
 	"github.com/platinasystems/goes/v2/pkg/xnet/netph"
 )
 
@@ -30,11 +30,36 @@ var IEEE8021Qtypes = map[uint16]func([]byte) fmt.Formatter{
 }
 
 type IEEE8021Q []byte
-type IEEE8021AD []byte
+
+func (pdu IEEE8021Q) Header() (h netph.IEEE8021, err error) {
+	_, err = xnet.Subtract(pdu, &h)
+	return
+}
+
+func (pdu IEEE8021Q) Data() (d []byte) {
+	if len(pdu) >= netph.SizeofIEEE8021 {
+		d = []byte(pdu)[netph.SizeofIEEE8021:]
+	}
+	return
+}
 
 func (pdu IEEE8021Q) Format(w fmt.State, verb rune) {
 	fmt.Fprint(w, "ieee8021q: ")
 	ieee8021qFormat(w, verb, pdu)
+}
+
+type IEEE8021AD []byte
+
+func (pdu IEEE8021AD) Header() (h netph.IEEE8021, err error) {
+	_, err = xnet.Subtract(pdu, &h)
+	return
+}
+
+func (pdu IEEE8021AD) Data() (d []byte) {
+	if len(pdu) >= netph.SizeofIEEE8021 {
+		d = []byte(pdu)[netph.SizeofIEEE8021:]
+	}
+	return
 }
 
 func (pdu IEEE8021AD) Format(w fmt.State, verb rune) {
@@ -42,18 +67,17 @@ func (pdu IEEE8021AD) Format(w fmt.State, verb rune) {
 	ieee8021qFormat(w, verb, pdu)
 }
 
-func ieee8021qFormat[PDU IEEE8021Q | IEEE8021AD](
-	w fmt.State, verb rune, pdu PDU,
-) {
-	var h netph.IEEE8021Q
-	buf := bytes.NewBuffer(pdu)
-	if _, err := h.ReadFrom(buf); err != nil {
+func ieee8021qFormat(w fmt.State, verb rune, pdu interface {
+	Header() (netph.IEEE8021, error)
+	Data() []byte
+}) {
+	if h, err := pdu.Header(); err != nil {
 		fmt.Fprint(w, err)
 	} else {
 		fmt.Fprintf(w, "pcp[%#x] dei[%d] vid [%#x]",
 			h.PCP(), h.DEI(), h.VID())
 		if f, ok := IEEE8021Qtypes[h.Type]; ok {
-			fmt.Fprint(w, Mark, f(buf.Bytes()))
+			fmt.Fprint(w, Mark, f(pdu.Data()))
 		} else {
 			fmt.Fprintf(w, " type[%#x]", h.Type)
 		}

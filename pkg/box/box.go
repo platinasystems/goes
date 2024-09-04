@@ -185,26 +185,10 @@ func (box *Box) RandZipCode() {
 	SetZip(box.data[ZipCode:], runtime_randn(4))
 }
 
-// Fill data with Contents then advance Contents.
-func (box *Box) Read(data []byte) (int, error) {
-	n := copy(data, box.Contents)
-	box.Contents = box.Contents[n:]
-	if len(box.Contents) == 0 {
-		box.Contents = box.data[Content:Content]
-	}
-	return n, nil
-}
-
 func (box *Box) Return() {
 	for box.next = inventory.Load(); !inventory.
 		CompareAndSwap(box.next, box); box.next = inventory.Load() {
 	}
-}
-
-// Restore read Contents.
-func (box *Box) Rewind() {
-	n := (BoxAndLabelCap - cap(box.Contents)) + len(box.Contents)
-	box.Contents = box.data[Content:n]
 }
 
 // Seal box label with the shared key and nonce.

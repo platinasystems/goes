@@ -4,20 +4,11 @@
 
 package netph
 
-import (
-	"encoding/binary"
-	"io"
-)
+import "unsafe"
 
 type TunPI struct {
 	Flags,
 	Proto uint16
 }
 
-func (p *TunPI) ReadFrom(r io.Reader) (int64, error) {
-	return SizeofTunPI, binary.Read(r, binary.BigEndian, p)
-}
-
-func (v TunPI) WriteTo(w io.Writer) (int64, error) {
-	return SizeofTunPI, binary.Write(w, binary.BigEndian, v)
-}
+const SizeofTunPI = int(unsafe.Sizeof(TunPI{}))

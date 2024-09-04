@@ -5,10 +5,9 @@
 package netpdu
 
 import (
-	"bytes"
-	"encoding/binary"
 	"fmt"
 
+	"github.com/platinasystems/goes/v2/pkg/xnet"
 	"github.com/platinasystems/goes/v2/pkg/xnet/netph"
 )
 
@@ -22,32 +21,61 @@ var MPLStypes = map[uint16]func([]byte) fmt.Formatter{
 }
 
 type MPLS_UC []byte
-type MPLS_MC []byte
+
+func (pdu MPLS_UC) Header() (h netph.MPLS, err error) {
+	_, err = xnet.Subtract(pdu, &h)
+	return
+}
+
+func (pdu MPLS_UC) Data() (d []byte) {
+	if len(pdu) >= netph.SizeofMPLS {
+		d = []byte(pdu)[netph.SizeofMPLS:]
+	}
+	return
+}
 
 func (pdu MPLS_UC) Format(w fmt.State, verb rune) {
 	fmt.Fprint(w, "mpls-uc: ")
 	mplsFormat(w, verb, pdu)
 }
 
+type MPLS_MC []byte
+
+func (pdu MPLS_MC) Header() (h netph.MPLS, err error) {
+	_, err = xnet.Subtract(pdu, &h)
+	return
+}
+
+func (pdu MPLS_MC) Data() (d []byte) {
+	if len(pdu) >= netph.SizeofMPLS {
+		d = []byte(pdu)[netph.SizeofMPLS:]
+	}
+	return
+}
+
 func (pdu MPLS_MC) Format(w fmt.State, verb rune) {
-	fmt.Fprint(w, "mpls-uc: ")
+	fmt.Fprint(w, "mpls-mc: ")
 	mplsFormat(w, verb, pdu)
 }
 
-func mplsFormat[PDU MPLS_UC | MPLS_MC](w fmt.State, verb rune, pdu PDU) {
-	var h netph.MPLS
-	buf := bytes.NewBuffer(pdu)
-	if _, err := h.ReadFrom(buf); err != nil {
+func mplsFormat(w fmt.State, verb rune, pdu interface {
+	Header() (netph.MPLS, error)
+	Data() []byte
+}) {
+	if h, err := pdu.Header(); err != nil {
 		fmt.Fprint(w, err)
 	} else {
+		var t uint16
 		fmt.Fprintf(w, "label[%#x] tc[%#x] ttl[%d]",
 			h.Label(), h.TC(), h.TTL())
-		payload := buf.Bytes()
-		t := binary.BigEndian.Uint16(payload)
-		if !h.IsBOS() {
-			fmt.Fprint(w, Mark, payload)
+		d := pdu.Data()
+		_, err = xnet.Subtract(d, &t)
+		if err != nil {
+			fmt.Fprint(w, " type ", err)
+		} else if !h.IsBOS() {
+			fmt.Fprint(w, Mark, d)
 		} else if f, ok := MPLStypes[t]; ok {
-			fmt.Fprint(w, Mark, f(payload))
+			fmt.Fprint(w, Mark, f(d))
 		} else {
 			fmt.Fprintf(w, " type[%#x]", t)
 		}

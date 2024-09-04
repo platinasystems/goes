@@ -147,11 +147,11 @@ A RESTful WWW server.
 		},
 	}
 
-	verbose.Println("start", svc)
-	defer verbose.Println("stopped", svc)
+	goRoutineTrace.Println("start", svc)
+	defer goRoutineTrace.Println("stopped", svc)
 	defer wg.Wait()
 	defer cancel()
-	defer verbose.Println("stopping", svc, "...")
+	defer goRoutineTrace.Println("stopping", svc, "...")
 
 	wg.Add(1)
 	go reg.shutdown(cctx, &wg)

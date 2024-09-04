@@ -4,10 +4,7 @@
 
 package netph
 
-import (
-	"encoding/binary"
-	"io"
-)
+import "unsafe"
 
 // https://en.wikipedia.org/wiki/IPv6
 type IP6 struct {
@@ -19,15 +16,8 @@ type IP6 struct {
 	DA         [16]byte
 }
 
+const SizeofIP6 = int(unsafe.Sizeof(IP6{}))
 const IP6FlowMask = ((1 << 20) - 1)
-
-func (p *IP6) ReadFrom(r io.Reader) (int64, error) {
-	return SizeofIP6, binary.Read(r, binary.BigEndian, p)
-}
-
-func (v IP6) WriteTo(w io.Writer) (int64, error) {
-	return SizeofIP6, binary.Write(w, binary.BigEndian, v)
-}
 
 func (p *IP6) Version() uint8 { return uint8(p.VCF >> 28) }
 func (p *IP6) Class() uint8   { return uint8(p.VCF >> 20) }

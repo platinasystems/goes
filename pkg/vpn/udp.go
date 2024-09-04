@@ -28,8 +28,9 @@ func pktRxRoutine(
 ) {
 	defer wg.Done()
 	defer close(ch)
-	verbose.Printf("start %v rx routine", udp.LocalAddr())
-	defer verbose.Printf("stopped %v rx routine", udp.LocalAddr())
+	la := udp.LocalAddr()
+	goRoutineTrace.Printf("start %v rx routine", la)
+	defer goRoutineTrace.Printf("stopped %v rx routine", la)
 	udp.SetReadDeadline(time.Time{})
 	for dur := minPktRxDeadline; ctx.Err() == nil; {
 		err := udp.SetReadDeadline(time.Now().Add(dur))
@@ -37,7 +38,7 @@ func pktRxRoutine(
 			verbose.Print(err)
 			break
 		} else if bx, err := box.NewRx(udp); err == nil {
-			verbose.Printf("rx %d bytes from %v",
+			udpRxTrace.Printf("rx %d bytes from %v",
 				bx.Len(), bx.AddrPort)
 			ch <- bx
 		} else if operr, ok := err.(*net.OpError); ok {
@@ -64,15 +65,15 @@ func pktTxRoutine(
 ) {
 	defer wg.Done()
 	la := udp.LocalAddr()
-	verbose.Printf("start %v tx routine", la)
-	defer verbose.Printf("stopped %v tx routine", la)
+	goRoutineTrace.Printf("start %v tx routine", la)
+	defer goRoutineTrace.Printf("stopped %v tx routine", la)
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case bx, ok := <-ch:
 			if !ok {
-				verbose.Println("pkt tx ch closed")
+				goRoutineTrace.Println("pkt tx ch closed")
 				return
 			}
 			ta := bx.AddrPort
@@ -81,7 +82,7 @@ func pktTxRoutine(
 				verbose.Printf("tx from %v to %v: %v",
 					la, ta, err)
 			} else {
-				verbose.Printf("tx %d bytes from %v to %v",
+				udpTxTrace.Printf("tx %d bytes from %v to %v",
 					n, la, ta)
 			}
 			bx.Return()

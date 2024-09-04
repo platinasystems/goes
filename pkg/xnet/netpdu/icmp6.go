@@ -5,9 +5,9 @@
 package netpdu
 
 import (
-	"bytes"
 	"fmt"
 
+	"github.com/platinasystems/goes/v2/pkg/xnet"
 	"github.com/platinasystems/goes/v2/pkg/xnet/netph"
 )
 
@@ -20,18 +20,29 @@ var ICMP6TypeCodes = map[uint8]func(uint8) string{
 
 type ICMP6 []byte
 
+func (pdu ICMP6) Header() (h netph.ICMP6, err error) {
+	_, err = xnet.Subtract(pdu, &h)
+	return
+}
+
+func (pdu ICMP6) Data() (d []byte) {
+	if len(pdu) >= netph.SizeofICMP6 {
+		d = []byte(pdu)[netph.SizeofICMP6:]
+	}
+	return
+}
+
 func (pdu ICMP6) Format(w fmt.State, verb rune) {
-	var h netph.ICMP6
-	buf := bytes.NewBuffer(pdu)
 	fmt.Fprint(w, "icmp6 ")
-	if _, err := h.ReadFrom(buf); err != nil {
+	h, err := pdu.Header()
+	if err != nil {
 		fmt.Fprint(w, err)
+		return
+	}
+	fmt.Fprint(w, ICMP6TypeName(h.Type), ", ")
+	if f, ok := ICMP6TypeCodes[h.Type]; ok {
+		fmt.Fprint(w, f(h.Code))
 	} else {
-		fmt.Fprint(w, ICMP6TypeName(h.Type), ", ")
-		if f, ok := ICMP6TypeCodes[h.Type]; ok {
-			fmt.Fprint(w, f(h.Code))
-		} else {
-			fmt.Fprint(w, h.Code)
-		}
+		fmt.Fprint(w, h.Code)
 	}
 }

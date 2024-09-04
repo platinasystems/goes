@@ -4,10 +4,7 @@
 
 package netph
 
-import (
-	"encoding/binary"
-	"io"
-)
+import "unsafe"
 
 // https://en.wikipedia.org/wiki/Ethernet_frame
 type Eth struct {
@@ -16,13 +13,7 @@ type Eth struct {
 	Type uint16
 }
 
-func (p *Eth) ReadFrom(r io.Reader) (int64, error) {
-	return SizeofEth, binary.Read(r, binary.BigEndian, p)
-}
-
-func (v Eth) WriteTo(w io.Writer) (int64, error) {
-	return SizeofEth, binary.Write(w, binary.BigEndian, v)
-}
+const SizeofEth = int(unsafe.Sizeof(Eth{}))
 
 func (p *Eth) IsUnicast() bool   { return (p.DMAC[0] & 1) == 0 }
 func (p *Eth) ShouldLearn() bool { return (p.SMAC[0] & 1) == 0 }

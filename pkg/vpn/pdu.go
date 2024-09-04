@@ -5,7 +5,6 @@
 package vpn
 
 import (
-	"bytes"
 	"encoding/binary"
 	"encoding/pem"
 	"fmt"
@@ -15,6 +14,7 @@ import (
 
 	"github.com/platinasystems/goes/v2/pkg/box"
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
+	"github.com/platinasystems/goes/v2/pkg/xnet"
 )
 
 const (
@@ -35,34 +35,26 @@ var PacketName = map[uint16]string{
 	VPN_P_WHOIS_SERVICE:    "vpn-whois-service",
 }
 
-func VpnHelloTimeSpan(r io.Reader) time.Duration {
-	var sent int64
-	binary.Read(r, binary.BigEndian, &sent)
-	now := time.Now().UnixMicro()
-	return time.Microsecond * time.Duration(now-sent)
-}
-
 var VpnPublicKey = pem.Decode
 
-func VpnWhoisAddress(r io.Reader) netip.Addr {
-	var a [16]byte
-	n, err := r.Read(a[:])
-	if err != nil || n != 16 {
-		return zaddr
+func VpnWhoisAddress(d []byte) (addr netip.Addr) {
+	if len(d) >= 16 {
+		addr = netip.AddrFrom16([16]byte(d)).Unmap()
 	}
-	return netip.AddrFrom16([16]byte(a)).Unmap()
-}
-
-func VpnWhoisId(r io.Reader) (id box.Id, ok bool) {
-	err := binary.Read(r, binary.BigEndian, &id)
-	ok = err == nil
 	return
 }
 
-func VpnWhoisService(r io.Reader) netip.AddrPort {
+func VpnWhoisId(d []byte) (id box.Id, err error) {
+	_, err = xnet.Subtract(d, &id)
+	return
+}
+
+func VpnWhoisService(d []byte) netip.AddrPort {
 	var port uint16
-	addr := VpnWhoisAddress(r)
-	binary.Read(r, binary.BigEndian, &port)
+	addr := VpnWhoisAddress(d)
+	if len(d) >= 16+2 {
+		port = binary.BigEndian.Uint16(d[16:])
+	}
 	return netip.AddrPortFrom(addr, port)
 }
 
@@ -91,10 +83,13 @@ var TunPIprotos = map[uint16]func([]byte) fmt.Formatter{
 }
 
 func (pdu VpnHelloPDU) Format(w fmt.State, verb rune) {
-	if span := VpnHelloTimeSpan(bytes.NewBuffer(pdu)); span == 0 {
-		fmt.Fprint(w, "underrun")
+	var then int64
+	if _, err := xnet.Subtract(pdu, &then); err != nil {
+		fmt.Fprint(w, err)
 	} else {
-		fmt.Fprint(w, span)
+		now := time.Now().UnixMicro()
+		dur := time.Microsecond * time.Duration(now-then)
+		fmt.Fprint(w, dur)
 	}
 }
 
@@ -109,20 +104,20 @@ func (pdu VpnPublicKeyPDU) Format(w fmt.State, verb rune) {
 
 func (pdu VpnWhoisAddressedPDU) Format(w fmt.State, verb rune) {
 	fmt.Fprint(w, "whois ")
-	fmt.Fprint(w, VpnWhoisAddress(bytes.NewBuffer(pdu)))
+	fmt.Fprint(w, VpnWhoisAddress(pdu))
 }
 
 func (pdu VpnWhoisIdentifiedPDU) Format(w fmt.State, verb rune) {
 	fmt.Fprint(w, "whois ")
-	if lbl, ok := VpnWhoisId(bytes.NewBuffer(pdu)); !ok {
-		fmt.Fprint(w, "underrun")
+	if lbl, err := VpnWhoisId(pdu); err != nil {
+		fmt.Fprint(w, err)
 	} else {
 		fmt.Fprint(w, lbl)
 	}
 }
 
 func (pdu VpnWhoisServicePDU) Format(w fmt.State, verb rune) {
-	fmt.Fprint(w, "whois ", VpnWhoisService(bytes.NewBuffer(pdu)))
+	fmt.Fprint(w, "whois ", VpnWhoisService(pdu))
 }
 
 func WriteAddrTo(w io.Writer, addr netip.Addr) (int64, error) {

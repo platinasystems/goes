@@ -5,10 +5,10 @@
 package netpdu
 
 import (
-	"bytes"
 	"fmt"
 	"net"
 
+	"github.com/platinasystems/goes/v2/pkg/xnet"
 	"github.com/platinasystems/goes/v2/pkg/xnet/netph"
 )
 
@@ -29,25 +29,30 @@ var IP6NextHeaders = map[uint8]func([]byte) fmt.Formatter{
 
 type IP6 []byte
 
-func (pdu IP6) Parse() (header netph.IP6, data []byte, err error) {
-	buf := bytes.NewBuffer(pdu)
-	if _, err = header.ReadFrom(buf); err == nil {
-		data = buf.Bytes()
+func (pdu IP6) Header() (h netph.IP6, err error) {
+	_, err = xnet.Subtract(pdu, &h)
+	return
+}
+
+func (pdu IP6) Data() (d []byte) {
+	if len(pdu) >= netph.SizeofIP6 {
+		d = []byte(pdu)[netph.SizeofIP6:]
 	}
 	return
 }
 
 func (pdu IP6) Format(w fmt.State, verb rune) {
 	fmt.Fprint(w, "ip6 ")
-	header, data, err := pdu.Parse()
+	h, err := pdu.Header()
 	if err != nil {
 		fmt.Fprint(w, err)
 		return
 	}
-	fmt.Fprint(w, net.IP(header.DA[:]), " <- ", net.IP(header.SA[:]))
-	if f, ok := IP6NextHeaders[header.NextHeader]; ok {
-		fmt.Fprint(w, Mark, f(data))
+	d := pdu.Data()
+	fmt.Fprint(w, net.IP(h.DA[:]), " <- ", net.IP(h.SA[:]))
+	if f, ok := IP6NextHeaders[h.NextHeader]; ok {
+		fmt.Fprint(w, Mark, f(d))
 	} else {
-		fmt.Fprintf(w, " next[%#x]", header.NextHeader)
+		fmt.Fprintf(w, " next[%#x]", h.NextHeader)
 	}
 }
