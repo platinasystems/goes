@@ -35,7 +35,8 @@ Exchange ciphered packets between guests.
 
 	nflag := NatFlag()
 
-	err := ex.flags(ctx, ExchangeFlag(), defport, args)
+	ex.xFlag = ExchangeFlag()
+	err := ex.flags(ctx, defport, args)
 	if err != nil {
 		return err
 	}

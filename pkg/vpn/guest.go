@@ -41,7 +41,8 @@ Forward ciphered packets between exchange and tunnel interface.
 
 	tflag := TunnelFlag()
 
-	err := g.flags(ctx, GuestFlag(), defport, args)
+	g.xFlag = GuestFlag()
+	err := g.flags(ctx, defport, args)
 	if err != nil {
 		return err
 	}

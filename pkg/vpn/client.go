@@ -47,13 +47,12 @@ type client struct {
 
 func (cl *client) flags(
 	ctx context.Context,
-	xFlag *string,
 	defport uint16,
 	args []string,
 ) error {
 	cl.sap = ServiceFlag(defport)
 
-	err := cl.rest.flags(xFlag, args)
+	err := cl.rest.flags(args)
 	if err != nil {
 		return err
 	}
@@ -76,7 +75,7 @@ func (cl *client) register(
 		return err
 	}
 
-	cl.name = cl.crt.First().Subject.CommonName
+	cl.name = cl.crt.Subject.CommonName
 	cl.addressed = make(map[netip.Addr]box.Id)
 	cl.gcm = make(map[int]*gcm.Cipher)
 	cl.service = make(map[int]netip.AddrPort)

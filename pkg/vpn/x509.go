@@ -2,8 +2,6 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-//go:build unix
-
 package vpn
 
 import (
@@ -30,7 +28,7 @@ import (
 )
 
 var CertificatesTemplate = sync.OnceValues(func() (*template.Template, error) {
-	return template.New("certificates").Parse(`
+	return template.New("certificates").Parse(`{{range .}}
 - dns_names:{{range .DNSNames}}
   - {{.}}{{end}}
   email_addresses:{{range .EmailAddresses}}
@@ -64,7 +62,7 @@ var CertificatesTemplate = sync.OnceValues(func() (*template.Template, error) {
     extra:{{range .Subject.ExtraNames}}
     - type: {{.Type}}
       value: {{.Value}}{{end}}
-`[1:])
+{{end}}`[1:])
 })
 
 // CreateCertificate a PEM encoded x509 certificate file.
@@ -218,243 +216,138 @@ Print parsed certificate.
 		return err
 	}
 
-	crt, err := NewCertificates(*iflag)
-	if err == nil {
-		err = crt.Show(os.Stdout)
+	cs, err := certificates(*iflag)
+	if err != nil {
+		return err
 	}
-	return err
+	if len(cs) == 0 {
+		fmt.Println("# none")
+		return nil
+	}
+	t, err := CertificatesTemplate()
+	if err != nil {
+		return err
+	}
+	return t.Execute(os.Stdout, cs)
 }
 
-// The embedding type or method must mutex CertificatesFile.
-type Certificates struct {
-	// Directory or File Name
-	dfn   string
-	BCs   []*BC
-	Named map[string]*BC
-}
-
-type BC struct {
-	Block *pem.Block
-	Cert  *x509.Certificate
-}
-
-// NewCertifiactes parses all of the PEM encoded [x509.Certificate](s) from
+// This parses all of the PEM encoded [x509.Certificate](s) from
 // the named directory, file, or, if named “-”, stdin.
-// The returned [Certificates] retains this name to write back
-// [Certificates.Add] and [Certificates.Remove].
-func NewCertificates(dfn string) (*Certificates, error) {
-	c := &Certificates{
-		dfn:   dfn,
-		Named: make(map[string]*BC),
-	}
+func certificates(dfn string) (cs []*x509.Certificate, err error) {
+	var fns []string
+	var rc io.ReadCloser
+	var cś []*x509.Certificate
 	if dfn == "-" {
-		data, err := io.ReadAll(os.Stdin)
-		if err == nil {
-			err = c.parse(data)
-		}
-		return c, err
+		cs, err = readCertificates(os.Stdin)
+		return
 	}
 	fi, err := os.Stat(dfn)
 	if err != nil {
-		return c, err
+		return
 	}
-	if !fi.IsDir() {
-		data, err := os.ReadFile(dfn)
-		if err == nil {
-			err = c.parse(data)
+	if fi.IsDir() {
+		fns, err = filepath.Glob(filepath.Join(dfn, "*.pem"))
+		if err != nil {
+			return
 		}
-		return c, err
-	}
-	fns, err := filepath.Glob(filepath.Join(dfn, "*.pem"))
-	if err != nil {
-		return c, err
+	} else {
+		fns = append(fns, dfn)
 	}
 	for _, fn := range fns {
-		if data, err := os.ReadFile(fn); err != nil {
-			return c, err
-		} else if err = c.parse(data); err != nil {
-			return c, xerrors.Label(err, fn)
-		}
-	}
-	return c, nil
-}
-
-// Decode PEM then parse certificate from DER.
-func (cs *Certificates) parse(data []byte) error {
-	var blks []*pem.Block
-	for blk, r := pem.Decode(data); blk != nil; blk, r = pem.Decode(r) {
-		if strings.HasSuffix(blk.Type, "CERTIFICATE") {
-			blks = append(blks, blk)
-		}
-	}
-	for i, blk := range blks {
-		b := blk.Bytes
-		if x, err := x509.ParseCertificate(b); err != nil {
-			return xerrors.Label(err, "block", fmt.Sprint(i))
-		} else if x != nil {
-			bc := &BC{blk, x}
-			cs.BCs = append(cs.BCs, bc)
-			cs.Named[x.Subject.CommonName] = bc
-		}
-	}
-	return nil
-}
-
-// FIXME prepend updates
-func (cs *Certificates) Add(blk *pem.Block, x *x509.Certificate) error {
-	cn := x.Subject.CommonName
-	if _, ok := cs.Named[cn]; ok {
-		return xerrors.Unavailable(cn)
-	}
-	bc := &BC{blk, x}
-	cs.BCs = append(cs.BCs, bc)
-	cs.Named[cn] = bc
-	if cs.dfn == "-" {
-		return pem.Encode(os.Stdout, blk)
-	}
-	if strings.Index(cs.dfn, ".") >= 0 {
-		w, err := os.OpenFile(cs.dfn, oAppend, 0644)
-		if err != nil {
-			return err
-		}
-		defer w.Close()
-		return pem.Encode(w, blk)
-	}
-	f, err := os.CreateTemp(cs.dfn, "*.pem")
-	if err == nil {
-		defer f.Close()
-		err = pem.Encode(f, blk)
-	}
-	return err
-}
-
-func (cs *Certificates) DERs() [][]byte {
-	ders := make([][]byte, len(cs.BCs))
-	for i, bc := range cs.BCs {
-		ders[i] = bc.Block.Bytes
-	}
-	return ders
-}
-
-func (cs *Certificates) Dump(w io.Writer) error {
-	for _, bc := range cs.BCs {
-		if err := pem.Encode(w, bc.Block); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// Thie returns <nil> if there are no certificates.
-func (cs *Certificates) First() *x509.Certificate {
-	for _, bc := range cs.BCs {
-		if bc.Cert != nil {
-			return bc.Cert
-		}
-	}
-	return nil
-}
-
-func (cs *Certificates) Has(peer *x509.Certificate) bool {
-	bc, found := cs.Named[peer.Subject.CommonName]
-	if !found {
-		return false
-	}
-	return peer.Equal(bc.Cert)
-}
-
-func (cs *Certificates) Join(pool *x509.CertPool) {
-	for _, bc := range cs.BCs {
-		if bc.Cert != nil {
-			verbose.Println("+root:", bc.Cert.Subject.CommonName)
-			pool.AddCert(bc.Cert)
-		}
-	}
-}
-
-func (cs *Certificates) Lookup(cn string) (
-	*pem.Block, *x509.Certificate, error,
-) {
-	bc, ok := cs.Named[cn]
-	if !ok {
-		return nil, nil, xerrors.NotFound(cn)
-	}
-	return bc.Block, bc.Cert, nil
-}
-
-func (cs *Certificates) Remove(cn string) error {
-	bc, ok := cs.Named[cn]
-	if !ok {
-		return xerrors.NotFound(cn)
-	}
-	bc.Block = nil
-	bc.Cert = nil
-	delete(cs.Named, cn)
-	if cs.dfn == "-" {
-		return nil
-	}
-	if strings.HasSuffix(cs.dfn, ".pem") {
-		w, err := os.OpenFile(cs.dfn, oCreate, 0644)
-		if err != nil {
-			return err
-		}
-		defer w.Close()
-		for _, bc := range cs.BCs {
-			if bc.Block != nil {
-				if err = pem.Encode(w, bc.Block); err != nil {
-					return err
-				}
+		if rc, err = os.Open(fn); err != nil {
+			return
+		} else {
+			cś, err = readCertificates(rc)
+			rc.Close()
+			if err != nil {
+				return
 			}
+			cs = append(cs, cś...)
 		}
-		return nil
 	}
-	dir, err := os.ReadDir(cs.dfn)
+	return
+}
+
+// FIXME replace os.ReadAll+pem.Decode with something that scans stream.
+func readCertificates(r io.Reader) (cs []*x509.Certificate, err error) {
+	var c *x509.Certificate
+	data, err := io.ReadAll(r)
+	if err != nil {
+		return
+	}
+	for blk, r := pem.Decode(data); blk != nil; blk, r = pem.Decode(r) {
+		if !strings.HasSuffix(blk.Type, "CERTIFICATE") {
+			continue
+		}
+		if c, err = x509.ParseCertificate(blk.Bytes); err != nil {
+			return
+		} else {
+			cs = append(cs, c)
+		}
+	}
+	return
+}
+
+func addCertificate(dfn string, c *x509.Certificate) error {
+	var wc io.WriteCloser
+	blk := pem.Block{
+		Type:  "CERTIFICATE",
+		Bytes: c.Raw,
+	}
+	cn := c.Subject.CommonName
+	fi, err := os.Stat(dfn)
 	if err != nil {
 		return err
 	}
-	for _, de := range dir {
-		if !strings.HasSuffix(de.Name(), ".pem") {
-			break
-		}
-		fn := filepath.Join(cs.dfn, de.Name())
-		if err != nil {
-			continue
-		}
-		data, err := os.ReadFile(fn)
-		if err != nil {
-			continue
-		}
-		for blk, r := pem.Decode(data); blk != nil; blk, r = pem.
-			Decode(r) {
-			if !strings.HasSuffix(blk.Type, "CERTIFICATE") {
-				continue
-			}
-			x, err := x509.ParseCertificate(blk.Bytes)
-			if err == nil && x != nil &&
-				x.Subject.CommonName == cn {
-				return os.Remove(fn)
-			}
-
-		}
-	}
-	return nil
-}
-
-func (cs *Certificates) Show(w io.Writer) error {
-	if len(cs.BCs) == 0 {
-		fmt.Println(w, "# none")
-	} else if t, err := CertificatesTemplate(); err != nil {
-		return err
+	if fi.IsDir() {
+		wc, err = os.Create(filepath.Join(dfn, cn+".pem"))
 	} else {
-		for _, bc := range cs.BCs {
-			if err = t.Execute(w, bc.Cert); err != nil {
-				return err
-			}
+		wc, err = os.OpenFile(dfn, oAppend, 0644)
+	}
+	if err != nil {
+		return err
+	}
+	defer wc.Close()
+	return pem.Encode(wc, &blk)
+}
+
+func dumpCertificates(w io.Writer, cs []*x509.Certificate) (err error) {
+	blk := pem.Block{
+		Type: "CERTIFICATE",
+	}
+	for _, c := range cs {
+		blk.Bytes = c.Raw
+		if err = pem.Encode(w, &blk); err != nil {
+			return err
 		}
 	}
 	return nil
 }
 
-func (cs *Certificates) String() string {
-	return cs.dfn
+func removeCertificate(dfn, cn string, cs []*x509.Certificate) error {
+	blk := pem.Block{
+		Type: "CERTIFICATE",
+	}
+	fi, err := os.Stat(dfn)
+	if err != nil {
+		return err
+	}
+	if fi.IsDir() {
+		return os.Remove(filepath.Join(dfn, cn+".pem"))
+	}
+	wc, err := os.OpenFile(dfn, oCreate, 0644)
+	if err != nil {
+		return err
+	}
+	defer wc.Close()
+	for _, c := range cs {
+		if c.Subject.CommonName == cn {
+			continue
+		}
+		blk.Bytes = c.Raw
+		if err = pem.Encode(wc, &blk); err != nil {
+			return err
+		}
+	}
+	return nil
 }

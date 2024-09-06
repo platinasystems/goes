@@ -19,6 +19,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -35,7 +36,7 @@ type registry struct {
 	mutex sync.RWMutex
 	cfg   *string
 	sig   *Signatures
-	crt   *Certificates
+	crt   *x509.Certificate
 	url   *url.URL
 	http  *http.Server
 	vpn   map[string]*regVpn
@@ -55,9 +56,16 @@ type regVpn struct {
 	}
 
 	admin map[string]bool
-	reg,
-	subscribers *Certificates
-	pending pending
+
+	reg *x509.Certificate
+
+	pending,
+	subscribers []*x509.Certificate
+
+	subscriberNamed map[string]*x509.Certificate
+
+	// directory or filename of subscriber certs
+	subscribersDfn string
 
 	block struct {
 		addressed  map[netip.Addr]*pem.Block
@@ -114,16 +122,17 @@ A RESTful WWW server.
 	if reg.sig, err = NewSignatures(*kFlag); err != nil {
 		return err
 	}
-	if reg.crt, err = NewCertificates(*rFlag); err != nil {
+	if cs, err := certificates(*rFlag); err != nil {
 		return err
-	}
-	if reg.crt == nil || len(reg.crt.BCs) == 0 {
+	} else if len(cs) == 0 {
 		return xerrors.Invalid(*rFlag)
+	} else {
+		reg.crt = cs[0]
 	}
 
 	svc := ":8003"
-	if len(reg.crt.BCs[0].Cert.URIs) > 0 {
-		if s := reg.crt.BCs[0].Cert.URIs[0].Port(); len(s) > 0 {
+	if len(reg.crt.URIs) > 0 {
+		if s := reg.crt.URIs[0].Port(); len(s) > 0 {
 			svc = ":" + s
 		}
 	}
@@ -313,7 +322,7 @@ func (reg *registry) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 					fmt.Fprintln(w, "-", s)
 				}
 			case "pending":
-				vpn.showPending(w)
+				err = vpn.showPending(w)
 			case "subscriber":
 				err = vpn.showSubscriber(w, qv)
 			case "tenant":
@@ -391,9 +400,12 @@ func (reg *registry) reload() error {
 	for name, cfg := range ConfigByName {
 		vpn, found := reg.vpn[name]
 		if !found {
+			named := make(map[string]*x509.Certificate)
 			vpn = &regVpn{
 				name: name,
 				reg:  reg.crt,
+
+				subscriberNamed: named,
 			}
 
 			vpn.addr.name = make(map[netip.Addr]string)
@@ -405,8 +417,6 @@ func (reg *registry) reload() error {
 
 			reg.vpn[name] = vpn
 		}
-
-		verbose.Printf("%s.admins: %v\n", name, cfg.Admins)
 
 		if !cfg.Prefix.IsValid() {
 			return xerrors.Invalid(name, "prefix")
@@ -427,16 +437,21 @@ func (reg *registry) reload() error {
 			}
 		}
 
-		dfn := cfg.Subscribers
-		if len(dfn) == 0 {
+		vpn.subscribersDfn = cfg.Subscribers
+		if len(vpn.subscribersDfn) == 0 {
 			if name == "vpn" {
-				dfn = xdg.ConfigHome()
+				vpn.subscribersDfn = xdg.ConfigHome()
 			} else {
-				dfn = filepath.Join(xdg.ConfigHome(), name)
+				vpn.subscribersDfn = filepath.
+					Join(xdg.ConfigHome(), name)
 			}
 		}
-		vpn.subscribers, err = NewCertificates(dfn)
-		if err != nil && !os.IsNotExist(err) {
+		vpn.subscribers, err = certificates(vpn.subscribersDfn)
+		if err == nil {
+			for _, c := range vpn.subscribers {
+				vpn.subscriberNamed[c.Subject.CommonName] = c
+			}
+		} else if !os.IsNotExist(err) {
 			return err
 		}
 	}
@@ -466,11 +481,18 @@ func (vpn *regVpn) approve(req *http.Request) error {
 	}
 	vpn.mutex.Lock()
 	defer vpn.mutex.Unlock()
-	blk, cert, err := vpn.pending.pull(sub)
-	if err != nil {
-		return err
+	for i, c := range vpn.pending {
+		if c.Subject.CommonName == sub {
+			vpn.pending = slices.Delete(vpn.pending, i, i+1)
+			err = addCertificate(vpn.subscribersDfn, c)
+			if err == nil {
+				vpn.subscribers = append(vpn.subscribers, c)
+				vpn.subscriberNamed[c.Subject.CommonName] = c
+			}
+			return err
+		}
 	}
-	return vpn.subscribers.Add(blk, cert)
+	return xerrors.NotFound(sub)
 }
 
 func (vpn *regVpn) checkin(w http.ResponseWriter, req *http.Request) error {
@@ -592,18 +614,33 @@ func (vpn *regVpn) checkin(w http.ResponseWriter, req *http.Request) error {
 
 func (vpn *regVpn) deny(req *http.Request) error {
 	sub, err := reqsub(req)
-	if err == nil {
-		vpn.mutex.Lock()
-		defer vpn.mutex.Unlock()
-		_, _, err = vpn.pending.pull(sub)
+	if err != nil {
+		return err
 	}
-	return err
+	vpn.mutex.Lock()
+	defer vpn.mutex.Unlock()
+	for i, c := range vpn.pending {
+		if c.Subject.CommonName == sub {
+			vpn.pending = slices.Delete(vpn.pending, i, i+1)
+			return nil
+		}
+	}
+	return xerrors.NotFound(sub)
 }
 
 func (vpn *regVpn) dumpSubscribers(w io.Writer) error {
 	vpn.mutex.RLock()
 	defer vpn.mutex.RUnlock()
-	return vpn.subscribers.Dump(w)
+	blk := pem.Block{
+		Type: "CERTIFICATE",
+	}
+	for _, c := range vpn.subscribers {
+		blk.Bytes = c.Raw
+		if err := pem.Encode(w, &blk); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (vpn *regVpn) lease(name string) (netip.Addr, error) {
@@ -621,7 +658,7 @@ func (vpn *regVpn) lease(name string) (netip.Addr, error) {
 }
 
 func (vpn *regVpn) selfOrAdmin(cn string) error {
-	if vpn.reg.First().Subject.CommonName == cn {
+	if vpn.reg.Subject.CommonName == cn {
 		return nil
 	}
 	vpn.mutex.RLock()
@@ -636,15 +673,17 @@ func (vpn *regVpn) selfOrSubscriber(peer *x509.Certificate) error {
 	if peer == nil {
 		return xerrors.Invalid("peer")
 	}
-	if vpn.reg.Has(peer) {
+	if peer.Equal(vpn.reg) {
 		return nil
 	}
 
 	vpn.mutex.RLock()
 	defer vpn.mutex.RUnlock()
 
-	if vpn.subscribers.Has(peer) {
-		return nil
+	for _, c := range vpn.subscribers {
+		if peer.Equal(c) {
+			return nil
+		}
 	}
 	return xerrors.NotFound(peer.Subject.CommonName)
 }
@@ -701,29 +740,34 @@ func (vpn *regVpn) showAddress(w http.ResponseWriter, qv url.Values) error {
 	return nil
 }
 
-func (vpn *regVpn) showPending(w io.Writer) {
-	vpn.mutex.RLock()
-	defer vpn.mutex.RUnlock()
-	fmt.Fprint(w, &vpn.pending)
-}
-
-func (vpn *regVpn) showSubscriber(w http.ResponseWriter, qv url.Values) error {
-	vpn.mutex.RLock()
-	defer vpn.mutex.RUnlock()
-
-	if !qv.Has("arg0") {
-		return xerrors.Incomplete("name")
-	}
-	name := qv.Get("arg0")
-	sub, ok := vpn.subscribers.Named[name]
-	if !ok {
-		return xerrors.NotFound(name)
-	}
+func (vpn *regVpn) showPending(w io.Writer) error {
 	t, err := CertificatesTemplate()
 	if err != nil {
 		return err
 	}
-	return t.Execute(w, sub.Cert)
+	vpn.mutex.RLock()
+	defer vpn.mutex.RUnlock()
+	return t.Execute(os.Stdout, vpn.pending)
+}
+
+func (vpn *regVpn) showSubscriber(w http.ResponseWriter, qv url.Values) error {
+	if !qv.Has("arg0") {
+		return xerrors.Incomplete("name")
+	}
+	name := qv.Get("arg0")
+	t, err := CertificatesTemplate()
+	if err != nil {
+		return err
+	}
+
+	vpn.mutex.RLock()
+	defer vpn.mutex.RUnlock()
+
+	sub, ok := vpn.subscriberNamed[name]
+	if !ok {
+		return xerrors.NotFound(name)
+	}
+	return t.Execute(w, []*x509.Certificate{sub})
 }
 
 func (vpn *regVpn) showTenant(w http.ResponseWriter, qv url.Values) error {
@@ -752,17 +796,12 @@ func (vpn *regVpn) subscribe(req *http.Request) error {
 	vpn.mutex.Lock()
 	defer vpn.mutex.Unlock()
 
-	data, err := io.ReadAll(req.Body)
-	if err != nil {
-		return err
+	c := req.TLS.PeerCertificates[0]
+	cn := c.Subject.CommonName
+	if _, present := vpn.subscriberNamed[cn]; present {
+		return xerrors.Unavailable(cn)
 	}
-	blk, _ := pem.Decode(data)
-	cert := req.TLS.PeerCertificates[0]
-	cn := cert.Subject.CommonName
-	if _, present := vpn.subscribers.Named[cn]; present {
-		return xerrors.Unavailable("n")
-	}
-	vpn.pending.add(blk, cert)
+	vpn.pending = append(vpn.pending, c)
 	return nil
 }
 
@@ -774,7 +813,7 @@ func (vpn *regVpn) unsubscribe(req *http.Request) error {
 	vpn.mutex.Lock()
 	defer vpn.mutex.Unlock()
 	delete(vpn.admin, sub)
-	return vpn.subscribers.Remove(sub)
+	return removeCertificate(vpn.subscribersDfn, sub, vpn.subscribers)
 }
 
 func (vpn *regVpn) whois(w http.ResponseWriter, req *http.Request) error {
