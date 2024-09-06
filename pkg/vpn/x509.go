@@ -5,11 +5,13 @@
 package vpn
 
 import (
+	"bufio"
 	"context"
 	"crypto/rand"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -25,18 +27,26 @@ import (
 
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xflag"
+	"github.com/platinasystems/goes/v2/pkg/xlog"
 )
 
+const BlockTypeCertificate = "CERTIFICATE"
+
 var CertificatesTemplate = sync.OnceValues(func() (*template.Template, error) {
-	return template.New("certificates").Parse(`{{range .}}
-- dns_names:{{range .DNSNames}}
+	return template.New("certificates").Parse(`{{range .}}- {{/*
+*/}}dns_names:{{range .DNSNames}}
   - {{.}}{{end}}
   email_addresses:{{range .EmailAddresses}}
-  - {{.}}{{end}}
-  ip_addresses: {{range .IPAddresses}}
-  - {{.}}{{end}}
+  - {{.}}{{/*
+*/}}{{end}}{{/*
+*/}}{{if .IPAddresses}}
+  ip_addresses:{{range .IPAddresses}}
+  - {{.}}{{/*
+*/}}{{end}}{{end}}{{/*
+*/}}{{if .URIs}}
   uris:{{range .URIs}}
-  - {{.}}{{end}}
+  - {{.}}{{/*
+*/}}{{end}}{{end}}
   serial_number: {{.SerialNumber}}
   not_before: {{.NotBefore}}
   not_after: {{.NotAfter}}
@@ -44,25 +54,41 @@ var CertificatesTemplate = sync.OnceValues(func() (*template.Template, error) {
   signature_algorithm: {{.SignatureAlgorithm}}
   subject:
     common_name: {{.Subject.CommonName}}
-    serial_number: {{.Subject.SerialNumber}}
+    serial_number: {{.Subject.SerialNumber}}{{/*
+*/}}{{if .Subject.Organization}}
     organization:{{range .Subject.Organization}}
-    - {{.}}{{end}}
+    - {{.}}{{/*
+*/}}{{end}}{{end}}{{/*
+*/}}{{if  .Subject.OrganizationalUnit}}
     unit:{{range .Subject.OrganizationalUnit}}
-    - {{.}}{{end}}
+    - {{.}}{{/*
+*/}}{{end}}{{end}}{{/*
+*/}}{{if .Subject.StreetAddress}}
     street:{{range .Subject.StreetAddress}}
-    - {{.}}{{end}}
+    - {{.}}{{/*
+*/}}{{end}}{{end}}{{/*
+*/}}{{if .Subject.Locality}}
     locality:{{range .Subject.Locality}}
-    - {{.}}{{end}}
+    - {{.}}{{/*
+*/}}{{end}}{{end}}{{/*
+*/}}{{if .Subject.Province}}
     province:{{range .Subject.Province}}
-    - {{.}}{{end}}
+    - {{.}}{{/*
+*/}}{{end}}{{end}}{{/*
+*/}}{{if .Subject.Country}}
     country:{{range .Subject.Country}}
-    - {{.}}{{end}}
+    - {{.}}{{/*
+*/}}{{end}}{{end}}{{/*
+*/}}{{if .Subject.PostalCode}}
     postal_code:{{range .Subject.PostalCode}}
-    - {{.}}{{end}}
+    - {{.}}{{/*
+*/}}}{{end}}{{end}}{{/*
+*/}}{{if .Subject.ExtraNames}}
     extra:{{range .Subject.ExtraNames}}
     - type: {{.Type}}
-      value: {{.Value}}{{end}}
-{{end}}`[1:])
+      value: {{.Value}}{{/*
+*/}}{{end}}{{end}}
+{{end}}`)
 })
 
 // CreateCertificate a PEM encoded x509 certificate file.
@@ -178,7 +204,7 @@ Create PEM encoded x509 certificate file.
 		return err
 	}
 	blk := &pem.Block{
-		Type:    "CERTIFICATE",
+		Type:    BlockTypeCertificate,
 		Headers: map[string]string{},
 		Bytes:   der,
 	}
@@ -268,22 +294,43 @@ func certificates(dfn string) (cs []*x509.Certificate, err error) {
 	return
 }
 
-// FIXME replace os.ReadAll+pem.Decode with something that scans stream.
+var readCertificateTrace = xlog.Mute(mutable)
+
 func readCertificates(r io.Reader) (cs []*x509.Certificate, err error) {
-	var c *x509.Certificate
-	data, err := io.ReadAll(r)
-	if err != nil {
-		return
-	}
-	for blk, r := pem.Decode(data); blk != nil; blk, r = pem.Decode(r) {
-		if !strings.HasSuffix(blk.Type, "CERTIFICATE") {
+	var eof bool
+
+	ŕ := bufio.NewReaderSize(r, 64<<10)
+	b := make([]byte, 0, 4<<10)
+
+	for {
+		if !eof {
+			n, erŕ := ŕ.Read(b[len(b):cap(b)])
+			readCertificateTrace.Println("read:", n, erŕ)
+			if n > 0 {
+				b = b[:len(b)+n]
+			} else {
+				eof = errors.Is(erŕ, io.EOF)
+				if !eof {
+					err = erŕ
+					break
+				}
+			}
+		}
+		blk, rem := pem.Decode(b)
+		if blk == nil {
+			break
+		}
+		b = b[:len(rem)]
+		copy(b, rem)
+		if !strings.HasSuffix(blk.Type, BlockTypeCertificate) {
 			continue
 		}
-		if c, err = x509.ParseCertificate(blk.Bytes); err != nil {
-			return
-		} else {
-			cs = append(cs, c)
+		c, erŕ := x509.ParseCertificate(blk.Bytes)
+		if erŕ != nil {
+			err = erŕ
+			break
 		}
+		cs = append(cs, c)
 	}
 	return
 }
@@ -291,7 +338,7 @@ func readCertificates(r io.Reader) (cs []*x509.Certificate, err error) {
 func addCertificate(dfn string, c *x509.Certificate) error {
 	var wc io.WriteCloser
 	blk := pem.Block{
-		Type:  "CERTIFICATE",
+		Type:  BlockTypeCertificate,
 		Bytes: c.Raw,
 	}
 	cn := c.Subject.CommonName
@@ -313,7 +360,7 @@ func addCertificate(dfn string, c *x509.Certificate) error {
 
 func dumpCertificates(w io.Writer, cs []*x509.Certificate) (err error) {
 	blk := pem.Block{
-		Type: "CERTIFICATE",
+		Type: BlockTypeCertificate,
 	}
 	for _, c := range cs {
 		blk.Bytes = c.Raw
@@ -326,7 +373,7 @@ func dumpCertificates(w io.Writer, cs []*x509.Certificate) (err error) {
 
 func removeCertificate(dfn, cn string, cs []*x509.Certificate) error {
 	blk := pem.Block{
-		Type: "CERTIFICATE",
+		Type: BlockTypeCertificate,
 	}
 	fi, err := os.Stat(dfn)
 	if err != nil {
