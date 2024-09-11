@@ -20,8 +20,8 @@ func (pdu ARP) Header() (h netph.ARP, err error) {
 }
 
 func (pdu ARP) Data() (d []byte) {
-	if len(pdu) >= netph.SizeofARP {
-		d = []byte(pdu)[netph.SizeofARP:]
+	if len(pdu) >= netph.ARPSize {
+		d = []byte(pdu)[netph.ARPSize:]
 	}
 	return
 }

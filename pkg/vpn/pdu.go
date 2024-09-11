@@ -15,6 +15,7 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/box"
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xnet"
+	"github.com/platinasystems/goes/v2/pkg/xnet/netph"
 )
 
 const (
@@ -38,8 +39,8 @@ var PacketName = map[uint16]string{
 var VpnPublicKey = pem.Decode
 
 func VpnWhoisAddress(d []byte) (addr netip.Addr) {
-	if len(d) >= 16 {
-		addr = netip.AddrFrom16([16]byte(d)).Unmap()
+	if len(d) >= netph.IPv6len {
+		addr = netip.AddrFrom16([netph.IPv6len]byte(d)).Unmap()
 	}
 	return
 }

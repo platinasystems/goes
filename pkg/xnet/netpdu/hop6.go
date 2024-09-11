@@ -11,18 +11,6 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xnet/netph"
 )
 
-var HOP6Types = map[uint8]func([]byte) fmt.Formatter{
-	IPPROTO_ICMPV6: func(data []byte) fmt.Formatter {
-		return ICMP6(data)
-	},
-	IPPROTO_TCP: func(data []byte) fmt.Formatter {
-		return TCP(data)
-	},
-	IPPROTO_UDP: func(data []byte) fmt.Formatter {
-		return UDP(data)
-	},
-}
-
 type HOP6 []byte
 
 func (pdu HOP6) Header() (h netph.HOP6, err error) {
@@ -31,17 +19,26 @@ func (pdu HOP6) Header() (h netph.HOP6, err error) {
 }
 
 func (pdu HOP6) Data() (d []byte) {
-	if len(pdu) >= netph.SizeofHOP6 {
-		d = []byte(pdu)[netph.SizeofHOP6:]
+	if len(pdu) >= netph.HOP6Size {
+		d = []byte(pdu)[netph.HOP6Size:]
 	}
 	return
 }
 
-func (pdu HOP6) Format(w fmt.State, verb rune) {
+type ChecksummingHOP6 struct {
+	csr Checksummer
+	pdu HOP6
+}
+
+func (x ChecksummingHOP6) Format(w fmt.State, verb rune) {
 	fmt.Fprint(w, "hop6 ")
-	if h, err := pdu.Header(); err != nil {
+	h, err := x.pdu.Header()
+	if err != nil {
 		fmt.Fprint(w, err)
-	} else if s, ok := map[uint8]string{
+		return
+	}
+	d := x.pdu.Data()
+	if s, ok := map[uint8]string{
 		0:   "hop-by-hop",
 		43:  "routing",
 		44:  "fragment",
@@ -54,11 +51,18 @@ func (pdu HOP6) Format(w fmt.State, verb rune) {
 	}[h.Type]; ok {
 		fmt.Fprintf(w, "%s[%d]", s, h.Len)
 		if h.Type != 59 {
-			fmt.Fprint(w, Mark, HOP6(pdu.Data()))
+			fmt.Fprint(w, Mark, ChecksummingHOP6{x.csr, d})
 		}
-	} else if f, ok := HOP6Types[h.Type]; ok {
-		fmt.Fprint(w, Mark, f(pdu.Data()))
-	} else {
+		return
+	}
+	switch h.Type {
+	case netph.IPPROTO_ICMPV6:
+		fmt.Fprint(w, Mark, ChecksummingICMP6{x.csr, d})
+	case netph.IPPROTO_TCP:
+		fmt.Fprint(w, Mark, ChecksummingTCP{x.csr, d})
+	case netph.IPPROTO_UDP:
+		fmt.Fprint(w, Mark, ChecksummingUDP{x.csr, d})
+	default:
 		fmt.Fprintf(w, "type[%#x]", h.Type)
 	}
 }

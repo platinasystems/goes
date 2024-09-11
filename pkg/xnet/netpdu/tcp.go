@@ -19,17 +19,32 @@ func (pdu TCP) Header() (h netph.TCP, err error) {
 }
 
 func (pdu TCP) Data() (d []byte) {
-	if len(pdu) >= netph.SizeofTCP {
-		d = []byte(pdu)[netph.SizeofTCP:]
+	if len(pdu) >= netph.TCPSize {
+		d = []byte(pdu)[netph.TCPSize:]
 	}
 	return
 }
 
-func (pdu TCP) Format(w fmt.State, verb rune) {
+func (pdu TCP) SetSum(sum uint16) {
+	pdu[netph.TCPSumIndex] = byte(sum >> 8)
+	pdu[netph.TCPSumIndex+1] = byte(sum)
+}
+
+type ChecksummingTCP struct {
+	csr Checksummer
+	pdu TCP
+}
+
+func (x ChecksummingTCP) Format(w fmt.State, verb rune) {
 	fmt.Fprint(w, "tcp ")
-	if h, err := pdu.Header(); err != nil {
+	h, err := x.pdu.Header()
+	if err != nil {
 		fmt.Fprint(w, err)
-	} else {
-		fmt.Fprint(w, "port ", h.DP, " <- ", h.SP)
+		return
 	}
+	sum := x.csr.Checksum(netph.IPPROTO_TCP, uint(len(x.pdu)), x.pdu)
+	if sum != 0 && sum != 0xffff {
+		fmt.Fprintf(w, "sum %04x, ", sum)
+	}
+	fmt.Fprint(w, "port ", h.DP, " <- ", h.SP)
 }

@@ -12,19 +12,19 @@ import (
 )
 
 var IEEE8021Qtypes = map[uint16]func([]byte) fmt.Formatter{
-	ETH_P_ARP: func(data []byte) fmt.Formatter {
+	netph.ETH_P_ARP: func(data []byte) fmt.Formatter {
 		return ARP(data)
 	},
-	ETH_P_IP: func(data []byte) fmt.Formatter {
+	netph.ETH_P_IP: func(data []byte) fmt.Formatter {
 		return IP(data)
 	},
-	ETH_P_IPV6: func(data []byte) fmt.Formatter {
+	netph.ETH_P_IPV6: func(data []byte) fmt.Formatter {
 		return IP6(data)
 	},
-	ETH_P_MPLS_UC: func(data []byte) fmt.Formatter {
+	netph.ETH_P_MPLS_UC: func(data []byte) fmt.Formatter {
 		return MPLS_UC(data)
 	},
-	ETH_P_MPLS_MC: func(data []byte) fmt.Formatter {
+	netph.ETH_P_MPLS_MC: func(data []byte) fmt.Formatter {
 		return MPLS_MC(data)
 	},
 }
@@ -37,8 +37,8 @@ func (pdu IEEE8021Q) Header() (h netph.IEEE8021, err error) {
 }
 
 func (pdu IEEE8021Q) Data() (d []byte) {
-	if len(pdu) >= netph.SizeofIEEE8021 {
-		d = []byte(pdu)[netph.SizeofIEEE8021:]
+	if len(pdu) >= netph.IEEE8021Size {
+		d = []byte(pdu)[netph.IEEE8021Size:]
 	}
 	return
 }
@@ -56,8 +56,8 @@ func (pdu IEEE8021AD) Header() (h netph.IEEE8021, err error) {
 }
 
 func (pdu IEEE8021AD) Data() (d []byte) {
-	if len(pdu) >= netph.SizeofIEEE8021 {
-		d = []byte(pdu)[netph.SizeofIEEE8021:]
+	if len(pdu) >= netph.IEEE8021Size {
+		d = []byte(pdu)[netph.IEEE8021Size:]
 	}
 	return
 }
@@ -74,7 +74,7 @@ func ieee8021qFormat(w fmt.State, verb rune, pdu interface {
 	if h, err := pdu.Header(); err != nil {
 		fmt.Fprint(w, err)
 	} else {
-		fmt.Fprintf(w, "pcp[%#x] dei[%d] vid [%#x]",
+		fmt.Fprintf(w, "pcp[%#x] dei[%v] vid [%#x]",
 			h.PCP(), h.DEI(), h.VID())
 		if f, ok := IEEE8021Qtypes[h.Type]; ok {
 			fmt.Fprint(w, Mark, f(pdu.Data()))

@@ -12,10 +12,10 @@ import (
 )
 
 var MPLStypes = map[uint16]func([]byte) fmt.Formatter{
-	ETH_P_IP: func(data []byte) fmt.Formatter {
+	netph.ETH_P_IP: func(data []byte) fmt.Formatter {
 		return IP(data)
 	},
-	ETH_P_IPV6: func(data []byte) fmt.Formatter {
+	netph.ETH_P_IPV6: func(data []byte) fmt.Formatter {
 		return IP6(data)
 	},
 }
@@ -28,8 +28,8 @@ func (pdu MPLS_UC) Header() (h netph.MPLS, err error) {
 }
 
 func (pdu MPLS_UC) Data() (d []byte) {
-	if len(pdu) >= netph.SizeofMPLS {
-		d = []byte(pdu)[netph.SizeofMPLS:]
+	if len(pdu) >= netph.MPLSSize {
+		d = []byte(pdu)[netph.MPLSSize:]
 	}
 	return
 }
@@ -47,8 +47,8 @@ func (pdu MPLS_MC) Header() (h netph.MPLS, err error) {
 }
 
 func (pdu MPLS_MC) Data() (d []byte) {
-	if len(pdu) >= netph.SizeofMPLS {
-		d = []byte(pdu)[netph.SizeofMPLS:]
+	if len(pdu) >= netph.MPLSSize {
+		d = []byte(pdu)[netph.MPLSSize:]
 	}
 	return
 }

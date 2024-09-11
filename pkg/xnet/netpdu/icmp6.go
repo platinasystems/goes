@@ -11,13 +11,6 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xnet/netph"
 )
 
-var ICMP6TypeCodes = map[uint8]func(uint8) string{
-	ICMP6TypeDestinationUnreachable: ICMP6UnreachableCodeName[uint8],
-	ICMP6TypeTimeExceeded:           ICMP6TimeExceededCodeName[uint8],
-	ICMP6TypeInvalidParameter:       ICMP6InvalidParameterCodeName[uint8],
-	ICMP6TypeRouterRenumbering:      ICMP6RouterRenumberingCodeName[uint8],
-}
-
 type ICMP6 []byte
 
 func (pdu ICMP6) Header() (h netph.ICMP6, err error) {
@@ -26,23 +19,162 @@ func (pdu ICMP6) Header() (h netph.ICMP6, err error) {
 }
 
 func (pdu ICMP6) Data() (d []byte) {
-	if len(pdu) >= netph.SizeofICMP6 {
-		d = []byte(pdu)[netph.SizeofICMP6:]
+	if len(pdu) >= netph.ICMP6Size {
+		d = []byte(pdu)[netph.ICMP6Size:]
 	}
 	return
 }
 
-func (pdu ICMP6) Format(w fmt.State, verb rune) {
+func (pdu ICMP6) SetSum(sum uint16) {
+	pdu[netph.ICMP6SumIndex] = byte(sum >> 8)
+	pdu[netph.ICMP6SumIndex+1] = byte(sum)
+}
+
+type ChecksummingICMP6 struct {
+	csr Checksummer
+	pdu ICMP6
+}
+
+func (x ChecksummingICMP6) Format(w fmt.State, verb rune) {
 	fmt.Fprint(w, "icmp6 ")
-	h, err := pdu.Header()
+	h, err := x.pdu.Header()
 	if err != nil {
 		fmt.Fprint(w, err)
 		return
 	}
-	fmt.Fprint(w, ICMP6TypeName(h.Type), ", ")
-	if f, ok := ICMP6TypeCodes[h.Type]; ok {
-		fmt.Fprint(w, f(h.Code))
-	} else {
-		fmt.Fprint(w, h.Code)
+	d := x.pdu.Data()
+	sum := x.csr.Checksum(netph.IPPROTO_ICMPV6, uint(len(x.pdu)), x.pdu)
+	if sum != 0 && sum != 0xffff {
+		fmt.Fprintf(w, "sum %04x, ", sum)
 	}
+	fmt.Fprint(w, ICMP6TypeName(h.Type))
+	switch h.Type {
+	case netph.ICMP6TypeRouterSolicitation:
+		ICMP6RouterSolicitation(d).Format(w, verb)
+	case netph.ICMP6TypeRouterAdvertisement:
+		ICMP6RouterAdvertisement(d).Format(w, verb)
+	case netph.ICMP6TypeNeighborSolicitation:
+		ICMP6NeighborSolicitation(d).Format(w, verb)
+	case netph.ICMP6TypeNeighborAdvertisement:
+		ICMP6NeighborAdvertisement(d).Format(w, verb)
+	case netph.ICMP6TypeRedirectMessage:
+		ICMP6RedirectMessage(d).Format(w, verb)
+	case netph.ICMP6TypeDestinationUnreachable:
+		fmt.Fprint(w, ICMP6UnreachableCodeName(h.Code))
+	case netph.ICMP6TypeTimeExceeded:
+		fmt.Fprint(w, ICMP6TimeExceededCodeName(h.Code))
+	case netph.ICMP6TypeInvalidParameter:
+		fmt.Fprint(w, ICMP6InvalidParameterCodeName(h.Code))
+	case netph.ICMP6TypeRouterRenumbering:
+		fmt.Fprint(w, ICMP6RouterRenumberingCodeName(h.Code))
+	default:
+		fmt.Fprintf(w, "code %#x", h.Code)
+	}
+}
+
+type ICMP6RouterSolicitation []byte
+
+func (pdu ICMP6RouterSolicitation) Header() (
+	h netph.ICMP6RouterSolicitation, err error,
+) {
+	_, err = xnet.Subtract(pdu, &h)
+	return
+}
+
+func (pdu ICMP6RouterSolicitation) Data() (d []byte) {
+	if len(pdu) >= netph.ICMP6RouterSolicitationSize {
+		d = []byte(pdu)[netph.ICMP6RouterSolicitationSize:]
+	}
+	return
+}
+
+func (pdu ICMP6RouterSolicitation) Format(w fmt.State, verb rune) {
+	if _, err := pdu.Header(); err != nil {
+		fmt.Fprint(w, err)
+		return
+	}
+	d := pdu.Data()
+	if n := len(d); n > 0 {
+		fmt.Fprintf(w, "options[%d]", n)
+	}
+}
+
+type ICMP6RouterAdvertisement []byte
+
+func (pdu ICMP6RouterAdvertisement) Header() (
+	h netph.ICMP6RouterSolicitation, err error,
+) {
+	_, err = xnet.Subtract(pdu, &h)
+	return
+}
+
+func (pdu ICMP6RouterAdvertisement) Data() (d []byte) {
+	if len(pdu) >= netph.ICMP6RouterAdvertisementSize {
+		d = []byte(pdu)[netph.ICMP6RouterAdvertisementSize:]
+	}
+	return
+}
+
+func (pdu ICMP6RouterAdvertisement) Format(w fmt.State, verb rune) {
+	// FIXME
+}
+
+type ICMP6NeighborSolicitation []byte
+
+func (pdu ICMP6NeighborSolicitation) Header() (
+	h netph.ICMP6NeighborSolicitation, err error,
+) {
+	_, err = xnet.Subtract(pdu, &h)
+	return
+}
+
+func (pdu ICMP6NeighborSolicitation) Data() (d []byte) {
+	if len(pdu) >= netph.ICMP6NeighborSolicitationSize {
+		d = []byte(pdu)[netph.ICMP6NeighborSolicitationSize:]
+	}
+	return
+}
+
+func (pdu ICMP6NeighborSolicitation) Format(w fmt.State, verb rune) {
+	// FIXME
+}
+
+type ICMP6NeighborAdvertisement []byte
+
+func (pdu ICMP6NeighborAdvertisement) Header() (
+	h netph.ICMP6NeighborSolicitation, err error,
+) {
+	_, err = xnet.Subtract(pdu, &h)
+	return
+}
+
+func (pdu ICMP6NeighborAdvertisement) Data() (d []byte) {
+	if len(pdu) >= netph.ICMP6NeighborAdvertisementSize {
+		d = []byte(pdu)[netph.ICMP6NeighborAdvertisementSize:]
+	}
+	return
+}
+
+func (pdu ICMP6NeighborAdvertisement) Format(w fmt.State, verb rune) {
+	// FIXME
+}
+
+type ICMP6RedirectMessage []byte
+
+func (pdu ICMP6RedirectMessage) Header() (
+	h netph.ICMP6RedirectMessage, err error,
+) {
+	_, err = xnet.Subtract(pdu, &h)
+	return
+}
+
+func (pdu ICMP6RedirectMessage) Data() (d []byte) {
+	if len(pdu) >= netph.ICMP6RedirectMessageSize {
+		d = []byte(pdu)[netph.ICMP6RedirectMessageSize:]
+	}
+	return
+}
+
+func (pdu ICMP6RedirectMessage) Format(w fmt.State, verb rune) {
+	// FIXME
 }

@@ -17,7 +17,8 @@ type TCP struct {
 	UP    uint16
 }
 
-const SizeofTCP = int(unsafe.Sizeof(TCP{}))
+const TCPSumIndex = 16
+const TCPSize = int(unsafe.Sizeof(TCP{}))
 
 func (p *TCP) DataOffset() uint8 { return uint8(p.Flags >> 28) }
 

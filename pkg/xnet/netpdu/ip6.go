@@ -12,21 +12,6 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xnet/netph"
 )
 
-var IP6NextHeaders = map[uint8]func([]byte) fmt.Formatter{
-	0: func(data []byte) fmt.Formatter {
-		return HOP6(data)
-	},
-	IPPROTO_ICMPV6: func(data []byte) fmt.Formatter {
-		return ICMP6(data)
-	},
-	IPPROTO_TCP: func(data []byte) fmt.Formatter {
-		return TCP(data)
-	},
-	IPPROTO_UDP: func(data []byte) fmt.Formatter {
-		return UDP(data)
-	},
-}
-
 type IP6 []byte
 
 func (pdu IP6) Header() (h netph.IP6, err error) {
@@ -35,8 +20,8 @@ func (pdu IP6) Header() (h netph.IP6, err error) {
 }
 
 func (pdu IP6) Data() (d []byte) {
-	if len(pdu) >= netph.SizeofIP6 {
-		d = []byte(pdu)[netph.SizeofIP6:]
+	if len(pdu) >= netph.IP6Size {
+		d = []byte(pdu)[netph.IP6Size:]
 	}
 	return
 }
@@ -49,10 +34,31 @@ func (pdu IP6) Format(w fmt.State, verb rune) {
 		return
 	}
 	d := pdu.Data()
-	fmt.Fprint(w, net.IP(h.DA[:]), " <- ", net.IP(h.SA[:]))
-	if f, ok := IP6NextHeaders[h.NextHeader]; ok {
-		fmt.Fprint(w, Mark, f(d))
-	} else {
-		fmt.Fprintf(w, " next[%#x]", h.NextHeader)
+	fmt.Fprint(w, net.IP(h.DA[:]), " <- ", net.IP(h.SA[:]), Mark)
+	switch h.NextHeader {
+	case netph.IPPROTO_HOPOPTS:
+		fmt.Fprint(w, ChecksummingHOP6{pdu, d})
+	case netph.IPPROTO_ICMPV6:
+		fmt.Fprint(w, ChecksummingICMP6{pdu, d})
+	case netph.IPPROTO_TCP:
+		fmt.Fprint(w, ChecksummingTCP{pdu, d})
+	case netph.IPPROTO_UDP:
+		fmt.Fprint(w, ChecksummingUDP{pdu, d})
+	default:
+		fmt.Fprintf(w, "next[%#x]", h.NextHeader)
 	}
+}
+
+// https://datatracker.ietf.org/doc/html/rfc2460#section-8
+func (pdu IP6) Checksum(prot uint8, n uint, data []byte) uint16 {
+	sum := Checksum(pdu[netph.IP6AddrsIndex:netph.IP6Size])
+	sum += Checksum([]byte{
+		byte(n >> 24),
+		byte(n >> 16),
+		byte(n >> 8),
+		byte(n),
+	})
+	sum += Checksum([]byte{0, 0, 0, prot})
+	sum += Checksum(data)
+	return CarryOver(sum)
 }

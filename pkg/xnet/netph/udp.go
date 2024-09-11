@@ -14,4 +14,5 @@ type UDP struct {
 	Sum uint16
 }
 
-const SizeofUDP = int(unsafe.Sizeof(UDP{}))
+const UDPSumIndex = 8
+const UDPSize = int(unsafe.Sizeof(UDP{}))

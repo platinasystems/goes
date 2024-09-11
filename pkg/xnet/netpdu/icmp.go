@@ -11,14 +11,6 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xnet/netph"
 )
 
-var ICMPTypeCodes = map[uint8]func(uint8) string{
-	ICMPTypeDestinationUnreachable: ICMPUnreachableCodeName[uint8],
-	ICMPTypeRedirectMessage:        ICMPRedirectCodeName[uint8],
-	ICMPTypeTimeExceeded:           ICMPTimeExceededCodeName[uint8],
-	ICMPTypeInvalidParamter:        ICMPInvalidParameterCodeName[uint8],
-	ICMPTypeExtendedEchoReply:      ICMPExtendedEchoReplyCodeName[uint8],
-}
-
 type ICMP []byte
 
 func (pdu ICMP) Header() (h netph.ICMP, err error) {
@@ -27,24 +19,45 @@ func (pdu ICMP) Header() (h netph.ICMP, err error) {
 }
 
 func (pdu ICMP) Data() (d []byte) {
-	if len(pdu) >= netph.SizeofICMP {
-		d = []byte(pdu)[netph.SizeofICMP:]
+	if len(pdu) >= netph.ICMPSize {
+		d = []byte(pdu)[netph.ICMPSize:]
 	}
 	return
 }
 
-func (pdu ICMP) Format(w fmt.State, verb rune) {
+type ChecksummingICMP struct {
+	csr Checksummer
+	pdu ICMP
+}
+
+func (x ChecksummingICMP) Format(w fmt.State, verb rune) {
 	fmt.Fprint(w, "icmp ")
-	if h, err := pdu.Header(); err != nil {
+	h, err := x.pdu.Header()
+	if err != nil {
 		fmt.Fprint(w, err)
-	} else if typename := ICMPTypeName(h.Type); len(typename) == 0 {
-		typename = "unknown"
-	} else {
-		fmt.Fprint(w, typename, " ")
-		if f, ok := ICMPTypeCodes[h.Type]; ok {
-			fmt.Fprint(w, f(h.Code))
-		} else {
-			fmt.Fprint(w, h.Code)
-		}
+		return
 	}
+	sum := x.csr.Checksum(netph.IPPROTO_ICMP, uint(len(x.pdu)), x.pdu)
+	if sum != 0 && sum != 0xffff {
+		fmt.Fprintf(w, "sum %04x, ", sum)
+	}
+	typename := ICMPTypeName(h.Type)
+	if len(typename) == 0 {
+		typename = "unknown"
+	}
+	fmt.Fprint(w, typename, " ")
+	if f, ok := ICMPTypeCodes[h.Type]; ok {
+		fmt.Fprint(w, f(h.Code))
+	} else {
+		fmt.Fprintf(w, "code %#x", h.Code)
+	}
+}
+
+var ICMPTypeCodes = map[uint8]func(uint8) string{
+	netph.ICMPTypeDestinationUnreachable: ICMPUnreachableCodeName[uint8],
+
+	netph.ICMPTypeRedirectMessage:   ICMPRedirectCodeName[uint8],
+	netph.ICMPTypeTimeExceeded:      ICMPTimeExceededCodeName[uint8],
+	netph.ICMPTypeInvalidParamter:   ICMPInvalidParameterCodeName[uint8],
+	netph.ICMPTypeExtendedEchoReply: ICMPExtendedEchoReplyCodeName[uint8],
 }

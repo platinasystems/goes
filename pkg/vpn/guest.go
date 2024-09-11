@@ -260,7 +260,7 @@ guestLoop:
 					verbose.Println(err)
 				}
 				bx.Return()
-			case netpdu.ETH_P_IP, netpdu.ETH_P_IPV6:
+			case netph.ETH_P_IP, netph.ETH_P_IPV6:
 				tunWriteCh <- bx
 			default:
 				verbose.Printf("proto[%#x]", tunpi.Proto)
@@ -335,11 +335,11 @@ func (*guest) toWhom(pdu netpdu.TunPI) (addr netip.Addr) {
 	d := pdu.Data()
 	switch {
 	case err != nil:
-	case pi.Proto == netpdu.ETH_P_IP:
+	case pi.Proto == netph.ETH_P_IP:
 		if ip, err := netpdu.IP(d).Header(); err == nil {
 			addr.UnmarshalBinary(ip.DA[:])
 		}
-	case pi.Proto == netpdu.ETH_P_IPV6:
+	case pi.Proto == netph.ETH_P_IPV6:
 		if ip6, err := netpdu.IP6(d).Header(); err == nil {
 			addr.UnmarshalBinary(ip6.DA[:])
 		}

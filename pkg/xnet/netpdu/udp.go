@@ -19,17 +19,34 @@ func (pdu UDP) Header() (h netph.UDP, err error) {
 }
 
 func (pdu UDP) Data() (d []byte) {
-	if len(pdu) >= netph.SizeofUDP {
-		d = []byte(pdu)[netph.SizeofUDP:]
+	if len(pdu) >= netph.UDPSize {
+		d = []byte(pdu)[netph.UDPSize:]
 	}
 	return
 }
 
-func (pdu UDP) Format(w fmt.State, verb rune) {
-	fmt.Fprint(w, "udp ")
-	if h, err := pdu.Header(); err != nil {
-		fmt.Fprint(w, err)
-	} else {
-		fmt.Fprint(w, "port ", h.DP, " <- ", h.SP)
+func (pdu UDP) SetSum(sum uint16) {
+	if len(pdu) >= netph.UDPSize {
+		pdu[netph.UDPSumIndex] = byte(sum >> 8)
+		pdu[netph.UDPSumIndex+1] = byte(sum)
 	}
+}
+
+type ChecksummingUDP struct {
+	csr Checksummer
+	pdu UDP
+}
+
+func (x ChecksummingUDP) Format(w fmt.State, verb rune) {
+	fmt.Fprint(w, "udp ")
+	h, err := x.pdu.Header()
+	if err != nil {
+		fmt.Fprint(w, err)
+		return
+	}
+	sum := x.csr.Checksum(netph.IPPROTO_UDP, uint(h.Len), x.pdu)
+	if sum != 0 && sum != 0xffff {
+		fmt.Fprintf(w, "sum %04x, ", sum)
+	}
+	fmt.Fprint(w, "port ", h.DP, " <- ", h.SP)
 }

@@ -11,4 +11,4 @@ type HOP6 struct {
 	Len  uint8
 }
 
-const SizeofHOP6 = int(unsafe.Sizeof(HOP6{}))
+const HOP6Size = int(unsafe.Sizeof(HOP6{}))

@@ -287,10 +287,10 @@ func (ex *exchange) rx(
 		verbose.Printf("rx %d @ %v whois-service %v",
 			ifrom, afrom, VpnWhoisService(d))
 		bx.Return()
-	case netpdu.ETH_P_IP:
+	case netph.ETH_P_IP:
 		ex.rxIP(netpdu.IP(d))
 		bx.Return()
-	case netpdu.ETH_P_IPV6:
+	case netph.ETH_P_IPV6:
 		ex.rxIP6(netpdu.IP6(d))
 		bx.Return()
 	default:
@@ -323,7 +323,7 @@ func (ex *exchange) rxIP6(pdu netpdu.IP6) {
 		case da == ex.all6nodes:
 			verbose.Println("FIXME mcast neighbor discovery:", err)
 		case da == ex.all6routers:
-			if h.NextHeader == netpdu.IPPROTO_ICMPV6 {
+			if h.NextHeader == netph.IPPROTO_ICMPV6 {
 				ex.rxICMP6(pdu, netpdu.ICMP6(d))
 			} else {
 				verbose.Println("dropped:", pdu)
@@ -343,7 +343,7 @@ func (ex *exchange) rxICMP6(ip6 netpdu.IP6, icmp6 netpdu.ICMP6) {
 		return
 	}
 	switch h.Type {
-	case netpdu.ICMP6TypeRouterSolicitation:
+	case netph.ICMP6TypeRouterSolicitation:
 		verbose.Println("FIXME reply:", ip6)
 	default:
 		verbose.Println("dropped:", "type", h.Type, ip6)

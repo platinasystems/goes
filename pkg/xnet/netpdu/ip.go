@@ -12,18 +12,6 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xnet/netph"
 )
 
-var IPprotocols = map[uint8]func([]byte) fmt.Formatter{
-	IPPROTO_ICMP: func(data []byte) fmt.Formatter {
-		return ICMP(data)
-	},
-	IPPROTO_TCP: func(data []byte) fmt.Formatter {
-		return TCP(data)
-	},
-	IPPROTO_UDP: func(data []byte) fmt.Formatter {
-		return UDP(data)
-	},
-}
-
 type IP []byte
 
 func (pdu IP) Header() (h netph.IP, err error) {
@@ -60,9 +48,28 @@ func (pdu IP) Format(w fmt.State, verb rune) {
 	}
 	d := pdu.Data()
 	fmt.Fprint(w, net.IP(h.DA[:]), " <- ", net.IP(h.SA[:]))
-	if f, ok := IPprotocols[h.Protocol]; ok {
-		fmt.Fprint(w, Mark, f(d))
-	} else {
+	switch h.Protocol {
+	case netph.IPPROTO_ICMP:
+		fmt.Fprint(w, Mark, ChecksummingICMP{pdu, d})
+	case netph.IPPROTO_TCP:
+		fmt.Fprint(w, Mark, ChecksummingTCP{pdu, d})
+	case netph.IPPROTO_UDP:
+		fmt.Fprint(w, Mark, ChecksummingUDP{pdu, d})
+	default:
 		fmt.Fprintf(w, ", protocol[%#x]", h.Protocol)
 	}
+}
+
+// https://www.ietf.org/rfc/rfc768.txt
+// https://www.ietf.org/rfc/rfc793.txt
+func (pdu IP) Checksum(prot uint8, n uint, data []byte) uint16 {
+	sum := Checksum(pdu[netph.IPAddrsIndex:netph.IPSize])
+	sum += Checksum([]byte{
+		0,
+		prot,
+		byte(n >> 8),
+		byte(n),
+	})
+	sum += Checksum(data)
+	return CarryOver(sum)
 }

@@ -6,6 +6,8 @@ package netph
 
 import "unsafe"
 
+const IPv4len = 4
+
 // https://en.wikipedia.org/wiki/IPv4
 type IP struct {
 	VIHL     uint8
@@ -16,16 +18,27 @@ type IP struct {
 	TTL      uint8
 	Protocol uint8
 	Checksum uint16
-	SA       [4]byte
-	DA       [4]byte
+	SA       [IPv4len]byte
+	DA       [IPv4len]byte
 }
 
-const SizeofIP = int(unsafe.Sizeof(IP{}))
+const IPProtIndex = 9
+const IPSumIndex = 10
+const IPAddrsIndex = 12
+const IPSize = int(unsafe.Sizeof(IP{}))
 
 const (
 	IP4MFbit    = 13
 	IP4DFbit    = 14
 	IP4FlagMask = ((1 << IP4MFbit) - 1)
+)
+
+const (
+	IPPROTO_HOPOPTS = 0x0
+	IPPROTO_ICMP    = 0x1
+	IPPROTO_ICMPV6  = 0x3a
+	IPPROTO_TCP     = 0x6
+	IPPROTO_UDP     = 0x11
 )
 
 func (p *IP) Version() uint8 { return p.VIHL >> 4 }

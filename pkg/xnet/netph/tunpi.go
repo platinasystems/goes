@@ -11,4 +11,4 @@ type TunPI struct {
 	Proto uint16
 }
 
-const SizeofTunPI = int(unsafe.Sizeof(TunPI{}))
+const TunPISize = int(unsafe.Sizeof(TunPI{}))

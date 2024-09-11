@@ -12,10 +12,10 @@ import (
 )
 
 var TunPIprotos = map[uint16]func([]byte) fmt.Formatter{
-	ETH_P_IP: func(data []byte) fmt.Formatter {
+	netph.ETH_P_IP: func(data []byte) fmt.Formatter {
 		return IP(data)
 	},
-	ETH_P_IPV6: func(data []byte) fmt.Formatter {
+	netph.ETH_P_IPV6: func(data []byte) fmt.Formatter {
 		return IP6(data)
 	},
 }
@@ -28,8 +28,8 @@ func (pdu TunPI) Header() (h netph.TunPI, err error) {
 }
 
 func (pdu TunPI) Data() (d []byte) {
-	if len(pdu) >= netph.SizeofTunPI {
-		d = []byte(pdu)[netph.SizeofTunPI:]
+	if len(pdu) >= netph.TunPISize {
+		d = []byte(pdu)[netph.TunPISize:]
 	}
 	return
 }

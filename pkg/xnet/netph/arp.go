@@ -19,4 +19,4 @@ type ARP struct {
 	TPA   [4]byte
 }
 
-const SizeofARP = int(unsafe.Sizeof(ARP{}))
+const ARPSize = int(unsafe.Sizeof(ARP{}))

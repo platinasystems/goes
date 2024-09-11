@@ -9,7 +9,7 @@ import "unsafe"
 // https://en.wikipedia.org/wiki/Multiprotocol_Label_Switching
 type MPLS uint32
 
-const SizeofMPLS = int(unsafe.Sizeof(MPLS(0)))
+const MPLSSize = int(unsafe.Sizeof(MPLS(0)))
 
 func (v MPLS) Label() uint32 { return uint32(v) >> (3 + 1 + 8) }
 func (v MPLS) TC() uint8     { return uint8(v>>9) & 7 }

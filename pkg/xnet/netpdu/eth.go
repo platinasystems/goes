@@ -13,25 +13,25 @@ import (
 )
 
 var EthTypes = map[uint16]func([]byte) fmt.Formatter{
-	ETH_P_8021Q: func(data []byte) fmt.Formatter {
+	netph.ETH_P_8021Q: func(data []byte) fmt.Formatter {
 		return IEEE8021Q(data)
 	},
-	ETH_P_8021AD: func(data []byte) fmt.Formatter {
+	netph.ETH_P_8021AD: func(data []byte) fmt.Formatter {
 		return IEEE8021AD(data)
 	},
-	ETH_P_ARP: func(data []byte) fmt.Formatter {
+	netph.ETH_P_ARP: func(data []byte) fmt.Formatter {
 		return ARP(data)
 	},
-	ETH_P_IP: func(data []byte) fmt.Formatter {
+	netph.ETH_P_IP: func(data []byte) fmt.Formatter {
 		return IP(data)
 	},
-	ETH_P_IPV6: func(data []byte) fmt.Formatter {
+	netph.ETH_P_IPV6: func(data []byte) fmt.Formatter {
 		return IP6(data)
 	},
-	ETH_P_MPLS_UC: func(data []byte) fmt.Formatter {
+	netph.ETH_P_MPLS_UC: func(data []byte) fmt.Formatter {
 		return MPLS_UC(data)
 	},
-	ETH_P_MPLS_MC: func(data []byte) fmt.Formatter {
+	netph.ETH_P_MPLS_MC: func(data []byte) fmt.Formatter {
 		return MPLS_MC(data)
 	},
 }
@@ -44,8 +44,8 @@ func (pdu Eth) Header() (h netph.Eth, err error) {
 }
 
 func (pdu Eth) Data() (d []byte) {
-	if len(pdu) >= netph.SizeofEth {
-		d = []byte(pdu)[netph.SizeofEth:]
+	if len(pdu) >= netph.EthSize {
+		d = []byte(pdu)[netph.EthSize:]
 	}
 	return
 }
