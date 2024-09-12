@@ -119,12 +119,12 @@ Forward ciphered packets between exchange and tunnel interface.
 			g.hostPrefix.String(), "mtu", mtu)
 	}
 
-	err = routeAdd(cctx, g.vpnPrefix, dst)
+	err = routeAdd(cctx, g.vpnPrefix, nif)
 	if err != nil {
 		return xerrors.Note(err,
-			"route", "add", g.vpnPrefix, "via", dst)
+			"route", "add", g.vpnPrefix, "via", nif)
 	}
-	defer routeDelete(cctx, g.vpnPrefix, dst)
+	defer routeDelete(cctx, g.vpnPrefix, nif)
 
 	pktRxCh := make(chan *box.Box, 4)
 	pktTxCh := make(chan *box.Box, 4)

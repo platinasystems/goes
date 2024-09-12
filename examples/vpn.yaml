@@ -66,14 +66,14 @@ metadata:
 data:
   config.yaml: |
     vpn:
-      prefix: 10.99.98.0/24
+      prefix: fc00:1234::/64
       address:
-        hosta: 10.99.98.1
-        hostb: 10.99.98.2
-        hostc: 10.99.98.3
-        exchange0: 10.99.98.10
-        exchange1: 10.99.98.11
-        exchange2: 10.99.98.12
+        hosta: fc00:1234::1
+        hostb: fc00:1234::2
+        hostc: fc00:1234::3
+        exchange0: fc00:1234::10
+        exchange1: fc00:1234::11
+        exchange2: fc00:1234::12
       subscribers: /etc/goes/vpn
   registry.pem: |
     -----BEGIN CERTIFICATE-----
