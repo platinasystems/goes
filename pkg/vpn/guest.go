@@ -121,7 +121,8 @@ Forward ciphered packets between exchange and tunnel interface.
 
 	err = routeAdd(cctx, g.vpnPrefix, dst)
 	if err != nil {
-		return xerrors.Label(err, "route", "add", g.vpnPrefix.String())
+		return xerrors.Note(err,
+			"route", "add", g.vpnPrefix, "via", dst)
 	}
 	defer routeDelete(cctx, g.vpnPrefix, dst)
 
