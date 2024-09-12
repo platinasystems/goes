@@ -9,51 +9,50 @@ import (
 	"fmt"
 	"path/filepath"
 	"runtime"
-	"strings"
 )
 
 var ErrFIXME = errors.New("FIXME")
 var FileNameMutation = filepath.Base
-
-func IsMarked(err error) bool {
-	_, ok := err.(*MarkError)
-	return ok
-}
 
 // Mark ErrFIXME with the caller's file name and line number and args.
 func FIXME(args ...any) error {
 	return MarkCaller(ErrFIXME, args...)
 }
 
-// Wrap a non-nil error with the caller's file name and line number and args.
+// [Note] the non-nil error then [Label] that with the caller's file name and
+// line number.
 func Mark(err error, args ...any) error {
-	if err != nil {
-		if _, f, l, ok := runtime.Caller(1); ok {
-			err = &MarkError{f, l, err, args}
-		} else {
-			err = &MarkError{"unavailable", -1, err, args}
-		}
+	if err == nil {
+		return err
+	}
+	if len(args) > 0 {
+		err = note(err, args...)
+	}
+	if _, f, l, ok := runtime.Caller(1); ok {
+		err = MarkError{label(err, FileNameMutation(f), l)}
 	}
 	return err
 }
 
 // Skip 2 calls back.
 func MarkCaller(err error, args ...any) error {
-	if err != nil {
-		if _, f, l, ok := runtime.Caller(2); ok {
-			err = &MarkError{f, l, err, args}
-		} else {
-			err = &MarkError{"unavailable", -1, err, args}
-		}
+	if err == nil {
+		return err
+	}
+	if len(args) > 0 {
+		err = note(err, args...)
+	}
+	if _, f, l, ok := runtime.Caller(2); ok {
+		err = MarkError{label(err, FileNameMutation(f), l)}
 	}
 	return err
 }
 
-// Wrap fmt.Errorf with the caller's file name and line number.
+// Preface fmt.Errorf with the caller's file name and line number.
 func Markf(format string, args ...any) error {
 	err := fmt.Errorf(format, args...)
 	if _, f, l, ok := runtime.Caller(1); ok {
-		err = &MarkError{f, l, err, nil}
+		err = MarkError{label(err, FileNameMutation(f), l)}
 	}
 	return err
 }
@@ -62,40 +61,13 @@ func MarkResult[T any](v T, err error) (T, error) {
 	return v, MarkCaller(err)
 }
 
-type MarkError struct {
-	file string
-	line int
-	err  error
-	args []any
-}
+type MarkError struct{ LabelError }
 
-func (m *MarkError) Error() string {
-	if m == nil {
-		return ""
+func IsMarked(err error) bool {
+	ne, ok := err.(NoteError)
+	if ok {
+		err = ne.err
 	}
-	var sb strings.Builder
-	if m.line >= 0 {
-		fmt.Fprint(&sb, FileNameMutation(m.file), ":", m.line)
-		if IsMarked(m.err) {
-			fmt.Fprint(&sb, "/ ")
-		} else {
-			fmt.Fprint(&sb, ": ")
-		}
-	}
-	fmt.Fprint(&sb, m.err)
-	if len(m.args) > 0 {
-		fmt.Fprint(&sb, " [")
-		for i, arg := range m.args {
-			if i > 0 {
-				fmt.Fprint(&sb, " ")
-			}
-			fmt.Fprint(&sb, arg)
-		}
-		fmt.Fprint(&sb, "]")
-	}
-	return sb.String()
-}
-
-func (m *MarkError) Unwrap() error {
-	return m.err
+	_, ok = err.(MarkError)
+	return ok
 }

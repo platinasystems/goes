@@ -20,68 +20,75 @@ var (
 	ErrUnavailable = errors.New("unavailable")
 )
 
-func Broken(txt ...string) error {
-	return Label(ErrBroken, txt...)
+func Broken(args ...any) error {
+	return Label(ErrBroken, args...)
 }
 
-func Incomplete(txt ...string) error {
-	return Label(ErrIncomplete, txt...)
+func Incomplete(args ...any) error {
+	return Label(ErrIncomplete, args...)
 }
 
-func Invalid(txt ...string) error {
-	return Label(ErrInvalid, txt...)
+func Invalid(args ...any) error {
+	return Label(ErrInvalid, args...)
 }
 
-func NotFound(txt ...string) error {
-	return Label(ErrNotFound, txt...)
+func NotFound(args ...any) error {
+	return Label(ErrNotFound, args...)
 }
 
-func Range(txt ...string) error {
-	return Label(ErrRange, txt...)
+func Range(args ...any) error {
+	return Label(ErrRange, args...)
 }
 
-func Unknown(txt ...string) error {
-	return Label(ErrUnknown, txt...)
+func Unknown(args ...any) error {
+	return Label(ErrUnknown, args...)
 }
 
-func Unavailable(txt ...string) error {
-	return Label(ErrUnavailable, txt...)
-}
-
-type LabelError struct {
-	err error
-	txt []string
+func Unavailable(args ...any) error {
+	return Label(ErrUnavailable, args...)
 }
 
 func IsLabelled(err error) bool {
-	_, ok := err.(*LabelError)
+	ne, ok := err.(NoteError)
+	if ok {
+		err = ne.err
+	}
+	_, ok = err.(LabelError)
 	return ok
 }
 
-func Label(err error, txt ...string) error {
-	if err == nil || IsMarked(err) {
+// Preface non-nil error with “arg:...”
+func Label(err error, args ...any) error {
+	if err == nil || len(args) == 0 {
 		return err
 	}
-	if len(txt) > 0 {
-		err = &LabelError{err, txt}
-	}
-	return err
+	return label(err, args...)
 }
 
-func (lbl *LabelError) Error() string {
+func label(err error, args ...any) LabelError {
 	var sb strings.Builder
-	fmt.Fprint(&sb, strings.Join(lbl.txt, ":"))
-	sb.WriteRune(':')
-	es := lbl.err.Error()
+	for _, arg := range args {
+		fmt.Fprint(&sb, arg, ":")
+	}
+	es := err.Error()
 	colon := strings.IndexRune(es, ':')
 	space := strings.IndexRune(es, ' ')
 	if colon < 0 || (space > 0 && space < colon) {
 		sb.WriteRune(' ')
 	}
 	sb.WriteString(es)
-	return sb.String()
+	return LabelError{err, sb.String()}
 }
 
-func (lbl *LabelError) Unwrap() error {
+type LabelError struct {
+	err error
+	txt string
+}
+
+func (lbl LabelError) Error() string {
+	return lbl.txt
+}
+
+func (lbl LabelError) Unwrap() error {
 	return lbl.err
 }

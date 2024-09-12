@@ -96,8 +96,10 @@ func Main() {
 				err = errors.New(string(ee.Stderr))
 			}
 		}
-		fields := strings.Fields(flag.CommandLine.Name())
-		err = xerrors.Label(err, fields...)
+		if !xerrors.IsMarked(err) {
+			err = xerrors.Label(err, strings.
+				Replace(flag.CommandLine.Name(), " ", ":", -1))
+		}
 		if err != nil {
 			os.Stderr.WriteString(xutf8.AlineString(err.Error()))
 		}
