@@ -112,14 +112,14 @@ func (cl *client) register(
 	}
 	cl.service[idi] = optsvc
 
-	verbose.Printf("assigned: id %d @ %v, via %v, prefix %v",
-		cl.id, cl.addr, via, cl.vpnPrefix)
-
 	if cl.addr.Is4() {
 		cl.hostPrefix = netip.PrefixFrom(cl.addr, 32)
 	} else {
 		cl.hostPrefix = netip.PrefixFrom(cl.addr, 128)
 	}
+
+	verbose.Printf("assigned: id %d @ %v, via %v, vpn %v",
+		cl.id, cl.hostPrefix, via, cl.vpnPrefix)
 
 	return nil
 }
