@@ -44,10 +44,13 @@ func (x ChecksummingICMP6) Format(w fmt.State, verb rune) {
 	}
 	d := x.pdu.Data()
 	sum := x.csr.Checksum(netph.IPPROTO_ICMPV6, uint(len(x.pdu)), x.pdu)
-	if sum != 0 && sum != 0xffff {
-		fmt.Fprintf(w, "sum %04x, ", sum)
+	fmt.Fprint(w, "sum ")
+	if sum == 0 || ^sum == 0 {
+		fmt.Fprint(w, "ok")
+	} else {
+		fmt.Fprintf(w, "%04x", sum)
 	}
-	fmt.Fprint(w, ICMP6TypeName(h.Type))
+	fmt.Fprint(w, Mark, ICMP6TypeName(h.Type))
 	switch h.Type {
 	case netph.ICMP6TypeRouterSolicitation:
 		ICMP6RouterSolicitation(d).Format(w, verb)
