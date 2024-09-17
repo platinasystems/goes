@@ -26,6 +26,8 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xnet/netph"
 )
 
+const MTU = box.ContentMTU - netph.TunPISize
+
 // Guest is a UDP server that forwards ciphered packets between an exchange
 // and a network tunnel interface.
 func Guest(ctx context.Context, args []string) error {
@@ -112,7 +114,7 @@ Forward ciphered packets between exchange and tunnel interface.
 		return xerrors.NotFound(tun.Name())
 	}
 
-	mtu := fmt.Sprintf("%d", box.ContentMTU)
+	mtu := fmt.Sprint(MTU)
 	err = nif.Add(cctx, g.hostPrefix, dst, "up", "mtu", mtu)
 	if err != nil {
 		return xerrors.Label(err, "ifconfig", nif.Name,
