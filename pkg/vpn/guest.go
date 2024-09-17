@@ -311,9 +311,15 @@ func (g *guest) unicast(ch chan<- *box.Box, bx *box.Box, addr netip.Addr) {
 	bx.CloseWith(cto)
 	via, ok := g.via[ito]
 	if !ok {
-		errata.Println("%d@%v: %s", ito, addr, "no guest exchange")
-		bx.Return()
-		return
+		if _, ok := g.service[ito]; ok {
+			verbose.Printf("%d@%v: %s", ito, addr, "exchange")
+			via = to
+		} else {
+			errata.Printf("%d@%v: %s",
+				ito, addr, "no guest exchange")
+			bx.Return()
+			return
+		}
 	}
 	bx.Via(via)
 	ivia := IdIndex(via)
@@ -325,7 +331,7 @@ func (g *guest) unicast(ch chan<- *box.Box, bx *box.Box, addr netip.Addr) {
 	}
 	bx.AddrPort, ok = g.service[ivia]
 	if !ok {
-		errata.Println("%d: %s", ivia, "no exchange service")
+		errata.Printf("%d: %s", ivia, "no exchange service")
 		bx.Return()
 		return
 	}
