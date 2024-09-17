@@ -127,7 +127,7 @@ extended-echo
 126
 127
 echo-request
-rcho-reply
+echo-reply
 multicast-listener-query
 multicast-listener-report
 multicast-listener-done
