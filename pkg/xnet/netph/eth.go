@@ -17,6 +17,8 @@ type Eth struct {
 
 const EthSize = int(unsafe.Sizeof(Eth{}))
 
+const ETHMTU = 1500
+
 const (
 	ETH_P_8021Q   = 0x8100
 	ETH_P_8021AD  = 0x88a8

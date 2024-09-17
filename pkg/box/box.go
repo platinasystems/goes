@@ -17,12 +17,12 @@ import (
 	"unsafe"
 
 	"github.com/platinasystems/goes/v2/pkg/gcm"
+	"github.com/platinasystems/goes/v2/pkg/xnet/netph"
 )
 
-const SizeofEthPayload = 1500
-const SizeofIP6 = 4 + 2 + 1 + 1 + 16 + 16
-const SizeofUDP = 2 + 2 + 2 + 2
-const BoxAndLabelCap = (SizeofEthPayload - SizeofIP6 - SizeofUDP) &^ (8 - 1)
+const IP6MTU = netph.ETHMTU - netph.IP6Size
+const UDPMTU = IP6MTU - netph.UDPSize
+const Cap = UDPMTU &^ (4 - 1)
 
 const (
 	From = iota
@@ -45,10 +45,10 @@ const (
 )
 
 const Content = Stamp + gcm.Overhead
-const ContentMTU = BoxAndLabelCap - Content - gcm.Overhead
+const ContentMTU = Cap - Content - gcm.Overhead
 
 type Box struct {
-	data [BoxAndLabelCap]byte
+	data [Cap]byte
 	next *Box
 	netip.AddrPort
 	Contents []byte
@@ -170,7 +170,7 @@ func (box *Box) OpenWith(v Opener) error {
 	if len(box.Contents) == 0 {
 		return ErrEmpty
 	}
-	if cap(box.Contents) < BoxAndLabelCap-Content {
+	if cap(box.Contents) < Cap-Content {
 		return fmt.Errorf("read offset Contents")
 	}
 	zip := box.data[ZipCode:Stamp]
@@ -216,7 +216,7 @@ func (box *Box) UnsealWith(v Opener) error {
 
 // This appends data to Contents.
 func (box *Box) Write(data []byte) (int, error) {
-	if cap(box.Contents) < BoxAndLabelCap-Content {
+	if cap(box.Contents) < Cap-Content {
 		box.Contents = box.data[Content:Content]
 	}
 	n := len(data)
