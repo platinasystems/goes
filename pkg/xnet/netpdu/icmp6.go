@@ -50,8 +50,12 @@ func (x ChecksummingICMP6) Format(w fmt.State, verb rune) {
 	} else {
 		fmt.Fprintf(w, "%04x", sum)
 	}
-	fmt.Fprint(w, Mark, ICMP6TypeName(h.Type))
+	fmt.Fprint(w, Mark, ICMP6TypeName(h.Type), " ")
 	switch h.Type {
+	case netph.ICMP6TypeEchoRequest:
+		fmt.Fprint(w, ICMP6EchoRequest(d))
+	case netph.ICMP6TypeEchoReply:
+		fmt.Fprint(w, ICMP6EchoReply(d))
 	case netph.ICMP6TypeRouterSolicitation:
 		ICMP6RouterSolicitation(d).Format(w, verb)
 	case netph.ICMP6TypeRouterAdvertisement:
@@ -74,6 +78,32 @@ func (x ChecksummingICMP6) Format(w fmt.State, verb rune) {
 		fmt.Fprintf(w, "code %#x", h.Code)
 	}
 }
+
+type ICMP6EchoRequest []byte
+
+func (pdu ICMP6EchoRequest) Header() (
+	h netph.ICMP6EchoRequest, err error,
+) {
+	_, err = xnet.Subtract(pdu, &h)
+	return
+}
+
+func (pdu ICMP6EchoRequest) Data() (d []byte) {
+	if len(pdu) >= netph.ICMP6EchoRequestSize {
+		d = []byte(pdu)[netph.ICMP6EchoRequestSize:]
+	}
+	return
+}
+
+func (pdu ICMP6EchoRequest) Format(w fmt.State, verb rune) {
+	if h, err := pdu.Header(); err != nil {
+		fmt.Fprint(w, err)
+	} else {
+		fmt.Fprintf(w, "id %#04x, seq %d", h.Identifier, h.Sequence)
+	}
+}
+
+type ICMP6EchoReply = ICMP6EchoRequest
 
 type ICMP6RouterSolicitation []byte
 

@@ -76,6 +76,18 @@ const (
 	ICMP6RouterRenumberingCodeResult
 )
 
+// See https://www.rfc-editor.org/rfc/rfc4443.html#page-13
+type ICMP6EchoRequest struct {
+	Identifier,
+	Sequence uint16
+}
+
+const ICMP6EchoRequestSize = int(unsafe.Sizeof(ICMP6EchoRequest{}))
+
+type ICMP6EchoReply = ICMP6EchoRequest
+
+const ICMP6EchoReplySize = ICMP6EchoRequestSize
+
 // See https://datatracker.ietf.org/doc/html/rfc4861#section-4.1
 type ICMP6RouterSolicitation struct {
 	_ uint32
