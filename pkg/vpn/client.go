@@ -124,35 +124,6 @@ func (cl *client) register(
 	return nil
 }
 
-func (cl *client) ack(ch chan<- *box.Box, bx *box.Box) {
-	var err error
-	ap := bx.AddrPort
-	peer := bx.FromWhom()
-	ipeer := IdIndex(peer)
-	cpeer := cl.gcm[ipeer]
-	bx.Empty()
-	if bx.Contents, err = xnet.Add(bx.Contents, netph.TunPI{
-		Proto: VPN_P_HELLO,
-	}); err != nil {
-		errata.Print(err)
-		bx.Return()
-		return
-	}
-	if bx.Contents, err = xnet.Add(bx.Contents,
-		time.Now().UnixMicro()); err != nil {
-		errata.Print(err)
-		bx.Return()
-		return
-	}
-	bx.AddrPort = ap
-	bx.From(cl.id)
-	bx.To(peer)
-	bx.CloseWith(cpeer)
-	bx.SealWith(cpeer)
-	bx.NonBlockingPut(ch)
-	verbose.Printf("ack %d @ %v", ipeer, ap)
-}
-
 func (cl *client) hello(ch chan<- *box.Box, to box.Id, now time.Time) error {
 	var err error
 	ifrom := IdIndex(cl.id)

@@ -12,6 +12,7 @@ import (
 	"net"
 	"net/netip"
 	"sync"
+	"time"
 
 	"github.com/platinasystems/goes/v2/pkg/box"
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
@@ -207,16 +208,15 @@ func (ex *exchange) rx(
 	wg *sync.WaitGroup,
 	bx *box.Box,
 ) {
+	defer bx.Return()
 	ex.all6nodes = netip.IPv6LinkLocalAllNodes()
 	ex.all6routers = netip.IPv6LinkLocalAllRouters()
 	afrom := bx.AddrPort
 	from := bx.FromWhom()
 	ifrom := IdIndex(from)
-	cfrom := ex.gcm[ifrom]
 	pi, err := netpdu.TunPI(bx.Contents).Header()
 	if err != nil {
 		verbose.Println("rx %d @ %v pi %v", ifrom, afrom, err)
-		bx.Return()
 		return
 	}
 	d := netpdu.TunPI(bx.Contents).Data()
@@ -224,93 +224,102 @@ func (ex *exchange) rx(
 	case VPN_P_HELLO:
 		verbose.Printf("rx %d @ %v hello %v",
 			ifrom, afrom, VpnHelloPDU(d))
-		ex.ack(ex.pktTxCh, bx)
+		ex.ack(ex.pktTxCh, from, afrom)
 	case VPN_P_WHOIS_ADDRESSED:
 		if addr := VpnWhoisAddress(d); !addr.IsValid() {
 			verbose.Printf("rx %d @ %v whois %v",
 				ifrom, afrom, "underrun")
-			bx.Return()
 		} else if blk := ex.pem.addressed[addr]; blk == nil {
 			verbose.Printf("rc %d @ %v whois %v",
 				ifrom, afrom, addr)
-			bx.Return()
 			wg.Add(1)
 			go ex.whoisAddressedRoutine(ctx, wg, addr)
 		} else {
-			bx.Empty()
-			bx.Contents, err = xnet.Add(bx.Contents, netph.TunPI{
-				Proto: VPN_P_PUBLIC_KEY,
-			})
-			if err != nil {
-				errata.Print(err)
-				bx.Return()
-			} else {
-				pem.Encode(bx, blk)
-				bx.From(ex.id)
-				bx.To(from)
-				bx.CloseWith(cfrom)
-				bx.SealWith(cfrom)
-				bx.NonBlockingPut(ex.pktTxCh)
-			}
+			ex.txpubkey(from, blk)
 		}
 	case VPN_P_WHOIS_IDENTIFIED:
 		if id, err := VpnWhoisId(d); err != nil {
 			verbose.Printf("rx %d @ %v whois %v",
 				ifrom, afrom, err)
-			bx.Return()
 		} else if blk := ex.pem.identified[IdIndex(id)]; blk == nil {
 			verbose.Printf("rx %d @ %v whois %d",
 				ifrom, afrom, id)
-			bx.Return()
 			wg.Add(1)
 			go ex.whoisIdRoutine(ctx, wg, id)
 		} else {
-			bx.Empty()
-			bx.Contents, err = xnet.Add(bx.Contents, netph.TunPI{
-				Proto: VPN_P_PUBLIC_KEY,
-			})
-			if err != nil {
-				errata.Print(err)
-				bx.Return()
-			} else if err = pem.Encode(bx, blk); err != nil {
-				errata.Print(err)
-				bx.Return()
-			} else {
-				bx.From(ex.id)
-				bx.To(from)
-				bx.CloseWith(cfrom)
-				bx.SealWith(cfrom)
-				bx.NonBlockingPut(ex.pktTxCh)
-			}
+			ex.txpubkey(from, blk)
 		}
 	case VPN_P_WHOIS_SERVICE:
 		verbose.Printf("rx %d @ %v whois-service %v",
 			ifrom, afrom, VpnWhoisService(d))
-		bx.Return()
 	case netph.ETH_P_IP:
-		ex.rxIP(netpdu.IP(d))
-		bx.Return()
+		ex.rxIP(from, netpdu.IP(d))
 	case netph.ETH_P_IPV6:
-		ex.rxIP6(netpdu.IP6(d))
-		bx.Return()
+		ex.rxIP6(from, netpdu.IP6(d))
 	default:
 		verbose.Printf("rx %d @ %v unknown proto %#x",
 			ifrom, afrom, pi.Proto)
-		bx.Return()
 	}
 }
 
-func (ex *exchange) rxIP(pdu netpdu.IP) {
+func (ex *exchange) ack(ch chan<- *box.Box, to box.Id, ap netip.AddrPort) {
+	var err error
+	bx := box.New()
+	defer bx.Return()
+	i := IdIndex(to)
+	c := ex.gcm[i]
+	bx.Contents, err = xnet.Add(bx.Contents, netph.TunPI{
+		Proto: VPN_P_HELLO,
+	})
+	if err != nil {
+		errata.Print(err)
+		return
+	}
+	bx.Contents, err = xnet.Add(bx.Contents, time.Now().UnixMicro())
+	if err != nil {
+		errata.Print(err)
+		return
+	}
+	bx.AddrPort = ap
+	bx.From(ex.id)
+	bx.To(to)
+	bx.CloseWith(c)
+	bx.SealWith(c)
+	bx.NonBlockingPut(ch)
+	verbose.Printf("ack %d @ %v", i, ap)
+}
+
+func (ex *exchange) txpubkey(to box.Id, blk *pem.Block) {
+	var err error
+	i := IdIndex(to)
+	c := ex.gcm[i]
+	bx := box.New()
+	defer bx.Return()
+	bx.Contents, err = xnet.Add(bx.Contents, netph.TunPI{
+		Proto: VPN_P_PUBLIC_KEY,
+	})
+	if err != nil {
+		errata.Print(err)
+		return
+	}
+	pem.Encode(bx, blk)
+	bx.From(ex.id)
+	bx.To(to)
+	bx.CloseWith(c)
+	bx.SealWith(c)
+	bx.NonBlockingPut(ex.pktTxCh)
+}
+
+func (ex *exchange) rxIP(from box.Id, pdu netpdu.IP) {
 	_, err := pdu.Header()
 	if err != nil {
 		verbose.Println("ip:", err)
 		return
 	}
-	// forward to all guests?
-	verbose.Println("FIXME", pdu)
+	verbose.Println("FIXME mcast", pdu)
 }
 
-func (ex *exchange) rxIP6(pdu netpdu.IP6) {
+func (ex *exchange) rxIP6(from box.Id, pdu netpdu.IP6) {
 	h, err := pdu.Header()
 	if err != nil {
 		verbose.Println("ip6:", err)
@@ -318,36 +327,54 @@ func (ex *exchange) rxIP6(pdu netpdu.IP6) {
 	}
 	d := pdu.Data()
 	da := netip.AddrFrom16(h.DA)
-	if da.IsMulticast() {
-		switch {
-		case da == ex.all6nodes:
-			verbose.Println("FIXME mcast neighbor discovery:", err)
-		case da == ex.all6routers:
-			if h.NextHeader == netph.IPPROTO_ICMPV6 {
-				ex.rxICMP6(pdu, netpdu.ICMP6(d))
-			} else {
-				verbose.Println("dropped:", pdu)
-			}
-		default:
-			verbose.Println("FIXME mcast:", err)
+	if h.NextHeader == netph.IPPROTO_ICMPV6 {
+		if da.IsMulticast() || da == ex.addr {
+			ex.rxICMP6(from, h.SA[:], pdu, netpdu.ICMP6(d))
+		} else {
+			verbose.Println("FIXME route:", pdu)
 		}
-	} else {
-		verbose.Println("FIXME route:", err)
+	} else if da.IsMulticast() {
+		verbose.Println("FIXME mcast:", pdu)
+	} else if da != ex.addr {
+		verbose.Println("FIXME route:", pdu)
+	} else if true {
+		verbose.Println("dropped:", pdu)
 	}
 }
 
-func (ex *exchange) rxICMP6(ip6 netpdu.IP6, icmp6 netpdu.ICMP6) {
+func (ex *exchange) rxICMP6(
+	from box.Id,
+	addr []byte,
+	ip6 netpdu.IP6,
+	icmp6 netpdu.ICMP6,
+) {
+	sum := ip6.Checksum(netph.IPPROTO_ICMPV6, uint(len(icmp6)), icmp6)
+	if sum != 0 && ^sum != 0 {
+		verbose.Printf("bad sum: %#04x", sum)
+		return
+	}
 	h, err := icmp6.Header()
 	if err != nil {
 		verbose.Print(err)
 		return
 	}
+	d := icmp6.Data()
 	switch h.Type {
+	case netph.ICMP6TypeEchoRequest:
+		ex.txICMP6EchoReply(from, addr, netpdu.ICMP6EchoRequest(d))
 	case netph.ICMP6TypeRouterSolicitation:
 		verbose.Println("FIXME reply:", ip6)
 	default:
 		verbose.Println("dropped:", "type", h.Type, ip6)
 	}
+}
+
+func (ex *exchange) txICMP6EchoReply(
+	id box.Id,
+	addr []byte,
+	req netpdu.ICMP6EchoRequest,
+) {
+	verbose.Println("FIXME", ex.addr, "reply to", net.IP(addr))
 }
 
 func (ex *exchange) whoisAddressedRoutine(
