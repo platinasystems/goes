@@ -118,7 +118,7 @@ func (cl *client) register(
 		cl.hostPrefix = netip.PrefixFrom(cl.addr, 128)
 	}
 
-	verbose.Printf("assigned: id %d @ %v, via %v, vpn %v",
+	verbose.Printf("assigned id %d @ %v, via %v, vpn %v",
 		cl.id, cl.hostPrefix, via, cl.vpnPrefix)
 
 	return nil
@@ -126,7 +126,6 @@ func (cl *client) register(
 
 func (cl *client) hello(ch chan<- *box.Box, to box.Id, now time.Time) error {
 	var err error
-	ifrom := IdIndex(cl.id)
 	ito := IdIndex(to)
 	cto, ok := cl.gcm[ito]
 	if !ok {
@@ -164,7 +163,7 @@ func (cl *client) hello(ch chan<- *box.Box, to box.Id, now time.Time) error {
 	bx.CloseWith(cto)
 	bx.SealWith(cvia)
 	bx.NonBlockingPut(ch)
-	verbose.Printf("hello %d from %d via %d", ito, ifrom, ivia)
+	verbose.Printf("tx %d@%v hello %d", ivia, svc, ito)
 	return nil
 }
 

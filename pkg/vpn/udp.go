@@ -76,14 +76,14 @@ func pktTxRoutine(
 				goRoutineTrace.Println("pkt tx ch closed")
 				return
 			}
-			ta := bx.AddrPort
-			n, err := bx.Tx(udp)
-			if err != nil {
+			if tap := bx.AddrPort; !tap.IsValid() {
+				errata.Println("no DAP")
+			} else if n, err := bx.Tx(udp); err != nil {
 				verbose.Printf("tx from %v to %v: %v",
-					la, ta, err)
+					la, tap, err)
 			} else {
 				udpTxTrace.Printf("tx %d bytes from %v to %v",
-					n, la, ta)
+					n, la, tap)
 			}
 			bx.Return()
 		}

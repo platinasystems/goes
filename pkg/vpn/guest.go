@@ -72,7 +72,7 @@ Forward ciphered packets between exchange and tunnel interface.
 	iguest := IdIndex(g.id)
 	via := g.via[iguest]
 
-	svc := fmt.Sprintf("(%d via %d @ %v)", iguest, via, lap)
+	svc := fmt.Sprintf("(%d via %d@%v)", iguest, via, lap)
 	goRoutineTrace.Println("start", svc)
 	defer goRoutineTrace.Println("stopped", svc)
 	defer wg.Wait()
@@ -249,7 +249,7 @@ guestLoop:
 			data = netpdu.TunPI(bx.Contents).Data()
 			switch tunpi.Proto {
 			case VPN_P_HELLO:
-				verbose.Printf("rx %d @ %v hello %v",
+				verbose.Printf("rx %d@%v hello %v",
 					ifrom, afrom, VpnHelloPDU(data))
 				bx.Return()
 				// FIXME re-checkin if registry era mismatch
@@ -312,7 +312,6 @@ func (g *guest) unicast(ch chan<- *box.Box, bx *box.Box, addr netip.Addr) {
 	via, ok := g.via[ito]
 	if !ok {
 		if _, ok := g.service[ito]; ok {
-			verbose.Printf("%d@%v: %s", ito, addr, "exchange")
 			via = to
 		} else {
 			errata.Printf("%d@%v: %s",
@@ -370,7 +369,7 @@ func (g *guest) whoisAddressed(ch chan<- *box.Box, addr netip.Addr) {
 		errata.Print(err)
 		bx.Return()
 	} else {
-		verbose.Println("whois addressed:", addr)
+		verbose.Println("whois", addr)
 		g.whois(ch, bx)
 	}
 }
@@ -387,7 +386,7 @@ func (g *guest) whoisId(ch chan<- *box.Box, id box.Id) {
 		errata.Print(err)
 		bx.Return()
 	} else {
-		verbose.Println("whois id:", id)
+		verbose.Println("whois", id)
 		g.whois(ch, bx)
 	}
 }
@@ -429,9 +428,9 @@ func tunReadRoutine(
 	ch chan<- *box.Box,
 ) {
 	defer wg.Done()
-	verbose.Println("start", name, "read routine")
+	goRoutineTrace.Println("start", name, "read routine")
 	bx, err := box.NewReadContents(r)
-	defer verbose.Println("stopped", name, "read routine:", err)
+	defer goRoutineTrace.Println("stopped", name, "read routine:", err)
 	for err == nil && ctx.Err() == nil {
 		ch <- bx
 		bx, err = box.NewReadContents(r)
@@ -455,7 +454,7 @@ func tunWriteRoutine(
 	for {
 		select {
 		case <-ctx.Done():
-			goRoutineTrace.Println("done")
+			goRoutineTrace.Print("done")
 			return
 		case bx, ok := <-ch:
 			if !ok {
@@ -466,7 +465,7 @@ func tunWriteRoutine(
 			if _, err = bx.WriteTo(w); err != nil {
 				verbose.Print(err)
 			} else {
-				verbose.Print(tunpdu)
+				verbose.Println("write", tunpdu)
 			}
 			bx.Return()
 		}
