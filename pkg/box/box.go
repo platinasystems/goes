@@ -47,6 +47,8 @@ const (
 const Content = Stamp + gcm.Overhead
 const ContentMTU = Cap - Content - gcm.Overhead
 
+var zap netip.AddrPort
+
 type Box struct {
 	data [Cap]byte
 	next *Box
@@ -81,16 +83,18 @@ var (
 
 var inventory atomic.Pointer[Box]
 
-func New() *Box {
-	for box := inventory.Load(); box != nil; box = inventory.Load() {
+func New() (box *Box) {
+	for box = inventory.Load(); box != nil; box = inventory.Load() {
 		if inventory.CompareAndSwap(box, box.next) {
-			box.Contents = box.data[Content:Content]
-			return box
+			break
 		}
 	}
-	box := new(Box)
+	if box == nil {
+		box = new(Box)
+	}
 	box.Contents = box.data[Content:Content]
-	return box
+	box.AddrPort = zap
+	return
 }
 
 func NewReadContents(r io.Reader) (*Box, error) {
