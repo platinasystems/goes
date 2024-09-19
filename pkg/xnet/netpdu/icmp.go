@@ -37,15 +37,20 @@ func (x ChecksummingICMP) Format(w fmt.State, verb rune) {
 		fmt.Fprint(w, err)
 		return
 	}
-	sum := x.csr.Checksum(netph.IPPROTO_ICMP, uint(len(x.pdu)), x.pdu)
-	if sum != 0 && sum != 0xffff {
-		fmt.Fprintf(w, "sum %04x, ", sum)
+	fmt.Fprint(w, "sum ")
+	sum := x.csr.Checksum(netph.IPPROTO_ICMP, x.pdu)
+	if h.Sum == 0 {
+		fmt.Fprint(w, "zero")
+	} else if sum != 0 {
+		fmt.Fprint(w, "bad")
+	} else {
+		fmt.Fprint(w, "ok")
 	}
 	typename := ICMPTypeName(h.Type)
 	if len(typename) == 0 {
 		typename = "unknown"
 	}
-	fmt.Fprint(w, typename, " ")
+	fmt.Fprint(w, Mark, typename, " ")
 	if f, ok := ICMPTypeCodes[h.Type]; ok {
 		fmt.Fprint(w, f(h.Code))
 	} else {

@@ -18,6 +18,7 @@ type IP6 struct {
 	DA         [IPv6len]byte
 }
 
+const IP6LenIndex = 4
 const IP6AddrsIndex = 8
 const IP6AddrsLen = 2 * 16
 const IP6NextHeaderIndex = 6

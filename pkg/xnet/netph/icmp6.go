@@ -13,7 +13,7 @@ type ICMP6 struct {
 	Sum  uint16
 }
 
-const ICMP6SumIndex = 4
+const ICMP6SumIndex = 2
 const ICMP6Size = int(unsafe.Sizeof(ICMP6{}))
 
 const (

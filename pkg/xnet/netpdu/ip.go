@@ -46,6 +46,7 @@ func (pdu IP) Format(w fmt.State, verb rune) {
 		fmt.Fprint(w, err)
 		return
 	}
+	fmt.Fprintf(w, "%d bytes ", h.TL)
 	d := pdu.Data()
 	fmt.Fprint(w, net.IP(h.DA[:]), " <- ", net.IP(h.SA[:]))
 	switch h.Protocol {
@@ -62,7 +63,8 @@ func (pdu IP) Format(w fmt.State, verb rune) {
 
 // https://www.ietf.org/rfc/rfc768.txt
 // https://www.ietf.org/rfc/rfc793.txt
-func (pdu IP) Checksum(prot uint8, n uint, data []byte) uint16 {
+func (pdu IP) Checksum(prot uint8, data []byte) uint16 {
+	n := uint(len(data))
 	sum := Checksum(pdu[netph.IPAddrsIndex:netph.IPSize])
 	sum += Checksum([]byte{
 		0,

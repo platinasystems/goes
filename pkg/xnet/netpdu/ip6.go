@@ -33,6 +33,7 @@ func (pdu IP6) Format(w fmt.State, verb rune) {
 		fmt.Fprint(w, err)
 		return
 	}
+	fmt.Fprintf(w, "%d bytes ", h.LEN)
 	d := pdu.Data()
 	fmt.Fprint(w, net.IP(h.DA[:]), " <- ", net.IP(h.SA[:]), Mark)
 	switch h.NextHeader {
@@ -50,7 +51,8 @@ func (pdu IP6) Format(w fmt.State, verb rune) {
 }
 
 // https://datatracker.ietf.org/doc/html/rfc2460#section-8
-func (pdu IP6) Checksum(prot uint8, n uint, data []byte) uint16 {
+func (pdu IP6) Checksum(prot uint8, data []byte) uint16 {
+	n := uint(len(data))
 	sum := Checksum(pdu[netph.IP6AddrsIndex:netph.IP6Size])
 	sum += Checksum([]byte{
 		byte(n >> 24),
@@ -60,5 +62,12 @@ func (pdu IP6) Checksum(prot uint8, n uint, data []byte) uint16 {
 	})
 	sum += Checksum([]byte{0, 0, 0, prot})
 	sum += Checksum(data)
-	return CarryOver(sum)
+	return CarryOver(sum) ^ 0xffff
+}
+
+func (pdu IP6) SetLen() {
+	n := len(pdu.Data())
+	b := pdu[netph.IP6LenIndex:]
+	b[0] = byte(n >> 8)
+	b[1] = byte(n)
 }

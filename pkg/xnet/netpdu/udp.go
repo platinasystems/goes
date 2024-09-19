@@ -44,9 +44,14 @@ func (x ChecksummingUDP) Format(w fmt.State, verb rune) {
 		fmt.Fprint(w, err)
 		return
 	}
-	sum := x.csr.Checksum(netph.IPPROTO_UDP, uint(h.Len), x.pdu)
-	if sum != 0 && sum != 0xffff {
-		fmt.Fprintf(w, "sum %04x, ", sum)
+	fmt.Fprint(w, "sum ")
+	sum := x.csr.Checksum(netph.IPPROTO_UDP, x.pdu[:h.Len])
+	if h.Sum == 0 {
+		fmt.Fprint(w, "zero")
+	} else if sum != 0 {
+		fmt.Fprint(w, "bad")
+	} else {
+		fmt.Fprint(w, "ok")
 	}
-	fmt.Fprint(w, "port ", h.DP, " <- ", h.SP)
+	fmt.Fprint(w, Mark, "port ", h.DP, " <- ", h.SP)
 }

@@ -5,7 +5,7 @@
 package netpdu
 
 type Checksummer interface {
-	Checksum(uint8, uint, []byte) uint16
+	Checksum(uint8, []byte) uint16
 }
 
 // http://www.faqs.org/rfcs/rfc1071.html
