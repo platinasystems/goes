@@ -7,22 +7,13 @@ package netpdu
 import (
 	"fmt"
 
-	"github.com/platinasystems/goes/v2/pkg/xnet"
 	"github.com/platinasystems/goes/v2/pkg/xnet/netph"
 )
 
 type TCP []byte
 
-func (pdu TCP) Header() (h netph.TCP, err error) {
-	_, err = xnet.Subtract(pdu, &h)
-	return
-}
-
-func (pdu TCP) Data() (d []byte) {
-	if len(pdu) >= netph.TCPSize {
-		d = []byte(pdu)[netph.TCPSize:]
-	}
-	return
+func (pdu TCP) Parse() (netph.TCP, []byte, error) {
+	return netph.Parse[netph.TCP](pdu)
 }
 
 func (pdu TCP) SetSum(sum uint16) {
@@ -37,7 +28,7 @@ type ChecksummingTCP struct {
 
 func (x ChecksummingTCP) Format(w fmt.State, verb rune) {
 	fmt.Fprint(w, "tcp ")
-	h, err := x.pdu.Header()
+	h, _, err := x.pdu.Parse()
 	if err != nil {
 		fmt.Fprint(w, err)
 		return

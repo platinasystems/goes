@@ -8,9 +8,30 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/platinasystems/goes/v2/pkg/xnet"
 	"github.com/platinasystems/goes/v2/pkg/xnet/netph"
 )
+
+type Eth []byte
+
+func (pdu Eth) Format(w fmt.State, verb rune) {
+	fmt.Fprint(w, "eth  ")
+	h, d, err := pdu.Parse()
+	if err != nil {
+		fmt.Fprint(w, err)
+		return
+	}
+	fmt.Fprint(w, net.HardwareAddr(h.DMAC[:]), " <- ",
+		net.HardwareAddr(h.SMAC[:]))
+	if f, ok := EthTypes[h.Type]; ok {
+		fmt.Fprint(w, f(d))
+	} else {
+		fmt.Fprintf(w, ", type %#x", h.Type)
+	}
+}
+
+func (pdu Eth) Parse() (netph.Eth, []byte, error) {
+	return netph.Parse[netph.Eth](pdu)
+}
 
 var EthTypes = map[uint16]func([]byte) fmt.Formatter{
 	netph.ETH_P_8021Q: func(data []byte) fmt.Formatter {
@@ -34,33 +55,4 @@ var EthTypes = map[uint16]func([]byte) fmt.Formatter{
 	netph.ETH_P_MPLS_MC: func(data []byte) fmt.Formatter {
 		return MPLS_MC(data)
 	},
-}
-
-type Eth []byte
-
-func (pdu Eth) Header() (h netph.Eth, err error) {
-	_, err = xnet.Subtract(pdu, &h)
-	return
-}
-
-func (pdu Eth) Data() (d []byte) {
-	if len(pdu) >= netph.EthSize {
-		d = []byte(pdu)[netph.EthSize:]
-	}
-	return
-}
-
-func (pdu Eth) Format(w fmt.State, verb rune) {
-	fmt.Fprint(w, "eth: ")
-	if h, err := pdu.Header(); err != nil {
-		fmt.Fprint(w, err)
-	} else {
-		fmt.Fprint(w, net.HardwareAddr(h.DMAC[:]), " <- ",
-			net.HardwareAddr(h.SMAC[:]))
-		if f, ok := EthTypes[h.Type]; ok {
-			fmt.Fprint(w, Mark, f(pdu.Data()))
-		} else {
-			fmt.Fprintf(w, ", type[%#x]", h.Type)
-		}
-	}
 }

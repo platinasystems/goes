@@ -4,15 +4,11 @@
 
 package netph
 
-import "unsafe"
-
 // https://en.wikipedia.org/wiki/IEEE_802.1Q
 type IEEE8021 struct {
 	TCI  uint16
 	Type uint16
 }
-
-const IEEE8021Size = int(unsafe.Sizeof(IEEE8021{}))
 
 func (p *IEEE8021) PCP() uint8  { return uint8(p.TCI >> (1 + 12)) }
 func (p *IEEE8021) DEI() bool   { return (p.TCI & (1 << 12)) != 0 }

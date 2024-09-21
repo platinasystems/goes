@@ -4,11 +4,9 @@
 
 package netph
 
-import "unsafe"
-
 type TunPI struct {
 	Flags,
 	Proto uint16
 }
 
-const TunPISize = int(unsafe.Sizeof(TunPI{}))
+const TunPISize = 2 + 2

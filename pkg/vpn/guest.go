@@ -157,7 +157,7 @@ Forward ciphered packets between exchange and tunnel interface.
 	defer goRoutineTrace.Printf("stopped (%s, %v)", nif.Name, g.hostPrefix)
 
 	var tunpi netph.TunPI
-	var data []byte
+	var tund []byte
 
 guestLoop:
 	for {
@@ -240,23 +240,22 @@ guestLoop:
 				bx.Return()
 				continue guestLoop
 			}
-			tunpi, err = netpdu.TunPI(bx.Contents).Header()
+			tunpi, tund, err = netpdu.TunPI(bx.Contents).Parse()
 			if err != nil {
 				verbose.Println(err)
 				bx.Return()
 				continue guestLoop
 			}
-			data = netpdu.TunPI(bx.Contents).Data()
 			switch tunpi.Proto {
 			case VPN_P_HELLO:
 				verbose.Printf("rx %d@%v hello %v",
-					ifrom, afrom, VpnHelloPDU(data))
+					ifrom, afrom, VpnHelloPDU(tund))
 				bx.Return()
 				// FIXME re-checkin if registry era mismatch
 				// else re-query exchange from registry
 				// if that era is mismatched
 			case VPN_P_PUBLIC_KEY:
-				blk, _ := pem.Decode(data)
+				blk, _ := pem.Decode(tund)
 				if blk == nil {
 					verbose.Println("encoding")
 				} else if err = g.peer(blk); err != nil {
@@ -339,16 +338,15 @@ func (g *guest) unicast(ch chan<- *box.Box, bx *box.Box, addr netip.Addr) {
 }
 
 func (*guest) toWhom(pdu netpdu.TunPI) (addr netip.Addr) {
-	pi, err := pdu.Header()
-	d := pdu.Data()
+	pi, d, err := pdu.Parse()
 	switch {
 	case err != nil:
 	case pi.Proto == netph.ETH_P_IP:
-		if ip, err := netpdu.IP(d).Header(); err == nil {
+		if ip, _, err := netpdu.IP(d).Parse(); err == nil {
 			addr.UnmarshalBinary(ip.DA[:])
 		}
 	case pi.Proto == netph.ETH_P_IPV6:
-		if ip6, err := netpdu.IP6(d).Header(); err == nil {
+		if ip6, _, err := netpdu.IP6(d).Parse(); err == nil {
 			addr.UnmarshalBinary(ip6.DA[:])
 		}
 	}

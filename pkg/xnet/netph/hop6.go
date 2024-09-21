@@ -4,11 +4,9 @@
 
 package netph
 
-import "unsafe"
-
 type HOP6 struct {
 	Type uint8
 	Len  uint8
 }
 
-const HOP6Size = int(unsafe.Sizeof(HOP6{}))
+const HOP6Size = 1 + 1

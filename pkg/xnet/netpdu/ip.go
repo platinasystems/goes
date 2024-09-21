@@ -8,16 +8,10 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/platinasystems/goes/v2/pkg/xnet"
 	"github.com/platinasystems/goes/v2/pkg/xnet/netph"
 )
 
 type IP []byte
-
-func (pdu IP) Header() (h netph.IP, err error) {
-	_, err = xnet.Subtract(pdu, &h)
-	return
-}
 
 func (pdu IP) Data() (d []byte) {
 	if len(pdu) >= 1 {
@@ -29,19 +23,9 @@ func (pdu IP) Data() (d []byte) {
 	return
 }
 
-func (pdu IP) Options() (d []byte) {
-	if len(pdu) >= 1 {
-		n := int(pdu[0]&0xf) * 4
-		if len(pdu) > 20 {
-			d = []byte(pdu)[20:n]
-		}
-	}
-	return
-}
-
 func (pdu IP) Format(w fmt.State, verb rune) {
 	fmt.Fprint(w, "ip ")
-	h, err := pdu.Header()
+	h, _, err := pdu.Parse()
 	if err != nil {
 		fmt.Fprint(w, err)
 		return
@@ -59,6 +43,20 @@ func (pdu IP) Format(w fmt.State, verb rune) {
 	default:
 		fmt.Fprintf(w, ", protocol[%#x]", h.Protocol)
 	}
+}
+
+func (pdu IP) Options() (d []byte) {
+	if len(pdu) >= 1 {
+		n := int(pdu[0]&0xf) * 4
+		if len(pdu) > 20 {
+			d = []byte(pdu)[20:n]
+		}
+	}
+	return
+}
+
+func (pdu IP) Parse() (netph.IP, []byte, error) {
+	return netph.Parse[netph.IP](pdu)
 }
 
 // https://www.ietf.org/rfc/rfc768.txt

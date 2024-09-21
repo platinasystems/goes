@@ -4,8 +4,6 @@
 
 package netph
 
-import "unsafe"
-
 // https://en.wikipedia.org/wiki/Internet_Control_Message_Protocol
 type ICMP struct {
 	Type uint8
@@ -13,8 +11,8 @@ type ICMP struct {
 	Sum  uint16
 }
 
-const ICMPSumIndex = 2
-const ICMPSize = int(unsafe.Sizeof(ICMP{}))
+const ICMPSumIndex = 1 + 1
+const ICMPSize = 1 + 1 + 2
 
 const (
 	ICMPTypeEchoReply = iota

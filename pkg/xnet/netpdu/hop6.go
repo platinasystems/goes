@@ -7,22 +7,13 @@ package netpdu
 import (
 	"fmt"
 
-	"github.com/platinasystems/goes/v2/pkg/xnet"
 	"github.com/platinasystems/goes/v2/pkg/xnet/netph"
 )
 
 type HOP6 []byte
 
-func (pdu HOP6) Header() (h netph.HOP6, err error) {
-	_, err = xnet.Subtract(pdu, &h)
-	return
-}
-
-func (pdu HOP6) Data() (d []byte) {
-	if len(pdu) >= netph.HOP6Size {
-		d = []byte(pdu)[netph.HOP6Size:]
-	}
-	return
+func (pdu HOP6) Parse() (netph.HOP6, []byte, error) {
+	return netph.Parse[netph.HOP6](pdu)
 }
 
 type ChecksummingHOP6 struct {
@@ -32,12 +23,11 @@ type ChecksummingHOP6 struct {
 
 func (x ChecksummingHOP6) Format(w fmt.State, verb rune) {
 	fmt.Fprint(w, "hop6 ")
-	h, err := x.pdu.Header()
+	h, d, err := x.pdu.Parse()
 	if err != nil {
 		fmt.Fprint(w, err)
 		return
 	}
-	d := x.pdu.Data()
 	if s, ok := map[uint8]string{
 		0:   "hop-by-hop",
 		43:  "routing",
@@ -49,7 +39,7 @@ func (x ChecksummingHOP6) Format(w fmt.State, verb rune) {
 		139: "HIP",
 		140: "shim",
 	}[h.Type]; ok {
-		fmt.Fprintf(w, "%s[%d]", s, h.Len)
+		fmt.Fprintf(w, "%s %d", s, h.Len)
 		if h.Type != 59 {
 			fmt.Fprint(w, Mark, ChecksummingHOP6{x.csr, d})
 		}

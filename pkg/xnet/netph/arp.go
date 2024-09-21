@@ -4,8 +4,6 @@
 
 package netph
 
-import "unsafe"
-
 // https://en.wikipedia.org/wiki/Address_Resolution_Protocol
 type ARP struct {
 	HTYPE uint16
@@ -18,5 +16,3 @@ type ARP struct {
 	THA   [6]byte
 	TPA   [4]byte
 }
-
-const ARPSize = int(unsafe.Sizeof(ARP{}))

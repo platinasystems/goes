@@ -4,8 +4,6 @@
 
 package netph
 
-import "unsafe"
-
 const ETHER_ADDR_LEN = 6
 
 // https://en.wikipedia.org/wiki/Ethernet_frame
@@ -14,8 +12,6 @@ type Eth struct {
 	SMAC [ETHER_ADDR_LEN]byte
 	Type uint16
 }
-
-const EthSize = int(unsafe.Sizeof(Eth{}))
 
 const ETHMTU = 1500
 

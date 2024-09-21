@@ -4,8 +4,6 @@
 
 package netph
 
-import "unsafe"
-
 const IPv4len = 4
 
 // https://en.wikipedia.org/wiki/IPv4
@@ -25,7 +23,7 @@ type IP struct {
 const IPProtIndex = 9
 const IPSumIndex = 10
 const IPAddrsIndex = 12
-const IPSize = int(unsafe.Sizeof(IP{}))
+const IPSize = 5 * 4
 
 const (
 	IP4MFbit    = 13

@@ -7,22 +7,13 @@ package netpdu
 import (
 	"fmt"
 
-	"github.com/platinasystems/goes/v2/pkg/xnet"
 	"github.com/platinasystems/goes/v2/pkg/xnet/netph"
 )
 
 type ICMP []byte
 
-func (pdu ICMP) Header() (h netph.ICMP, err error) {
-	_, err = xnet.Subtract(pdu, &h)
-	return
-}
-
-func (pdu ICMP) Data() (d []byte) {
-	if len(pdu) >= netph.ICMPSize {
-		d = []byte(pdu)[netph.ICMPSize:]
-	}
-	return
+func (pdu ICMP) Parse() (netph.ICMP, []byte, error) {
+	return netph.Parse[netph.ICMP](pdu)
 }
 
 type ChecksummingICMP struct {
@@ -32,7 +23,7 @@ type ChecksummingICMP struct {
 
 func (x ChecksummingICMP) Format(w fmt.State, verb rune) {
 	fmt.Fprint(w, "icmp ")
-	h, err := x.pdu.Header()
+	h, _, err := x.pdu.Parse()
 	if err != nil {
 		fmt.Fprint(w, err)
 		return

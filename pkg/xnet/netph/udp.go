@@ -4,8 +4,6 @@
 
 package netph
 
-import "unsafe"
-
 // https://en.wikipedia.org/wiki/User_Datagram_Protocol
 type UDP struct {
 	SP  uint16
@@ -15,4 +13,4 @@ type UDP struct {
 }
 
 const UDPSumIndex = 8
-const UDPSize = int(unsafe.Sizeof(UDP{}))
+const UDPSize = 4 * 2

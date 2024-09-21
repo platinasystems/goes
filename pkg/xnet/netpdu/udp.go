@@ -7,22 +7,13 @@ package netpdu
 import (
 	"fmt"
 
-	"github.com/platinasystems/goes/v2/pkg/xnet"
 	"github.com/platinasystems/goes/v2/pkg/xnet/netph"
 )
 
 type UDP []byte
 
-func (pdu UDP) Header() (h netph.UDP, err error) {
-	_, err = xnet.Subtract(pdu, &h)
-	return
-}
-
-func (pdu UDP) Data() (d []byte) {
-	if len(pdu) >= netph.UDPSize {
-		d = []byte(pdu)[netph.UDPSize:]
-	}
-	return
+func (pdu UDP) Parse() (netph.UDP, []byte, error) {
+	return netph.Parse[netph.UDP](pdu)
 }
 
 func (pdu UDP) SetSum(sum uint16) {
@@ -39,7 +30,7 @@ type ChecksummingUDP struct {
 
 func (x ChecksummingUDP) Format(w fmt.State, verb rune) {
 	fmt.Fprint(w, "udp ")
-	h, err := x.pdu.Header()
+	h, _, err := x.pdu.Parse()
 	if err != nil {
 		fmt.Fprint(w, err)
 		return

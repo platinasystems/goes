@@ -4,7 +4,7 @@
 
 package netph
 
-import "unsafe"
+import "encoding/binary"
 
 // See https://en.wikipedia.org/wiki/ICMPv6
 type ICMP6 struct {
@@ -13,8 +13,9 @@ type ICMP6 struct {
 	Sum  uint16
 }
 
-const ICMP6SumIndex = 2
-const ICMP6Size = int(unsafe.Sizeof(ICMP6{}))
+const ICMP6TypeIndex = 0
+const ICMP6SumIndex = 1 + 1
+const ICMP6Size = 1 + 1 + 2
 
 const (
 	ICMP6TypeDestinationUnreachable                = 1
@@ -78,35 +79,32 @@ const (
 
 // See https://www.rfc-editor.org/rfc/rfc4443.html#page-13
 type ICMP6EchoRequest struct {
+	ICMP6
 	Identifier,
 	Sequence uint16
 }
 
-const ICMP6EchoRequestSize = int(unsafe.Sizeof(ICMP6EchoRequest{}))
-
-type ICMP6EchoReply = ICMP6EchoRequest
-
-const ICMP6EchoReplySize = ICMP6EchoRequestSize
+type ICMP6EchoReply struct {
+	ICMP6
+	Identifier,
+	Sequence uint16
+}
 
 // See https://datatracker.ietf.org/doc/html/rfc4861#section-4.1
 type ICMP6RouterSolicitation struct {
+	ICMP6
 	_ uint32
 }
 
-const ICMP6RouterSolicitationSize = int(unsafe.
-	Sizeof(ICMP6RouterSolicitation{}))
-
 // See https://datatracker.ietf.org/doc/html/rfc4861#section-4.2
 type ICMP6RouterAdvertisement struct {
+	ICMP6
 	CurHopLimit,
 	Flags uint8
 	Lifetime uint16
 	ReachableTime,
 	RetransTimer uint32
 }
-
-const ICMP6RouterAdvertisementSize = int(unsafe.
-	Sizeof(ICMP6RouterAdvertisement{}))
 
 const (
 	_ = 1 << iota
@@ -123,26 +121,21 @@ const (
 
 // See https://datatracker.ietf.org/doc/html/rfc4861#section-4.3
 type ICMP6NeighborSolicitation struct {
+	ICMP6
 	_ uint32
 
 	TargetAddress [IPv6len]byte
 }
 
-const ICMP6NeighborSolicitationSize = int(unsafe.
-	Sizeof(ICMP6NeighborSolicitation{}))
-
 // https://datatracker.ietf.org/doc/html/rfc4861#section-4.4
 type ICMP6NeighborAdvertisement struct {
+	ICMP6
 	Flags,
 	_ uint8
-
 	_ uint16
 
 	TargetAddress [IPv6len]byte
 }
-
-const ICMP6NeighborAdvertisementSize = int(unsafe.
-	Sizeof(ICMP6NeighborAdvertisement{}))
 
 const (
 	_ = 1 << iota
@@ -159,12 +152,11 @@ const (
 
 // https://datatracker.ietf.org/doc/html/rfc4861#section-4.5
 type ICMP6RedirectMessage struct {
+	ICMP6
 	_ uint32
 	TargetAddress,
 	DestinationAddress [IPv6len]byte
 }
-
-const ICMP6RedirectMessageSize = int(unsafe.Sizeof(ICMP6RedirectMessage{}))
 
 // https://datatracker.ietf.org/doc/html/rfc4861#section-4.6
 type ICMP6Option struct {
@@ -172,7 +164,7 @@ type ICMP6Option struct {
 	Length uint8
 }
 
-const ICMP6OptionSize = int(unsafe.Sizeof(ICMP6Option{}))
+const ICMP6OptionSize = 2
 
 const (
 	ICMP6OptionTypeSourceLinkLayerAddress = 1 + iota
@@ -182,8 +174,45 @@ const (
 	ICMP6OptionTypeMTU
 )
 
+const (
+	ICMP6OptionTypeRDNSS = 25
+	ICMP6OptionTypeDNSSL = 31
+)
+
+type ICMP6OptionHeader interface {
+	ICMP6SourceLinkLayerAddress |
+		ICMP6TargetLinkLayerAddress |
+		ICMP6PrefixInformation |
+		ICMP6RedirectedHeader |
+		ICMP6MTU |
+		ICMP6RDNSS |
+		ICMP6DNSSL
+}
+
+func ParseICMP6Option[H ICMP6OptionHeader](b []byte) (
+	header H, data, next []byte, err error,
+) {
+	n, err := binary.Decode(b, binary.BigEndian, &header)
+	if err == nil {
+		i := int(b[1])
+		data = b[n:i]
+		next = b[i:]
+	}
+	return
+}
+
+// https://datatracker.ietf.org/doc/html/rfc4861#section-4.6.1
+// Note: “Link-Layer Address” is the variable length data that follows this
+// empty header.
+type ICMP6SourceLinkLayerAddress struct{ ICMP6Option }
+type ICMP6TargetLinkLayerAddress struct{ ICMP6Option }
+
+const ICMP6SourceLinkLayerAddressSize = ICMP6OptionSize
+const ICMP6TargetLinkLayerAddressSize = ICMP6OptionSize
+
 // https://datatracker.ietf.org/doc/html/rfc4861#section-4.6.2
-type ICMP6Prefix struct {
+type ICMP6PrefixInformation struct {
+	ICMP6Option
 	PrefixLength,
 	Flags uint8
 	ValidLifetime,
@@ -192,12 +221,36 @@ type ICMP6Prefix struct {
 	Prefix [IPv6len]byte
 }
 
-const ICMP6PrefixSize = int(unsafe.Sizeof(ICMP6Prefix{}))
+// https://datatracker.ietf.org/doc/html/rfc4861#section-4.6.3
+// Note: “IP header + data” is the variable length data that follows these
+// reserved fields.
+type ICMP6RedirectedHeader struct {
+	ICMP6Option
+	_ uint16
+	_ uint32
+}
 
 // https://datatracker.ietf.org/doc/html/rfc4861#section-4.6.4
 type ICMP6MTU struct {
+	ICMP6Option
 	_   uint16
 	MTU uint32
 }
 
-const ICMP6MTUSize = int(unsafe.Sizeof(ICMP6MTU{}))
+// https://datatracker.ietf.org/doc/html/rfc8106#section-5.1
+// Note: “Addresses of IPv6 Recursive DNS Servers” are the 16-byte
+// arrays that follow this ICMP6RDNSS header.
+type ICMP6RDNSS struct {
+	ICMP6Option
+	_        uint16
+	Lifetime uint32
+}
+
+// https://datatracker.ietf.org/doc/html/rfc8106#section-5.2
+// Note: “Domain Names of DNS Search List” are the null terminated strings
+// that follow this ICMP6RDNSSSize header.
+type ICMP6DNSSL struct {
+	ICMP6Option
+	_        uint16
+	Lifetime uint32
+}

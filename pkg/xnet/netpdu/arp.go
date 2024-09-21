@@ -8,38 +8,30 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/platinasystems/goes/v2/pkg/xnet"
 	"github.com/platinasystems/goes/v2/pkg/xnet/netph"
 )
 
 type ARP []byte
 
-func (pdu ARP) Header() (h netph.ARP, err error) {
-	_, err = xnet.Subtract(pdu, &h)
-	return
-}
-
-func (pdu ARP) Data() (d []byte) {
-	if len(pdu) >= netph.ARPSize {
-		d = []byte(pdu)[netph.ARPSize:]
-	}
-	return
-}
-
 func (pdu ARP) Format(w fmt.State, verb rune) {
-	fmt.Fprint(w, "arp: ")
-	if h, err := pdu.Header(); err != nil {
+	fmt.Fprint(w, "arp ")
+	h, _, err := pdu.Parse()
+	if err != nil {
 		fmt.Fprint(w, err)
-	} else {
-		switch h.OPER {
-		case 1:
-			fmt.Fprint(w, net.IP(h.SPA[:]), " request ",
-				net.IP(h.TPA[:]))
-		case 2:
-			fmt.Fprint(w, net.IP(h.TPA[:]), " reply ",
-				net.HardwareAddr(h.THA[:]))
-		default:
-			fmt.Fprint(w, "op[", h.OPER, "]")
-		}
+		return
 	}
+	switch h.OPER {
+	case 1:
+		fmt.Fprint(w, net.IP(h.SPA[:]), " request ",
+			net.IP(h.TPA[:]))
+	case 2:
+		fmt.Fprint(w, net.IP(h.TPA[:]), " reply ",
+			net.HardwareAddr(h.THA[:]))
+	default:
+		fmt.Fprint(w, "op ", h.OPER)
+	}
+}
+
+func (pdu ARP) Parse() (netph.ARP, []byte, error) {
+	return netph.Parse[netph.ARP](pdu)
 }

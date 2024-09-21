@@ -4,8 +4,6 @@
 
 package netph
 
-import "unsafe"
-
 // https://en.wikipedia.org/wiki/Transmission_Control_Protocol
 type TCP struct {
 	SP    uint16
@@ -18,7 +16,7 @@ type TCP struct {
 }
 
 const TCPSumIndex = 16
-const TCPSize = int(unsafe.Sizeof(TCP{}))
+const TCPSize = 2 + 2 + 4 + 4 + 4 + 2 + 2
 
 func (p *TCP) DataOffset() uint8 { return uint8(p.Flags >> 28) }
 
