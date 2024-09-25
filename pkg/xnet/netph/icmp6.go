@@ -101,7 +101,7 @@ type ICMP6RouterAdvertisement struct {
 	ICMP6
 	CurHopLimit,
 	Flags uint8
-	Lifetime uint16
+	RouterLifetime uint16
 	ReachableTime,
 	RetransTimer uint32
 }
@@ -110,11 +110,9 @@ const (
 	_ = 1 << iota
 	_ // 0x02
 	_ // 0x04
-	_ // 0x06
 	_ // 0x08
 	_ // 0x10
 	_ // 0x20
-	_ // 0x40
 	ICMP6RouterAdvertisementOtherConfiguration
 	ICMP6RouterAdvertisementManagedAddress
 )
@@ -141,10 +139,8 @@ const (
 	_ = 1 << iota
 	_ // 0x02
 	_ // 0x04
-	_ // 0x06
 	_ // 0x08
 	_ // 0x10
-	_ // 0x20
 	ICMP6NeighborAdvertisementOverride
 	ICMP6NeighborAdvertisementSolicited
 	ICMP6NeighborAdvertisementRouter
@@ -165,6 +161,7 @@ type ICMP6Option struct {
 }
 
 const ICMP6OptionSize = 2
+const ICMP6OptionLengthIndex = 1
 
 const (
 	ICMP6OptionTypeSourceLinkLayerAddress = 1 + iota
@@ -220,6 +217,17 @@ type ICMP6PrefixInformation struct {
 	_ uint32
 	Prefix [IPv6len]byte
 }
+
+const (
+	_ = 1 << iota
+	_ // 0x02
+	_ // 0x04
+	_ // 0x08
+	_ // 0x10
+	_ // 0x20
+	ICMP6PrefixAutonomousAddressConfiguration
+	ICMP6PrefixOnLink
+)
 
 // https://datatracker.ietf.org/doc/html/rfc4861#section-4.6.3
 // Note: “IP header + data” is the variable length data that follows these

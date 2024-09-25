@@ -50,6 +50,10 @@ Exchange ciphered packets between guests.
 
 	ex.whoisResponseCh = make(chan *pem.Block)
 
+	if ex.lladdr, err = RandLinkLocalAddr(); err != nil {
+		return err
+	}
+
 	cctx, cancel := context.WithCancel(ctx)
 
 	udp, err := net.ListenUDP(ex.udpv, &net.UDPAddr{
@@ -192,6 +196,7 @@ pktRxLoop:
 
 type exchange struct {
 	client
+	lladdr netip.Addr
 	pktRxCh,
 	pktTxCh chan *box.Box
 	pem struct {
@@ -268,17 +273,13 @@ func (ex *exchange) rxIP(from box.Id, pdu netpdu.IP) {
 	}
 	da := netip.AddrFrom4(h.DA)
 	if h.Protocol == netph.IPPROTO_ICMP {
-		if da.IsMulticast() || da == ex.addr {
-			// FIXME respond
-		} else {
-			// FIXME route
-		}
+		verbose.Println("FIXME icmp", pdu)
 	} else if da.IsMulticast() {
-		// FIXME multicast
+		verbose.Println("FIXME mcast", pdu)
 	} else if da != ex.addr {
-		// FIXME route
+		verbose.Println("FIXME route", pdu)
 	} else {
-		// // ignore
+		verbose.Println("dropped", pdu)
 	}
 }
 
@@ -287,25 +288,22 @@ func (ex *exchange) rxIP6(from box.Id, pdu netpdu.IP6) {
 	if err != nil {
 		return
 	}
+	sa := netip.AddrFrom16(h.SA)
 	da := netip.AddrFrom16(h.DA)
 	if h.NextHeader == netph.IPPROTO_ICMPV6 {
-		if da.IsMulticast() || da == ex.addr {
-			ex.rxICMP6(from, h.SA, pdu, netpdu.ICMP6(d))
-		} else {
-			// FIXME route
-		}
+		ex.rxICMP6(from, sa, pdu, netpdu.ICMP6(d))
 	} else if da.IsMulticast() {
-		// FIXME multicast
+		verbose.Println("FIXME mcast", pdu)
 	} else if da != ex.addr {
-		// FIXME route
+		verbose.Println("FIXME route", pdu)
 	} else {
-		// ignore
+		verbose.Println("dropped", pdu)
 	}
 }
 
 func (ex *exchange) rxICMP6(
 	from box.Id,
-	sa [netph.IPv6len]byte,
+	sa netip.Addr,
 	ip6 netpdu.IP6,
 	icmp6 netpdu.ICMP6,
 ) {
@@ -318,7 +316,7 @@ func (ex *exchange) rxICMP6(
 	case netph.ICMP6TypeEchoRequest:
 		ex.txICMP6EchoReply(from, sa, netpdu.ICMP6EchoRequest(icmp6))
 	case netph.ICMP6TypeRouterSolicitation:
-		// FIXME router-advertisement
+		ex.txICMP6RouterAdvertisement(from, sa)
 	}
 }
 
@@ -374,7 +372,7 @@ func (ex *exchange) txPubKey(to box.Id, blk *pem.Block) {
 
 func (ex *exchange) txICMP6EchoReply(
 	to box.Id,
-	da [netph.IPv6len]byte,
+	da netip.Addr,
 	req netpdu.ICMP6EchoRequest,
 ) {
 	i := IdIndex(to)
@@ -397,11 +395,10 @@ func (ex *exchange) txICMP6EchoReply(
 	ip6i := len(bx.Contents)
 	bx.Contents, err = xnet.Add(bx.Contents, netph.IP6{
 		VCF:        netph.ConstructVCF(class, flow),
-		LEN:        0, // updated after appending icmp6
 		NextHeader: netph.IPPROTO_ICMPV6,
 		HopLimit:   255,
 		SA:         ex.addr.As16(),
-		DA:         da,
+		DA:         da.As16(),
 	})
 	if err != nil {
 		bx.Return()
@@ -412,7 +409,6 @@ func (ex *exchange) txICMP6EchoReply(
 		ICMP6: netph.ICMP6{
 			Type: netph.ICMP6TypeEchoReply,
 			Code: 0,
-			Sum:  0, // updated after appending reply
 		},
 		Identifier: reqh.Identifier,
 		Sequence:   reqh.Sequence,
@@ -426,6 +422,86 @@ func (ex *exchange) txICMP6EchoReply(
 		bx.Return()
 		return
 	}
+	ip6 := netpdu.IP6(bx.Contents[ip6i:])
+	ip6.SetLen()
+	icmp6 := netpdu.ICMP6(bx.Contents[icmp6i:])
+	sum := ip6.Checksum(netph.IPPROTO_ICMPV6, icmp6)
+	icmp6.SetSum(sum)
+	verbose.Printf("tx %d@%v %v", i, ap, ip6)
+	bx.AddrPort = ap
+	bx.From(ex.id)
+	bx.To(to)
+	bx.CloseWith(c)
+	bx.SealWith(c)
+	bx.NonBlockingPut(ex.pktTxCh)
+}
+
+func (ex *exchange) txICMP6RouterAdvertisement(to box.Id, da netip.Addr) {
+	var err error
+	i := IdIndex(to)
+	ap := ex.service[i]
+	c := ex.gcm[i]
+	bx := box.New()
+	bx.Contents, err = xnet.Add(bx.Contents, netph.TunPI{
+		Proto: netph.ETH_P_IPV6,
+	})
+	if err != nil {
+		bx.Return()
+		return
+	}
+	class := uint8(0)
+	flow := uint32(0)
+	ip6i := len(bx.Contents)
+	bx.Contents, err = xnet.Add(bx.Contents, netph.IP6{
+		VCF:        netph.ConstructVCF(class, flow),
+		NextHeader: netph.IPPROTO_ICMPV6,
+		HopLimit:   255, // 1 ir 2 ?
+		SA:         ex.lladdr.As16(),
+		DA:         da.As16(),
+	})
+	if err != nil {
+		bx.Return()
+		return
+	}
+	icmp6i := len(bx.Contents)
+	bx.Contents, err = xnet.Add(bx.Contents, netph.ICMP6RouterAdvertisement{
+		ICMP6: netph.ICMP6{
+			Type: netph.ICMP6TypeRouterAdvertisement,
+			Code: 0,
+		},
+		CurHopLimit: 2, // ?
+		// netph.ICMP6RouterAdvertisementOtherConfiguration |
+		// netph.ICMP6RouterAdvertisementManagedAddress
+		Flags: 0,
+		// not default
+		RouterLifetime: 0,
+		// unspecified
+		ReachableTime: 0,
+		// unspecified
+		RetransTimer: 0,
+	})
+	if err != nil {
+		bx.Return()
+		return
+	}
+	prefixopti := len(bx.Contents)
+	bx.Contents, err = xnet.Add(bx.Contents, netph.ICMP6PrefixInformation{
+		ICMP6Option: netph.ICMP6Option{
+			Type:   netph.ICMP6OptionTypePrefixInformation,
+			Length: 0, // updated later
+		},
+		// FIXME 96 or 98 for ID derrived address?
+		PrefixLength: 64,
+		Flags: netph.ICMP6PrefixAutonomousAddressConfiguration |
+			netph.ICMP6PrefixOnLink,
+		// infinite
+		ValidLifetime:     0xffffffff,
+		PreferredLifetime: 0xffffffff,
+		Prefix:            netip.MustParseAddr("fc00:5678::").As16(),
+	})
+	bx.Contents[prefixopti+netph.ICMP6OptionLengthIndex] =
+		uint8(len(bx.Contents) - prefixopti)
+	// FIXME add MTU, RDNSS and DNSSL options
 	ip6 := netpdu.IP6(bx.Contents[ip6i:])
 	ip6.SetLen()
 	icmp6 := netpdu.ICMP6(bx.Contents[icmp6i:])

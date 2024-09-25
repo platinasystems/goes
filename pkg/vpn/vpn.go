@@ -5,6 +5,8 @@
 package vpn
 
 import (
+	"crypto/rand"
+	"errors"
 	"flag"
 	"log"
 	"net/netip"
@@ -15,6 +17,7 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/fhs"
 	"github.com/platinasystems/goes/v2/pkg/xdg"
 	"github.com/platinasystems/goes/v2/pkg/xlog"
+	"github.com/platinasystems/goes/v2/pkg/xnet/netph"
 	"github.com/platinasystems/goes/v2/pkg/xprogram"
 )
 
@@ -34,6 +37,8 @@ var (
 
 	goRoutineTrace = xlog.Mute(mutable)
 )
+
+var ErrLLAddrUnderrun = errors.New("link-local address underrun")
 
 // [xdg.ConfigHome] or [fhs.Config] + GOES/vpn
 var ConfigDir = sync.OnceValue(func() string {
@@ -127,6 +132,21 @@ func NatFlag() *netip.AddrPort {
 	flag.TextVar(ap, "n", dap, `NAT'd service {addr}:{port}.
 Ignored if 0.0.0.0:0.`)
 	return ap
+}
+
+func RandLinkLocalAddr() (lladdr netip.Addr, err error) {
+	var a [netph.IPv6len]byte
+	a[0] = 0xfe
+	a[1] = 0x80
+	n, err := rand.Read(a[8:])
+	if err != nil {
+	} else if n != len(a[8:]) {
+		err = ErrLLAddrUnderrun
+	} else {
+		lladdr = netip.AddrFrom16(a)
+		verbose.Println("link-local address:", lladdr)
+	}
+	return
 }
 
 func RegistryFlag() *string {

@@ -187,14 +187,25 @@ func (pdu ICMP6RouterAdvertisement) Format(w fmt.State, verb rune) {
 		fmt.Fprint(w, err)
 		return
 	}
-	fmt.Fprintf(w, "hop-limit %d, ", h.CurHopLimit)
-	fmt.Fprintf(w, "flags %#x, ", h.Flags)
-	fmt.Fprintf(w, "lifetime %v, ",
-		time.Second*time.Duration(h.Lifetime))
-	fmt.Fprintf(w, "reachable %d, ",
-		time.Millisecond*time.Duration(h.ReachableTime))
-	fmt.Fprintf(w, "retrans %d",
-		time.Millisecond*time.Duration(h.RetransTimer))
+	fmt.Fprintf(w, "hop-limit %d", h.CurHopLimit)
+	if (h.Flags & netph.ICMP6RouterAdvertisementOtherConfiguration) != 0 {
+		fmt.Fprint(w, ", other-configuration")
+	}
+	if (h.Flags & netph.ICMP6RouterAdvertisementManagedAddress) != 0 {
+		fmt.Fprint(w, ", managed-address")
+	}
+	if h.RouterLifetime != 0 {
+		fmt.Fprintf(w, ", router-lifetime %v",
+			time.Second*time.Duration(h.RouterLifetime))
+	}
+	if h.ReachableTime != 0 {
+		fmt.Fprintf(w, " reachable-time %d",
+			time.Millisecond*time.Duration(h.ReachableTime))
+	}
+	if h.RetransTimer != 0 {
+		fmt.Fprintf(w, "retrans-timer %d",
+			time.Millisecond*time.Duration(h.RetransTimer))
+	}
 	fmt.Fprint(w, ICMP6Options(d))
 }
 
@@ -341,13 +352,32 @@ func (pdu ICMP6PrefixInformation) Format(w fmt.State, verb rune) {
 		fmt.Fprint(w, err)
 		return
 	}
-	fmt.Fprint(w, "length %d, ", h.PrefixLength)
-	fmt.Fprintf(w, "flags %#x, ", h.Flags)
-	fmt.Fprintf(w, "valid-lifetime %v, ",
-		time.Second*time.Duration(h.ValidLifetime))
-	fmt.Fprintf(w, "preferred-lifetime %v, ",
-		time.Second*time.Duration(h.PreferredLifetime))
-	fmt.Fprintf(w, "prefix %v", netip.AddrFrom16(h.Prefix))
+	fmt.Fprintf(w, "length %d", h.PrefixLength)
+	if (h.Flags & netph.ICMP6PrefixAutonomousAddressConfiguration) != 0 {
+		fmt.Fprint(w, ", autonomous-address-configuration")
+	}
+	if (h.Flags & netph.ICMP6PrefixOnLink) != 0 {
+		fmt.Fprint(w, ", on-link")
+	}
+	if h.ValidLifetime != 0 {
+		fmt.Fprint(w, ", valid-lifetime ")
+		if h.ValidLifetime == 0xffffffff {
+			fmt.Fprint(w, "infinite")
+		} else {
+			fmt.Fprint(w,
+				time.Second*time.Duration(h.ValidLifetime))
+		}
+	}
+	if h.PreferredLifetime != 0 {
+		fmt.Fprint(w, ", preferred-lifetime ")
+		if h.PreferredLifetime == 0xffffffff {
+			fmt.Fprint(w, "infinite")
+		} else {
+			fmt.Fprint(w,
+				time.Second*time.Duration(h.PreferredLifetime))
+		}
+	}
+	fmt.Fprintf(w, ", prefix %v", netip.AddrFrom16(h.Prefix))
 }
 
 func (pdu ICMP6RedirectedHeader) Format(w fmt.State, verb rune) {

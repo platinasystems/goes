@@ -426,12 +426,16 @@ func tunReadRoutine(
 	ch chan<- *box.Box,
 ) {
 	defer wg.Done()
+	defer goRoutineTrace.Println("stopped", name, "read routine")
 	goRoutineTrace.Println("start", name, "read routine")
-	bx, err := box.NewReadContents(r)
-	defer goRoutineTrace.Println("stopped", name, "read routine:", err)
-	for err == nil && ctx.Err() == nil {
+	for ctx.Err() == nil {
+		bx, err := box.NewReadContents(r)
+		if err != nil {
+			errata.Print(name, ": ", err)
+			break
+		}
+		verbose.Println(name, "read", netpdu.TunPI(bx.Contents))
 		ch <- bx
-		bx, err = box.NewReadContents(r)
 	}
 }
 
@@ -442,13 +446,9 @@ func tunWriteRoutine(
 	w io.Writer,
 	ch <-chan *box.Box,
 ) {
-	var (
-		tunpdu netpdu.TunPI
-		err    error
-	)
 	defer wg.Done()
-	goRoutineTrace.Println("start", name, "write routine")
 	defer goRoutineTrace.Println("stopped", name, "write routine")
+	goRoutineTrace.Println("start", name, "write routine")
 	for {
 		select {
 		case <-ctx.Done():
@@ -456,16 +456,16 @@ func tunWriteRoutine(
 			return
 		case bx, ok := <-ch:
 			if !ok {
-				goRoutineTrace.Println("tun write ch closed")
+				goRoutineTrace.Println(name, "write ch closed")
 				return
 			}
-			tunpdu = netpdu.TunPI(bx.Contents)
-			if _, err = bx.WriteTo(w); err != nil {
-				verbose.Print(err)
-			} else {
-				verbose.Println("write", tunpdu)
-			}
+			verbose.Println(name, "write", netpdu.TunPI(bx.Contents))
+			_, err := bx.WriteTo(w)
 			bx.Return()
+			if err != nil {
+				errata.Print(name, ": ", err)
+				return
+			}
 		}
 	}
 }
