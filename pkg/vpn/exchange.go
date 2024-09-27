@@ -376,11 +376,9 @@ func (ex *exchange) txICMP6EchoReply(
 		bx.Return()
 		return
 	}
-	class := uint8(0)
-	flow := uint32(0)
 	ip6i := len(bx.Contents)
 	bx.Contents, err = xnet.Add(bx.Contents, netph.IP6{
-		VCF:        netph.ConstructVCF(class, flow),
+		VCF:        req6.VCF,
 		NextHeader: netph.IPPROTO_ICMPV6,
 		HopLimit:   255,
 		SA:         req6.DA,
@@ -435,11 +433,9 @@ func (ex *exchange) txICMP6RouterAdvertisement(to box.Id, req6 *netph.IP6) {
 		bx.Return()
 		return
 	}
-	class := uint8(0)
-	flow := uint32(0)
 	ip6i := len(bx.Contents)
 	bx.Contents, err = xnet.Add(bx.Contents, netph.IP6{
-		VCF:        netph.ConstructVCF(class, flow),
+		VCF:        req6.VCF,
 		NextHeader: netph.IPPROTO_ICMPV6,
 		HopLimit:   255, // 1 ir 2 ?
 		SA:         ex.lladdr.As16(),
