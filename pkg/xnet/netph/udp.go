@@ -12,5 +12,11 @@ type UDP struct {
 	Sum uint16
 }
 
-const UDPSumIndex = 8
+const UDPLenIndex = 2 + 2
+const UDPSumIndex = 2 + 2 + 2
 const UDPSize = 4 * 2
+
+const (
+	UDPEcho   = 7
+	UDPDomain = 53
+)

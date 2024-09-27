@@ -228,7 +228,7 @@ func (ex *exchange) rx(
 	case VPN_P_HELLO:
 		verbose.Printf("rx %d@%v hello %v", ifrom, afrom,
 			VpnHelloPDU(d))
-		ex.txHelloAck(ex.pktTxCh, from)
+		ex.txHelloAck(from)
 	case VPN_P_WHOIS_ADDRESSED:
 		if addr := VpnWhoisAddress(d); !addr.IsValid() {
 			verbose.Printf("rx %d@%v whois underrun", ifrom, afrom)
@@ -254,77 +254,88 @@ func (ex *exchange) rx(
 		verbose.Printf("rx %d@%v whois %v", ifrom, afrom,
 			VpnWhoisService(d))
 	case netph.ETH_P_IP:
-		ip := netpdu.IP(d)
-		verbose.Printf("rx %d@%v %v", ifrom, afrom, ip)
-		ex.rxIP(from, ip)
+		verbose.Printf("dropped %d@%v %v", ifrom, afrom, netpdu.IP(d))
 	case netph.ETH_P_IPV6:
-		ip6 := netpdu.IP6(d)
-		verbose.Printf("rx %d@%v %v", ifrom, afrom, ip6)
-		ex.rxIP6(from, ip6)
+		ex.rxIP6(from, netpdu.IP6(d))
 	default:
 		verbose.Printf("rx %d@%v unknown %#x", ifrom, afrom, pi.Proto)
-	}
-}
-
-func (ex *exchange) rxIP(from box.Id, pdu netpdu.IP) {
-	h, _, err := pdu.Parse()
-	if err != nil {
-		return
-	}
-	da := netip.AddrFrom4(h.DA)
-	if h.Protocol == netph.IPPROTO_ICMP {
-		verbose.Println("FIXME icmp", pdu)
-	} else if da.IsMulticast() {
-		verbose.Println("FIXME mcast", pdu)
-	} else if da != ex.addr {
-		verbose.Println("FIXME route", pdu)
-	} else {
-		verbose.Println("dropped", pdu)
 	}
 }
 
 func (ex *exchange) rxIP6(from box.Id, pdu netpdu.IP6) {
 	h, d, err := pdu.Parse()
 	if err != nil {
+		verbose.Print(err)
 		return
 	}
-	sa := netip.AddrFrom16(h.SA)
-	da := netip.AddrFrom16(h.DA)
-	if h.NextHeader == netph.IPPROTO_ICMPV6 {
-		ex.rxICMP6(from, sa, pdu, netpdu.ICMP6(d))
-	} else if da.IsMulticast() {
-		verbose.Println("FIXME mcast", pdu)
-	} else if da != ex.addr {
-		verbose.Println("FIXME route", pdu)
-	} else {
+	sum := pdu.Checksum(h.NextHeader, d)
+	if sum != 0 {
+		verbose.Print("bad sum")
+		return
+	}
+	switch h.NextHeader {
+	case netph.IPPROTO_ICMPV6:
+		ex.rxICMP6(from, &h, netpdu.ICMP6(d))
+	case netph.IPPROTO_UDP:
+		if da := netip.AddrFrom16(h.DA); ex.tome(da) {
+			ex.rxUDP6(from, &h, netpdu.UDP(d))
+		} else {
+			verbose.Println("dropped udp to", da)
+		}
+	default:
 		verbose.Println("dropped", pdu)
 	}
 }
 
 func (ex *exchange) rxICMP6(
 	from box.Id,
-	sa netip.Addr,
-	ip6 netpdu.IP6,
-	icmp6 netpdu.ICMP6,
+	req6 *netph.IP6,
+	pdu netpdu.ICMP6,
 ) {
-	sum := ip6.Checksum(netph.IPPROTO_ICMPV6, icmp6)
-	if sum != 0 {
-		verbose.Print("bad sum")
-		return
-	}
-	switch icmp6.Type() {
+	switch pdu.Type() {
 	case netph.ICMP6TypeEchoRequest:
-		ex.txICMP6EchoReply(from, sa, netpdu.ICMP6EchoRequest(icmp6))
+		if da := netip.AddrFrom16(req6.DA); ex.tome(da) {
+			req := netpdu.ICMP6EchoRequest(pdu)
+			ex.txICMP6EchoReply(from, req6, req)
+		} else {
+			verbose.Println("dropped icmp6 echo req to", da)
+		}
 	case netph.ICMP6TypeRouterSolicitation:
-		ex.txICMP6RouterAdvertisement(from, sa)
+		ex.txICMP6RouterAdvertisement(from, req6)
 	}
 }
 
-func (ex *exchange) txHelloAck(ch chan<- *box.Box, to box.Id) {
+func (ex *exchange) rxUDP6(
+	from box.Id,
+	req6 *netph.IP6,
+	pdu netpdu.UDP,
+) {
+	h, d, err := pdu.Parse()
+	if err != nil {
+		verbose.Print(err)
+		return
+	}
+	switch h.DP {
+	case netph.UDPEcho:
+		ex.txUDP6EchoReply(from, req6, &h, d)
+	case netph.UDPDomain:
+		// FIXME
+	default:
+		verbose.Println("dropped", pdu)
+	}
+}
+
+func (ex *exchange) tome(a netip.Addr) bool {
+	return a.Compare(ex.lladdr) == 0 || a.Compare(ex.addr) == 0
+}
+
+func (ex *exchange) txHelloAck(to box.Id) {
 	var err error
 	bx := box.New()
-	i := IdIndex(to)
-	c := ex.gcm[i]
+	toi := IdIndex(to)
+	bx.AddrPort = ex.service[toi]
+	bx.From(ex.id)
+	bx.To(to)
 	bx.Contents, err = xnet.Add(bx.Contents, netph.TunPI{
 		Proto: VPN_P_HELLO,
 	})
@@ -337,34 +348,8 @@ func (ex *exchange) txHelloAck(ch chan<- *box.Box, to box.Id) {
 		bx.Return()
 		return
 	}
-	ap := ex.service[i]
-	verbose.Printf("tx %d@%v hello ack", i, ap)
-	bx.AddrPort = ap
-	bx.From(ex.id)
-	bx.To(to)
-	bx.CloseWith(c)
-	bx.SealWith(c)
-	bx.NonBlockingPut(ch)
-}
-
-func (ex *exchange) txPubKey(to box.Id, blk *pem.Block) {
-	var err error
-	i := IdIndex(to)
-	c := ex.gcm[i]
-	bx := box.New()
-	bx.Contents, err = xnet.Add(bx.Contents, netph.TunPI{
-		Proto: VPN_P_PUBLIC_KEY,
-	})
-	if err != nil {
-		bx.Return()
-		return
-	}
-	pem.Encode(bx, blk)
-	ap := ex.service[i]
-	verbose.Printf("tx %d@%v pub-key", i, ap)
-	bx.AddrPort = ap
-	bx.From(ex.id)
-	bx.To(to)
+	verbose.Printf("tx %d@%v hello ack", toi, bx.AddrPort)
+	c := ex.gcm[toi]
 	bx.CloseWith(c)
 	bx.SealWith(c)
 	bx.NonBlockingPut(ex.pktTxCh)
@@ -372,17 +357,18 @@ func (ex *exchange) txPubKey(to box.Id, blk *pem.Block) {
 
 func (ex *exchange) txICMP6EchoReply(
 	to box.Id,
-	da netip.Addr,
+	req6 *netph.IP6,
 	req netpdu.ICMP6EchoRequest,
 ) {
-	i := IdIndex(to)
-	ap := ex.service[i]
-	c := ex.gcm[i]
+	toi := IdIndex(to)
 	reqh, reqd, err := req.Parse()
 	if err != nil {
 		return
 	}
 	bx := box.New()
+	bx.AddrPort = ex.service[toi]
+	bx.From(ex.id)
+	bx.To(to)
 	bx.Contents, err = xnet.Add(bx.Contents, netph.TunPI{
 		Proto: netph.ETH_P_IPV6,
 	})
@@ -397,8 +383,8 @@ func (ex *exchange) txICMP6EchoReply(
 		VCF:        netph.ConstructVCF(class, flow),
 		NextHeader: netph.IPPROTO_ICMPV6,
 		HopLimit:   255,
-		SA:         ex.addr.As16(),
-		DA:         da.As16(),
+		SA:         req6.DA,
+		DA:         req6.SA,
 	})
 	if err != nil {
 		bx.Return()
@@ -427,21 +413,21 @@ func (ex *exchange) txICMP6EchoReply(
 	icmp6 := netpdu.ICMP6(bx.Contents[icmp6i:])
 	sum := ip6.Checksum(netph.IPPROTO_ICMPV6, icmp6)
 	icmp6.SetSum(sum)
-	verbose.Printf("tx %d@%v %v", i, ap, ip6)
-	bx.AddrPort = ap
-	bx.From(ex.id)
-	bx.To(to)
+	verbose.Printf("tx %d@%v %v", toi, bx.AddrPort, ip6)
+	c := ex.gcm[toi]
 	bx.CloseWith(c)
 	bx.SealWith(c)
 	bx.NonBlockingPut(ex.pktTxCh)
 }
 
-func (ex *exchange) txICMP6RouterAdvertisement(to box.Id, da netip.Addr) {
+func (ex *exchange) txICMP6RouterAdvertisement(to box.Id, req6 *netph.IP6) {
+	const infiniteLifetime = 0xffffffff
 	var err error
-	i := IdIndex(to)
-	ap := ex.service[i]
-	c := ex.gcm[i]
+	toi := IdIndex(to)
 	bx := box.New()
+	bx.AddrPort = ex.service[toi]
+	bx.From(ex.id)
+	bx.To(to)
 	bx.Contents, err = xnet.Add(bx.Contents, netph.TunPI{
 		Proto: netph.ETH_P_IPV6,
 	})
@@ -457,7 +443,7 @@ func (ex *exchange) txICMP6RouterAdvertisement(to box.Id, da netip.Addr) {
 		NextHeader: netph.IPPROTO_ICMPV6,
 		HopLimit:   255, // 1 ir 2 ?
 		SA:         ex.lladdr.As16(),
-		DA:         da.As16(),
+		DA:         req6.SA,
 	})
 	if err != nil {
 		bx.Return()
@@ -494,9 +480,8 @@ func (ex *exchange) txICMP6RouterAdvertisement(to box.Id, da netip.Addr) {
 		PrefixLength: 64,
 		Flags: netph.ICMP6PrefixAutonomousAddressConfiguration |
 			netph.ICMP6PrefixOnLink,
-		// infinite
-		ValidLifetime:     0xffffffff,
-		PreferredLifetime: 0xffffffff,
+		ValidLifetime:     infiniteLifetime,
+		PreferredLifetime: infiniteLifetime,
 		Prefix:            netip.MustParseAddr("fc00:5678::").As16(),
 	})
 	bx.Contents[prefixopti+netph.ICMP6OptionLengthIndex] =
@@ -505,12 +490,88 @@ func (ex *exchange) txICMP6RouterAdvertisement(to box.Id, da netip.Addr) {
 	ip6 := netpdu.IP6(bx.Contents[ip6i:])
 	ip6.SetLen()
 	icmp6 := netpdu.ICMP6(bx.Contents[icmp6i:])
-	sum := ip6.Checksum(netph.IPPROTO_ICMPV6, icmp6)
-	icmp6.SetSum(sum)
-	verbose.Printf("tx %d@%v %v", i, ap, ip6)
-	bx.AddrPort = ap
+	icmp6.SetSum(ip6.Checksum(netph.IPPROTO_ICMPV6, icmp6))
+	verbose.Printf("tx %d@%v %v", toi, bx.AddrPort, ip6)
+	c := ex.gcm[toi]
+	bx.CloseWith(c)
+	bx.SealWith(c)
+	bx.NonBlockingPut(ex.pktTxCh)
+}
+
+func (ex *exchange) txPubKey(to box.Id, blk *pem.Block) {
+	var err error
+	toi := IdIndex(to)
+	bx := box.New()
+	bx.AddrPort = ex.service[toi]
 	bx.From(ex.id)
 	bx.To(to)
+	bx.Contents, err = xnet.Add(bx.Contents, netph.TunPI{
+		Proto: VPN_P_PUBLIC_KEY,
+	})
+	if err != nil {
+		bx.Return()
+		return
+	}
+	pem.Encode(bx, blk)
+	verbose.Printf("tx %d@%v pub-key", toi, bx.AddrPort)
+	c := ex.gcm[toi]
+	bx.CloseWith(c)
+	bx.SealWith(c)
+	bx.NonBlockingPut(ex.pktTxCh)
+}
+
+func (ex *exchange) txUDP6EchoReply(
+	to box.Id,
+	req6 *netph.IP6,
+	requdp *netph.UDP,
+	data []byte,
+) {
+	var err error
+	toi := IdIndex(to)
+	bx := box.New()
+	bx.From(ex.id)
+	bx.To(to)
+	bx.AddrPort = ex.service[toi]
+	bx.Contents, err = xnet.Add(bx.Contents, netph.TunPI{
+		Proto: netph.ETH_P_IPV6,
+	})
+	if err != nil {
+		bx.Return()
+		return
+	}
+	ip6i := len(bx.Contents)
+	bx.Contents, err = xnet.Add(bx.Contents, netph.IP6{
+		VCF:        req6.VCF,
+		NextHeader: netph.IPPROTO_UDP,
+		HopLimit:   255,
+		SA:         req6.DA,
+		DA:         req6.SA,
+	})
+	if err != nil {
+		bx.Return()
+		return
+	}
+	udpi := len(bx.Contents)
+	bx.Contents, err = xnet.Add(bx.Contents, netph.UDP{
+		SP: requdp.DP,
+		DP: requdp.SP,
+	})
+	if err != nil {
+		bx.Return()
+		return
+	}
+	bx.Contents, err = xnet.Add(bx.Contents, data)
+	if err != nil {
+		bx.Return()
+		return
+	}
+	ip6 := netpdu.IP6(bx.Contents[ip6i:])
+	ip6.SetLen()
+	udp := netpdu.UDP(bx.Contents[udpi:])
+	udp.SetLen()
+	udp.SetSum(ip6.Checksum(netph.IPPROTO_UDP, udp))
+	verbose.Printf("tx %d@%v %v", toi, bx.AddrPort, ip6)
+	c := ex.gcm[toi]
 	bx.CloseWith(c)
 	bx.SealWith(c)
 	bx.NonBlockingPut(ex.pktTxCh)

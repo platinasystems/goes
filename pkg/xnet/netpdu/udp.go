@@ -13,14 +13,24 @@ import (
 type UDP []byte
 
 func (pdu UDP) Parse() (netph.UDP, []byte, error) {
-	return netph.Parse[netph.UDP](pdu)
+	h, d, err := netph.Parse[netph.UDP](pdu)
+	if err == nil {
+		if n := int(h.Len - netph.UDPSize); n < len(d) {
+			d = d[:n]
+		}
+	}
+	return h, d, err
+}
+
+func (pdu UDP) SetLen() {
+	n := len(pdu)
+	pdu[netph.UDPLenIndex] = byte(n >> 8)
+	pdu[netph.UDPLenIndex+1] = byte(n)
 }
 
 func (pdu UDP) SetSum(sum uint16) {
-	if len(pdu) >= netph.UDPSize {
-		pdu[netph.UDPSumIndex] = byte(sum >> 8)
-		pdu[netph.UDPSumIndex+1] = byte(sum)
-	}
+	pdu[netph.UDPSumIndex] = byte(sum >> 8)
+	pdu[netph.UDPSumIndex+1] = byte(sum)
 }
 
 type ChecksummingUDP struct {
