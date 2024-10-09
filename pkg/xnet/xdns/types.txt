@@ -1,0 +1,63 @@
+<https://en.wikipedia.org/wiki/List_of_DNS_record_types>
+
+A	Returns a 32-bit IPv4 address, most commonly used to map hostnames to
+	an IP address of the host, but it is also used for DNSBLs, storing
+	subnet masks in RFC 1101, etc.
+
+AAAA	Returns a 128-bit IPv6 address, most commonly used to map hostnames
+	to an IP address of the host.
+
+ALL	Returns all records of all types known to the name server.
+	If the name server does not have any information on the name, the
+	request will be forwarded on. The records returned may not be complete.
+	For example, if there is both an A and an MX for a name, but the name
+	server has only the A record cached, only the A record will be
+	returned. Usually referred to as ANY (e.g., in dig, Windows nslookup,
+	and Wireshark). In 2019, RFC8482 [14] standards-track publication led
+	many DNS providers, including Cloudflare,[15] to provide only minimal
+	responses to "ANY" queries, instead of enumerating records.
+
+AXFR	Transfer entire zone file from the primary name server to secondary
+	name servers.
+
+CNAME	Alias of one name to another: the DNS lookup will continue by retrying
+	the lookup with the new name.
+
+HINFO	Record intended to provide information about host CPU type and
+	operating system. It was intended to allow protocols to optimize
+	processing when communicating with similar peers.
+
+MINFO	MB, MG, MR, and MINFO are records to publish subscriber mailing lists.
+	MAILB is a query code which returns one of those records. The intent
+	was for MB and MG to replace the SMTP VRFY and EXPN commands. MR was to
+	replace the "551 User Not Local" SMTP error. Later, RFC 2505
+	recommended that both VRFY and EXPN be disabled, making MB and MG
+	unnecessary. They were classified as experimental by RFC 1035.
+
+MX	List of mail exchange servers that accept email for a domain
+
+NS	Delegates a DNS zone to use the given authoritative name servers
+
+OPT	This is a pseudo-record type needed to support EDNS.
+
+PTR	Pointer to a canonical name. Unlike a CNAME, DNS processing stops and
+	just the name is returned. The most common use is for implementing
+	reverse DNS lookups, but other uses include such things as DNS-SD.
+
+SOA	Specifies authoritative information about a DNS zone, including the
+	primary name server, the email of the domain administrator, the domain
+	serial number, and several timers relating to refreshing the zone.
+
+SRV	Generalized service location record, used for newer protocols instead
+	of creating protocol-specific records such as MX.
+
+TXT	Originally for arbitrary human-readable text in a DNS record.
+	Since the early 1990s, however, this record more often carries
+	machine-readable data, such as specified by RFC 1464, opportunistic
+	encryption, Sender Policy Framework, DKIM, DMARC, DNS-SD, etc.
+
+WKS	Record to describe well-known services supported by a host.
+	Not used in practice. The current recommendation and practice is to
+	determine whether a service is supported on an IP address by trying to
+	connect to it. SMTP is even prohibited from using WKS records in MX
+	processing.

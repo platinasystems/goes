@@ -5,15 +5,15 @@ go 1.22.0
 require (
 	github.com/creack/pty v1.1.18
 	github.com/prometheus-community/pro-bing v0.3.0
+	golang.org/x/net v0.21.0
 	golang.org/x/sys v0.24.0
-	golang.org/x/term v0.10.0
+	golang.org/x/term v0.23.0
 	golang/buildid v1.19.1+incompatible
 	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
 	github.com/google/uuid v1.3.0 // indirect
-	golang.org/x/net v0.11.0 // indirect
 	golang.org/x/sync v0.3.0 // indirect
 	golang/xcoff v1.19.1+incompatible // indirect
 )

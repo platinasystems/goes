@@ -7,6 +7,7 @@ package main
 import (
 	_ "embed"
 
+	"github.com/platinasystems/goes/v2/pkg/bind"
 	core_util "github.com/platinasystems/goes/v2/pkg/core-util"
 	"github.com/platinasystems/goes/v2/pkg/goes"
 	goes_util "github.com/platinasystems/goes/v2/pkg/goes-util"
@@ -40,6 +41,7 @@ var features = []map[string]any{
 	goes_util.Features,
 	core_util.Features,
 	net_tool.Features,
+	bind.Features,
 	vpn.Features,
 }
 
