@@ -4,9 +4,13 @@
 
 package bind
 
-import "github.com/platinasystems/goes/v2/pkg/bind/dig"
+import (
+	"github.com/platinasystems/goes/v2/pkg/bind/dig"
+	"github.com/platinasystems/goes/v2/pkg/bind/host"
+)
 
 // Features map by name these emulated BIND9 tools.
 var Features = map[string]any{
-	"dig": dig.DiG,
+	"dig":  dig.DiG,
+	"host": host.Host,
 }
