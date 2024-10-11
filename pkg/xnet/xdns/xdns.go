@@ -221,11 +221,31 @@ var Resolver = &net.Resolver{
 	StrictErrors: true,
 }
 
+const dnsmessageTypeHTTPS = 65
+
 type Type dnsmessage.Type
 
-const DefaultType = Type(dnsmessage.TypeA)
-const ZeroType = Type(0)
-const TypePTR = Type(dnsmessage.TypePTR)
+const (
+	DefaultType = Type(dnsmessage.TypeA)
+	ZeroType    = Type(0)
+	TypeA       = Type(dnsmessage.TypeA)
+	TypeNS      = Type(dnsmessage.TypeNS)
+	TypeCNAME   = Type(dnsmessage.TypeCNAME)
+	TypeSOA     = Type(dnsmessage.TypeSOA)
+	TypePTR     = Type(dnsmessage.TypePTR)
+	TypeMX      = Type(dnsmessage.TypeMX)
+	TypeTXT     = Type(dnsmessage.TypeTXT)
+	TypeAAAA    = Type(dnsmessage.TypeAAAA)
+	TypeSRV     = Type(dnsmessage.TypeSRV)
+	TypeOPT     = Type(dnsmessage.TypeOPT)
+	TypeWKS     = Type(dnsmessage.TypeWKS)
+	TypeHINFO   = Type(dnsmessage.TypeHINFO)
+	TypeMINFO   = Type(dnsmessage.TypeMINFO)
+	TypeHTTPS   = Type(dnsmessageTypeHTTPS)
+	TypeAXFR    = Type(dnsmessage.TypeAXFR)
+	TypeALL     = Type(dnsmessage.TypeALL)
+	TypeANY     = TypeALL
+)
 
 func (v Type) MarshalText() ([]byte, error) {
 	if v == 0 {
@@ -245,9 +265,9 @@ func (v Type) MarshalText() ([]byte, error) {
 		dnsmessage.TypeWKS:   "WKS",
 		dnsmessage.TypeHINFO: "HINFO",
 		dnsmessage.TypeMINFO: "MINFO",
+		dnsmessageTypeHTTPS:  "HTTPS",
 		dnsmessage.TypeAXFR:  "AXFR",
-		dnsmessage.TypeALL:   "ALL",
-		dnsmessage.Type(65):  "HTTPS",
+		dnsmessage.TypeALL:   "ANY",
 	}[dnsmessage.Type(v)]
 	if !ok {
 		s = fmt.Sprintf("TYPE%d", v)
@@ -308,9 +328,10 @@ func (p *Type) UnmarshalText(text []byte) error {
 		"WKS":   dnsmessage.TypeWKS,
 		"HINFO": dnsmessage.TypeHINFO,
 		"MINFO": dnsmessage.TypeMINFO,
+		"HTTPS": dnsmessageTypeHTTPS,
 		"AXFR":  dnsmessage.TypeAXFR,
 		"ALL":   dnsmessage.TypeALL,
-		"HTTPS": dnsmessage.Type(65),
+		"ANY":   dnsmessage.TypeALL,
 	}[s]; !ok {
 		return ErrInvalid
 	} else {
@@ -319,70 +340,129 @@ func (p *Type) UnmarshalText(text []byte) error {
 	return nil
 }
 
-// AskUDP sends req then reads response with deadline upto 3 times.
-// If successful, this returns the unpacked message and its total length.
-func AskUDP(ctx context.Context, udp *net.UDPConn, req []byte) (
-	*dnsmessage.Message, int, error,
-) {
-	buf := make([]byte, 512)
-	for tries := 0; tries < 3; tries++ {
-		n, err := udp.Write(req)
-		if err != nil {
-			return nil, 0, err
-		} else if n != len(req) {
-			return nil, 0, ErrUnderrun
-		}
-		err = udp.SetReadDeadline(time.Now().Add(time.Second * 3))
-		if err != nil {
-			return nil, 0, err
-		}
-		n, err = udp.Read(buf)
-		udp.SetReadDeadline(ResetDeadline)
-		if err != nil {
-			if errors.Is(err, os.ErrDeadlineExceeded) {
-				continue
-			}
-			return nil, 0, err
-		}
-		msg := new(dnsmessage.Message)
-		return msg, n, msg.Unpack(buf[:n])
+type AResource = dnsmessage.AResource
+type NSResource = dnsmessage.NSResource
+type CNAMEResource = dnsmessage.CNAMEResource
+type SOAResource = dnsmessage.SOAResource
+type PTRResource = dnsmessage.PTRResource
+type MXResource = dnsmessage.MXResource
+type TXTResource = dnsmessage.TXTResource
+type AAAAResource = dnsmessage.AAAAResource
+type SRVResource = dnsmessage.SRVResource
+type OPTResource = dnsmessage.OPTResource
+type UnknownResource = dnsmessage.UnknownResource
+
+func AnswerString(r dnsmessage.Resource) (s string) {
+	switch r.Header.Type {
+	case dnsmessage.TypeA:
+		rb := r.Body.(*AResource)
+		s = net.IP(rb.A[:]).String()
+	case dnsmessage.TypeNS:
+		rb := r.Body.(*NSResource)
+		s = rb.NS.String()
+	case dnsmessage.TypeCNAME:
+		rb := r.Body.(*CNAMEResource)
+		s = rb.CNAME.String()
+	case dnsmessage.TypeSOA:
+		rb := r.Body.(*SOAResource)
+		s = fmt.Sprintf("ns %v, mbox %v, s/n %d",
+			rb.NS, rb.MBox, rb.Serial)
+	case dnsmessage.TypePTR:
+		rb := r.Body.(*PTRResource)
+		s = rb.PTR.String()
+	case dnsmessage.TypeMX:
+		rb := r.Body.(*MXResource)
+		s = fmt.Sprintf("%v, pref %d", rb.MX, rb.Pref)
+	case dnsmessage.TypeTXT:
+		rb := r.Body.(*TXTResource)
+		s = strings.Join(rb.TXT, " ")
+	case dnsmessage.TypeAAAA:
+		rb := r.Body.(*AAAAResource)
+		s = net.IP(rb.AAAA[:]).String()
+	case dnsmessage.TypeSRV:
+		rb := r.Body.(*SRVResource)
+		s = fmt.Sprintf("%v, port %d, pri %d, weight %d",
+			rb.Target, rb.Port, rb.Priority, rb.Weight)
+	default:
+		rb := r.Body.(*UnknownResource)
+		s = fmt.Sprintf("%#x", rb.Data)
 	}
-	return nil, 0, os.ErrDeadlineExceeded
+	return
 }
 
-func HeaderFlagNames(h *dnsmessage.Header) string {
+// TenaciousAsk resends the buffered request every 1 sec until it receives a
+// response or context is cancelled.
+// If successful, it returns the response within the same buffer.
+func TenaciousAsk(ctx context.Context, udp *net.UDPConn, buf []byte) (
+	[]byte, error,
+) {
+	for {
+		err := ctx.Err()
+		if err != nil {
+			return buf[:0], err
+		}
+		n, err := udp.Write(buf)
+		if err != nil {
+			return buf[:0], err
+		} else if n != len(buf) {
+			return buf[:0], ErrUnderrun
+		}
+		err = udp.SetReadDeadline(time.Now().Add(time.Second))
+		if err != nil {
+			return buf[:0], err
+		}
+		n, err = udp.Read(buf[:cap(buf)])
+		udp.SetReadDeadline(ResetDeadline)
+		if err == nil {
+			return buf[:n], nil
+		} else if !errors.Is(err, os.ErrDeadlineExceeded) {
+			return buf[:0], err
+		}
+	}
+}
+
+// TimeLimitedAsk is a `TenaciousAsk` with a deadlined context.
+func TimeLimitedAsk(
+	ctx context.Context, udp *net.UDPConn, buf []byte, dur time.Duration,
+) ([]byte, error) {
+	dl := time.Now().Add(dur)
+	cctx, cancel := context.WithDeadline(ctx, dl)
+	defer cancel()
+	return TenaciousAsk(cctx, udp, buf)
+}
+
+type HeaderFlags struct{ dnsmessage.Header }
+
+func (h HeaderFlags) Format(w fmt.State, verb rune) {
 	const space = " "
-	var sb strings.Builder
 	var sep string
 	if h.Response {
-		fmt.Fprint(&sb, "qr")
+		fmt.Fprint(w, "qr")
 		sep = space
 	}
 	if h.Authoritative {
-		fmt.Fprint(&sb, sep, "aa")
+		fmt.Fprint(w, sep, "aa")
 		sep = space
 	}
 	if h.Truncated {
-		fmt.Fprint(&sb, sep, "tr")
+		fmt.Fprint(w, sep, "tr")
 		sep = space
 	}
 	if h.RecursionDesired {
-		fmt.Fprint(&sb, sep, "rd")
+		fmt.Fprint(w, sep, "rd")
 		sep = space
 	}
 	if h.RecursionAvailable {
-		fmt.Fprint(&sb, sep, "ra")
+		fmt.Fprint(w, sep, "ra")
 		sep = space
 	}
 	if h.AuthenticData {
-		fmt.Fprint(&sb, sep, "ad")
+		fmt.Fprint(w, sep, "ad")
 		sep = space
 	}
 	if h.CheckingDisabled {
-		fmt.Fprint(&sb, sep, "cd")
-		sep = space
+		fmt.Fprint(w, sep, "cd")
 	}
-	return sb.String()
 }
 
 func NewID() uint16 {
@@ -392,7 +472,7 @@ func NewID() uint16 {
 func NewQuestion(
 	buf []byte,
 	hdr dnsmessage.Header,
-	name dnsmessage.Name,
+	name Name,
 	t Type,
 	c Class,
 ) ([]byte, error) {
@@ -406,7 +486,7 @@ func NewQuestion(
 		return nil, err
 	}
 	err = mb.Question(dnsmessage.Question{
-		Name:  name,
+		Name:  name.Name,
 		Type:  dnsmessage.Type(t),
 		Class: dnsmessage.Class(c),
 	})

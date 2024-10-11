@@ -9,9 +9,8 @@ import (
 	"flag"
 	"fmt"
 	"log"
-	"net"
 	"os"
-	"strings"
+	"time"
 
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xflag"
@@ -27,8 +26,31 @@ var (
 	verbose = xlog.Mute(mutable)
 )
 
+var explanations = map[dnsmessage.Type]string{
+	dnsmessage.TypeA:     "has address",
+	dnsmessage.TypeNS:    "name server",
+	dnsmessage.TypeCNAME: "is an alias for",
+	dnsmessage.Type(11):  "has well known services",
+	dnsmessage.TypePTR:   "domain name pointer",
+	dnsmessage.Type(13):  "host information",
+	dnsmessage.TypeMX:    "mail is handled by",
+	dnsmessage.TypeTXT:   "descriptive text",
+	dnsmessage.Type(19):  "x25 address",
+	dnsmessage.Type(20):  "ISDN address",
+	dnsmessage.Type(24):  "has signature",
+	dnsmessage.Type(25):  "has key",
+	dnsmessage.TypeAAAA:  "has IPv6 address",
+	dnsmessage.Type(29):  "location",
+}
+
 func Host(ctx context.Context, args []string) error {
-	var name xdns.Name
+	var (
+		name xdns.Name
+		msg  dnsmessage.Message
+		qhdr dnsmessage.Header
+		rbuf []byte
+	)
+	buf := make([]byte, 2, 2+xdns.MaxPacketSize)
 	svr := "127.0.0.1"
 
 	xflag.UsageTemplate(flag.CommandLine, `
@@ -70,57 +92,36 @@ Mimic BIND9's DNS lookup utility.
 		return err
 	}
 	defer udp.Close()
-	qbuf := make([]byte, 2, 2+512)
-	qhdr := dnsmessage.Header{
-		ID: xdns.NewID(),
+	types := []xdns.Type{flags.t}
+	if flags.a || flags.A {
+		types[0] = xdns.Type(dnsmessage.TypeALL)
+	} else if flags.t == xdns.Type(dnsmessage.TypeA) {
+		types = append(types, xdns.Type(dnsmessage.TypeAAAA),
+			xdns.Type(dnsmessage.TypeMX))
 	}
-	if !flags.r {
-		qhdr.RecursionDesired = true
-	}
-	q, err := xdns.NewQuestion(qbuf[2:], qhdr, name.Name, flags.t, flags.c)
-	if err != nil {
-		return err
-	}
-	msg, _, err := xdns.AskUDP(ctx, udp, q)
-	if err != nil {
-		return err
-	}
-	if msg.ID != qhdr.ID {
-		return fmt.Errorf("id %d != %d", msg.ID, qhdr.ID)
-	}
-	for _, r := range msg.Answers {
-		switch r.Header.Type {
-		case dnsmessage.TypeA:
-			ŕ := r.Body.(*dnsmessage.AResource)
-			fmt.Print(net.IP(ŕ.A[:]))
-		case dnsmessage.TypeNS:
-			ŕ := r.Body.(*dnsmessage.NSResource)
-			fmt.Print(ŕ.NS)
-		case dnsmessage.TypeCNAME:
-			ŕ := r.Body.(*dnsmessage.CNAMEResource)
-			fmt.Print(ŕ.CNAME)
-		case dnsmessage.TypeSOA:
-			ŕ := r.Body.(*dnsmessage.SOAResource)
-			fmt.Printf("ns %v, mbox %v, s/n %d",
-				ŕ.NS, ŕ.MBox, ŕ.Serial)
-		case dnsmessage.TypePTR:
-			ŕ := r.Body.(*dnsmessage.PTRResource)
-			fmt.Print(ŕ.PTR)
-		case dnsmessage.TypeMX:
-			ŕ := r.Body.(*dnsmessage.MXResource)
-			fmt.Printf("%v, pref %d", ŕ.MX, ŕ.Pref)
-		case dnsmessage.TypeTXT:
-			ŕ := r.Body.(*dnsmessage.TXTResource)
-			fmt.Print(strings.Join(ŕ.TXT, " "))
-		case dnsmessage.TypeAAAA:
-			ŕ := r.Body.(*dnsmessage.AAAAResource)
-			fmt.Print(net.IP(ŕ.AAAA[:]))
-		case dnsmessage.TypeSRV:
-			ŕ := r.Body.(*dnsmessage.SRVResource)
-			fmt.Printf("%v, port %d, pri %d, weight %d",
-				ŕ.Target, ŕ.Port, ŕ.Priority, ŕ.Weight)
+	for _, t := range types {
+		qhdr.ID = xdns.NewID()
+		qhdr.RecursionDesired = !flags.r
+		q, err := xdns.NewQuestion(buf[2:], qhdr, name, t, flags.c)
+		if err != nil {
+			return xerrors.Mark(err)
 		}
-		fmt.Println()
+		rbuf, err = xdns.TimeLimitedAsk(ctx, udp, q, 30*time.Second)
+		if err != nil {
+			return xerrors.Mark(err)
+		} else if err = msg.Unpack(rbuf); err != nil {
+			return xerrors.Mark(err)
+		} else if msg.ID != qhdr.ID {
+			return fmt.Errorf("id %d != %d", msg.ID, qhdr.ID)
+		}
+		for _, r := range msg.Answers {
+			fmt.Print(name, " ")
+			s, ok := explanations[r.Header.Type]
+			if ok {
+				fmt.Print(s, " ")
+			}
+			fmt.Println(xdns.AnswerString(r))
+		}
 	}
 	return nil
 }

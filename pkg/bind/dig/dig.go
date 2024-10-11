@@ -23,16 +23,17 @@ import (
 )
 
 var (
-	udp  *net.UDPConn
-	qbuf []byte
+	udp *net.UDPConn
+	buf,
+	rbuf []byte
+	msg  dnsmessage.Message
+	qhdr dnsmessage.Header
 	cmd,
 	svr,
 	ver string
 )
 
 func DiG(ctx context.Context, args []string) error {
-	var err error
-
 	xflag.UsageTemplate(flag.CommandLine, `
 usage: {{.Name}} [@server] [+global] [[-flags] [name [TYPE] [CLASS] [+options]]
 Mimic BIND9's DNS lookup utility.
@@ -46,6 +47,7 @@ Mimic BIND9's DNS lookup utility.
 		ver = "(unavailable)"
 	}
 
+	buf = make([]byte, 2, 2+xdns.MaxPacketSize)
 	cmd = strings.Join(args, " ")
 	svr = "127.0.0.1"
 	if len(args) > 0 && strings.HasPrefix(args[0], "@") {
@@ -53,6 +55,7 @@ Mimic BIND9's DNS lookup utility.
 		args = args[1:]
 	}
 
+	var err error
 	args, err = gopts.parse(args)
 	if err != nil {
 		return err
@@ -65,8 +68,6 @@ Mimic BIND9's DNS lookup utility.
 			udp = nil
 		}
 	}()
-
-	qbuf = make([]byte, 2, 2+512)
 
 	for fs := flag.CommandLine; len(args) > 0; fs = newFlagSet() {
 		if args, err = lookup(ctx, fs, args); err != nil {
@@ -134,38 +135,39 @@ func lookup(ctx context.Context, fs *flag.FlagSet, args []string) (
 	if err != nil {
 		return args, err
 	}
-	id := xdns.NewID()
-	q, err := xdns.NewQuestion(qbuf[2:], dnsmessage.Header{
-		ID: id,
 
-		RecursionDesired: true,
-	}, flags.q.Name, flags.t, flags.c)
+	qhdr.ID = xdns.NewID()
+	qhdr.RecursionDesired = true
+	q, err := xdns.NewQuestion(buf[2:], qhdr, flags.q, flags.t, flags.c)
 	if err != nil {
 		return args, err
 	}
+
 	beg := time.Now()
-	msg, n, err := ask(ctx, q)
+	rbuf, err = ask(ctx, q)
 	end := time.Now()
 	if err != nil {
 		return args, err
+	} else if err = msg.Unpack(rbuf); err != nil {
+		return args, err
+	} else if msg.ID != qhdr.ID {
+		return args, fmt.Errorf("id %d != %d", msg.ID, qhdr.ID)
 	}
-	if msg.ID != id {
-		return args, fmt.Errorf("id %d != %d", msg.ID, id)
-	}
-	showHeader(msg)
+
+	showHeader(&msg)
 	showOptPseudoSection(msg.Additionals)
 	showQuestionSection(msg.Questions)
 	showAnswerSection(msg.Answers)
 	showAuthoritySection(msg.Authorities)
-	showStats(beg, end, n, ra)
+	showStats(beg, end, len(rbuf), ra)
 	return args, nil
 }
 
-func ask(ctx context.Context, q []byte) (*dnsmessage.Message, int, error) {
+func ask(ctx context.Context, b []byte) ([]byte, error) {
 	if udp != nil {
-		return xdns.AskUDP(ctx, udp, q)
+		return xdns.TimeLimitedAsk(ctx, udp, b, 30*time.Second)
 	}
-	return nil, 0, xerrors.FIXME("DOH")
+	return b[:0], xerrors.FIXME("DOH")
 }
 
 func batch(ctx context.Context, fn string) error {
