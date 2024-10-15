@@ -24,17 +24,24 @@ import (
 //go:embed types.txt
 var TypesTxt string
 
+//go:linkname runtime_rand runtime.rand
+func runtime_rand() uint64
+
+//go:linkname unpackCNAMEResource golang.org/x/net/dns/dnsmessage.unpackCNAMEResource
+func unpackCNAMEResource([]byte, int) (dnsmessage.CNAMEResource, error)
+
+//go:linkname unpackMXResource golang.org/x/net/dns/dnsmessage.unpackMXResource
+func unpackMXResource([]byte, int) (dnsmessage.MXResource, error)
+
+//go:linkname unpackUint16 golang.org/x/net/dns/dnsmessage.unpackUint16
+func unpackUint16([]byte, int) (uint16, int, error)
+
 var (
 	ErrIncomplete = errors.New("incomplete")
 	ErrInvalid    = errors.New("invalid")
 	ErrOverrun    = errors.New("overrun")
 	ErrUnderrun   = errors.New("underrun")
 )
-
-// provided by runtime
-//
-//go:linkname runtime_rand runtime.rand
-func runtime_rand() uint64
 
 const MaxPacketSize = 1232
 
@@ -221,7 +228,11 @@ var Resolver = &net.Resolver{
 	StrictErrors: true,
 }
 
-const dnsmessageTypeHTTPS = 65
+const (
+	dnsmessageTypeSVCB  dnsmessage.Type = 64
+	dnsmessageTypeHTTPS dnsmessage.Type = 65
+	dnsmessageTypeCAA   dnsmessage.Type = 257
+)
 
 type Type dnsmessage.Type
 
@@ -241,10 +252,12 @@ const (
 	TypeWKS     = Type(dnsmessage.TypeWKS)
 	TypeHINFO   = Type(dnsmessage.TypeHINFO)
 	TypeMINFO   = Type(dnsmessage.TypeMINFO)
+	TypeSVCB    = Type(dnsmessageTypeSVCB)
 	TypeHTTPS   = Type(dnsmessageTypeHTTPS)
 	TypeAXFR    = Type(dnsmessage.TypeAXFR)
 	TypeALL     = Type(dnsmessage.TypeALL)
 	TypeANY     = TypeALL
+	TypeCAA     = Type(dnsmessageTypeCAA)
 )
 
 func (v Type) MarshalText() ([]byte, error) {
@@ -265,9 +278,11 @@ func (v Type) MarshalText() ([]byte, error) {
 		dnsmessage.TypeWKS:   "WKS",
 		dnsmessage.TypeHINFO: "HINFO",
 		dnsmessage.TypeMINFO: "MINFO",
+		dnsmessageTypeSVCB:   "SVCB",
 		dnsmessageTypeHTTPS:  "HTTPS",
 		dnsmessage.TypeAXFR:  "AXFR",
 		dnsmessage.TypeALL:   "ANY",
+		dnsmessageTypeCAA:    "CAA",
 	}[dnsmessage.Type(v)]
 	if !ok {
 		s = fmt.Sprintf("TYPE%d", v)
@@ -328,10 +343,12 @@ func (p *Type) UnmarshalText(text []byte) error {
 		"WKS":   dnsmessage.TypeWKS,
 		"HINFO": dnsmessage.TypeHINFO,
 		"MINFO": dnsmessage.TypeMINFO,
+		"SVCB":  dnsmessageTypeSVCB,
 		"HTTPS": dnsmessageTypeHTTPS,
 		"AXFR":  dnsmessage.TypeAXFR,
 		"ALL":   dnsmessage.TypeALL,
 		"ANY":   dnsmessage.TypeALL,
+		"CAA":   dnsmessageTypeCAA,
 	}[s]; !ok {
 		return ErrInvalid
 	} else {
@@ -352,30 +369,49 @@ type SRVResource = dnsmessage.SRVResource
 type OPTResource = dnsmessage.OPTResource
 type UnknownResource = dnsmessage.UnknownResource
 
+type SVCBResource struct {
+	Pri uint16
+	dnsmessage.Name
+	Params []SVCBParam
+}
+
+type SVCBParam struct {
+	Key   uint16
+	Value any
+}
+
+type HTTPSResource struct{ SVCBResource }
+
+func (r *HTTPSResource) UnmarshalBinary(msg []byte) error {
+	return r.SVCBResource.UnmarshalBinary(msg)
+}
+
+type CAAResource struct{ SVCBResource }
+
+func (r *CAAResource) UnmarshalBinary(msg []byte) error {
+	return r.SVCBResource.UnmarshalBinary(msg)
+}
+
 func AnswerString(r dnsmessage.Resource) (s string) {
 	switch r.Header.Type {
 	case dnsmessage.TypeA:
 		rb := r.Body.(*AResource)
 		s = net.IP(rb.A[:]).String()
 	case dnsmessage.TypeNS:
-		rb := r.Body.(*NSResource)
-		s = rb.NS.String()
+		s = r.Body.(*NSResource).NS.String()
 	case dnsmessage.TypeCNAME:
-		rb := r.Body.(*CNAMEResource)
-		s = rb.CNAME.String()
+		s = r.Body.(*CNAMEResource).CNAME.String()
 	case dnsmessage.TypeSOA:
 		rb := r.Body.(*SOAResource)
 		s = fmt.Sprintf("ns %v, mbox %v, s/n %d",
 			rb.NS, rb.MBox, rb.Serial)
 	case dnsmessage.TypePTR:
-		rb := r.Body.(*PTRResource)
-		s = rb.PTR.String()
+		s = r.Body.(*PTRResource).PTR.String()
 	case dnsmessage.TypeMX:
 		rb := r.Body.(*MXResource)
 		s = fmt.Sprintf("%v, pref %d", rb.MX, rb.Pref)
 	case dnsmessage.TypeTXT:
-		rb := r.Body.(*TXTResource)
-		s = strings.Join(rb.TXT, " ")
+		s = strings.Join(r.Body.(*TXTResource).TXT, " ")
 	case dnsmessage.TypeAAAA:
 		rb := r.Body.(*AAAAResource)
 		s = net.IP(rb.AAAA[:]).String()
@@ -383,9 +419,32 @@ func AnswerString(r dnsmessage.Resource) (s string) {
 		rb := r.Body.(*SRVResource)
 		s = fmt.Sprintf("%v, port %d, pri %d, weight %d",
 			rb.Target, rb.Port, rb.Priority, rb.Weight)
+	case dnsmessageTypeSVCB:
+		var rb SVCBResource
+		data := r.Body.(*UnknownResource).Data
+		if err := rb.UnmarshalBinary(data); err != nil {
+			s = err.Error()
+		} else {
+			s = rb.String()
+		}
+	case dnsmessageTypeHTTPS:
+		var rb HTTPSResource
+		data := r.Body.(*UnknownResource).Data
+		if err := rb.UnmarshalBinary(data); err != nil {
+			s = err.Error()
+		} else {
+			s = rb.String()
+		}
+	case dnsmessageTypeCAA:
+		var rb CAAResource
+		data := r.Body.(*UnknownResource).Data
+		if err := rb.UnmarshalBinary(data); err != nil {
+			s = err.Error()
+		} else {
+			s = rb.String()
+		}
 	default:
-		rb := r.Body.(*UnknownResource)
-		s = fmt.Sprintf("%#x", rb.Data)
+		s = fmt.Sprintf("%#x", r.Body.(*UnknownResource).Data)
 	}
 	return
 }
@@ -528,4 +587,131 @@ func NewUDP(ctx context.Context, svr string, port uint) (*net.UDPConn, error) {
 		nw = "udp6"
 	}
 	return net.DialUDP(nw, nil, a)
+}
+
+const (
+	SVCBParamKeyMandatory = iota
+	SVCBParamKeyALPN
+	SVCBParamKeyNoDefaultALPN
+	SVCBParamKeyPort
+	SVCBParamKeyIPV4Hint
+	SVCBParamKeyECH
+	SVCBParamKeyIPV6Hint
+	SVCBParamKeyDOHPath
+)
+
+func (r *SVCBResource) String() string {
+	var sb strings.Builder
+	fmt.Fprintf(&sb, "%d", r.Pri)
+	fmt.Fprint(&sb, " ", r.Name)
+	for _, param := range r.Params {
+		fmt.Fprint(&sb, " ", param)
+	}
+	return sb.String()
+}
+
+func (r *SVCBResource) UnmarshalBinary(msg []byte) error {
+	mx, err := unpackMXResource(msg, 0)
+	if err != nil {
+		return err
+	}
+	r.Pri = mx.Pref
+	r.Name = mx.MX
+	if r.Pri == 0 {
+		// Alias mode [rfc9460 section 2.4.2]
+		return nil
+	}
+	msg = msg[2+r.Name.Length:]
+	for len(msg) >= 4 {
+		u16, n, err := unpackUint16(msg, 0)
+		if err != nil {
+			return err
+		}
+		param := SVCBParam{Key: u16}
+		msg = msg[n:]
+		u16, n, err = unpackUint16(msg, 0)
+		if err != nil {
+			return err
+		}
+		l := int(u16)
+		msg = msg[n:]
+		switch param.Key {
+		case SVCBParamKeyMandatory:
+			// FIXME txt
+		case SVCBParamKeyALPN:
+			var alpns []string
+			for i := 0; i < l; i += 1 + n {
+				n = int(msg[i])
+				if 1+n > l {
+					return ErrUnderrun
+				}
+				b := make([]byte, n)
+				copy(b, msg[i+1:i+1+n])
+				alpns = append(alpns, string(b))
+			}
+			param.Value = alpns
+		case SVCBParamKeyNoDefaultALPN:
+			// empty
+		case SVCBParamKeyPort:
+			param.Value, n, err = unpackUint16(msg, 0)
+		case SVCBParamKeyIPV4Hint:
+			if len(msg) < 4 {
+				return ErrUnderrun
+			}
+			param.Value, _ = netip.AddrFromSlice(msg[:4])
+		case SVCBParamKeyECH:
+			// FIXME decode base64
+		case SVCBParamKeyIPV6Hint:
+			if len(msg) < 16 {
+				return ErrUnderrun
+			}
+			param.Value, _ = netip.AddrFromSlice(msg[:16])
+		case SVCBParamKeyDOHPath:
+			// FIXME decode DOH path
+		default:
+			param.Value = msg[:l]
+		}
+		r.Params = append(r.Params, param)
+		msg = msg[l:]
+	}
+	return nil
+}
+
+func (param SVCBParam) Format(w fmt.State, verb rune) {
+	if s, ok := map[uint16]string{
+		SVCBParamKeyMandatory:     "mandatory",
+		SVCBParamKeyALPN:          "alpn",
+		SVCBParamKeyNoDefaultALPN: "no-default-alpn",
+		SVCBParamKeyPort:          "port",
+		SVCBParamKeyIPV4Hint:      "ipv4hint",
+		SVCBParamKeyECH:           "ech",
+		SVCBParamKeyIPV6Hint:      "ipv6hint",
+		SVCBParamKeyDOHPath:       "dohpath",
+	}[param.Key]; ok {
+		fmt.Fprint(w, s, "=")
+	} else {
+		fmt.Fprintf(w, "key%d=", param.Key)
+	}
+	switch param.Key {
+	case SVCBParamKeyMandatory:
+		fmt.Fprint(w, "FIXME")
+	case SVCBParamKeyALPN:
+		if ss, ok := param.Value.([]string); !ok {
+			fmt.Fprint(w, "invalid")
+		} else {
+			fmt.Fprintf(w, "%q", strings.Join(ss, ","))
+		}
+	case SVCBParamKeyNoDefaultALPN:
+		// empty
+	case SVCBParamKeyPort:
+		fmt.Fprintf(w, "%d", param.Value)
+	case SVCBParamKeyIPV4Hint:
+		fmt.Fprintf(w, "%q", param.Value)
+	case SVCBParamKeyECH:
+		fmt.Fprint(w, "FIXME")
+	case SVCBParamKeyIPV6Hint:
+		fmt.Fprintf(w, "%q", param.Value)
+	case SVCBParamKeyDOHPath:
+		fmt.Fprint(w, "FIXME")
+	}
 }
