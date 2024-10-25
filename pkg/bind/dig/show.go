@@ -9,7 +9,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/platinasystems/goes/v2/pkg/xnet/xdns"
+	"github.com/platinasystems/goes/v2/pkg/xnet/xdns/xdnsmessage"
 	"golang.org/x/net/dns/dnsmessage"
 )
 
@@ -24,10 +24,10 @@ func showAnswerSection(resources []dnsmessage.Resource) {
 		if !qopts.has(boolOptShort) {
 			fmt.Printf("%-24s", r.Header.Name)
 			fmt.Printf("%-8d", r.Header.TTL)
-			fmt.Printf("%-8s", xdns.Class(r.Header.Class))
-			fmt.Printf("%-8s", xdns.Type(r.Header.Type))
+			fmt.Printf("%-8s", xdnsmessage.Class(r.Header.Class))
+			fmt.Printf("%-8s", xdnsmessage.Type(r.Header.Type))
 		}
-		fmt.Println(xdns.AnswerString(r))
+		fmt.Println(xdnsmessage.AnswerString(r))
 	}
 	if qopts.has(boolOptComments) {
 		fmt.Println()
@@ -64,13 +64,13 @@ func showHeader(msg *dnsmessage.Message) {
 	}
 	fmt.Println(";; Got answer:")
 	fmt.Printf(";; ->>HEADER<<- opcode: %s, status: %s, id: %d\n",
-		xdns.OpCodeName[msg.OpCode],
-		xdns.RCodeName[msg.RCode],
+		xdnsmessage.OpCodeName[msg.OpCode],
+		xdnsmessage.RCodeName[msg.RCode],
 		msg.ID,
 	)
 	fmt.Printf(";; flags: %s; QUERY: %d, ANSWER: %d, AUTHORITY: %d, "+
 		"ADDITIONAL: %d\n",
-		xdns.HeaderFlags{msg.Header},
+		xdnsmessage.HeaderFlags{msg.Header},
 		len(msg.Questions),
 		len(msg.Answers),
 		len(msg.Authorities),
@@ -88,11 +88,12 @@ func showOptPseudoSection(resources []dnsmessage.Resource) {
 		fmt.Println(";; OPT PSEUDOSECTION:")
 	}
 	for _, r := range resources {
-		fmt.Print("; EDNS: version: ", xdns.EDNSVersion(r.Header.TTL))
-		if xdns.HasEDNS0DNSSECOK(r.Header.TTL) {
+		fmt.Print("; EDNS: version: ",
+			xdnsmessage.EDNSVersion(r.Header.TTL))
+		if xdnsmessage.HasEDNS0DNSSECOK(r.Header.TTL) {
 			fmt.Print(" do")
 		}
-		if mbz := xdns.EDNS0MBZ(r.Header.TTL); mbz != 0 {
+		if mbz := xdnsmessage.EDNS0MBZ(r.Header.TTL); mbz != 0 {
 			fmt.Printf("; MBZ: %#.4x, udp: ", mbz)
 		} else {
 			fmt.Print("; udp: ")
@@ -114,8 +115,8 @@ func showQuestionSection(questions []dnsmessage.Question) {
 	}
 	for _, q := range questions {
 		fmt.Printf(";%-31s", q.Name)
-		fmt.Printf("%-8s", xdns.Class(q.Class))
-		fmt.Printf("%-s\n", xdns.Type(q.Type))
+		fmt.Printf("%-8s", xdnsmessage.Class(q.Class))
+		fmt.Printf("%-s\n", xdnsmessage.Type(q.Type))
 	}
 	if qopts.has(boolOptComments) {
 		fmt.Println()

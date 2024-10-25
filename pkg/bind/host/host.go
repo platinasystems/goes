@@ -15,7 +15,7 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xflag"
 	"github.com/platinasystems/goes/v2/pkg/xlog"
-	"github.com/platinasystems/goes/v2/pkg/xnet/xdns"
+	"github.com/platinasystems/goes/v2/pkg/xnet/xdns/xdnsmessage"
 	"github.com/platinasystems/goes/v2/pkg/xprogram"
 	"golang.org/x/net/dns/dnsmessage"
 )
@@ -45,12 +45,12 @@ var explanations = map[dnsmessage.Type]string{
 
 func Host(ctx context.Context, args []string) error {
 	var (
-		name xdns.Name
+		name xdnsmessage.Name
 		msg  dnsmessage.Message
 		qhdr dnsmessage.Header
 		rbuf []byte
 	)
-	buf := make([]byte, 2, 2+xdns.MaxPacketSize)
+	buf := make([]byte, 2, 2+xdnsmessage.MaxPacketSize)
 	svr := "127.0.0.1"
 
 	xflag.UsageTemplate(flag.CommandLine, `
@@ -87,26 +87,28 @@ Mimic BIND9's DNS lookup utility.
 		svr = args[0]
 	}
 	// FIXME alt DOH
-	udp, err := xdns.NewUDP(ctx, svr, flags.p)
+	udp, err := xdnsmessage.NewUDP(ctx, svr, flags.p)
 	if err != nil {
 		return err
 	}
 	defer udp.Close()
-	types := []xdns.Type{flags.t}
+	types := []xdnsmessage.Type{flags.t}
 	if flags.a || flags.A {
-		types[0] = xdns.Type(dnsmessage.TypeALL)
-	} else if flags.t == xdns.Type(dnsmessage.TypeA) {
-		types = append(types, xdns.Type(dnsmessage.TypeAAAA),
-			xdns.Type(dnsmessage.TypeMX))
+		types[0] = xdnsmessage.Type(dnsmessage.TypeALL)
+	} else if flags.t == xdnsmessage.Type(dnsmessage.TypeA) {
+		types = append(types, xdnsmessage.Type(dnsmessage.TypeAAAA),
+			xdnsmessage.Type(dnsmessage.TypeMX))
 	}
 	for _, t := range types {
-		qhdr.ID = xdns.NewID()
+		qhdr.ID = xdnsmessage.NewID()
 		qhdr.RecursionDesired = !flags.r
-		q, err := xdns.NewQuestion(buf[2:], qhdr, name, t, flags.c)
+		q, err := xdnsmessage.
+			NewQuestion(buf[2:], qhdr, name, t, flags.c)
 		if err != nil {
 			return xerrors.Mark(err)
 		}
-		rbuf, err = xdns.TimeLimitedAsk(ctx, udp, q, 30*time.Second)
+		rbuf, err = xdnsmessage.
+			TimeLimitedAsk(ctx, udp, q, 30*time.Second)
 		if err != nil {
 			return xerrors.Mark(err)
 		} else if err = msg.Unpack(rbuf); err != nil {
@@ -120,7 +122,7 @@ Mimic BIND9's DNS lookup utility.
 			if ok {
 				fmt.Print(s, " ")
 			}
-			fmt.Println(xdns.AnswerString(r))
+			fmt.Println(xdnsmessage.AnswerString(r))
 		}
 	}
 	return nil

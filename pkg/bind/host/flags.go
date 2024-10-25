@@ -8,17 +8,17 @@ import (
 	"flag"
 	"time"
 
-	"github.com/platinasystems/goes/v2/pkg/xnet/xdns"
+	"github.com/platinasystems/goes/v2/pkg/xnet/xdns/xdnsmessage"
 )
 
 var flags struct {
 	a, A, C, d, i, ip4, ip6, l, m, r, s, T, U, v, V, w bool
 
-	c xdns.Class
+	c xdnsmessage.Class
 	N,
 	p,
 	R uint
-	t xdns.Type
+	t xdnsmessage.Type
 	W time.Duration
 }
 
@@ -27,7 +27,7 @@ func addCommandLineFlags() {
 		"is equivalent to -v -t ANY")
 	flag.BoolVar(&flags.A, "A", false,
 		"is like -a but omits RRSIG, NSEC, NSEC3")
-	flag.TextVar(&flags.c, "c", xdns.DefaultClass,
+	flag.TextVar(&flags.c, "c", xdnsmessage.DefaultClass,
 		"specifies query class for non-IN data")
 	flag.BoolVar(&flags.C, "C", false,
 		"compares SOA records on authoritative nameservers")
@@ -52,7 +52,7 @@ func addCommandLineFlags() {
 		"specifies number of retries for UDP packets")
 	flag.BoolVar(&flags.s, "s", false,
 		"a SERVFAIL response should stop query")
-	flag.TextVar(&flags.t, "t", xdns.DefaultType,
+	flag.TextVar(&flags.t, "t", xdnsmessage.DefaultType,
 		"specifies the query type")
 	flag.BoolVar(&flags.T, "T", false,
 		"enables TCP/IP mode")

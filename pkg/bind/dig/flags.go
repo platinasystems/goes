@@ -8,7 +8,7 @@ import (
 	"flag"
 
 	"github.com/platinasystems/goes/v2/pkg/xflag"
-	"github.com/platinasystems/goes/v2/pkg/xnet/xdns"
+	"github.com/platinasystems/goes/v2/pkg/xnet/xdns/xdnsmessage"
 )
 
 func newFlagSet() *flag.FlagSet {
@@ -22,9 +22,9 @@ var flags struct {
 
 	b, f, i, k, x, y string
 
-	c xdns.Class
-	q xdns.Name
-	t xdns.Type
+	c xdnsmessage.Class
+	q xdnsmessage.Name
+	t xdnsmessage.Type
 	p uint
 }
 
@@ -78,7 +78,7 @@ ps(1) or in a history file maintained by the user's shell.`[1:])
 }
 
 func addQueryFlags(fs *flag.FlagSet) {
-	fs.TextVar(&flags.c, "c", xdns.ZeroClass, `
+	fs.TextVar(&flags.c, "c", xdnsmessage.Class0, `
 Set the query class. { ANY, CH, CS, HS, IN }`[1:])
 	fs.StringVar(&flags.i, "i", "", `
 Do reverse IPv6 lookups using the obsolete RFC1886 IP6.INT
@@ -87,7 +87,7 @@ queries (RFC2874) are not attempted.`[1:])
 	flags.q.Length = 0
 	fs.TextVar(&flags.q, "q", flags.q, `
 Query the flagged name instead of positional argument.`[1:])
-	fs.TextVar(&flags.t, "t", xdns.ZeroType, `
+	fs.TextVar(&flags.t, "t", xdnsmessage.Type0, `
 The resource record type to query. It can be any valid query
 type which is supported in BIND 9. The default query type is
 "A", unless the -x option is supplied to indicate a reverse

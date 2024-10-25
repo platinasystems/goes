@@ -17,7 +17,7 @@ import (
 
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xflag"
-	"github.com/platinasystems/goes/v2/pkg/xnet/xdns"
+	"github.com/platinasystems/goes/v2/pkg/xnet/xdns/xdnsmessage"
 	"github.com/platinasystems/goes/v2/pkg/xprogram"
 	"golang.org/x/net/dns/dnsmessage"
 )
@@ -47,7 +47,7 @@ Mimic BIND9's DNS lookup utility.
 		ver = "(unavailable)"
 	}
 
-	buf = make([]byte, 2, 2+xdns.MaxPacketSize)
+	buf = make([]byte, 2, 2+xdnsmessage.MaxPacketSize)
 	cmd = strings.Join(args, " ")
 	svr = "127.0.0.1"
 	if len(args) > 0 && strings.HasPrefix(args[0], "@") {
@@ -93,7 +93,7 @@ func lookup(ctx context.Context, fs *flag.FlagSet, args []string) (
 			return args, nil
 		}
 		if flags.T {
-			fmt.Print(xdns.TypesTxt)
+			fmt.Print(xdnsmessage.TypesTxt)
 			return args, nil
 		}
 		if flags.v {
@@ -107,7 +107,7 @@ func lookup(ctx context.Context, fs *flag.FlagSet, args []string) (
 	}
 	if udp == nil {
 		// FIXME alt DOH
-		udp, err = xdns.NewUDP(ctx, svr, flags.p)
+		udp, err = xdnsmessage.NewUDP(ctx, svr, flags.p)
 		if err != nil {
 			return args, err
 		}
@@ -120,8 +120,8 @@ func lookup(ctx context.Context, fs *flag.FlagSet, args []string) (
 			return args, xerrors.Label(err, "x")
 		}
 		flags.q.Reverse(addr)
-		flags.t = xdns.TypePTR
-		flags.c = xdns.DefaultClass
+		flags.t = xdnsmessage.TypePTR
+		flags.c = xdnsmessage.DefaultClass
 	} else if args, err = flags.q.Pull(args); err != nil {
 		return args, xerrors.Label(err, "name")
 	} else if args, err = flags.t.Pull(args); err != nil {
@@ -136,9 +136,10 @@ func lookup(ctx context.Context, fs *flag.FlagSet, args []string) (
 		return args, err
 	}
 
-	qhdr.ID = xdns.NewID()
+	qhdr.ID = xdnsmessage.NewID()
 	qhdr.RecursionDesired = true
-	q, err := xdns.NewQuestion(buf[2:], qhdr, flags.q, flags.t, flags.c)
+	q, err := xdnsmessage.
+		NewQuestion(buf[2:], qhdr, flags.q, flags.t, flags.c)
 	if err != nil {
 		return args, err
 	}
@@ -165,7 +166,7 @@ func lookup(ctx context.Context, fs *flag.FlagSet, args []string) (
 
 func ask(ctx context.Context, b []byte) ([]byte, error) {
 	if udp != nil {
-		return xdns.TimeLimitedAsk(ctx, udp, b, 30*time.Second)
+		return xdnsmessage.TimeLimitedAsk(ctx, udp, b, 30*time.Second)
 	}
 	return b[:0], xerrors.FIXME("DOH")
 }
