@@ -26,30 +26,26 @@ var (
 	verbose = xlog.Mute(mutable)
 )
 
-var explanations = map[dnsmessage.Type]string{
-	dnsmessage.TypeA:     "has address",
-	dnsmessage.TypeNS:    "name server",
-	dnsmessage.TypeCNAME: "is an alias for",
-	dnsmessage.Type(11):  "has well known services",
-	dnsmessage.TypePTR:   "domain name pointer",
-	dnsmessage.Type(13):  "host information",
-	dnsmessage.TypeMX:    "mail is handled by",
-	dnsmessage.TypeTXT:   "descriptive text",
-	dnsmessage.Type(19):  "x25 address",
-	dnsmessage.Type(20):  "ISDN address",
-	dnsmessage.Type(24):  "has signature",
-	dnsmessage.Type(25):  "has key",
-	dnsmessage.TypeAAAA:  "has IPv6 address",
-	dnsmessage.Type(29):  "location",
+var explanations = map[xdnsmessage.Type]string{
+	xdnsmessage.TypeA:     "has address",
+	xdnsmessage.TypeNS:    "name server",
+	xdnsmessage.TypeCNAME: "is an alias for",
+	xdnsmessage.TypeWKS:   "has well known services",
+	xdnsmessage.TypePTR:   "domain name pointer",
+	xdnsmessage.TypeHINFO: "host information",
+	xdnsmessage.TypeMX:    "mail is handled by",
+	xdnsmessage.TypeTXT:   "descriptive text",
+	xdnsmessage.TypeX25:   "x25 address",
+	xdnsmessage.TypeISDN:  "ISDN address",
+	xdnsmessage.TypeSIG:   "has signature",
+	xdnsmessage.TypeKEY:   "has key",
+	xdnsmessage.TypeAAAA:  "has IPv6 address",
+	xdnsmessage.TypeLOC:   "location",
 }
 
 func Host(ctx context.Context, args []string) error {
-	var (
-		name xdnsmessage.Name
-		msg  dnsmessage.Message
-		qhdr dnsmessage.Header
-		rbuf []byte
-	)
+	var name string
+
 	buf := make([]byte, 2, 2+xdnsmessage.MaxPacketSize)
 	svr := "127.0.0.1"
 
@@ -78,9 +74,8 @@ Mimic BIND9's DNS lookup utility.
 	args = flag.CommandLine.Args()
 	if len(args) == 0 {
 		return xerrors.Incomplete("name")
-	} else if err = name.UnmarshalText([]byte(args[0])); err != nil {
-		return xerrors.Label(err, "name")
 	} else {
+		name = args[0]
 		args = args[1:]
 	}
 	if len(args) > 0 {
@@ -94,31 +89,36 @@ Mimic BIND9's DNS lookup utility.
 	defer udp.Close()
 	types := []xdnsmessage.Type{flags.t}
 	if flags.a || flags.A {
-		types[0] = xdnsmessage.Type(dnsmessage.TypeALL)
-	} else if flags.t == xdnsmessage.Type(dnsmessage.TypeA) {
-		types = append(types, xdnsmessage.Type(dnsmessage.TypeAAAA),
-			xdnsmessage.Type(dnsmessage.TypeMX))
+		types[0] = xdnsmessage.TypeANY
+	} else if flags.t == xdnsmessage.TypeA {
+		types = append(types, xdnsmessage.TypeAAAA, xdnsmessage.TypeMX)
+	}
+	var hf xdnsmessage.HF
+	if !flags.r {
+		hf |= xdnsmessage.HFRecursionDesired
 	}
 	for _, t := range types {
-		qhdr.ID = xdnsmessage.NewID()
-		qhdr.RecursionDesired = !flags.r
-		q, err := xdnsmessage.
-			NewQuestion(buf[2:], qhdr, name, t, flags.c)
+		var msg dnsmessage.Message
+
+		id, q, err := xdnsmessage.
+			NewQuestion(buf[2:], name, t, flags.c, hf)
 		if err != nil {
 			return xerrors.Mark(err)
 		}
-		rbuf, err = xdnsmessage.
+		data, err := xdnsmessage.
 			TimeLimitedAsk(ctx, udp, q, 30*time.Second)
 		if err != nil {
 			return xerrors.Mark(err)
-		} else if err = msg.Unpack(rbuf); err != nil {
+		}
+		if err = msg.Unpack(data); err != nil {
 			return xerrors.Mark(err)
-		} else if msg.ID != qhdr.ID {
-			return fmt.Errorf("id %d != %d", msg.ID, qhdr.ID)
+		}
+		if msg.ID != id {
+			return fmt.Errorf("id %d != %d", msg.ID, id)
 		}
 		for _, r := range msg.Answers {
 			fmt.Print(name, " ")
-			s, ok := explanations[r.Header.Type]
+			s, ok := explanations[xdnsmessage.Type(r.Header.Type)]
 			if ok {
 				fmt.Print(s, " ")
 			}

@@ -19,15 +19,11 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xflag"
 	"github.com/platinasystems/goes/v2/pkg/xnet/xdns/xdnsmessage"
 	"github.com/platinasystems/goes/v2/pkg/xprogram"
-	"golang.org/x/net/dns/dnsmessage"
 )
 
 var (
 	udp *net.UDPConn
-	buf,
-	rbuf []byte
-	msg  dnsmessage.Message
-	qhdr dnsmessage.Header
+	buf []byte
 	cmd,
 	svr,
 	ver string
@@ -81,6 +77,8 @@ func lookup(ctx context.Context, fs *flag.FlagSet, args []string) (
 	[]string, error,
 ) {
 	var ra net.Addr
+	var msg xdnsmessage.Message
+
 	addQueryFlags(fs)
 	err := fs.Parse(args)
 	if err != nil {
@@ -93,18 +91,23 @@ func lookup(ctx context.Context, fs *flag.FlagSet, args []string) (
 			return args, nil
 		}
 		if flags.T {
-			fmt.Print(xdnsmessage.TypesTxt)
+			fmt.Print(xdnsmessage.TypeHelpTxt)
 			return args, nil
 		}
 		if flags.v {
 			fmt.Println(ver)
 			return args, nil
 		}
-		showCmd()
+		if !gopts.has(boolOptShort) && gopts.has(boolOptCmd) {
+			fmt.Printf("; <<>> goes/pkg/bind/dig %s <<>> %s\n",
+				ver, cmd)
+			fmt.Println()
+		}
 		if len(flags.f) > 0 {
 			return []string{}, batch(ctx, flags.f)
 		}
 	}
+
 	if udp == nil {
 		// FIXME alt DOH
 		udp, err = xdnsmessage.NewUDP(ctx, svr, flags.p)
@@ -114,61 +117,168 @@ func lookup(ctx context.Context, fs *flag.FlagSet, args []string) (
 		ra = udp.RemoteAddr()
 	}
 
+	var name string
+	var c xdnsmessage.Class
+	var t xdnsmessage.Type
+
 	if s := flags.x; len(s) > 0 {
 		addr, err := netip.ParseAddr(s)
 		if err != nil {
 			return args, xerrors.Label(err, "x")
 		}
-		flags.q.Reverse(addr)
-		flags.t = xdnsmessage.TypePTR
-		flags.c = xdnsmessage.DefaultClass
-	} else if args, err = flags.q.Pull(args); err != nil {
-		return args, xerrors.Label(err, "name")
-	} else if args, err = flags.t.Pull(args); err != nil {
-		return args, xerrors.Label(err, "type")
-	} else if args, err = flags.c.Pull(args); err != nil {
-		return args, xerrors.Label(err, "class")
+		name = xdnsmessage.Reverse(addr)
+		t = xdnsmessage.TypePTR
+		c = xdnsmessage.ClassINET
+	} else {
+		if len(flags.q) > 0 {
+			name = flags.q
+		} else if len(args) == 0 {
+			return args, xerrors.Incomplete("name")
+		} else {
+			name = args[0]
+			args = args[1:]
+		}
+		if flags.t != xdnsmessage.Type0 {
+			t = flags.t
+		} else if len(args) == 0 {
+			t = xdnsmessage.TypeA
+		} else if t, err = xdnsmessage.TypeNamed(args[0]); err != nil {
+			t = xdnsmessage.TypeA
+		} else {
+			args = args[1:]
+		}
+		if flags.c != xdnsmessage.Class0 {
+			c = flags.c
+		} else if len(args) == 0 {
+			c = xdnsmessage.ClassINET
+		} else if c, err = xdnsmessage.ClassNamed(args[0]); err != nil {
+			c = xdnsmessage.ClassINET
+		} else {
+			args = args[1:]
+		}
 	}
 
-	qopts.clone(&gopts)
+	qopts := gopts.clone()
 	args, err = qopts.parse(args)
 	if err != nil {
 		return args, err
 	}
 
-	qhdr.ID = xdnsmessage.NewID()
-	qhdr.RecursionDesired = true
-	q, err := xdnsmessage.
-		NewQuestion(buf[2:], qhdr, flags.q, flags.t, flags.c)
+	const hf = xdnsmessage.HFRecursionDesired
+	id, q, err := xdnsmessage.NewQuestion(buf[2:], name, t, c, hf)
 	if err != nil {
 		return args, err
 	}
 
 	beg := time.Now()
-	rbuf, err = ask(ctx, q)
+	data, err := xdnsmessage.TimeLimitedAsk(ctx, udp, q, 30*time.Second)
 	end := time.Now()
 	if err != nil {
 		return args, err
-	} else if err = msg.Unpack(rbuf); err != nil {
+	}
+	if err = msg.Unpack(data); err != nil {
 		return args, err
-	} else if msg.ID != qhdr.ID {
-		return args, fmt.Errorf("id %d != %d", msg.ID, qhdr.ID)
+	}
+	if msg.ID != id {
+		return args, fmt.Errorf("id %d != %d", msg.ID, id)
 	}
 
-	showHeader(&msg)
-	showOptPseudoSection(msg.Additionals)
-	showQuestionSection(msg.Questions)
-	showAnswerSection(msg.Answers)
-	showAuthoritySection(msg.Authorities)
-	showStats(beg, end, len(rbuf), ra)
+	if !qopts.has(boolOptShort) && qopts.has(boolOptComments) {
+		opcode := xdnsmessage.OpCode(msg.OpCode)
+		rcode := xdnsmessage.RCode(msg.RCode)
+		hf := xdnsmessage.NewHeaderFlags(msg.Header)
+		fmt.Println(";; Got answer:")
+		fmt.Print(";; ->>HEADER<<- opcode: ", opcode)
+		fmt.Print(", status: ", rcode)
+		fmt.Printf(", id: %d", msg.ID)
+		fmt.Println()
+		fmt.Printf(";; flags: %s", hf)
+		fmt.Printf("; QUERY: %d", len(msg.Questions))
+		fmt.Printf(", ANSWER: %d", len(msg.Answers))
+		fmt.Printf(", AUTHORITY: %d", len(msg.Authorities))
+		fmt.Printf(", ADDITIONAL: %d", len(msg.Additionals))
+		fmt.Println()
+		fmt.Println()
+	}
+	if !qopts.has(boolOptShort) && qopts.has(boolOptAdditional) &&
+		len(msg.Additionals) > 0 {
+		if qopts.has(boolOptComments) {
+			fmt.Println(";; OPT PSEUDOSECTION:")
+		}
+		for _, r := range msg.Additionals {
+			fmt.Print("; EDNS: version: ",
+				xdnsmessage.EDNSVersion(r.Header.TTL))
+			if xdnsmessage.HasEDNS0DNSSECOK(r.Header.TTL) {
+				fmt.Print(" do")
+			}
+			mbz := xdnsmessage.EDNS0MBZ(r.Header.TTL)
+			if mbz != 0 {
+				fmt.Printf("; MBZ: %#.4x, udp: ", mbz)
+			} else {
+				fmt.Print("; udp: ")
+			}
+			fmt.Println(r.Header.Class)
+		}
+	}
+	if !qopts.has(boolOptShort) && qopts.has(boolOptQuestion) &&
+		len(msg.Questions) > 0 {
+		if qopts.has(boolOptComments) {
+			fmt.Println(";; QUESTION SECTION:")
+		}
+		for _, q := range msg.Questions {
+			fmt.Printf(";%-31s", q.Name)
+			fmt.Printf("%-8s", xdnsmessage.Class(q.Class))
+			fmt.Printf("%-s\n", xdnsmessage.Type(q.Type))
+		}
+		if qopts.has(boolOptComments) {
+			fmt.Println()
+		}
+	}
+	if qopts.has(boolOptAnswer) && len(msg.Answers) > 0 {
+		if qopts.has(boolOptComments) && !qopts.has(boolOptShort) {
+			fmt.Println(";; ANSWER SECTION:")
+		}
+		for _, r := range msg.Answers {
+			if !qopts.has(boolOptShort) {
+				c := xdnsmessage.Class(r.Header.Class)
+				t := xdnsmessage.Type(r.Header.Type)
+				fmt.Printf("%-24s", r.Header.Name)
+				fmt.Printf("%-8d", r.Header.TTL)
+				fmt.Printf("%-8s", c)
+				fmt.Printf("%-8s", t)
+			}
+			fmt.Println(xdnsmessage.AnswerString(r))
+		}
+		if qopts.has(boolOptComments) {
+			fmt.Println()
+		}
+	}
+	if !qopts.has(boolOptShort) && qopts.has(boolOptAuthority) &&
+		len(msg.Authorities) > 0 {
+		if qopts.has(boolOptComments) {
+			fmt.Println(";; AUTHORITY SECTION:")
+		}
+		for _, r := range msg.Authorities {
+			fmt.Println(r.Header)
+		}
+		if qopts.has(boolOptComments) {
+			fmt.Println()
+		}
+	}
+	if !qopts.has(boolOptShort) && qopts.has(boolOptStats) {
+		ef := end.Format("Mon Jan 01 15:04:05 MST 2006")
+		fmt.Print(";; Query time: ")
+		dur := end.Sub(beg)
+		if flags.u {
+			fmt.Println(dur.Microseconds(), "µsec")
+		} else {
+			fmt.Println(dur.Milliseconds(), "msec")
+		}
+		fmt.Printf(";; SERVER: %s#%d(%v\n", svr, flags.p, ra)
+		fmt.Println(";; WHEN:", ef)
+		fmt.Println(";; MSG SIZE:", len(data))
+	}
 	return args, nil
-}
-
-func ask(ctx context.Context, b []byte) ([]byte, error) {
-	if udp != nil {
-		return xdnsmessage.TimeLimitedAsk(ctx, udp, b, 30*time.Second)
-	}
-	return b[:0], xerrors.FIXME("DOH")
 }
 
 func batch(ctx context.Context, fn string) error {

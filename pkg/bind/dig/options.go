@@ -199,7 +199,7 @@ type options struct {
 	strings [stringOpts]string
 }
 
-var gopts = options{
+var gopts = options{ // Global Options
 	bools: boolOptAdditional |
 		boolOptAnswer |
 		boolOptAuthority |
@@ -214,12 +214,12 @@ var gopts = options{
 	},
 }
 
-var qopts options
-
-func (dst *options) clone(src *options) {
-	dst.bools = src.bools
-	copy(dst.uints[:], src.uints[:])
-	copy(dst.strings[:], src.strings[:])
+func (opts *options) clone() *options {
+	clone := new(options)
+	clone.bools = opts.bools
+	copy(clone.uints[:], opts.uints[:])
+	copy(clone.strings[:], opts.strings[:])
+	return clone
 }
 
 func (opts *options) has(mask uint64) bool {

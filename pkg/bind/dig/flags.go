@@ -20,10 +20,9 @@ func newFlagSet() *flag.FlagSet {
 var flags struct {
 	ip4, ip6, m, O, T, u, v bool
 
-	b, f, i, k, x, y string
+	b, f, i, k, q, x, y string
 
 	c xdnsmessage.Class
-	q xdnsmessage.Name
 	t xdnsmessage.Type
 	p uint
 }
@@ -84,8 +83,7 @@ Set the query class. { ANY, CH, CS, HS, IN }`[1:])
 Do reverse IPv6 lookups using the obsolete RFC1886 IP6.INT
 domain, which is no longer in use. Obsolete bit string label
 queries (RFC2874) are not attempted.`[1:])
-	flags.q.Length = 0
-	fs.TextVar(&flags.q, "q", flags.q, `
+	fs.StringVar(&flags.q, "q", "", `
 Query the flagged name instead of positional argument.`[1:])
 	fs.TextVar(&flags.t, "t", xdnsmessage.Type0, `
 The resource record type to query. It can be any valid query

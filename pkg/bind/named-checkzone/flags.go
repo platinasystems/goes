@@ -27,7 +27,7 @@ Quiet mode - only set an exit code to indicate
 successful or failed verification.`[1:])
 	flag.BoolVar(&flags.v, "v", false, `
 Prints version then exits`[1:])
-	flag.TextVar(&flags.c, "c", xdnsmessage.DefaultClass, `
+	flag.TextVar(&flags.c, "c", xdnsmessage.ClassINET, `
 Zone class if unspecified`[1:])
 	flag.StringVar(&flags.C, "C", "fail", `
 Check mode: fail, or ignore.`[1:])

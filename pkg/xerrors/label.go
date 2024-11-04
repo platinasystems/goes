@@ -18,6 +18,7 @@ var (
 	ErrRange       = errors.New("out of range")
 	ErrUnknown     = errors.New("unknown")
 	ErrUnavailable = errors.New("unavailable")
+	ErrUnsupported = errors.New("unsupported")
 )
 
 func Broken(args ...any) error {
@@ -46,6 +47,10 @@ func Unknown(args ...any) error {
 
 func Unavailable(args ...any) error {
 	return Label(ErrUnavailable, args...)
+}
+
+func Unsupported(args ...any) error {
+	return Label(ErrUnsupported, args...)
 }
 
 func IsLabelled(err error) bool {

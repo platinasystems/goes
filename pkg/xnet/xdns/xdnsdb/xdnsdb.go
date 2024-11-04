@@ -26,29 +26,10 @@ var (
 	ErrUnsupported = xdnsmessage.ErrUnsupported
 )
 
-// Compare domain names in right to left order. e.g.
-//
-//	foo.com < bar.edu
-func DomCmp(s1, s2 string) int {
-	dom1 := strings.Split(s1, ".")
-	dom2 := strings.Split(s2, ".")
-	i1 := len(dom1) - 1
-	i2 := len(dom2) - 1
-	if i1 >= 0 && len(dom1[i1]) == 0 {
-		i1 -= 1
-	}
-	if i2 >= 0 && len(dom2[i2]) == 0 {
-		i2 -= 1
-	}
-	for ; i1 >= 0 && i2 >= 0; i1, i2 = i1-1, i2-1 {
-		if dom1[i1] != dom2[i2] {
-			l1 := strings.ToLower(dom1[i1])
-			l2 := strings.ToLower(dom2[i2])
-			return strings.Compare(l1, l2)
-		}
-	}
-	return len(dom1) - len(dom2)
-}
+type UniqueString = xdnsmessage.UniqueString
+
+var MakeUniqueString = xdnsmessage.MakeUniqueString
+var Root = MakeUniqueString(".")
 
 // This only retains INET Resource Records;
 // it ignores CSNET, CHAOS, and HESIOD.
@@ -60,7 +41,7 @@ type DB interface {
 	// return records of the named host within the default zone;
 	// otherwise, return records of the first matching zone suffix.
 	Lookup(zone, name string) []RR
-	// Calls given function foreach (zone, name) in DomCmp order.
+	// Calls given function foreach (zone, name) in domain order.
 	Range(func(zone, name string, rrs []RR) bool)
 	WhoIsAt(netip.Addr) (zone, name string)
 }
@@ -70,18 +51,18 @@ type RR struct {
 	V   xdnsmessage.Resource
 }
 
-func New(zone string) DB {
+func MakeDB(zone string) DB {
 	if len(zone) == 0 {
 		zone = "."
 	} else if !strings.HasSuffix(zone, ".") {
 		zone += "."
 	}
 	db := new(db)
-	db.zone = zone
-	db.zones = make(map[string]map[string][]RR)
-	db.zones["."] = make(map[string][]RR)
-	if zone != "." {
-		db.zones[zone] = make(map[string][]RR)
+	db.zone = MakeUniqueString(strings.ToLower(zone))
+	db.zones = make(map[UniqueString]map[UniqueString][]RR)
+	db.zones[db.zone] = make(map[UniqueString][]RR)
+	if db.zone != Root {
+		db.zones[Root] = make(map[UniqueString][]RR)
 	}
 	db.zns = make(map[netip.Addr]zn)
 	return db
@@ -89,12 +70,12 @@ func New(zone string) DB {
 
 type db struct {
 	sync.Mutex
-	zones map[string]map[string][]RR
+	zones map[UniqueString]map[UniqueString][]RR
 	zns   map[netip.Addr]zn
-	zone  string
+	zone  UniqueString
 }
 
-type zn struct{ zone, name string }
+type zn struct{ zone, name UniqueString }
 
 func (db *db) Fread(ctx context.Context, f *os.File) error {
 	db.Lock()
@@ -103,15 +84,16 @@ func (db *db) Fread(ctx context.Context, f *os.File) error {
 	return db.fread(ctx, f, db.zone)
 }
 
-func (db *db) fread(ctx context.Context, f *os.File, origin string) error {
-	var last string
+func (db *db) fread(
+	ctx context.Context, f *os.File, origin UniqueString,
+) error {
 	var defaultTTL time.Duration
 	var tokens []string
 	var cont, uselast bool
 
 	fn := filepath.Base(f.Name())
 	now := time.Now()
-
+	last := xdnsmessage.UniqueEmptyString
 	sc := bufio.NewScanner(f)
 	firstln := true
 	for lno := 1; ctx.Err() == nil && sc.Scan(); lno++ {
@@ -159,14 +141,15 @@ func (db *db) fread(ctx context.Context, f *os.File, origin string) error {
 					return fmt.Errorf("%s[%d]:INCLUDE: %w",
 						fn, lno, ErrIncomplete)
 				}
-				include, err := os.Open(tokens[2])
+				include, err := os.Open(tokens[1])
 				if err != nil {
 					return fmt.Errorf("%s[%d]: %w",
 						fn, lno, err)
 				}
 				zone := origin
 				if len(tokens) > 2 {
-					zone = tokens[2]
+					s := strings.ToLower(tokens[2])
+					zone = MakeUniqueString(s)
 				}
 				err = db.fread(ctx, include, zone)
 				include.Close()
@@ -179,7 +162,8 @@ func (db *db) fread(ctx context.Context, f *os.File, origin string) error {
 						fn, lno, ErrIncomplete)
 
 				}
-				origin = tokens[1]
+				s := strings.ToLower(tokens[1])
+				origin = MakeUniqueString(s)
 			case "TTL":
 				if len(tokens) == 1 {
 					return fmt.Errorf("%s[%d]:TTL: %w",
@@ -195,30 +179,32 @@ func (db *db) fread(ctx context.Context, f *os.File, origin string) error {
 			tokens = tokens[:0]
 			continue
 		}
-		var zone, name string
+		var zone, name UniqueString
 		var ttl time.Duration
 		c := xdnsmessage.Class0
 		if uselast {
 			uselast = false
-			if strings.HasSuffix(last, ".") {
-				zone = "."
-				name = strings.TrimSuffix(last, ".")
+			if s := last.String(); strings.HasSuffix(s, ".") {
+				zone = Root
+				s = strings.TrimSuffix(s, ".")
+				name = MakeUniqueString(strings.ToLower(s))
 			} else {
 				zone = origin
 				name = last
 			}
 		} else if tokens[0] == "." {
-			zone = "."
-			name = "@"
+			zone = Root
+			name = MakeUniqueString("@")
 			tokens = tokens[1:]
 		} else if strings.HasSuffix(tokens[0], ".") {
-			zone = "."
-			name = strings.TrimSuffix(tokens[0], ".")
-			last = tokens[0]
+			zone = Root
+			s := strings.TrimSuffix(tokens[0], ".")
+			name = MakeUniqueString(strings.ToLower(s))
+			last = name
 			tokens = tokens[1:]
 		} else {
 			zone = origin
-			name = tokens[0]
+			name = MakeUniqueString(strings.ToLower(tokens[0]))
 			last = name
 			tokens = tokens[1:]
 		}
@@ -261,23 +247,20 @@ func (db *db) fread(ctx context.Context, f *os.File, origin string) error {
 		}
 		tokens = tokens[1:]
 		rr := RR{TTL: now.Add(ttl)}
-		rr.V, err = xdnsmessage.ParseResource(t, tokens)
-		if err != nil {
-			return fmt.Errorf("%s[%d]: %w", fn, lno, err)
-		}
+		rr.V, tokens, err = t.ParseResource(tokens)
 		tokens = tokens[:0]
 		m, ok := db.zones[zone]
 		if !ok {
-			m = make(map[string][]RR)
+			m = make(map[UniqueString][]RR)
 			db.zones[zone] = m
 		}
 		m[name] = append(m[name], rr)
 		switch rr.V.Type() {
 		case xdnsmessage.TypeA:
-			addr := netip.Addr(rr.V.(xdnsmessage.A))
+			addr := rr.V.(xdnsmessage.A).Addr
 			db.zns[addr] = zn{zone, name}
 		case xdnsmessage.TypeAAAA:
-			addr := netip.Addr(rr.V.(xdnsmessage.AAAA))
+			addr := rr.V.(xdnsmessage.AAAA).Addr
 			db.zns[addr] = zn{zone, name}
 		}
 	}
@@ -293,16 +276,16 @@ func (db *db) Lookup(zone, name string) []RR {
 	defer db.Unlock()
 
 	if len(zone) > 0 {
-		return db.zones[zone][name]
+		return db.zones[MakeUniqueString(zone)][MakeUniqueString(name)]
 	}
 	if !strings.HasSuffix(name, ".") {
-		return db.zones[db.zone][name]
+		return db.zones[db.zone][MakeUniqueString(name)]
 	}
-	for zone, names := range db.zones {
-		if strings.HasSuffix(name, zone) {
-			s := strings.TrimSuffix(name, zone)
+	for uz, names := range db.zones {
+		if suf := uz.String(); strings.HasSuffix(name, suf) {
+			s := strings.TrimSuffix(name, suf)
 			s = strings.TrimSuffix(s, ".")
-			if rrs, ok := names[s]; ok {
+			if rrs, ok := names[MakeUniqueString(s)]; ok {
 				return rrs
 			}
 		}
@@ -314,11 +297,11 @@ func (db *db) Range(f func(zone, name string, rrs []RR) bool) {
 	db.Lock()
 	defer db.Unlock()
 
-	zones := slices.SortedFunc(maps.Keys(db.zones), DomCmp)
-	for _, zone := range zones {
-		names := slices.SortedFunc(maps.Keys(db.zones[zone]), DomCmp)
-		for _, name := range names {
-			if !f(zone, name, db.zones[zone][name]) {
+	zones := slices.SortedFunc(maps.Keys(db.zones), db.cmp)
+	for _, uz := range zones {
+		names := slices.SortedFunc(maps.Keys(db.zones[uz]), db.cmp)
+		for _, un := range names {
+			if !f(uz.String(), un.String(), db.zones[uz][un]) {
 				return
 			}
 		}
@@ -330,8 +313,32 @@ func (db *db) WhoIsAt(addr netip.Addr) (zone, name string) {
 	defer db.Unlock()
 
 	if zn, ok := db.zns[addr]; ok {
-		zone = zn.zone
-		name = zn.name
+		zone = zn.zone.String()
+		name = zn.name.String()
 	}
 	return
+}
+
+// Compare domain names in right to left order. e.g.
+//
+//	foo.com < bar.edu
+func (*db) cmp(us1, us2 UniqueString) int {
+	dom1 := strings.Split(us1.String(), ".")
+	dom2 := strings.Split(us2.String(), ".")
+	i1 := len(dom1) - 1
+	i2 := len(dom2) - 1
+	if i1 >= 0 && len(dom1[i1]) == 0 {
+		i1 -= 1
+	}
+	if i2 >= 0 && len(dom2[i2]) == 0 {
+		i2 -= 1
+	}
+	for ; i1 >= 0 && i2 >= 0; i1, i2 = i1-1, i2-1 {
+		if dom1[i1] != dom2[i2] {
+			l1 := strings.ToLower(dom1[i1])
+			l2 := strings.ToLower(dom2[i2])
+			return strings.Compare(l1, l2)
+		}
+	}
+	return len(dom1) - len(dom2)
 }

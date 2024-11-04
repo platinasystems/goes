@@ -27,7 +27,7 @@ func addCommandLineFlags() {
 		"is equivalent to -v -t ANY")
 	flag.BoolVar(&flags.A, "A", false,
 		"is like -a but omits RRSIG, NSEC, NSEC3")
-	flag.TextVar(&flags.c, "c", xdnsmessage.DefaultClass,
+	flag.TextVar(&flags.c, "c", xdnsmessage.ClassINET,
 		"specifies query class for non-IN data")
 	flag.BoolVar(&flags.C, "C", false,
 		"compares SOA records on authoritative nameservers")
@@ -52,7 +52,7 @@ func addCommandLineFlags() {
 		"specifies number of retries for UDP packets")
 	flag.BoolVar(&flags.s, "s", false,
 		"a SERVFAIL response should stop query")
-	flag.TextVar(&flags.t, "t", xdnsmessage.DefaultType,
+	flag.TextVar(&flags.t, "t", xdnsmessage.TypeA,
 		"specifies the query type")
 	flag.BoolVar(&flags.T, "T", false,
 		"enables TCP/IP mode")

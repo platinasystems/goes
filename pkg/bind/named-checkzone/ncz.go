@@ -70,7 +70,7 @@ Mimic BIND9's config verification tool.
 		}
 	}
 
-	db := xdnsdb.New(zone)
+	db := xdnsdb.MakeDB(zone)
 	if err = db.Fread(ctx, f); err != nil {
 		return err
 	}
