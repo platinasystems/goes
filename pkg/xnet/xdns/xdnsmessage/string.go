@@ -8,6 +8,7 @@ import (
 	"unique"
 	_ "unsafe"
 
+	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"golang.org/x/net/dns/dnsmessage"
 )
 
@@ -48,7 +49,8 @@ func ParseString[T CNAME | NS | PTR](tokens []string) (
 	T, []string, error,
 ) {
 	if len(tokens) == 0 {
-		return T{UniqueEmptyString}, tokens, ErrIncomplete
+		return T{UniqueEmptyString}, tokens, xerrors.
+			Incomplete("CNAME|NS|PTR")
 	}
 	return T{MakeUniqueString(tokens[0])}, tokens[1:], nil
 }

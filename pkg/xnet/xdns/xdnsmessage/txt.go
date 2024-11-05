@@ -4,13 +4,17 @@
 
 package xdnsmessage
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/platinasystems/goes/v2/pkg/xerrors"
+)
 
 type TXT []string
 
 func ParseTXT(tokens []string) (TXT, []string, error) {
 	if len(tokens) == 0 {
-		return TXT{}, tokens, ErrIncomplete
+		return TXT{}, tokens, xerrors.Incomplete("TXT")
 	}
 	txt := make(TXT, len(tokens))
 	for i, s := range tokens {

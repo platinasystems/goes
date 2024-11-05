@@ -130,6 +130,8 @@ func (t Type) ParseResource(tokens []string) (Resource, []string, error) {
 		return ParseLOC(tokens)
 	case TypeSRV:
 		return ParseSRV(tokens)
+	case TypeOPT:
+		return ParseOPT(tokens)
 	}
 	return nil, tokens, xerrors.Unsupported(t)
 }
@@ -146,6 +148,7 @@ func (TXT) Type() Type   { return TypeTXT }
 func (AAAA) Type() Type  { return TypeAAAA }
 func (LOC) Type() Type   { return TypeLOC }
 func (SRV) Type() Type   { return TypeSRV }
+func (OPT) Type() Type   { return TypeOPT }
 func (SVCB) Type() Type  { return TypeSVCB }
 func (HTTPS) Type() Type { return TypeHTTPS }
 func (CAA) Type() Type   { return TypeCAA }
@@ -166,7 +169,7 @@ func TypeNamed(name string) (Type, error) {
 	if found {
 		return v, nil
 	}
-	return Type0, ErrInvalid
+	return Type0, xerrors.Invalid("TYPE")
 }
 
 func (v Type) MarshalText() (b []byte, _ error) {

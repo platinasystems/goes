@@ -77,7 +77,6 @@ func lookup(ctx context.Context, fs *flag.FlagSet, args []string) (
 	[]string, error,
 ) {
 	var ra net.Addr
-	var msg xdnsmessage.Message
 
 	addQueryFlags(fs)
 	err := fs.Parse(args)
@@ -176,23 +175,20 @@ func lookup(ctx context.Context, fs *flag.FlagSet, args []string) (
 	if err != nil {
 		return args, err
 	}
-	if err = msg.Unpack(data); err != nil {
+	msg, err := xdnsmessage.Decode(data)
+	if err != nil {
 		return args, err
 	}
 	if msg.ID != id {
 		return args, fmt.Errorf("id %d != %d", msg.ID, id)
 	}
-
 	if !qopts.has(boolOptShort) && qopts.has(boolOptComments) {
-		opcode := xdnsmessage.OpCode(msg.OpCode)
-		rcode := xdnsmessage.RCode(msg.RCode)
-		hf := xdnsmessage.NewHeaderFlags(msg.Header)
 		fmt.Println(";; Got answer:")
-		fmt.Print(";; ->>HEADER<<- opcode: ", opcode)
-		fmt.Print(", status: ", rcode)
+		fmt.Print(";; ->>HEADER<<- opcode: ", msg.OpCode)
+		fmt.Print(", status: ", msg.RCode)
 		fmt.Printf(", id: %d", msg.ID)
 		fmt.Println()
-		fmt.Printf(";; flags: %s", hf)
+		fmt.Printf(";; flags: %s", msg.HF)
 		fmt.Printf("; QUERY: %d", len(msg.Questions))
 		fmt.Printf(", ANSWER: %d", len(msg.Answers))
 		fmt.Printf(", AUTHORITY: %d", len(msg.Authorities))
@@ -205,19 +201,19 @@ func lookup(ctx context.Context, fs *flag.FlagSet, args []string) (
 		if qopts.has(boolOptComments) {
 			fmt.Println(";; OPT PSEUDOSECTION:")
 		}
-		for _, r := range msg.Additionals {
+		for _, rr := range msg.Additionals {
 			fmt.Print("; EDNS: version: ",
-				xdnsmessage.EDNSVersion(r.Header.TTL))
-			if xdnsmessage.HasEDNS0DNSSECOK(r.Header.TTL) {
+				xdnsmessage.EDNSVersion(rr.Secs))
+			if xdnsmessage.HasEDNS0DNSSECOK(rr.Secs) {
 				fmt.Print(" do")
 			}
-			mbz := xdnsmessage.EDNS0MBZ(r.Header.TTL)
+			mbz := xdnsmessage.EDNS0MBZ(rr.Secs)
+			n := uint16(rr.Class)
 			if mbz != 0 {
-				fmt.Printf("; MBZ: %#.4x, udp: ", mbz)
+				fmt.Printf("; MBZ: %#.4x, udp: %d\n", mbz, n)
 			} else {
-				fmt.Print("; udp: ")
+				fmt.Println("; udp:", n)
 			}
-			fmt.Println(r.Header.Class)
 		}
 	}
 	if !qopts.has(boolOptShort) && qopts.has(boolOptQuestion) &&
@@ -227,8 +223,8 @@ func lookup(ctx context.Context, fs *flag.FlagSet, args []string) (
 		}
 		for _, q := range msg.Questions {
 			fmt.Printf(";%-31s", q.Name)
-			fmt.Printf("%-8s", xdnsmessage.Class(q.Class))
-			fmt.Printf("%-s\n", xdnsmessage.Type(q.Type))
+			fmt.Printf("%-8s", q.Class)
+			fmt.Printf("%-s\n", q.Type)
 		}
 		if qopts.has(boolOptComments) {
 			fmt.Println()
@@ -238,16 +234,16 @@ func lookup(ctx context.Context, fs *flag.FlagSet, args []string) (
 		if qopts.has(boolOptComments) && !qopts.has(boolOptShort) {
 			fmt.Println(";; ANSWER SECTION:")
 		}
-		for _, r := range msg.Answers {
-			if !qopts.has(boolOptShort) {
-				c := xdnsmessage.Class(r.Header.Class)
-				t := xdnsmessage.Type(r.Header.Type)
-				fmt.Printf("%-24s", r.Header.Name)
-				fmt.Printf("%-8d", r.Header.TTL)
-				fmt.Printf("%-8s", c)
-				fmt.Printf("%-8s", t)
+		for _, rr := range msg.Answers {
+			if qopts.has(boolOptShort) {
+				fmt.Print(rr.Resource)
+				continue
 			}
-			fmt.Println(xdnsmessage.AnswerString(r))
+			fmt.Printf("%-24s", rr.Name)
+			fmt.Printf("%-8d", rr.Secs)
+			fmt.Printf("%-8s", rr.Class)
+			fmt.Printf("%-8s", rr.Type())
+			xdnsmessage.LineWrapResource(rr.Resource, 24+8+8+8)
 		}
 		if qopts.has(boolOptComments) {
 			fmt.Println()
@@ -258,8 +254,16 @@ func lookup(ctx context.Context, fs *flag.FlagSet, args []string) (
 		if qopts.has(boolOptComments) {
 			fmt.Println(";; AUTHORITY SECTION:")
 		}
-		for _, r := range msg.Authorities {
-			fmt.Println(r.Header)
+		for _, rr := range msg.Authorities {
+			if qopts.has(boolOptShort) {
+				fmt.Print(rr.Resource)
+				continue
+			}
+			fmt.Printf("%-24s", rr.Name)
+			fmt.Printf("%-8d", rr.Secs)
+			fmt.Printf("%-8s", rr.Class)
+			fmt.Printf("%-8s", rr.Type())
+			xdnsmessage.LineWrapResource(rr.Resource, 24+8+8+8)
 		}
 		if qopts.has(boolOptComments) {
 			fmt.Println()

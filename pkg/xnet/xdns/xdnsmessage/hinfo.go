@@ -4,7 +4,11 @@
 
 package xdnsmessage
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/platinasystems/goes/v2/pkg/xerrors"
+)
 
 type HINFO struct {
 	CPU, OS string
@@ -12,7 +16,7 @@ type HINFO struct {
 
 func ParseHINFO(tokens []string) (HINFO, []string, error) {
 	if len(tokens) < 2 {
-		return HINFO{}, tokens, ErrIncomplete
+		return HINFO{}, tokens, xerrors.Incomplete("HINFO")
 	}
 	return HINFO{
 		CPU: strings.Clone(tokens[0]),

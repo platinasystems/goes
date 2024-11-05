@@ -10,6 +10,8 @@ import (
 	"net"
 	"os"
 	"time"
+
+	"github.com/platinasystems/goes/v2/pkg/xerrors"
 )
 
 const MaxPacketSize = 1232
@@ -59,7 +61,7 @@ func TenaciousAsk(
 		if err != nil {
 			return buf[:0], err
 		} else if n != len(buf) {
-			err = ErrUnderrun
+			err = xerrors.Underrun("socket-write")
 			return buf[:0], err
 		}
 		err = udp.SetReadDeadline(time.Now().Add(time.Second))

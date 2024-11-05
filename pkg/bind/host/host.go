@@ -17,7 +17,6 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xlog"
 	"github.com/platinasystems/goes/v2/pkg/xnet/xdns/xdnsmessage"
 	"github.com/platinasystems/goes/v2/pkg/xprogram"
-	"golang.org/x/net/dns/dnsmessage"
 )
 
 var (
@@ -98,8 +97,6 @@ Mimic BIND9's DNS lookup utility.
 		hf |= xdnsmessage.HFRecursionDesired
 	}
 	for _, t := range types {
-		var msg dnsmessage.Message
-
 		id, q, err := xdnsmessage.
 			NewQuestion(buf[2:], name, t, flags.c, hf)
 		if err != nil {
@@ -110,19 +107,20 @@ Mimic BIND9's DNS lookup utility.
 		if err != nil {
 			return xerrors.Mark(err)
 		}
-		if err = msg.Unpack(data); err != nil {
-			return xerrors.Mark(err)
+		msg, err := xdnsmessage.Decode(data)
+		if err != nil {
+			return err
 		}
 		if msg.ID != id {
 			return fmt.Errorf("id %d != %d", msg.ID, id)
 		}
-		for _, r := range msg.Answers {
+		for _, a := range msg.Answers {
 			fmt.Print(name, " ")
-			s, ok := explanations[xdnsmessage.Type(r.Header.Type)]
+			s, ok := explanations[a.Type()]
 			if ok {
 				fmt.Print(s, " ")
 			}
-			fmt.Println(xdnsmessage.AnswerString(r))
+			fmt.Println(a)
 		}
 	}
 	return nil

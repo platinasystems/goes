@@ -7,6 +7,8 @@ package xdnsmessage
 import (
 	"fmt"
 	"net/netip"
+
+	"github.com/platinasystems/goes/v2/pkg/xerrors"
 )
 
 type A struct{ netip.Addr }
@@ -14,7 +16,7 @@ type AAAA struct{ netip.Addr }
 
 func ParseAddr[T A | AAAA](tokens []string) (T, []string, error) {
 	if len(tokens) == 0 {
-		return T{netip.Addr{}}, tokens, ErrIncomplete
+		return T{netip.Addr{}}, tokens, xerrors.Incomplete("A|AAAA")
 	}
 	addr, err := netip.ParseAddr(tokens[0])
 	if err == nil {

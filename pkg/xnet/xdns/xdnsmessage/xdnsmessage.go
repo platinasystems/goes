@@ -5,20 +5,19 @@
 package xdnsmessage
 
 import (
-	_ "embed"
 	"fmt"
-	"net"
 	"net/netip"
 	"strings"
-	"time"
 
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"golang.org/x/net/dns/dnsmessage"
 )
 
-// FIXME wrap, then replace these...
-type Message = dnsmessage.Message
-type Parser = dnsmessage.Parser
+type Question struct {
+	Class
+	Type
+	Name UniqueString
+}
 
 type Resource interface {
 	String() string
@@ -27,30 +26,100 @@ type Resource interface {
 
 type ResourceRecord struct {
 	Name UniqueString
-	TTL  time.Duration
-	V    Resource
+	Secs uint32
+	Class
+	Resource
 }
 
-func ConvertResource(r dnsmessage.Resource) (rr ResourceRecord, err error) {
-	if r.Header.Class != dnsmessage.ClassINET {
-		err = xerrors.Unsupported("class", Class(r.Header.Class))
+func Decode(data []byte) (msg struct {
+	ID uint16
+	HF
+	OpCode
+	RCode
+	Questions []Question
+	Answers,
+	Authorities,
+	Additionals []ResourceRecord
+}, err error) {
+	var p dnsmessage.Parser
+	h, err := p.Start(data)
+	if err != nil {
 		return
 	}
+	msg.ID = h.ID
+	msg.HF = NewHeaderFlags(h)
+	msg.OpCode = OpCode(h.OpCode)
+	msg.RCode = RCode(h.RCode)
+	if msg.Questions, err = gatherQuestions(p.Question); err != nil {
+		return
+	}
+	if msg.Answers, err = gatherResources(p.Answer); err != nil {
+		return
+	}
+	if msg.Authorities, err = gatherResources(p.Authority); err != nil {
+		return
+	}
+	msg.Additionals, err = gatherResources(p.Additional)
+	return
+}
+
+func gatherQuestions(f func() (dnsmessage.Question, error)) (
+	qs []Question, err error,
+) {
+	for {
+		if q, e := f(); e != nil {
+			if e == dnsmessage.ErrSectionDone {
+				break
+			}
+			err = e
+			return
+		} else {
+			qs = append(qs, Question{
+				Class: Class(q.Class),
+				Type:  Type(q.Type),
+				Name:  MakeUniqueString(q.Name.String()),
+			})
+		}
+	}
+	return
+}
+
+func gatherResources(f func() (dnsmessage.Resource, error)) (
+	rrs []ResourceRecord, err error,
+) {
+	for {
+		if r, e := f(); e != nil {
+			if e != dnsmessage.ErrSectionDone {
+				err = e
+			}
+			break
+		} else if rr, e := convert(r); e != nil {
+			err = e
+			break
+		} else {
+			rrs = append(rrs, rr)
+		}
+	}
+	return
+}
+
+func convert(r dnsmessage.Resource) (rr ResourceRecord, err error) {
 	rr.Name = MakeUniqueString(r.Header.Name.String())
-	rr.TTL = time.Second * time.Duration(r.Header.TTL)
+	rr.Secs = r.Header.TTL
+	rr.Class = Class(r.Header.Class)
 	switch r.Header.Type {
 	case dnsmessage.TypeA:
 		a := r.Body.(*dnsmessage.AResource).A
-		rr.V = A{netip.AddrFrom4(a)}
+		rr.Resource = A{netip.AddrFrom4(a)}
 	case dnsmessage.TypeNS:
 		s := r.Body.(*dnsmessage.NSResource).NS.String()
-		rr.V = NS{MakeUniqueString(s)}
+		rr.Resource = NS{MakeUniqueString(s)}
 	case dnsmessage.TypeCNAME:
 		s := r.Body.(*dnsmessage.CNAMEResource).CNAME.String()
-		rr.V = CNAME{MakeUniqueString(s)}
+		rr.Resource = CNAME{MakeUniqueString(s)}
 	case dnsmessage.TypeSOA:
 		soa := r.Body.(*dnsmessage.SOAResource)
-		rr.V = SOA{
+		rr.Resource = SOA{
 			MName:   MakeUniqueString(soa.MBox.String()),
 			RName:   MakeUniqueString(soa.NS.String()),
 			Serial:  soa.Serial,
@@ -61,102 +130,63 @@ func ConvertResource(r dnsmessage.Resource) (rr ResourceRecord, err error) {
 		}
 	case dnsmessage.TypePTR:
 		s := r.Body.(*dnsmessage.PTRResource).PTR.String()
-		rr.V = PTR{MakeUniqueString(s)}
+		rr.Resource = PTR{MakeUniqueString(s)}
 	case dnsmessage.TypeMX:
 		mx := r.Body.(*dnsmessage.MXResource)
-		rr.V = MX{
+		rr.Resource = MX{
 			Preference: mx.Pref,
 			Exchange:   MakeUniqueString(mx.MX.String()),
 		}
 	case dnsmessage.TypeTXT:
 	case dnsmessage.TypeAAAA:
 		aaaa := r.Body.(*dnsmessage.AAAAResource).AAAA
-		rr.V = AAAA{netip.AddrFrom16(aaaa)}
+		rr.Resource = AAAA{netip.AddrFrom16(aaaa)}
 	case dnsmessage.TypeSRV:
 		srv := r.Body.(*dnsmessage.SRVResource)
-		rr.V = SRV{
+		rr.Resource = SRV{
 			Priority: srv.Priority,
 			Weight:   srv.Weight,
 			Port:     srv.Port,
 			Target:   MakeUniqueString(srv.Target.String()),
 		}
+	case dnsmessage.TypeOPT:
+		opts := r.Body.(*dnsmessage.OPTResource).Options
+		rr.Resource = OPT(opts)
 	case dnsmessage.Type(TypeSVCB):
 		var svcb SVCB
 		data := r.Body.(*dnsmessage.UnknownResource).Data
 		err = svcb.UnmarshalBinary(data)
-		rr.V = svcb
+		rr.Resource = svcb
 	case dnsmessage.Type(TypeHTTPS):
 		var https HTTPS
 		data := r.Body.(*dnsmessage.UnknownResource).Data
 		err = https.UnmarshalBinary(data)
-		rr.V = https
+		rr.Resource = https
 	case dnsmessage.Type(TypeCAA):
 		var caa CAA
 		data := r.Body.(*dnsmessage.UnknownResource).Data
 		err = caa.UnmarshalBinary(data)
-		rr.V = caa
+		rr.Resource = caa
 	default:
 		err = xerrors.Unsupported("type", Type(r.Header.Type))
 	}
 	return
 }
 
-func AnswerString(r dnsmessage.Resource) (s string) {
-	switch Type(r.Header.Type) {
-	case TypeA:
-		rb := r.Body.(*dnsmessage.AResource)
-		s = net.IP(rb.A[:]).String()
-	case TypeNS:
-		s = r.Body.(*dnsmessage.NSResource).NS.String()
-	case TypeCNAME:
-		s = r.Body.(*dnsmessage.CNAMEResource).CNAME.String()
-	case TypeSOA:
-		rb := r.Body.(*dnsmessage.SOAResource)
-		s = fmt.Sprintf("ns %v, mbox %v, s/n %d",
-			rb.NS, rb.MBox, rb.Serial)
-	case TypePTR:
-		s = r.Body.(*dnsmessage.PTRResource).PTR.String()
-	case TypeMX:
-		rb := r.Body.(*dnsmessage.MXResource)
-		s = fmt.Sprintf("%v, pref %d", rb.MX, rb.Pref)
-	case TypeTXT:
-		s = strings.Join(r.Body.(*dnsmessage.TXTResource).TXT, " ")
-	case TypeAAAA:
-		rb := r.Body.(*dnsmessage.AAAAResource)
-		s = net.IP(rb.AAAA[:]).String()
-	case TypeSRV:
-		rb := r.Body.(*dnsmessage.SRVResource)
-		s = fmt.Sprintf("%v, port %d, pri %d, weight %d",
-			rb.Target, rb.Port, rb.Priority, rb.Weight)
-	case TypeSVCB:
-		var svcb SVCB
-		data := r.Body.(*dnsmessage.UnknownResource).Data
-		if err := svcb.UnmarshalBinary(data); err != nil {
-			s = err.Error()
-		} else {
-			s = svcb.String()
-		}
-	case TypeHTTPS:
-		var https HTTPS
-		data := r.Body.(*dnsmessage.UnknownResource).Data
-		if err := https.UnmarshalBinary(data); err != nil {
-			s = err.Error()
-		} else {
-			s = https.String()
-		}
-	case TypeCAA:
-		var caa CAA
-		data := r.Body.(*dnsmessage.UnknownResource).Data
-		if err := caa.UnmarshalBinary(data); err != nil {
-			s = err.Error()
-		} else {
-			s = caa.String()
-		}
+func LineWrapResource(r Resource, indent int) {
+	lns := strings.Split(r.String(), "\n")
+	switch len(lns) {
+	case 0:
+		fmt.Println()
+	case 1:
+		fmt.Println(lns[0])
 	default:
-		data := r.Body.(*dnsmessage.UnknownResource).Data
-		s = fmt.Sprintf("%#x", data)
+		fmt.Print("(", lns[0])
+		for _, s := range lns[1:] {
+			fmt.Printf("\n%*s%s", indent+1, "", s)
+		}
+		fmt.Println(")")
 	}
-	return
 }
 
 // Format new query.

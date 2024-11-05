@@ -4,7 +4,11 @@
 
 package xdnsmessage
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/platinasystems/goes/v2/pkg/xerrors"
+)
 
 type MX struct {
 	Preference uint16
@@ -14,7 +18,7 @@ type MX struct {
 func ParseMX(tokens []string) (MX, []string, error) {
 	var mx MX
 	if len(tokens) < 2 {
-		return mx, tokens, ErrIncomplete
+		return mx, tokens, xerrors.Incomplete("MX")
 	}
 	_, err := fmt.Sscan(tokens[0], &mx.Preference)
 	if err == nil {

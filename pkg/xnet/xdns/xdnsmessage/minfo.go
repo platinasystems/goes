@@ -4,7 +4,11 @@
 
 package xdnsmessage
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/platinasystems/goes/v2/pkg/xerrors"
+)
 
 type MINFO struct {
 	RMAILBX, EMAILBX string
@@ -12,7 +16,7 @@ type MINFO struct {
 
 func ParseMINFO(tokens []string) (MINFO, []string, error) {
 	if len(tokens) < 2 {
-		return MINFO{}, tokens, ErrIncomplete
+		return MINFO{}, tokens, xerrors.Incomplete("MINFO")
 	}
 	return MINFO{
 		RMAILBX: strings.Clone(tokens[0]),

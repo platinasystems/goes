@@ -4,7 +4,11 @@
 
 package xdnsmessage
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/platinasystems/goes/v2/pkg/xerrors"
+)
 
 type SRV struct {
 	Priority, Weight, Port uint16
@@ -15,7 +19,7 @@ type SRV struct {
 func ParseSRV(tokens []string) (SRV, []string, error) {
 	var srv SRV
 	if len(tokens) < 4 {
-		return srv, tokens, ErrIncomplete
+		return srv, tokens, xerrors.Incomplete("SRV")
 	}
 	_, err := fmt.Sscan(tokens[0], &srv.Priority)
 	if err == nil {

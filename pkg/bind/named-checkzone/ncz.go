@@ -11,13 +11,13 @@ import (
 	"log"
 	"math"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xflag"
 	"github.com/platinasystems/goes/v2/pkg/xlog"
 	"github.com/platinasystems/goes/v2/pkg/xnet/xdns/xdnsdb"
+	"github.com/platinasystems/goes/v2/pkg/xnet/xdns/xdnsmessage"
 	"github.com/platinasystems/goes/v2/pkg/xprogram"
 )
 
@@ -77,7 +77,6 @@ Mimic BIND9's config verification tool.
 
 	var last string
 	now := time.Now()
-	const indent, lineLen = 48, 80
 	db.Range(func(zone, name string, rrs []xdnsdb.RR) bool {
 		if len(rrs) == 0 {
 			fmt.Print("%-24sEMPTY\n", name+"."+zone)
@@ -100,19 +99,8 @@ Mimic BIND9's config verification tool.
 			}
 			fmt.Printf("%-8d", secs)
 			fmt.Printf("%-8s", "IN")
-			fmt.Printf("%-8s", rr.V.Type())
-			lns := strings.Split(rr.V.String(), "\n")
-			if n := len(lns); n == 0 {
-				fmt.Println()
-			} else if n == 1 {
-				fmt.Println(lns[0])
-			} else {
-				fmt.Print("(", lns[0])
-				for _, s := range lns[1:] {
-					fmt.Printf("\n%*s%s", indent+1, "", s)
-				}
-				fmt.Println(")")
-			}
+			fmt.Printf("%-8s", rr.Type())
+			xdnsmessage.LineWrapResource(rr.Resource, 24+8+8+8)
 		}
 		return true
 	})

@@ -10,6 +10,8 @@ import (
 	"fmt"
 	"net/netip"
 	"strings"
+
+	"github.com/platinasystems/goes/v2/pkg/xerrors"
 )
 
 //go:generate stringer -type SVCBKey -trimprefix SVCBKey -linecomment
@@ -61,7 +63,7 @@ func (port SVCBPort) String() string {
 func (svcb *SVCB) UnmarshalBinary(msg []byte) error {
 	var err error
 	if len(msg) < 2 {
-		return ErrIncomplete
+		return xerrors.Incomplete("SVCB")
 	}
 	svcb.Pri = binary.BigEndian.Uint16(msg)
 	msg = msg[2:]
@@ -87,7 +89,7 @@ func (svcb *SVCB) UnmarshalBinary(msg []byte) error {
 			for i, n := 0, 0; i < l; i += 1 + n {
 				n = int(msg[i])
 				if 1+n > l {
-					return ErrUnderrun
+					return xerrors.Underrun("SVCB-ALPN")
 				}
 				alpn := string(bytes.Clone(msg[i+1 : i+1+n]))
 				alpns = append(alpns, alpn)
@@ -99,14 +101,14 @@ func (svcb *SVCB) UnmarshalBinary(msg []byte) error {
 			param.Value = SVCBPort(binary.BigEndian.Uint16(msg))
 		case SVCBKeyIPV4Hint:
 			if len(msg) < 4 {
-				return ErrUnderrun
+				return xerrors.Underrun("SVCB-IPV4HINT")
 			}
 			param.Value, _ = netip.AddrFromSlice(msg[:4])
 		case SVCBKeyECH:
-			// FIXME decode base64
+			return xerrors.FIXME("SVCB-ECH: decode base64")
 		case SVCBKeyIPV6Hint:
 			if len(msg) < 16 {
-				return ErrUnderrun
+				return xerrors.Underrun("SVCB-IPV6HINT")
 			}
 			param.Value, _ = netip.AddrFromSlice(msg[:16])
 		case SVCBKeyDOHPath:

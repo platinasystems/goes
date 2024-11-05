@@ -18,12 +18,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xnet/xdns/xdnsmessage"
 )
 
 var (
-	ErrIncomplete  = xdnsmessage.ErrIncomplete
-	ErrUnsupported = xdnsmessage.ErrUnsupported
+	ErrIncomplete  = xerrors.ErrIncomplete
+	ErrUnsupported = xerrors.ErrUnsupported
 )
 
 type UniqueString = xdnsmessage.UniqueString
@@ -48,7 +49,7 @@ type DB interface {
 
 type RR struct {
 	TTL time.Time
-	V   xdnsmessage.Resource
+	xdnsmessage.Resource
 }
 
 func MakeDB(zone string) DB {
@@ -247,7 +248,7 @@ func (db *db) fread(
 		}
 		tokens = tokens[1:]
 		rr := RR{TTL: now.Add(ttl)}
-		rr.V, tokens, err = t.ParseResource(tokens)
+		rr.Resource, tokens, err = t.ParseResource(tokens)
 		tokens = tokens[:0]
 		m, ok := db.zones[zone]
 		if !ok {
@@ -255,12 +256,12 @@ func (db *db) fread(
 			db.zones[zone] = m
 		}
 		m[name] = append(m[name], rr)
-		switch rr.V.Type() {
+		switch rr.Type() {
 		case xdnsmessage.TypeA:
-			addr := rr.V.(xdnsmessage.A).Addr
+			addr := rr.Resource.(xdnsmessage.A).Addr
 			db.zns[addr] = zn{zone, name}
 		case xdnsmessage.TypeAAAA:
-			addr := rr.V.(xdnsmessage.AAAA).Addr
+			addr := rr.Resource.(xdnsmessage.AAAA).Addr
 			db.zns[addr] = zn{zone, name}
 		}
 	}

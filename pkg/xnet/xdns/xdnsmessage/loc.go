@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"math"
 	"strings"
+
+	"github.com/platinasystems/goes/v2/pkg/xerrors"
 )
 
 // RFC-1876
@@ -98,7 +100,7 @@ func (v LOC) String() string {
 func (p *LOCAlt) Parse(tokens []string) ([]string, error) {
 	var alt float32
 	if len(tokens) == 0 {
-		return tokens, ErrIncomplete
+		return tokens, xerrors.Incomplete("LOC")
 	}
 	_, err := fmt.Sscan(strings.TrimSuffix(tokens[0], "m"), &alt)
 	if err == nil {
@@ -120,7 +122,7 @@ func (p *LOCArc) Parse(tokens []string) ([]string, error) {
 		sec float32
 	)
 	if len(tokens) < 2 {
-		return tokens, ErrIncomplete
+		return tokens, xerrors.Incomplete("LOC")
 	}
 	_, err := fmt.Sscan(tokens[0], &deg)
 	if err != nil {
@@ -141,7 +143,7 @@ func (p *LOCArc) Parse(tokens []string) ([]string, error) {
 		arc += LOCArc(min) * LOCArcMin
 		tokens = tokens[1:]
 		if len(tokens) == 0 {
-			return tokens, ErrIncomplete
+			return tokens, xerrors.Incomplete("LOC")
 		}
 		switch tokens[0] {
 		case "N", "E":
@@ -156,7 +158,7 @@ func (p *LOCArc) Parse(tokens []string) ([]string, error) {
 			arc += LOCArc(sec * float32(LOCArcSec))
 			tokens = tokens[1:]
 			if len(tokens) == 0 {
-				return tokens, ErrIncomplete
+				return tokens, xerrors.Incomplete("LOC")
 			}
 			switch tokens[0] {
 			case "N", "E":
@@ -165,7 +167,7 @@ func (p *LOCArc) Parse(tokens []string) ([]string, error) {
 			case "S", "W":
 				tokens = tokens[1:]
 			default:
-				return tokens, ErrInvalid
+				return tokens, xerrors.Invalid(tokens[0])
 			}
 		}
 	}

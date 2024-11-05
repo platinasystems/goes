@@ -15,7 +15,9 @@ var (
 	ErrIncomplete  = errors.New("incomplete")
 	ErrInvalid     = errors.New("invalid")
 	ErrNotFound    = errors.New("not found")
+	ErrOverrun     = errors.New("overrun")
 	ErrRange       = errors.New("out of range")
+	ErrUnderrun    = errors.New("underrun")
 	ErrUnknown     = errors.New("unknown")
 	ErrUnavailable = errors.New("unavailable")
 	ErrUnsupported = errors.New("unsupported")
@@ -33,12 +35,40 @@ func Invalid(args ...any) error {
 	return Label(ErrInvalid, args...)
 }
 
+func IsLabelled(err error) bool {
+	ne, ok := err.(NoteError)
+	if ok {
+		err = ne.err
+	}
+	_, ok = err.(LabelError)
+	return ok
+}
+
+func IsBroken(err error) bool      { return errors.Is(err, ErrBroken) }
+func IsIncomplete(err error) bool  { return errors.Is(err, ErrIncomplete) }
+func IsInvalid(err error) bool     { return errors.Is(err, ErrInvalid) }
+func IsNotFound(err error) bool    { return errors.Is(err, ErrNotFound) }
+func IsOverrun(err error) bool     { return errors.Is(err, ErrOverrun) }
+func IsRange(err error) bool       { return errors.Is(err, ErrRange) }
+func IsUnderrun(err error) bool    { return errors.Is(err, ErrUnderrun) }
+func IsUnknown(err error) bool     { return errors.Is(err, ErrUnknown) }
+func IsUnavailable(err error) bool { return errors.Is(err, ErrUnavailable) }
+func IsUnsupported(err error) bool { return errors.Is(err, ErrUnsupported) }
+
 func NotFound(args ...any) error {
 	return Label(ErrNotFound, args...)
 }
 
+func Overrun(args ...any) error {
+	return Label(ErrOverrun, args...)
+}
+
 func Range(args ...any) error {
 	return Label(ErrRange, args...)
+}
+
+func Underrun(args ...any) error {
+	return Label(ErrUnderrun, args...)
 }
 
 func Unknown(args ...any) error {
@@ -51,15 +81,6 @@ func Unavailable(args ...any) error {
 
 func Unsupported(args ...any) error {
 	return Label(ErrUnsupported, args...)
-}
-
-func IsLabelled(err error) bool {
-	ne, ok := err.(NoteError)
-	if ok {
-		err = ne.err
-	}
-	_, ok = err.(LabelError)
-	return ok
 }
 
 // Preface non-nil error with “arg:...”

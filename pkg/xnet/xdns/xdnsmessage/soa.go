@@ -4,7 +4,11 @@
 
 package xdnsmessage
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/platinasystems/goes/v2/pkg/xerrors"
+)
 
 type SOA struct {
 	MName, RName UniqueString
@@ -15,7 +19,7 @@ type SOA struct {
 func ParseSOA(tokens []string) (SOA, []string, error) {
 	var soa SOA
 	if len(tokens) < 7 {
-		return soa, tokens, ErrIncomplete
+		return soa, tokens, xerrors.Incomplete("SOA")
 	}
 	soa.MName = MakeUniqueString(tokens[0])
 	soa.RName = MakeUniqueString(tokens[1])

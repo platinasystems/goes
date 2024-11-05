@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/platinasystems/goes/v2/pkg/integer"
+	"github.com/platinasystems/goes/v2/pkg/xerrors"
 )
 
 //go:generate stringer -type Class -trimprefix Class -linecomment
@@ -34,7 +35,7 @@ func ClassNamed(name string) (Class, error) {
 	if found {
 		return v, nil
 	}
-	return Class0, ErrInvalid
+	return Class0, xerrors.Invalid("CLASS")
 }
 
 func (v Class) MarshalText() (b []byte, err error) {
