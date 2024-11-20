@@ -5,10 +5,13 @@
 package xdnsmessage
 
 import (
+	"bytes"
 	_ "embed"
+	"fmt"
 
 	"github.com/platinasystems/goes/v2/pkg/integer"
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
+	"golang.org/x/net/dns/dnsmessage"
 )
 
 //go:embed type_help.txt
@@ -104,18 +107,25 @@ const (
 	TypeCAA
 )
 
-func (t Type) ParseResource(tokens []string) (Resource, []string, error) {
+func (v Type) MarshalText() (b []byte, _ error) {
+	if v != Type0 {
+		b = []byte(v.String())
+	}
+	return
+}
+
+func (t Type) Parse(tokens []string) (TypedResource, error) {
 	switch t {
 	case TypeA:
-		return ParseAddr[A](tokens)
+		return ParseAddr[TypeAResource](tokens)
 	case TypeNS:
-		return ParseString[NS](tokens)
+		return ParseString[TypeNSResource](tokens)
 	case TypeCNAME:
-		return ParseString[CNAME](tokens)
+		return ParseString[TypeCNAMEResource](tokens)
 	case TypeSOA:
 		return ParseSOA(tokens)
 	case TypePTR:
-		return ParseString[PTR](tokens)
+		return ParseString[TypePTRResource](tokens)
 	case TypeHINFO:
 		return ParseHINFO(tokens)
 	case TypeMINFO:
@@ -125,7 +135,7 @@ func (t Type) ParseResource(tokens []string) (Resource, []string, error) {
 	case TypeTXT:
 		return ParseTXT(tokens)
 	case TypeAAAA:
-		return ParseAddr[AAAA](tokens)
+		return ParseAddr[TypeAAAAResource](tokens)
 	case TypeLOC:
 		return ParseLOC(tokens)
 	case TypeSRV:
@@ -133,25 +143,62 @@ func (t Type) ParseResource(tokens []string) (Resource, []string, error) {
 	case TypeOPT:
 		return ParseOPT(tokens)
 	}
-	return nil, tokens, xerrors.Unsupported(t)
+	buf := new(bytes.Buffer)
+	for i, s := range tokens {
+		if i > 0 {
+			buf.WriteRune(' ')
+			buf.WriteString(s)
+		}
+	}
+	return TypeTBDResource{t, buf.Bytes()}, nil
 }
 
-func (A) Type() Type     { return TypeA }
-func (NS) Type() Type    { return TypeNS }
-func (CNAME) Type() Type { return TypeCNAME }
-func (SOA) Type() Type   { return TypeSOA }
-func (PTR) Type() Type   { return TypePTR }
-func (HINFO) Type() Type { return TypeHINFO }
-func (MINFO) Type() Type { return TypeMINFO }
-func (MX) Type() Type    { return TypeMX }
-func (TXT) Type() Type   { return TypeTXT }
-func (AAAA) Type() Type  { return TypeAAAA }
-func (LOC) Type() Type   { return TypeLOC }
-func (SRV) Type() Type   { return TypeSRV }
-func (OPT) Type() Type   { return TypeOPT }
-func (SVCB) Type() Type  { return TypeSVCB }
-func (HTTPS) Type() Type { return TypeHTTPS }
-func (CAA) Type() Type   { return TypeCAA }
+func (p *Type) UnmarshalText(text []byte) (err error) {
+	*p, err = TypeNamed(string(text))
+	return
+}
+
+func (TypeAResource) Type() Type     { return TypeA }
+func (TypeNSResource) Type() Type    { return TypeNS }
+func (TypeCNAMEResource) Type() Type { return TypeCNAME }
+func (TypeSOAResource) Type() Type   { return TypeSOA }
+func (TypePTRResource) Type() Type   { return TypePTR }
+func (TypeHINFOResource) Type() Type { return TypeHINFO }
+func (TypeMINFOResource) Type() Type { return TypeMINFO }
+func (TypeMXResource) Type() Type    { return TypeMX }
+func (TypeTXTResource) Type() Type   { return TypeTXT }
+func (TypeAAAAResource) Type() Type  { return TypeAAAA }
+func (TypeLOCResource) Type() Type   { return TypeLOC }
+func (TypeSRVResource) Type() Type   { return TypeSRV }
+func (TypeOPTResource) Type() Type   { return TypeOPT }
+func (TypeSVCBResource) Type() Type  { return TypeSVCB }
+func (TypeHTTPSResource) Type() Type { return TypeHTTPS }
+func (TypeCAAResource) Type() Type   { return TypeCAA }
+
+type TypeTBDResource struct {
+	t    Type
+	Data []byte
+}
+
+func (v TypeTBDResource) construct(
+	mb *dnsmessage.Builder, h dnsmessage.ResourceHeader,
+) error {
+	return mb.UnknownResource(h, dnsmessage.UnknownResource{
+		Type: dnsmessage.Type(v.t),
+		Data: v.Data,
+	})
+}
+
+func (v TypeTBDResource) String() string {
+	return fmt.Sprintf("%#x", v.Data)
+}
+
+func (v TypeTBDResource) Type() Type { return v.t }
+
+func (p *TypeTBDResource) UnmarshalBinary(data []byte) error {
+	p.Data = bytes.Clone(data)
+	return nil
+}
 
 func TypeNamed(name string) (Type, error) {
 	v, found := integer.Named(Type0, name, _Type_name_0,
@@ -169,17 +216,5 @@ func TypeNamed(name string) (Type, error) {
 	if found {
 		return v, nil
 	}
-	return Type0, xerrors.Invalid("TYPE")
-}
-
-func (v Type) MarshalText() (b []byte, _ error) {
-	if v != Type0 {
-		b = []byte(v.String())
-	}
-	return
-}
-
-func (p *Type) UnmarshalText(text []byte) (err error) {
-	*p, err = TypeNamed(string(text))
-	return
+	return Type0, xerrors.Invalid(name)
 }

@@ -8,21 +8,30 @@ import (
 	"strings"
 
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
+	"golang.org/x/net/dns/dnsmessage"
 )
 
-type TXT []string
+type TypeTXTResource []string
 
-func ParseTXT(tokens []string) (TXT, []string, error) {
+func ParseTXT(tokens []string) (TypeTXTResource, error) {
 	if len(tokens) == 0 {
-		return TXT{}, tokens, xerrors.Incomplete("TXT")
+		return TypeTXTResource{}, xerrors.Incomplete("TXT")
 	}
-	txt := make(TXT, len(tokens))
+	txt := make(TypeTXTResource, len(tokens))
 	for i, s := range tokens {
 		txt[i] = strings.Clone(s)
 	}
-	return txt, tokens[len(tokens):], nil
+	return txt, nil
 }
 
-func (v TXT) String() string {
+func (v TypeTXTResource) construct(
+	mb *dnsmessage.Builder, h dnsmessage.ResourceHeader,
+) error {
+	return mb.TXTResource(h, dnsmessage.TXTResource{
+		TXT: []string(v),
+	})
+}
+
+func (v TypeTXTResource) String() string {
 	return strings.Join(v, " ")
 }

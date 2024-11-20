@@ -9,20 +9,22 @@ import (
 	"net/netip"
 
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
+	"golang.org/x/net/dns/dnsmessage"
 )
 
-type A struct{ netip.Addr }
-type AAAA struct{ netip.Addr }
+type TypeAResource struct{ netip.Addr }
+type TypeAAAAResource struct{ netip.Addr }
 
-func ParseAddr[T A | AAAA](tokens []string) (T, []string, error) {
+type AddrResources interface {
+	TypeAResource | TypeAAAAResource
+}
+
+func ParseAddr[T AddrResources](tokens []string) (T, error) {
 	if len(tokens) == 0 {
-		return T{netip.Addr{}}, tokens, xerrors.Incomplete("A|AAAA")
+		return T{netip.Addr{}}, xerrors.Incomplete("A|AAAA")
 	}
 	addr, err := netip.ParseAddr(tokens[0])
-	if err == nil {
-		tokens = tokens[1:]
-	}
-	return T{addr}, tokens, err
+	return T{addr}, err
 }
 
 // With IPv4 address 1.2.3.4, return string "3.2.1.0.in-addr.arpa."
@@ -45,4 +47,20 @@ func Reverse(addr netip.Addr) string {
 		a6[11], a6[10], a6[9], a6[8],
 		a6[7], a6[6], a6[5], a6[4],
 		a6[3], a6[2], a6[1], a6[0])
+}
+
+func (v TypeAResource) construct(
+	mb *dnsmessage.Builder, h dnsmessage.ResourceHeader,
+) error {
+	var a dnsmessage.AResource
+	copy(a.A[:], v.AsSlice())
+	return mb.AResource(h, a)
+}
+
+func (v TypeAAAAResource) construct(
+	mb *dnsmessage.Builder, h dnsmessage.ResourceHeader,
+) error {
+	var aaaa dnsmessage.AAAAResource
+	copy(aaaa.AAAA[:], v.AsSlice())
+	return mb.AAAAResource(h, aaaa)
 }

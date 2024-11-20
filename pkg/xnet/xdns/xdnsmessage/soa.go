@@ -8,18 +8,19 @@ import (
 	"fmt"
 
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
+	"golang.org/x/net/dns/dnsmessage"
 )
 
-type SOA struct {
+type TypeSOAResource struct {
 	MName, RName UniqueString
 
 	Serial, Refresh, Retry, Expire, Minimum uint32
 }
 
-func ParseSOA(tokens []string) (SOA, []string, error) {
-	var soa SOA
+func ParseSOA(tokens []string) (TypeSOAResource, error) {
+	var soa TypeSOAResource
 	if len(tokens) < 7 {
-		return soa, tokens, xerrors.Incomplete("SOA")
+		return soa, xerrors.Incomplete("SOA")
 	}
 	soa.MName = MakeUniqueString(tokens[0])
 	soa.RName = MakeUniqueString(tokens[1])
@@ -36,10 +37,25 @@ func ParseSOA(tokens []string) (SOA, []string, error) {
 	if err == nil {
 		_, err = fmt.Sscan(tokens[6], &soa.Minimum)
 	}
-	return soa, tokens[7:], err
+	return soa, err
 }
 
-func (v SOA) String() string {
+func (v TypeSOAResource) construct(
+	mb *dnsmessage.Builder, h dnsmessage.ResourceHeader,
+) error {
+	var soa dnsmessage.SOAResource
+
+	v.MName.rename(&soa.MBox)
+	v.RName.rename(&soa.NS)
+	soa.Serial = v.Serial
+	soa.Refresh = v.Refresh
+	soa.Retry = v.Retry
+	soa.Expire = v.Expire
+	soa.MinTTL = v.Minimum
+	return mb.SOAResource(h, soa)
+}
+
+func (v TypeSOAResource) String() string {
 	return fmt.Sprint(v.MName, "\n",
 		v.RName.String(), "\n",
 		v.Serial, "\n",

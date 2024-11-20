@@ -9,15 +9,13 @@ import (
 	"flag"
 	"fmt"
 	"log"
-	"math"
 	"os"
-	"time"
+	"sync"
 
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xflag"
 	"github.com/platinasystems/goes/v2/pkg/xlog"
 	"github.com/platinasystems/goes/v2/pkg/xnet/xdns/xdnsdb"
-	"github.com/platinasystems/goes/v2/pkg/xnet/xdns/xdnsmessage"
 	"github.com/platinasystems/goes/v2/pkg/xprogram"
 )
 
@@ -33,6 +31,13 @@ usage: {{.Name}} [-flags] {zone} {file | -}
 Mimic BIND9's config verification tool.
 
 {{flags .}}`)
+
+	wg := new(sync.WaitGroup)
+	ctx, cancel := context.WithCancel(ctx)
+	defer func() {
+		cancel()
+		wg.Wait()
+	}()
 
 	addCommandLineFlags()
 
@@ -60,49 +65,16 @@ Mimic BIND9's config verification tool.
 		return xerrors.Incomplete("file")
 	}
 
-	zone, fn, f := args[0], args[1], os.Stdin
+	zone, fn := args[0], args[1]
 
-	if fn != "-" {
-		if f, err = os.Open(fn); err != nil {
-			return err
-		} else {
-			defer f.Close()
-		}
-	}
+	wg.Add(1)
+	go xdnsdb.Routine(ctx, wg, verbose)
 
-	db := xdnsdb.MakeDB(zone)
-	if err = db.Fread(ctx, f); err != nil {
+	if err = xdnsdb.Include(ctx, zone, fn); err != nil {
 		return err
 	}
 
-	var last string
-	now := time.Now()
-	db.Range(func(zone, name string, rrs []xdnsdb.RR) bool {
-		if len(rrs) == 0 {
-			fmt.Print("%-24sEMPTY\n", name+"."+zone)
-			return true
-		}
-		if zone != last {
-			fmt.Println("$ORIGIN", zone)
-			last = zone
-		}
-		fmt.Printf("%-24s", name)
-		for i, rr := range rrs {
-			if i > 0 {
-				fmt.Printf("%-24s", "")
-			}
-			var secs uint
-			if rr.TTL.After(now) {
-				fsecs := rr.TTL.Sub(now).Seconds()
-				secs = uint(math.Round(fsecs))
-			} else {
-			}
-			fmt.Printf("%-8d", secs)
-			fmt.Printf("%-8s", "IN")
-			fmt.Printf("%-8s", rr.Type())
-			xdnsmessage.LineWrapResource(rr.Resource, 24+8+8+8)
-		}
-		return true
-	})
+	xdnsdb.Dump(os.Stdout)
 	return nil
+
 }

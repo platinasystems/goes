@@ -5,121 +5,271 @@
 package xdnsmessage
 
 import (
+	"bytes"
+	"errors"
 	"fmt"
+	"io"
+	"net"
 	"net/netip"
 	"strings"
+	"sync"
+	"time"
 
-	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"golang.org/x/net/dns/dnsmessage"
 )
 
-type Question struct {
+var (
+	ErrOverrun  = errors.New("overrun")
+	ErrUnderrun = errors.New("underrun")
+)
+
+type WireQuestion struct {
+	Name UniqueString
 	Class
 	Type
-	Name UniqueString
 }
 
-type Resource interface {
-	String() string
+type WireResource struct {
+	Name     UniqueString
+	Duration time.Duration
+	Class    Class
+	TypedResource
+}
+
+type TypedResource interface {
 	Type() Type
-}
-
-type ResourceRecord struct {
-	Name UniqueString
-	Secs uint32
-	Class
 	Resource
 }
 
-func Decode(data []byte) (msg struct {
+type Resource interface {
+	fmt.Stringer
+	construct(*dnsmessage.Builder, dnsmessage.ResourceHeader) error
+}
+
+func (wr WireResource) Resource() Resource {
+	return wr.TypedResource
+}
+
+func (wr WireResource) Seconds() uint32 {
+	return uint32(wr.Duration / time.Second)
+}
+
+func (wr WireResource) build(mb *dnsmessage.Builder) error {
+	var h dnsmessage.ResourceHeader
+	wr.Name.rename(&h.Name)
+	h.Class = dnsmessage.Class(wr.Class)
+	h.Type = dnsmessage.Type(wr.Type())
+	h.TTL = wr.Seconds()
+	return wr.construct(mb, h)
+}
+
+type Message struct {
+	net.Addr
 	ID uint16
 	HF
 	OpCode
 	RCode
-	Questions []Question
+	Questions []WireQuestion
 	Answers,
 	Authorities,
-	Additionals []ResourceRecord
-}, err error) {
+	Additionals []WireResource
+}
+
+var MessagePool = sync.Pool{
+	New: func() any { return new(Message) },
+}
+
+func NewMessage() *Message {
+	return MessagePool.Get().(*Message)
+}
+
+func (m *Message) Free() {
+	m.Addr = nil
+	m.ID = 0
+	m.HF = 0
+	m.OpCode = 0
+	m.RCode = 0
+	if len(m.Questions) > 0 {
+		m.Questions = m.Questions[:0]
+	}
+	if len(m.Answers) > 0 {
+		m.Answers = m.Answers[:0]
+	}
+	if len(m.Authorities) > 0 {
+		m.Answers = m.Authorities[:0]
+	}
+	if len(m.Additionals) > 0 {
+		m.Answers = m.Additionals[:0]
+	}
+	MessagePool.Put(m)
+}
+
+// Append new query, or with any answers, response to given buffer.
+// If there are no Additionals and cap(buf) > 512, add EDNS0 OPT.
+// If “Message.ID“ is 0, set to random number.
+func (m *Message) AppendTo(data []byte) ([]byte, error) {
+	var err error
+	var rh dnsmessage.ResourceHeader
+	for m.ID == 0 {
+		m.ID = NewID()
+	}
+	if data == nil {
+		data = make([]byte, 0, 512)
+	}
+	mb := dnsmessage.NewBuilder(data, dnsmessage.Header{
+		ID:                 m.ID,
+		OpCode:             dnsmessage.OpCode(m.OpCode),
+		RCode:              dnsmessage.RCode(m.RCode),
+		Response:           (m.HF & HFResponse) != 0,
+		Authoritative:      (m.HF & HFAuthoritative) != 0,
+		Truncated:          (m.HF & HFTruncated) != 0,
+		RecursionDesired:   (m.HF & HFRecursionDesired) != 0,
+		RecursionAvailable: (m.HF & HFRecursionAvailable) != 0,
+		AuthenticData:      (m.HF & HFAuthenticData) != 0,
+		CheckingDisabled:   (m.HF & HFCheckingDisabled) != 0,
+	})
+	if len(m.Questions) > 0 {
+		if err = mb.StartQuestions(); err != nil {
+			return data[:0], err
+		}
+		for _, mq := range m.Questions {
+			var q dnsmessage.Question
+			mq.Name.rename(&q.Name)
+			q.Class = dnsmessage.Class(mq.Class)
+			q.Type = dnsmessage.Type(mq.Type)
+			if err = mb.Question(q); err != nil {
+				return data[:0], err
+			}
+		}
+	}
+	if len(m.Answers) > 0 {
+		if err = mb.StartAnswers(); err != nil {
+			return data[:0], err
+		}
+		for _, a := range m.Answers {
+			if err = a.build(&mb); err != nil {
+				return data[:0], err
+			}
+		}
+	}
+	if len(m.Additionals) > 0 {
+		if err = mb.StartAdditionals(); err != nil {
+			return data[:0], err
+		}
+		for _, a := range m.Additionals {
+			if err = a.build(&mb); err != nil {
+				return data[:0], err
+			}
+		}
+	} else if cap(data) > 512 {
+		err = mb.StartAdditionals()
+		if err != nil {
+			return nil, err
+		}
+		err = rh.SetEDNS0(cap(data), dnsmessage.RCodeSuccess, false)
+		if err != nil {
+			return nil, err
+		}
+		err = mb.OPTResource(rh, dnsmessage.OPTResource{})
+		if err != nil {
+			return nil, err
+		}
+	}
+	if len(m.Authorities) > 0 {
+		if err = mb.StartAuthorities(); err != nil {
+			return data[:0], err
+		}
+		for _, a := range m.Authorities {
+			if err = a.build(&mb); err != nil {
+				return data[:0], err
+			}
+		}
+	}
+	return mb.Finish()
+}
+
+func (m *Message) UnmarshalBinary(data []byte) error {
 	var p dnsmessage.Parser
 	h, err := p.Start(data)
 	if err != nil {
-		return
+		return err
 	}
-	msg.ID = h.ID
-	msg.HF = NewHeaderFlags(h)
-	msg.OpCode = OpCode(h.OpCode)
-	msg.RCode = RCode(h.RCode)
-	if msg.Questions, err = gatherQuestions(p.Question); err != nil {
-		return
+	m.ID = h.ID
+	m.HF = NewHeaderFlags(h)
+	m.OpCode = OpCode(h.OpCode)
+	m.RCode = RCode(h.RCode)
+	if m.Questions, err = unpackQuestions(p.Question); err != nil {
+		return err
 	}
-	if msg.Answers, err = gatherResources(p.Answer); err != nil {
-		return
+	if m.Answers, err = unpackResources(p.Answer); err != nil {
+		return err
 	}
-	if msg.Authorities, err = gatherResources(p.Authority); err != nil {
-		return
+	if m.Authorities, err = unpackResources(p.Authority); err != nil {
+		return err
 	}
-	msg.Additionals, err = gatherResources(p.Additional)
-	return
+	m.Additionals, err = unpackResources(p.Additional)
+	return err
 }
 
-func gatherQuestions(f func() (dnsmessage.Question, error)) (
-	qs []Question, err error,
+func unpackQuestions(unpack func() (dnsmessage.Question, error)) (
+	[]WireQuestion, error,
 ) {
+	var wqs []WireQuestion
 	for {
-		if q, e := f(); e != nil {
-			if e == dnsmessage.ErrSectionDone {
+		q, err := unpack()
+		if err != nil {
+			if errors.Is(err, dnsmessage.ErrSectionDone) {
 				break
 			}
-			err = e
-			return
-		} else {
-			qs = append(qs, Question{
-				Class: Class(q.Class),
-				Type:  Type(q.Type),
-				Name:  MakeUniqueString(q.Name.String()),
-			})
+			return wqs, err
 		}
+		wqs = append(wqs, WireQuestion{
+			Name:  MakeUniqueString(q.Name.String()),
+			Class: Class(q.Class),
+			Type:  Type(q.Type),
+		})
+
 	}
-	return
+	return wqs, nil
 }
 
-func gatherResources(f func() (dnsmessage.Resource, error)) (
-	rrs []ResourceRecord, err error,
+func unpackResources(unpack func() (dnsmessage.Resource, error)) (
+	[]WireResource, error,
 ) {
+	var wrs []WireResource
 	for {
-		if r, e := f(); e != nil {
-			if e != dnsmessage.ErrSectionDone {
-				err = e
+		r, err := unpack()
+		if err != nil {
+			if errors.Is(err, dnsmessage.ErrSectionDone) {
+				break
 			}
-			break
-		} else if rr, e := convert(r); e != nil {
-			err = e
-			break
-		} else {
-			rrs = append(rrs, rr)
+			return wrs, err
 		}
+		wr, err := makeWireResource(r)
+		if err != nil {
+			return wrs, err
+		}
+		wrs = append(wrs, wr)
 	}
-	return
+	return wrs, nil
 }
 
-func convert(r dnsmessage.Resource) (rr ResourceRecord, err error) {
-	rr.Name = MakeUniqueString(r.Header.Name.String())
-	rr.Secs = r.Header.TTL
-	rr.Class = Class(r.Header.Class)
+func makeWireResource(r dnsmessage.Resource) (WireResource, error) {
+	var err error
+	var v TypedResource
 	switch r.Header.Type {
 	case dnsmessage.TypeA:
 		a := r.Body.(*dnsmessage.AResource).A
-		rr.Resource = A{netip.AddrFrom4(a)}
+		v = TypeAResource{netip.AddrFrom4(a)}
 	case dnsmessage.TypeNS:
 		s := r.Body.(*dnsmessage.NSResource).NS.String()
-		rr.Resource = NS{MakeUniqueString(s)}
+		v = TypeNSResource{MakeUniqueString(s)}
 	case dnsmessage.TypeCNAME:
 		s := r.Body.(*dnsmessage.CNAMEResource).CNAME.String()
-		rr.Resource = CNAME{MakeUniqueString(s)}
+		v = TypeCNAMEResource{MakeUniqueString(s)}
 	case dnsmessage.TypeSOA:
 		soa := r.Body.(*dnsmessage.SOAResource)
-		rr.Resource = SOA{
+		v = TypeSOAResource{
 			MName:   MakeUniqueString(soa.MBox.String()),
 			RName:   MakeUniqueString(soa.NS.String()),
 			Serial:  soa.Serial,
@@ -130,20 +280,27 @@ func convert(r dnsmessage.Resource) (rr ResourceRecord, err error) {
 		}
 	case dnsmessage.TypePTR:
 		s := r.Body.(*dnsmessage.PTRResource).PTR.String()
-		rr.Resource = PTR{MakeUniqueString(s)}
+		v = TypePTRResource{MakeUniqueString(s)}
 	case dnsmessage.TypeMX:
 		mx := r.Body.(*dnsmessage.MXResource)
-		rr.Resource = MX{
+		v = TypeMXResource{
 			Preference: mx.Pref,
 			Exchange:   MakeUniqueString(mx.MX.String()),
 		}
 	case dnsmessage.TypeTXT:
+		txt := r.Body.(*dnsmessage.TXTResource)
+		v = TypeTXTResource(txt.TXT)
 	case dnsmessage.TypeAAAA:
 		aaaa := r.Body.(*dnsmessage.AAAAResource).AAAA
-		rr.Resource = AAAA{netip.AddrFrom16(aaaa)}
+		v = TypeAAAAResource{netip.AddrFrom16(aaaa)}
+	case dnsmessage.Type(TypeLOC):
+		var loc TypeLOCResource
+		data := r.Body.(*dnsmessage.UnknownResource).Data
+		err = loc.UnmarshalBinary(data)
+		v = loc
 	case dnsmessage.TypeSRV:
 		srv := r.Body.(*dnsmessage.SRVResource)
-		rr.Resource = SRV{
+		v = TypeSRVResource{
 			Priority: srv.Priority,
 			Weight:   srv.Weight,
 			Port:     srv.Port,
@@ -151,94 +308,46 @@ func convert(r dnsmessage.Resource) (rr ResourceRecord, err error) {
 		}
 	case dnsmessage.TypeOPT:
 		opts := r.Body.(*dnsmessage.OPTResource).Options
-		rr.Resource = OPT(opts)
+		v = TypeOPTResource(opts)
 	case dnsmessage.Type(TypeSVCB):
-		var svcb SVCB
+		var svcb TypeSVCBResource
 		data := r.Body.(*dnsmessage.UnknownResource).Data
 		err = svcb.UnmarshalBinary(data)
-		rr.Resource = svcb
+		v = svcb
 	case dnsmessage.Type(TypeHTTPS):
-		var https HTTPS
+		var https TypeHTTPSResource
 		data := r.Body.(*dnsmessage.UnknownResource).Data
 		err = https.UnmarshalBinary(data)
-		rr.Resource = https
+		v = https
 	case dnsmessage.Type(TypeCAA):
-		var caa CAA
+		var caa TypeCAAResource
 		data := r.Body.(*dnsmessage.UnknownResource).Data
 		err = caa.UnmarshalBinary(data)
-		rr.Resource = caa
+		v = caa
 	default:
-		err = xerrors.Unsupported("type", Type(r.Header.Type))
+		clone := bytes.Clone(r.Body.(*dnsmessage.UnknownResource).Data)
+		v = TypeTBDResource{Type(r.Header.Type), clone}
 	}
-	return
+	return WireResource{
+		MakeUniqueString(r.Header.Name.String()),
+		time.Second * time.Duration(r.Header.TTL),
+		Class(r.Header.Class),
+		v,
+	}, err
 }
 
-func LineWrapResource(r Resource, indent int) {
-	lns := strings.Split(r.String(), "\n")
+func LineWrap(w io.Writer, s string, indent int) {
+	lns := strings.Split(s, "\n")
 	switch len(lns) {
 	case 0:
-		fmt.Println()
+		fmt.Fprintln(w)
 	case 1:
-		fmt.Println(lns[0])
+		fmt.Fprintln(w, lns[0])
 	default:
-		fmt.Print("(", lns[0])
-		for _, s := range lns[1:] {
-			fmt.Printf("\n%*s%s", indent+1, "", s)
+		fmt.Fprint(w, "(", lns[0])
+		for _, ln := range lns[1:] {
+			fmt.Fprintf(w, "\n%*s%s", indent+1, "", ln)
 		}
-		fmt.Println(")")
+		fmt.Fprintln(w, ")")
 	}
-}
-
-// Format new query.
-// If cap(buf) > 512, add EDNS0 OPT.
-// Returns ID and binary request.
-func NewQuestion(
-	buf []byte,
-	name string,
-	t Type,
-	c Class,
-	hf HF,
-) (uint16, []byte, error) {
-	var rh dnsmessage.ResourceHeader
-	var q dnsmessage.Question
-	if buf == nil {
-		buf = make([]byte, 0, 512)
-	}
-	qhdr := dnsmessage.Header{
-		ID:                 NewID(),
-		Authoritative:      (hf & HFAuthoritative) != 0,
-		Truncated:          (hf & HFTruncated) != 0,
-		RecursionDesired:   (hf & HFRecursionDesired) != 0,
-		RecursionAvailable: (hf & HFRecursionAvailable) != 0,
-		AuthenticData:      (hf & HFAuthenticData) != 0,
-		CheckingDisabled:   (hf & HFCheckingDisabled) != 0,
-	}
-	mb := dnsmessage.NewBuilder(buf, qhdr)
-	err := mb.StartQuestions()
-	if err != nil {
-		return qhdr.ID, nil, err
-	}
-	q.Name.Length = uint8(copy(q.Name.Data[:], name))
-	q.Type = dnsmessage.Type(t)
-	q.Class = dnsmessage.Class(c)
-	err = mb.Question(q)
-	if err != nil {
-		return qhdr.ID, nil, err
-	}
-	if cap(buf) > 512 {
-		err = mb.StartAdditionals()
-		if err != nil {
-			return qhdr.ID, nil, err
-		}
-		err = rh.SetEDNS0(MaxPacketSize, dnsmessage.RCodeSuccess, false)
-		if err != nil {
-			return qhdr.ID, nil, err
-		}
-		err = mb.OPTResource(rh, dnsmessage.OPTResource{})
-		if err != nil {
-			return qhdr.ID, nil, err
-		}
-	}
-	fin, err := mb.Finish()
-	return qhdr.ID, fin, err
 }

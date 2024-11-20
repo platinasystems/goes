@@ -7,13 +7,15 @@ package bind
 import (
 	"github.com/platinasystems/goes/v2/pkg/bind/dig"
 	"github.com/platinasystems/goes/v2/pkg/bind/host"
-	named_checkzone "github.com/platinasystems/goes/v2/pkg/bind/named-checkzone"
+	"github.com/platinasystems/goes/v2/pkg/bind/named"
+	checkzone "github.com/platinasystems/goes/v2/pkg/bind/named-checkzone"
 )
 
 // Features map by name these emulated BIND9 tools.
 var Features = map[string]any{
-	"dig":  dig.DiG,
-	"host": host.Host,
+	"dig":   dig.DiG,
+	"host":  host.Host,
+	"named": named.Named,
 
-	"named-checkzone": named_checkzone.NamedCheckZone,
+	"named-checkzone": checkzone.NamedCheckZone,
 }

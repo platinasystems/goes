@@ -18,7 +18,7 @@ func newFlagSet() *flag.FlagSet {
 }
 
 var flags struct {
-	ip4, ip6, m, O, T, u, v bool
+	ip4only, ip6only, m, O, T, u, v bool
 
 	b, f, i, k, q, x, y string
 
@@ -28,8 +28,8 @@ var flags struct {
 }
 
 func addCommandLineFlags() {
-	flag.BoolVar(&flags.ip4, "4", false, "Use IPv4 only.")
-	flag.BoolVar(&flags.ip6, "6", false, "Use IPv6 only.")
+	flag.BoolVar(&flags.ip4only, "4", false, "Use IPv4 only.")
+	flag.BoolVar(&flags.ip6only, "6", false, "Use IPv6 only.")
 	flag.BoolVar(&flags.m, "m", false, "Enable memory usage debugging.")
 	flag.BoolVar(&flags.O, "O", false, `
 Print plus (+) prefaced options and exit.`[1:])

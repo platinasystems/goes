@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
+	"golang.org/x/net/dns/dnsmessage"
 )
 
 //go:generate stringer -type SVCBKey -trimprefix SVCBKey -linecomment
@@ -29,16 +30,31 @@ const (
 	SVCBKeyDOHPath       // doh-path
 )
 
-type SVCB struct {
+// https://datatracker.ietf.org/doc/rfc9460/
+type TypeSVCBResource struct {
 	Pri    uint16
 	Name   UniqueString
 	Params []Param
 }
 
-type HTTPS struct{ SVCB }
-type CAA struct{ SVCB }
+type TypeHTTPSResource struct{ TypeSVCBResource }
+type TypeCAAResource struct{ TypeSVCBResource }
 
-func (svcb SVCB) String() string {
+func (v TypeSVCBResource) construct(
+	mb *dnsmessage.Builder, h dnsmessage.ResourceHeader,
+) error {
+	r := dnsmessage.UnknownResource{
+		Type: h.Type,
+	}
+	r.Data = binary.BigEndian.AppendUint16(r.Data, v.Pri)
+	r.Data = v.Name.AppendTo(r.Data)
+	for _, param := range v.Params {
+		_ = param // FIXME r.Data = param.AppendTo(r.Data)
+	}
+	return mb.UnknownResource(h, r)
+}
+
+func (svcb TypeSVCBResource) String() string {
 	w := new(strings.Builder)
 	fmt.Fprintf(w, "%d", svcb.Pri)
 	fmt.Fprint(w, " ", svcb.Name)
@@ -60,7 +76,7 @@ func (port SVCBPort) String() string {
 	return fmt.Sprintf("%d", uint16(port))
 }
 
-func (svcb *SVCB) UnmarshalBinary(msg []byte) error {
+func (svcb *TypeSVCBResource) UnmarshalBinary(msg []byte) error {
 	var err error
 	if len(msg) < 2 {
 		return xerrors.Incomplete("SVCB")
@@ -122,10 +138,10 @@ func (svcb *SVCB) UnmarshalBinary(msg []byte) error {
 	return nil
 }
 
-func (r *HTTPS) UnmarshalBinary(msg []byte) error {
-	return r.SVCB.UnmarshalBinary(msg)
+func (r *TypeHTTPSResource) UnmarshalBinary(msg []byte) error {
+	return r.TypeSVCBResource.UnmarshalBinary(msg)
 }
 
-func (r *CAA) UnmarshalBinary(msg []byte) error {
-	return r.SVCB.UnmarshalBinary(msg)
+func (r *TypeCAAResource) UnmarshalBinary(msg []byte) error {
+	return r.TypeSVCBResource.UnmarshalBinary(msg)
 }

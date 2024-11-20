@@ -9,7 +9,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"net"
 	"net/netip"
 	"os"
 	"strings"
@@ -17,16 +16,10 @@ import (
 
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xflag"
+	"github.com/platinasystems/goes/v2/pkg/xnet/xdns"
 	"github.com/platinasystems/goes/v2/pkg/xnet/xdns/xdnsmessage"
+	"github.com/platinasystems/goes/v2/pkg/xnet/xdns/xdnspkt"
 	"github.com/platinasystems/goes/v2/pkg/xprogram"
-)
-
-var (
-	udp *net.UDPConn
-	buf []byte
-	cmd,
-	svr,
-	ver string
 )
 
 func DiG(ctx context.Context, args []string) error {
@@ -36,66 +29,89 @@ Mimic BIND9's DNS lookup utility.
 
 {{flags .}}`)
 	addCommandLineFlags()
+	return lookup(ctx, flag.CommandLine, nil, args)
+}
 
-	if mm := xprogram.MainModule(); mm != nil {
-		ver = mm.Version
-	} else {
-		ver = "(unavailable)"
+func lookup(
+	ctx context.Context,
+	fs *flag.FlagSet,
+	rsvp func([]byte) ([]byte, error),
+	args []string,
+) error {
+	const hf = xdnsmessage.HFRecursionDesired
+	var (
+		cmd,
+		name,
+		ra,
+		svr string
+		c   xdnsmessage.Class
+		t   xdnsmessage.Type
+		rsp xdnsmessage.Message
+		err error
+	)
+
+	pkt := xdnspkt.Pool.Alloc(0)
+	defer xdnspkt.Pool.Free(pkt)
+
+	if fs == flag.CommandLine {
+		cmd = strings.Join(args, " ")
+		svr = "localhost:domain"
+		if len(args) > 0 && strings.HasPrefix(args[0], "@") {
+			svr = strings.TrimPrefix(args[0], "@")
+			args = args[1:]
+		}
 	}
-
-	buf = make([]byte, 2, 2+xdnsmessage.MaxPacketSize)
-	cmd = strings.Join(args, " ")
-	svr = "127.0.0.1"
-	if len(args) > 0 && strings.HasPrefix(args[0], "@") {
-		svr = strings.TrimPrefix(args[0], "@")
-		args = args[1:]
-	}
-
-	var err error
 	args, err = gopts.parse(args)
 	if err != nil {
 		return err
 	}
-
-	// FIXME alt DOH
-	defer func() {
-		if udp != nil {
-			udp.Close()
-			udp = nil
-		}
-	}()
-
-	for fs := flag.CommandLine; len(args) > 0; fs = newFlagSet() {
-		if args, err = lookup(ctx, fs, args); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func lookup(ctx context.Context, fs *flag.FlagSet, args []string) (
-	[]string, error,
-) {
-	var ra net.Addr
-
 	addQueryFlags(fs)
-	err := fs.Parse(args)
-	if err != nil {
-		return args, err
+	if err = fs.Parse(args); err != nil {
+		return err
 	}
 	args = fs.Args()
 	if fs == flag.CommandLine {
 		if flags.O {
 			fmt.Print(optionsTxt)
-			return args, nil
+			return nil
 		}
 		if flags.T {
 			fmt.Print(xdnsmessage.TypeHelpTxt)
-			return args, nil
+			return nil
+		}
+		ver := "(unavailable)"
+		if mm := xprogram.MainModule(); mm != nil {
+			ver = mm.Version
 		}
 		if flags.v {
 			fmt.Println(ver)
-			return args, nil
+			return nil
+		}
+		if strings.HasPrefix(svr, "https:") {
+			rsvp = func(b []byte) ([]byte, error) {
+				return b[:0], xerrors.FIXME("DOH")
+			}
+			// FIXME defer cl.CloseIdleConnections()
+			return xerrors.FIXME("DOH")
+		} else {
+			nw := "udp"
+			if flags.ip4only {
+				nw = "udp4"
+			} else if flags.ip6only {
+				nw = "udp6"
+			}
+			conn, err := xdns.DialContext(ctx, nw, svr)
+			if err != nil {
+				return err
+			}
+			defer func() {
+				conn.Close()
+			}()
+			ra = conn.RemoteAddr().String()
+			rsvp = func(b []byte) ([]byte, error) {
+				const tl = 30 * time.Second
+				return xdnspkt.TimeLimitedAsk(ctx, conn, b, tl)
+			}
 		}
 		if !gopts.has(boolOptShort) && gopts.has(boolOptCmd) {
 			fmt.Printf("; <<>> goes/pkg/bind/dig %s <<>> %s\n",
@@ -103,27 +119,13 @@ func lookup(ctx context.Context, fs *flag.FlagSet, args []string) (
 			fmt.Println()
 		}
 		if len(flags.f) > 0 {
-			return []string{}, batch(ctx, flags.f)
+			return batch(ctx, rsvp, flags.f)
 		}
 	}
-
-	if udp == nil {
-		// FIXME alt DOH
-		udp, err = xdnsmessage.NewUDP(ctx, svr, flags.p)
-		if err != nil {
-			return args, err
-		}
-		ra = udp.RemoteAddr()
-	}
-
-	var name string
-	var c xdnsmessage.Class
-	var t xdnsmessage.Type
-
 	if s := flags.x; len(s) > 0 {
 		addr, err := netip.ParseAddr(s)
 		if err != nil {
-			return args, xerrors.Label(err, "x")
+			return xerrors.Label(err, "x")
 		}
 		name = xdnsmessage.Reverse(addr)
 		t = xdnsmessage.TypePTR
@@ -132,7 +134,7 @@ func lookup(ctx context.Context, fs *flag.FlagSet, args []string) (
 		if len(flags.q) > 0 {
 			name = flags.q
 		} else if len(args) == 0 {
-			return args, xerrors.Incomplete("name")
+			return xerrors.Incomplete("name")
 		} else {
 			name = args[0]
 			args = args[1:]
@@ -158,57 +160,61 @@ func lookup(ctx context.Context, fs *flag.FlagSet, args []string) (
 	}
 
 	qopts := gopts.clone()
-	args, err = qopts.parse(args)
-	if err != nil {
-		return args, err
+	if args, err = qopts.parse(args); err != nil {
+		return err
 	}
 
-	const hf = xdnsmessage.HFRecursionDesired
-	id, q, err := xdnsmessage.NewQuestion(buf[2:], name, t, c, hf)
-	if err != nil {
-		return args, err
+	req := xdnsmessage.Message{
+		HF:     hf,
+		OpCode: xdnsmessage.OpCodeQuery,
+		Questions: []xdnsmessage.WireQuestion{{
+			Name:  xdnsmessage.MakeUniqueString(name),
+			Class: c,
+			Type:  t,
+		}},
 	}
-
+	if pkt, err = req.AppendTo(pkt[:0]); err != nil {
+		return err
+	}
 	beg := time.Now()
-	data, err := xdnsmessage.TimeLimitedAsk(ctx, udp, q, 30*time.Second)
+	if pkt, err = rsvp(pkt); err != nil {
+		return err
+	}
 	end := time.Now()
-	if err != nil {
-		return args, err
+	if err = rsp.UnmarshalBinary(pkt); err != nil {
+		return err
 	}
-	msg, err := xdnsmessage.Decode(data)
-	if err != nil {
-		return args, err
-	}
-	if msg.ID != id {
-		return args, fmt.Errorf("id %d != %d", msg.ID, id)
+	if rsp.ID != req.ID {
+		return fmt.Errorf("id %d != %d", rsp.ID, req.ID)
 	}
 	if !qopts.has(boolOptShort) && qopts.has(boolOptComments) {
 		fmt.Println(";; Got answer:")
-		fmt.Print(";; ->>HEADER<<- opcode: ", msg.OpCode)
-		fmt.Print(", status: ", msg.RCode)
-		fmt.Printf(", id: %d", msg.ID)
+		fmt.Print(";; ->>HEADER<<- opcode: ", rsp.OpCode)
+		fmt.Print(", status: ", rsp.RCode)
+		fmt.Printf(", id: %d", rsp.ID)
 		fmt.Println()
-		fmt.Printf(";; flags: %s", msg.HF)
-		fmt.Printf("; QUERY: %d", len(msg.Questions))
-		fmt.Printf(", ANSWER: %d", len(msg.Answers))
-		fmt.Printf(", AUTHORITY: %d", len(msg.Authorities))
-		fmt.Printf(", ADDITIONAL: %d", len(msg.Additionals))
+		fmt.Printf(";; flags: %s", rsp.HF)
+		fmt.Printf("; QUERY: %d", len(rsp.Questions))
+		fmt.Printf(", ANSWER: %d", len(rsp.Answers))
+		fmt.Printf(", AUTHORITY: %d", len(rsp.Authorities))
+		fmt.Printf(", ADDITIONAL: %d", len(rsp.Additionals))
 		fmt.Println()
 		fmt.Println()
 	}
 	if !qopts.has(boolOptShort) && qopts.has(boolOptAdditional) &&
-		len(msg.Additionals) > 0 {
+		len(rsp.Additionals) > 0 {
 		if qopts.has(boolOptComments) {
 			fmt.Println(";; OPT PSEUDOSECTION:")
 		}
-		for _, rr := range msg.Additionals {
+		for _, a := range rsp.Additionals {
+			edns := a.Seconds()
 			fmt.Print("; EDNS: version: ",
-				xdnsmessage.EDNSVersion(rr.Secs))
-			if xdnsmessage.HasEDNS0DNSSECOK(rr.Secs) {
+				xdnsmessage.EDNSVersion(edns))
+			if xdnsmessage.HasEDNS0DNSSECOK(edns) {
 				fmt.Print(" do")
 			}
-			mbz := xdnsmessage.EDNS0MBZ(rr.Secs)
-			n := uint16(rr.Class)
+			mbz := xdnsmessage.EDNS0MBZ(edns)
+			n := uint16(a.Class)
 			if mbz != 0 {
 				fmt.Printf("; MBZ: %#.4x, udp: %d\n", mbz, n)
 			} else {
@@ -217,11 +223,11 @@ func lookup(ctx context.Context, fs *flag.FlagSet, args []string) (
 		}
 	}
 	if !qopts.has(boolOptShort) && qopts.has(boolOptQuestion) &&
-		len(msg.Questions) > 0 {
+		len(rsp.Questions) > 0 {
 		if qopts.has(boolOptComments) {
 			fmt.Println(";; QUESTION SECTION:")
 		}
-		for _, q := range msg.Questions {
+		for _, q := range rsp.Questions {
 			fmt.Printf(";%-31s", q.Name)
 			fmt.Printf("%-8s", q.Class)
 			fmt.Printf("%-s\n", q.Type)
@@ -230,40 +236,40 @@ func lookup(ctx context.Context, fs *flag.FlagSet, args []string) (
 			fmt.Println()
 		}
 	}
-	if qopts.has(boolOptAnswer) && len(msg.Answers) > 0 {
+	if qopts.has(boolOptAnswer) && len(rsp.Answers) > 0 {
 		if qopts.has(boolOptComments) && !qopts.has(boolOptShort) {
 			fmt.Println(";; ANSWER SECTION:")
 		}
-		for _, rr := range msg.Answers {
+		for _, a := range rsp.Answers {
 			if qopts.has(boolOptShort) {
-				fmt.Print(rr.Resource)
+				fmt.Print(a)
 				continue
 			}
-			fmt.Printf("%-24s", rr.Name)
-			fmt.Printf("%-8d", rr.Secs)
-			fmt.Printf("%-8s", rr.Class)
-			fmt.Printf("%-8s", rr.Type())
-			xdnsmessage.LineWrapResource(rr.Resource, 24+8+8+8)
+			fmt.Printf("%-24s", a.Name)
+			fmt.Printf("%-8d", a.Seconds())
+			fmt.Printf("%-8s", a.Class)
+			fmt.Printf("%-8s", a.Type())
+			xdnsmessage.LineWrap(os.Stdout, a.String(), 24+8+8+8)
 		}
 		if qopts.has(boolOptComments) {
 			fmt.Println()
 		}
 	}
 	if !qopts.has(boolOptShort) && qopts.has(boolOptAuthority) &&
-		len(msg.Authorities) > 0 {
+		len(rsp.Authorities) > 0 {
 		if qopts.has(boolOptComments) {
 			fmt.Println(";; AUTHORITY SECTION:")
 		}
-		for _, rr := range msg.Authorities {
+		for _, a := range rsp.Authorities {
 			if qopts.has(boolOptShort) {
-				fmt.Print(rr.Resource)
+				fmt.Print(a)
 				continue
 			}
-			fmt.Printf("%-24s", rr.Name)
-			fmt.Printf("%-8d", rr.Secs)
-			fmt.Printf("%-8s", rr.Class)
-			fmt.Printf("%-8s", rr.Type())
-			xdnsmessage.LineWrapResource(rr.Resource, 24+8+8+8)
+			fmt.Printf("%-24s", a.Name)
+			fmt.Printf("%-8d", a.Seconds())
+			fmt.Printf("%-8s", a.Class)
+			fmt.Printf("%-8s", a.Type())
+			xdnsmessage.LineWrap(os.Stdout, a.String(), 24+8+8+8)
 		}
 		if qopts.has(boolOptComments) {
 			fmt.Println()
@@ -278,14 +284,24 @@ func lookup(ctx context.Context, fs *flag.FlagSet, args []string) (
 		} else {
 			fmt.Println(dur.Milliseconds(), "msec")
 		}
-		fmt.Printf(";; SERVER: %s#%d(%v\n", svr, flags.p, ra)
+		if fs == flag.CommandLine {
+			fmt.Printf(";; SERVER: %s(%s)\n", svr, ra)
+		}
 		fmt.Println(";; WHEN:", ef)
-		fmt.Println(";; MSG SIZE:", len(data))
+		fmt.Println(";; MSG SIZE:", len(pkt))
 	}
-	return args, nil
+	if len(args) > 0 {
+		return lookup(ctx, newFlagSet(), rsvp, args)
+	}
+	return nil
 }
 
-func batch(ctx context.Context, fn string) error {
+func batch(
+	ctx context.Context,
+	rsvp func([]byte) ([]byte, error),
+	fn string,
+) error {
+	var err error
 	var sc *bufio.Scanner
 	if fn == "-" {
 		sc = bufio.NewScanner(os.Stdin)
@@ -295,18 +311,14 @@ func batch(ctx context.Context, fn string) error {
 		defer f.Close()
 		sc = bufio.NewScanner(f)
 	}
-	var err error
-	for sc.Scan() {
+	for err == nil && sc.Scan() {
 		line := sc.Text()
 		if len(line) == 0 ||
 			strings.HasPrefix(line, "#") ||
 			strings.HasPrefix(line, ";") {
 			continue
 		}
-		args := strings.Fields(line)
-		for err == nil && len(args) > 0 {
-			args, err = lookup(ctx, newFlagSet(), args)
-		}
+		err = lookup(ctx, newFlagSet(), rsvp, strings.Fields(line))
 	}
-	return nil
+	return err
 }

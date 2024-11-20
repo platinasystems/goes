@@ -5,25 +5,37 @@
 package xdnsmessage
 
 import (
-	"strings"
+	"fmt"
 
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
+	"golang.org/x/net/dns/dnsmessage"
 )
 
-type HINFO struct {
-	CPU, OS string
+type TypeHINFOResource struct {
+	CPU, OS UniqueString
 }
 
-func ParseHINFO(tokens []string) (HINFO, []string, error) {
+func ParseHINFO(tokens []string) (TypeHINFOResource, error) {
 	if len(tokens) < 2 {
-		return HINFO{}, tokens, xerrors.Incomplete("HINFO")
+		return TypeHINFOResource{}, xerrors.Incomplete("HINFO")
 	}
-	return HINFO{
-		CPU: strings.Clone(tokens[0]),
-		OS:  strings.Clone(tokens[1]),
-	}, tokens[2:], nil
+	return TypeHINFOResource{
+		CPU: MakeUniqueString(tokens[0]),
+		OS:  MakeUniqueString(tokens[1]),
+	}, nil
 }
 
-func (v HINFO) String() string {
-	return v.CPU + " " + v.OS
+func (v TypeHINFOResource) construct(
+	mb *dnsmessage.Builder, h dnsmessage.ResourceHeader,
+) error {
+	r := dnsmessage.UnknownResource{
+		Type: h.Type,
+	}
+	r.Data = v.CPU.AppendTo(r.Data)
+	r.Data = v.OS.AppendTo(r.Data)
+	return mb.UnknownResource(h, r)
+}
+
+func (v TypeHINFOResource) String() string {
+	return fmt.Sprint(v.CPU, " ", v.OS)
 }

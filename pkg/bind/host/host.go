@@ -10,12 +10,15 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xflag"
 	"github.com/platinasystems/goes/v2/pkg/xlog"
+	"github.com/platinasystems/goes/v2/pkg/xnet/xdns"
 	"github.com/platinasystems/goes/v2/pkg/xnet/xdns/xdnsmessage"
+	"github.com/platinasystems/goes/v2/pkg/xnet/xdns/xdnspkt"
 	"github.com/platinasystems/goes/v2/pkg/xprogram"
 )
 
@@ -44,9 +47,7 @@ var explanations = map[xdnsmessage.Type]string{
 
 func Host(ctx context.Context, args []string) error {
 	var name string
-
-	buf := make([]byte, 2, 2+xdnsmessage.MaxPacketSize)
-	svr := "127.0.0.1"
+	svr := "localhost:domain"
 
 	xflag.UsageTemplate(flag.CommandLine, `
 usage: {{.Name}} [-flags] {name} [server]
@@ -80,12 +81,27 @@ Mimic BIND9's DNS lookup utility.
 	if len(args) > 0 {
 		svr = args[0]
 	}
-	// FIXME alt DOH
-	udp, err := xdnsmessage.NewUDP(ctx, svr, flags.p)
-	if err != nil {
-		return err
+
+	pkt := xdnspkt.Pool.Alloc(0)
+	defer xdnspkt.Pool.Free(pkt)
+
+	rsvp := func(data []byte) ([]byte, error) {
+		return data, xerrors.Incomplete("requester")
 	}
-	defer udp.Close()
+	if strings.HasPrefix(svr, "https:") {
+		return xerrors.FIXME("DOH")
+	} else {
+		udp, err := xdns.DialContext(ctx, "udp", svr)
+		if err != nil {
+			return err
+		}
+		defer udp.Close()
+		rsvp = func(b []byte) ([]byte, error) {
+			const tl = 30 * time.Second
+			return xdnspkt.TimeLimitedAsk(ctx, udp, b, tl)
+		}
+	}
+
 	types := []xdnsmessage.Type{flags.t}
 	if flags.a || flags.A {
 		types[0] = xdnsmessage.TypeANY
@@ -97,24 +113,29 @@ Mimic BIND9's DNS lookup utility.
 		hf |= xdnsmessage.HFRecursionDesired
 	}
 	for _, t := range types {
-		id, q, err := xdnsmessage.
-			NewQuestion(buf[2:], name, t, flags.c, hf)
-		if err != nil {
-			return xerrors.Mark(err)
+		var rsp xdnsmessage.Message
+		req := xdnsmessage.Message{
+			HF:     hf,
+			OpCode: xdnsmessage.OpCodeQuery,
+			Questions: []xdnsmessage.WireQuestion{{
+				Name:  xdnsmessage.MakeUniqueString(name),
+				Class: flags.c,
+				Type:  t,
+			}},
 		}
-		data, err := xdnsmessage.
-			TimeLimitedAsk(ctx, udp, q, 30*time.Second)
-		if err != nil {
-			return xerrors.Mark(err)
-		}
-		msg, err := xdnsmessage.Decode(data)
-		if err != nil {
+		if pkt, err = req.AppendTo(pkt[:0]); err != nil {
 			return err
 		}
-		if msg.ID != id {
-			return fmt.Errorf("id %d != %d", msg.ID, id)
+		if pkt, err = rsvp(pkt); err != nil {
+			return err
 		}
-		for _, a := range msg.Answers {
+		if err = rsp.UnmarshalBinary(pkt); err != nil {
+			return err
+		}
+		if rsp.ID != req.ID {
+			return fmt.Errorf("id %d != %d", rsp.ID, req.ID)
+		}
+		for _, a := range rsp.Answers {
 			fmt.Print(name, " ")
 			s, ok := explanations[a.Type()]
 			if ok {

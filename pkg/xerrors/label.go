@@ -92,18 +92,18 @@ func Label(err error, args ...any) error {
 }
 
 func label(err error, args ...any) LabelError {
-	var sb strings.Builder
+	w := new(strings.Builder)
 	for _, arg := range args {
-		fmt.Fprint(&sb, arg, ":")
+		fmt.Fprint(w, arg, ":")
 	}
 	es := err.Error()
 	colon := strings.IndexRune(es, ':')
 	space := strings.IndexRune(es, ' ')
 	if colon < 0 || (space > 0 && space < colon) {
-		sb.WriteRune(' ')
+		w.WriteRune(' ')
 	}
-	sb.WriteString(es)
-	return LabelError{err, sb.String()}
+	w.WriteString(es)
+	return LabelError{err, w.String()}
 }
 
 type LabelError struct {

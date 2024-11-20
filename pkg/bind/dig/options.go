@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
-	"github.com/platinasystems/goes/v2/pkg/xnet/xdns/xdnsmessage"
+	"github.com/platinasystems/goes/v2/pkg/xnet/xdns/xdnspkt"
 )
 
 //go:embed options.txt
@@ -209,7 +209,7 @@ var gopts = options{ // Global Options
 		boolOptQuestion |
 		boolOptStats,
 	uints: [uintOpts]uint{
-		uintOptBufSize: xdnsmessage.MaxPacketSize,
+		uintOptBufSize: xdnspkt.Cap,
 		uintOptSplit:   56,
 	},
 }
