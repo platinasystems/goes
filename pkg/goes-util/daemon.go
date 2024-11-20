@@ -44,10 +44,10 @@ func StartDaemon(ctx context.Context, complete bool, args []string) error {
 	xflag.UsageTemplate(flag.CommandLine, `
 usage: {{.Name}} <feature> [args]
 If not a /ko-app, execute feature as a detached process with output piped to
-the system logger; otherwise, it perform within the current process context.
+the system logger; otherwise, perform within the current process context.
 `)
 	if len(args) > 0 && args[0] == "-h" {
-		flag.Usage()
+		flag.CommandLine.Usage()
 		return nil
 	}
 	if complete {
