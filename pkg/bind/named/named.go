@@ -6,9 +6,11 @@ package named
 
 import (
 	"context"
+	"encoding/binary"
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"os"
@@ -24,11 +26,13 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xprogram"
 )
 
-var (
-	mutable = log.New(os.Stdout, "", log.Lshortfile)
-	errata  = xlog.Unmute(mutable)
-	verbose = xlog.Mute(mutable)
-)
+var errata, verbose xlog.WritePrinter
+var opt map[string]string
+
+type xlistener interface {
+	net.Listener
+	SetDeadline(time.Time) error
+}
 
 func Named(ctx context.Context, args []string) error {
 	xflag.UsageTemplate(flag.CommandLine, `
@@ -41,6 +45,7 @@ Mimic BIND9's Internet domain name daemon.
 	if err != nil {
 		return err
 	}
+
 	if flags.V {
 		version := "(unavailable)"
 		if mm := xprogram.MainModule(); mm != nil {
@@ -49,23 +54,42 @@ Mimic BIND9's Internet domain name daemon.
 		fmt.Println(version)
 		return nil
 	}
+
+	mutable := log.New(os.Stdout, "", log.Lshortfile)
 	if flags.v {
-		verbose = xlog.Unmute(verbose)
+		verbose = xlog.Unmute(mutable)
 		verbose.Println("start named")
 		defer verbose.Println("stopped named")
 	} else if flags.q {
-		errata = xlog.Mute(errata)
+		errata = xlog.Mute(mutable)
 	}
+
 	if len(flags.c) > 0 {
 		if f, err := os.Open(flags.c); err == nil {
 			// FIXME parse config
 			f.Close()
-		} else if !os.IsNotExist(err) || flags.c != defaultNamedConfig {
+		} else if !os.IsNotExist(err) || flags.c != defaultNamedConf {
 			return xerrors.Mark(err)
 		}
 	}
 
+	opt = make(map[string]string)
+	for _, s := range strings.Split(flags.T, ",") {
+		eq := strings.Index(s, "=")
+		if eq < 0 {
+			opt[s] = "true"
+		} else {
+			opt[s[:eq]] = s[eq+1:]
+		}
+	}
+
+	ctx, cancel := context.WithCancel(ctx)
 	wg := new(sync.WaitGroup)
+	defer func() {
+		cancel()
+		wg.Wait()
+	}()
+
 	wg.Add(1)
 	go xdnsdb.Routine(ctx, wg, verbose)
 
@@ -81,75 +105,190 @@ Mimic BIND9's Internet domain name daemon.
 		xdnsdb.Dump(os.Stdout)
 		return nil
 	}
-	if flags.p != 0 {
-		nw := "udp"
-		laddr := fmt.Sprintf(":%d", flags.p)
-		if flags.ip4only {
-			nw = "udp4"
-		} else if flags.ip6only {
-			nw = "udp6"
+
+	for _, s := range strings.Split(flags.p, ",") {
+		if strings.HasPrefix(s, "tls=") {
+			return xerrors.Unsupported("tls")
+		} else if strings.HasPrefix(s, "https=") {
+			return xerrors.FIXME("https")
+		} else if strings.HasPrefix(s, "http=") {
+			return xerrors.FIXME("http")
+		} else {
+			laddr := ":" + strings.TrimPrefix(s, "dns=")
+			tcpNW := "tcp"
+			udpNW := "udp"
+			if flags.ip4only {
+				tcpNW = "tcp4"
+				udpNW = "udp4"
+			} else if flags.ip6only {
+				tcpNW = "tcp6"
+				udpNW = "udp6"
+			}
+			if opt["notcp"] != "true" {
+				ln, err := net.Listen(tcpNW, laddr)
+				if err != nil {
+					return err
+				}
+				defer ln.Close()
+				xln, ok := ln.(xlistener)
+				if !ok {
+					return errors.New("can't set deadline")
+				}
+				wg.Add(1)
+				go tcpAccept(ctx, wg, xln)
+			}
+			udpConn, err := net.ListenPacket(udpNW, laddr)
+			if err != nil {
+				return err
+			}
+			defer udpConn.Close()
+			mch := make(chan *xdnsmessage.Message, 4)
+			wg.Add(1)
+			go udpReceive(ctx, wg, udpConn, mch)
+			wg.Add(1)
+			go udpService(ctx, wg, udpConn, mch)
 		}
-		pc, err := net.ListenPacket(nw, laddr)
-		if err != nil {
-			return err
-		}
-		ch := make(chan *xdnsmessage.Message, 4)
-		wg.Add(1)
-		go pktrcv(ctx, wg, pc, ch)
-		wg.Add(1)
-		go pktsvc(ctx, wg, pc, ch)
-	}
-	if flags.P != 0 {
-		// FIXME DOH
 	}
 
 	wg.Wait()
-	return nil
+	return err
 }
 
-func pktrcv(
+func tcpAccept(
+	ctx context.Context,
+	wg *sync.WaitGroup,
+	xln xlistener,
+) {
+	var err error
+	la := xln.Addr()
+	defer verbose.Println("stopped tcp", la, "accept:", err)
+	defer wg.Done()
+	verbose.Println("start tcp", la, "accept")
+	for {
+		if err = ctx.Err(); err != nil {
+			break
+		}
+		err = xln.SetDeadline(time.Now().Add(time.Second))
+		if err != nil {
+			break
+		}
+		conn, err := xln.Accept()
+		if err != nil {
+			if errors.Is(err, os.ErrDeadlineExceeded) {
+				continue
+			}
+			break
+		}
+		wg.Add(1)
+		go tcpService(ctx, wg, conn)
+	}
+}
+
+func tcpService(
+	ctx context.Context,
+	wg *sync.WaitGroup,
+	conn net.Conn,
+) {
+	ra := conn.RemoteAddr()
+	defer verbose.Println("stopped tcp", ra, "service")
+	defer wg.Done()
+	defer conn.Close()
+	data := make([]byte, 4<<10, 4<<10)
+	req := xdnsmessage.NewMessage()
+	defer req.Free()
+	verbose.Println("start tcp", ra, "service")
+	for {
+		err := ctx.Err()
+		if err != nil {
+			break
+		}
+		err = conn.SetReadDeadline(time.Now().Add(time.Second))
+		if err != nil {
+			errata.Print(err)
+			break
+		}
+		n, err := conn.Read(data)
+		if err != nil {
+			if errors.Is(err, os.ErrDeadlineExceeded) {
+				continue
+			} else if !errors.Is(err, io.EOF) {
+				errata.Print(err)
+			}
+			break
+		}
+		if hn := binary.BigEndian.Uint16(data); n != 2+int(hn) {
+			errata.Print("underrun")
+			break
+		}
+		if err = req.UnmarshalBinary(data[2:n]); err != nil {
+			errata.Print(err)
+			break
+		}
+		ans := answer(req)
+		b, err := ans.AppendTo(data[2:2])
+		if err != nil {
+			errata.Print(err)
+			ans.Free()
+			break
+		}
+		n = len(b)
+		binary.BigEndian.PutUint16(data, uint16(n))
+		if _, err = conn.Write(data[:2+n]); err != nil {
+			errata.Print(err)
+		}
+		ans.Free()
+	}
+}
+
+func udpReceive(
 	ctx context.Context,
 	wg *sync.WaitGroup,
 	conn net.PacketConn,
 	ch chan<- *xdnsmessage.Message,
 ) {
-	verbose.Println("start pktrcv")
-	defer verbose.Println("stopped pktrcv")
+	defer verbose.Println("stopped udp receiver")
 	defer wg.Done()
-	var n int
-	var a net.Addr
+	defer close(ch)
 	data := make([]byte, 4<<10, 4<<10)
-	for err := ctx.Err(); err == nil; err = ctx.Err() {
+	verbose.Println("start udp receiver")
+	for {
+		err := ctx.Err()
+		if err != nil {
+			break
+		}
 		err = conn.SetReadDeadline(time.Now().Add(time.Second))
 		if err != nil {
 			errata.Print(err)
-		} else if n, a, err = conn.ReadFrom(data); err == nil {
-			m := xdnsmessage.NewMessage()
-			err = m.UnmarshalBinary(data[:n])
-			if err != nil {
-				errata.Print(err)
-				m.Free()
-			} else {
-				m.Addr = a
-				ch <- m
+			break
+		}
+		n, a, err := conn.ReadFrom(data)
+		if err != nil {
+			if errors.Is(err, os.ErrDeadlineExceeded) {
+				continue
 			}
-		} else if errors.Is(err, os.ErrDeadlineExceeded) {
-			err = nil
-		} else {
 			errata.Print(err)
+			break
+		}
+		req := xdnsmessage.NewMessage()
+		if err = req.UnmarshalBinary(data[:n]); err != nil {
+			errata.Print(err)
+			req.Free()
+		} else {
+			req.Addr = a
+			ch <- req
 		}
 	}
 }
 
-func pktsvc(
+func udpService(
 	ctx context.Context,
 	wg *sync.WaitGroup,
 	conn net.PacketConn,
 	ch <-chan *xdnsmessage.Message,
 ) {
-	verbose.Println("start pktsvc")
-	defer verbose.Println("stopped pktsvc")
+	defer verbose.Println("stopped udp message service")
 	defer wg.Done()
+	verbose.Println("start udp message service")
 	data := make([]byte, 4<<10, 4<<10)
 	for {
 		select {
@@ -171,22 +310,22 @@ func pktsvc(
 
 func answer(req *xdnsmessage.Message) *xdnsmessage.Message {
 	now := time.Now()
-	rsp := xdnsmessage.NewMessage()
-	rsp.Addr = req.Addr
-	rsp.ID = req.ID
-	rsp.HF = xdnsmessage.HFResponse
-	rsp.OpCode = req.OpCode
-	rsp.Questions = req.Questions
+	ans := xdnsmessage.NewMessage()
+	ans.Addr = req.Addr
+	ans.ID = req.ID
+	ans.HF = xdnsmessage.HFResponse
+	ans.OpCode = req.OpCode
+	ans.Questions = req.Questions
 	if len(req.Questions) == 0 {
-		rsp.RCode = xdnsmessage.RCodeFormatError
+		ans.RCode = xdnsmessage.RCodeFormatError
 	} else if req.OpCode != xdnsmessage.OpCodeQuery {
-		rsp.RCode = xdnsmessage.RCodeNotImplemented
+		ans.RCode = xdnsmessage.RCodeNotImplemented
 	} else {
 		name := req.Questions[0].Name
 		if entries := xdnsdb.Get(name); len(entries) == 0 {
-			rsp.RCode = xdnsmessage.RCodeNameError
+			ans.RCode = xdnsmessage.RCodeNameError
 		} else {
-			rsp.RCode = xdnsmessage.RCodeSuccess
+			ans.RCode = xdnsmessage.RCodeSuccess
 			c := req.Questions[0].Class
 			t := req.Questions[0].Type
 			for _, entry := range entries {
@@ -203,7 +342,7 @@ func answer(req *xdnsmessage.Message) *xdnsmessage.Message {
 				}
 				dur := entry.Deadline.Sub(now)
 				r := entry.TypedResource
-				rsp.Answers = append(rsp.Answers,
+				ans.Answers = append(ans.Answers,
 					xdnsmessage.WireResource{
 						Name:          name,
 						Duration:      dur,
@@ -213,5 +352,5 @@ func answer(req *xdnsmessage.Message) *xdnsmessage.Message {
 			}
 		}
 	}
-	return rsp
+	return ans
 }
