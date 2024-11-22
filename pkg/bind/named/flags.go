@@ -20,13 +20,8 @@ var flags struct {
 	Z string
 }
 
-const (
-	defaultNamedConf = "/etc/named.conf"
-	defaultNamedCrt  = "/etc/named.crt"
-	defaultNamedKey  = "/etc/named.key"
-)
+const defaultNamedConf = "/etc/named.conf"
 
-// This is “quoted”.
 func addCommandLineFlags() {
 	flag.BoolVar(&flags.ip4only, "4", false, `
 Only service IPv4 host addresses.`[1:])
