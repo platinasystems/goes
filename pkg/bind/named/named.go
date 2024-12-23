@@ -21,7 +21,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/platinasystems/goes/v2/pkg/xerrors"
+	named_conf "github.com/platinasystems/goes/v2/pkg/bind/named-conf"
 	"github.com/platinasystems/goes/v2/pkg/xflag"
 	"github.com/platinasystems/goes/v2/pkg/xlog"
 	"github.com/platinasystems/goes/v2/pkg/xnet/xdns/xdnsdb"
@@ -30,6 +30,7 @@ import (
 )
 
 var errata, verbose xlog.WritePrinter
+var conf named_conf.Conf
 var opt = map[string]string{
 	"cert":      "/etc/named.crt",
 	"key":       "/etc/named.key",
@@ -72,12 +73,16 @@ Mimic BIND9's Internet domain name daemon.
 	}
 
 	if len(flags.c) > 0 {
-		if f, err := os.Open(flags.c); err == nil {
-			// FIXME parse config
-			f.Close()
-		} else if !os.IsNotExist(err) || flags.c != defaultNamedConf {
-			return xerrors.Mark(err)
+		conf, err = named_conf.NewConf(flags.c)
+		if err != nil {
+			if !os.IsNotExist(err) || flags.c != defaultNamedConf {
+				return err
+			}
 		}
+	}
+	if flags.C {
+		fmt.Print(conf)
+		return nil
 	}
 
 	for _, s := range strings.Split(flags.T, ",") {
@@ -110,10 +115,6 @@ Mimic BIND9's Internet domain name daemon.
 				return err
 			}
 		}
-	}
-	if flags.C {
-		xdnsdb.Dump(os.Stdout)
-		return nil
 	}
 
 	host := ":"
