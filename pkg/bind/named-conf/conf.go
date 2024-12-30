@@ -27,6 +27,7 @@ import (
 	"net/netip"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 )
@@ -127,7 +128,9 @@ func (conf Conf) verify(expect Conf) error {
 }
 
 type CoreValue interface {
-	string | int64 | uint64 | float64 | netip.Addr | netip.Prefix
+	bool | float32 | string | uint16 | uint32 | uint64 |
+		netip.Addr | netip.Prefix |
+		time.Duration
 }
 
 // A Statement is a semicolon terminated list of [CoreValue]s and [Block]s, e.g.
