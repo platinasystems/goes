@@ -86,13 +86,16 @@ func (sc *Scanner) args() (any, error) {
 	return args, sc.Err()
 }
 
-// Join token with previous hyphenated key-word or colon separated ip6 address;
+// Attach token to previous hyphenated (“-”) key-word,
+// slash (“/”) separated net-prefix,
+// or colon (“:”) separated ip6 address;
 // otherwise, clone and append to args.
 func attach(args []any, token string) []any {
 	if n := len(args); n >= 2 {
 		s_1, s_1_ok := args[n-1].(string)
 		s_2, s_2_ok := args[n-2].(string)
-		if s_1_ok && s_2_ok && (s_1 == "-" || s_1 == ":") {
+		if s_1_ok && s_2_ok &&
+			(s_1 == "-" || s_1 == "/" || s_1 == ":") {
 			args[n-2] = fmt.Sprint(s_2, s_1, token)
 			return args[:n-1]
 		}

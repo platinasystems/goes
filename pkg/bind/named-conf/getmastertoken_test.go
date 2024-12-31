@@ -53,13 +53,13 @@ var expectGetMasterToken = Conf{
 		Statement{"allow-transfer", Block{Statement{"any"}}},
 		Statement{"allow-recursion", Block{Statement{"!any"}}},
 		Statement{"blackhole", Block{
-			Statement{"45", "/", "24"},
+			Statement{"45/24"},
 		}},
 		Statement{"keep-response-order", Block{
-			Statement{"46", "/", "24"},
+			Statement{"46/24"},
 		}},
 		Statement{"listen-on", Block{
-			Statement{"10", "/", "24"},
+			Statement{"10/24"},
 			Statement{"10.0.0.3"},
 		}},
 		Statement{"listen-on", "port", "53", Block{
@@ -68,7 +68,7 @@ var expectGetMasterToken = Conf{
 		Statement{"listen-on", Block{Statement{"5.6.7.8"}}},
 		Statement{"listen-on", "port", "1234", Block{
 			Statement{"!1.2.3.4"},
-			Statement{"1.2.3", "/", "24"},
+			Statement{"1.2.3/24"},
 		}},
 		Statement{"listen-on-v6", Block{Statement{
 			"1:1:1:1:1:1:1:1",
@@ -114,16 +114,16 @@ var expectGetMasterToken = Conf{
 		Statement{"interface-interval", "1002"},
 		Statement{"statistics-interval", "1003"},
 		Statement{"topology", Block{
-			Statement{"10", "/", "8"},
-			Statement{"!1.2.3", "/", "24"},
+			Statement{"10/8"},
+			Statement{"!1.2.3/24"},
 			Statement{Block{
-				Statement{"1.2", "/", "16"},
-				Statement{"3", "/", "8"},
+				Statement{"1.2/16"},
+				Statement{"3/8"},
 			}},
 		}},
 		Statement{"sortlist", Block{
-			Statement{"10", "/", "8"},
-			Statement{"11", "/", "8"},
+			Statement{"10/8"},
+			Statement{"11/8"},
 		}},
 		Statement{"tkey-domain", "foo.com"},
 		Statement{"tkey-dhkey", "xyz", "666"},
@@ -317,7 +317,7 @@ var expectGetMasterToken = Conf{
 			"/rick6gvEer5VcDEkLR5Q=="},
 	}},
 	Statement{"acl", "can_query", Block{
-		Statement{"!1.2.3", "/", "24"},
+		Statement{"!1.2.3/24"},
 		Statement{"any"},
 	}},
 	Statement{"acl", "can_axfr", Block{
