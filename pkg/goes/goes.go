@@ -196,12 +196,27 @@ func Do(
 	return nil
 }
 
-func PrintMatchingKeys(m map[string]any, prefixes ...string) {
+func MatchingKeys(m map[string]any, prefixes ...string) []string {
 	keys := xmaps.Match(m, strings.HasPrefix, prefixes...)
 	sort.Strings(keys)
-	for _, k := range keys {
-		fmt.Println(k)
+	return keys
+}
+
+func PrintKeyLines(keys []string) {
+	for _, key := range keys {
+		fmt.Println(key)
 	}
+}
+
+func PrintKeySet(keys []string) {
+	fmt.Print("{")
+	for i, key := range keys {
+		if i > 0 {
+			fmt.Print(", ")
+		}
+		fmt.Print(key)
+	}
+	fmt.Println("}")
 }
 
 func Reselect(ctx context.Context, args []string) error {

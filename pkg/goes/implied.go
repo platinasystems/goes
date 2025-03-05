@@ -117,9 +117,10 @@ func ImpliedSelect(
 	if len(args) == 0 {
 		switch preempt {
 		case None:
-			return xerrors.Incomplete("feature")
+			PrintKeySet(MatchingKeys(m))
+			return nil
 		case Complete:
-			PrintMatchingKeys(m)
+			PrintKeyLines(MatchingKeys(m))
 			return nil
 		case Help:
 			xflag.UsageTemplate(flag.CommandLine, `
@@ -134,7 +135,10 @@ Select feature.
 		xflag.Rename(flag.CommandLine, name)
 		return Do(ctx, preempt, v, args[1:])
 	} else if len(args) == 1 && preempt == Complete {
-		PrintMatchingKeys(m, args[0])
+		PrintKeyLines(MatchingKeys(m, args[0]))
+		return nil
+	} else if keys := MatchingKeys(m, args[0]); len(keys) > 0 {
+		PrintKeySet(keys)
 		return nil
 	}
 	return xerrors.Invalid(args[0])
