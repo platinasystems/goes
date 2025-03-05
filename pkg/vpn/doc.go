@@ -6,11 +6,11 @@ secure, Virtual Private Network.
 
   - [Certificate] creates a PEM encoded x509 certificate file.
 
-    <goes> new vpn certificate [flags]
+    <goes> new vpn {exchange, guest, registry} [flags]
 
   - [Ed25519] creates a PEM encoded ed25519 signature key file.
 
-    <goes> new vpn ed25519 [flags]
+    <goes> new vpn signature [flags]
 
 # Daemons
 
