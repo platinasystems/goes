@@ -1,0 +1,17 @@
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: hello-world
+  labels:
+    name: goes
+spec:
+  restartPolicy: Never
+  containers:
+  - name: goes
+    imagePullPolicy: IfNotPresent
+    image: ko://github.com/platinasystems/goes/v2
+    args:
+    - "echo"
+    - "hello"
+    - "world"
