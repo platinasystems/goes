@@ -57,26 +57,39 @@ var ConfigDir = sync.OnceValue(func() string {
 	return sys
 })
 
+// [xdg.StateHome] or [fhs.State] + GOES/vpn
+var StateDir = sync.OnceValue(func() string {
+	mn := xprogram.MainName()
+	sys := filepath.Join(fhs.State(), mn, "vpn")
+	if s := xdg.StateHome(); len(s) > 0 {
+		s = filepath.Join(s, mn, "vpn")
+		if fi, err := os.Stat(s); err == nil && fi.IsDir() {
+			return s
+		} else if fi, err = os.Stat(sys); err == nil && fi.IsDir() {
+			return sys
+		} else if os.Geteuid() != 0 {
+			return s
+		}
+	}
+	return sys
+})
+
 var Features = map[string]any{
 	"new": map[string]any{
 		"vpn": map[string]any{
-			"exchange":  CreateCertificate,
-			"guest":     CreateCertificate,
-			"registry":  CreateCertificate,
-			"signature": NewEd25519,
+			"certificate": CreateCertificate,
+			"signature":   NewEd25519,
 		},
 	},
 	"show": map[string]any{
 		"vpn": map[string]any{
-			"address":    RestShow,
-			"admins":     RestShow,
-			"exchange":   ShowCertificate,
-			"guest":      ShowCertificate,
-			"pending":    RestShow,
-			"registry":   ShowCertificate,
-			"signature":  ShowSignature,
-			"subscriber": RestShow,
-			"tenant":     RestShow,
+			"address":     RestShow,
+			"admins":      RestShow,
+			"certificate": ShowCertificate,
+			"pending":     RestShow,
+			"signature":   ShowSignature,
+			"subscriber":  RestShow,
+			"tenant":      RestShow,
 		},
 	},
 	"vpn": map[string]any{
@@ -92,44 +105,22 @@ var Features = map[string]any{
 	},
 }
 
-func AdminFlag() *string {
-	var dfn string
-	for _, s := range []string{"guest", "exchange", "registry"} {
-		dfn = filepath.Join(ConfigDir(), s+".pem")
-		if _, err := os.Stat(dfn); err == nil {
-			break
-		}
-	}
-	return flag.String("a", dfn, "Certificate file.")
+func CertFlag() *string {
+	return flag.String("cert",
+		filepath.Join(ConfigDir(), "cert.pem"),
+		"Certificate file name.")
 }
 
 func ConfigFlag() *string {
-	return flag.String("c", filepath.Join(ConfigDir(), "config.yaml"),
+	return flag.String("config",
+		filepath.Join(ConfigDir(), "config.yaml"),
 		"Configuration file name.")
-}
-
-func ExchangeFlag() *string {
-	return flag.String("e", filepath.Join(ConfigDir(), "exchange.pem"),
-		"Exchange certificate file name, “-” for stdio.")
-}
-
-func GuestFlag() *string {
-	return flag.String("g", filepath.Join(ConfigDir(), "guest.pem"),
-		"Guest certificate file name, “-” for stdio.")
-}
-
-func DefaultKey() string {
-	return filepath.Join(ConfigDir(), ".key")
-}
-
-func KeyFlag() *string {
-	return flag.String("k", DefaultKey(), "Key file name, “-” for stdio.")
 }
 
 func NatFlag() *netip.AddrPort {
 	ap := new(netip.AddrPort)
 	dap := netip.AddrPortFrom(netip.IPv4Unspecified(), 0)
-	flag.TextVar(ap, "n", dap, `NAT'd service {addr}:{port}.
+	flag.TextVar(ap, "nat", dap, `NAT'd service {addr}:{port}.
 Ignored if 0.0.0.0:0.`)
 	return ap
 }
@@ -149,9 +140,10 @@ func RandLinkLocalAddr() (lladdr netip.Addr, err error) {
 	return
 }
 
-func RegistryFlag() *string {
-	return flag.String("r", filepath.Join(ConfigDir(), "registry.pem"),
-		"Registry certificate file name, “-” for stdio.")
+func RegFlag() *string {
+	return flag.String("reg",
+		filepath.Join(ConfigDir(), "registry.pem"),
+		"Registry certificate file name.")
 }
 
 func ServiceFlag(defport uint16) *netip.AddrPort {
@@ -161,6 +153,12 @@ func ServiceFlag(defport uint16) *netip.AddrPort {
 If “addr” is 0.0.0.0 or [::], listen on all ipv4 or ipv6
 interface addresses.  If “port” is 0, allocate from system.`)
 	return ap
+}
+
+func SigFlag() *string {
+	return flag.String("sig",
+		filepath.Join(ConfigDir(), "sig.pk8"),
+		"Signature file name.")
 }
 
 func TunnelFlag() *uint {

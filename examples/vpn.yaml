@@ -74,7 +74,6 @@ data:
         exchange0: fc00:1234::10
         exchange1: fc00:1234::11
         exchange2: fc00:1234::12
-      subscribers: /etc/goes/vpn
   registry.pem: |
     -----BEGIN CERTIFICATE-----
     MIIBszCCAWWgAwIBAgIBATAFBgMrZXAwQTEgMA4GA1UEChMHUGxhdGluYTAOBgNV
@@ -182,11 +181,9 @@ spec:
     - "start"
     - "vpn"
     - "registry"
-    - "-v"
-    - "-k"
-    - "/etc/goes/vpn/registry.pk8"
-    - "-r"
+    - "-cert"
     - "/etc/goes/vpn/registry.pem"
+    - "-v"
     ports:
     - protocol: TCP
       containerPort: 8003
@@ -202,6 +199,9 @@ spec:
       sources:
       - secret:
           name: vpn
+          items:
+          - key: registry.pk8
+            path: sig.pk8
       - configMap:
           name: vpn
   - name: state
@@ -226,17 +226,13 @@ spec:
   - name: goes
     imagePullPolicy: IfNotPresent
     image: ko://github.com/platinasystems/goes/v2
-    args: 
+    args:
     - "start"
     - "vpn"
     - "exchange"
-    - "-v"
-    - "-k"
-    - "/etc/goes/vpn/exchange0.pk8"
-    - "-e"
+    - "-cert"
     - "/etc/goes/vpn/exchange0.pem"
-    - "-r"
-    - "/etc/goes/vpn/registry.pem"
+    - "-v"
     ports:
     - protocol: UDP
       containerPort: 8003
@@ -250,6 +246,10 @@ spec:
       sources:
       - secret:
           name: vpn
+          items:
+          - key: exchange0.pk8
+            path: sig.pk8
+            mode: 400
       - configMap:
           name: vpn
 ---
@@ -270,17 +270,13 @@ spec:
   - name: goes
     imagePullPolicy: IfNotPresent
     image: ko://github.com/platinasystems/goes/v2
-    args: 
+    args:
     - "start"
     - "vpn"
     - "guest"
-    - "-v"
-    - "-k"
-    - "/etc/goes/vpn/hosta.pk8"
-    - "-g"
+    - "-cert"
     - "/etc/goes/vpn/hosta.pem"
-    - "-r"
-    - "/etc/goes/vpn/registry.pem"
+    - "-v"
     securityContext:
       allowPrivilegeEscalation: true
       capabilities:
@@ -300,6 +296,10 @@ spec:
       sources:
       - secret:
           name: vpn
+          items:
+          - key: hosta.pk8
+            path: sig.pk8
+            mode: 400
       - configMap:
           name: vpn
 ---
@@ -320,17 +320,13 @@ spec:
   - name: goes
     imagePullPolicy: IfNotPresent
     image: ko://github.com/platinasystems/goes/v2
-    args: 
+    args:
     - "start"
     - "vpn"
     - "guest"
-    - "-v"
-    - "-k"
-    - "/etc/goes/vpn/hostb.pk8"
-    - "-g"
+    - "-cert"
     - "/etc/goes/vpn/hostb.pem"
-    - "-r"
-    - "/etc/goes/vpn/registry.pem"
+    - "-v"
     securityContext:
       allowPrivilegeEscalation: true
       capabilities:
@@ -351,6 +347,10 @@ spec:
       sources:
       - secret:
           name: vpn
+          items:
+          - key: hostb.pk8
+            path: sig.pk8
+            mode: 400
       - configMap:
           name: vpn
 ---
@@ -371,17 +371,13 @@ spec:
   - name: goes
     imagePullPolicy: IfNotPresent
     image: ko://github.com/platinasystems/goes/v2
-    args: 
+    args:
     - "start"
     - "vpn"
     - "guest"
-    - "-v"
-    - "-k"
-    - "/etc/goes/vpn/hostc.pk8"
-    - "-g"
+    - "-cert"
     - "/etc/goes/vpn/hostc.pem"
-    - "-r"
-    - "/etc/goes/vpn/registry.pem"
+    - "-v"
     securityContext:
       allowPrivilegeEscalation: true
       capabilities:
@@ -402,6 +398,10 @@ spec:
       sources:
       - secret:
           name: vpn
+          items:
+          - key: hostc.pk8
+            path: sig.pk8
+            mode: 400
       - configMap:
           name: vpn
 ---

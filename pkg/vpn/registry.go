@@ -26,7 +26,6 @@ import (
 	"time"
 
 	"github.com/platinasystems/goes/v2/pkg/box"
-	"github.com/platinasystems/goes/v2/pkg/xdg"
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xflag"
 	"gopkg.in/yaml.v3"
@@ -34,13 +33,15 @@ import (
 
 type registry struct {
 	mutex sync.RWMutex
-	cfg   *string
-	sig   *Signatures
-	crt   *x509.Certificate
-	url   *url.URL
-	http  *http.Server
-	vpn   map[string]*regVpn
-	wg    sync.WaitGroup
+
+	configFlag *string
+
+	sig  *Signatures
+	crt  *x509.Certificate
+	url  *url.URL
+	http *http.Server
+	vpn  map[string]*regVpn
+	wg   sync.WaitGroup
 }
 
 type regVpn struct {
@@ -64,9 +65,6 @@ type regVpn struct {
 
 	subscriberNamed map[string]*x509.Certificate
 
-	// directory or filename of subscriber certs
-	subscribersDfn string
-
 	block struct {
 		addressed  map[netip.Addr]*pem.Block
 		identified map[int]*pem.Block
@@ -89,10 +87,6 @@ var ConfigByName map[string]*struct {
 	// Optional list of subscriber's that are enabled to
 	// approve/deny/unscribe others.
 	Admins []string
-	// Optional directory or ``.pem'' extensioned file containing
-	// certificates of approved subscribers.
-	// (default: ConfigHome/)
-	Subscribers string
 }
 
 // Registry is a web server providing a REST interface to persistent
@@ -107,27 +101,26 @@ A RESTful WWW server.
 
 {{flags .}}`)
 
-	reg.cfg = ConfigFlag()
-	kFlag := KeyFlag()
-	rFlag := RegistryFlag()
+	certFlag := CertFlag()
+	reg.configFlag = ConfigFlag()
+	sigFlag := SigFlag()
 
 	err := qvFlags(args)
 	if err != nil {
 		return err
 	}
-
-	if _, err = os.Stat(*reg.cfg); err != nil {
+	if _, err = os.Stat(*reg.configFlag); err != nil {
 		return err
 	}
-	if reg.sig, err = NewSignatures(*kFlag); err != nil {
-		return err
-	}
-	if cs, err := certificates(*rFlag); err != nil {
+	if cs, err := certificates(*certFlag); err != nil {
 		return err
 	} else if len(cs) == 0 {
-		return xerrors.Invalid(*rFlag)
+		return xerrors.Invalid(*certFlag)
 	} else {
 		reg.crt = cs[0]
+	}
+	if reg.sig, err = NewSignatures(*sigFlag); err != nil {
+		return err
 	}
 
 	svc := ":8003"
@@ -165,7 +158,7 @@ A RESTful WWW server.
 	wg.Add(1)
 	go reg.shutdown(cctx, &wg)
 
-	err = reg.http.ListenAndServeTLS(*rFlag, *kFlag)
+	err = reg.http.ListenAndServeTLS(*certFlag, *sigFlag)
 	if errors.Is(err, http.ErrServerClosed) {
 		err = nil
 	}
@@ -388,7 +381,7 @@ func (reg *registry) shutdown(ctx context.Context, wg *sync.WaitGroup) {
 }
 
 func (reg *registry) reload() error {
-	data, err := os.ReadFile(*reg.cfg)
+	data, err := os.ReadFile(*reg.configFlag)
 	if err != nil {
 		return err
 	}
@@ -437,22 +430,21 @@ func (reg *registry) reload() error {
 			}
 		}
 
-		vpn.subscribersDfn = cfg.Subscribers
-		if len(vpn.subscribersDfn) == 0 {
-			if name == "vpn" {
-				vpn.subscribersDfn = xdg.ConfigHome()
-			} else {
-				vpn.subscribersDfn = filepath.
-					Join(xdg.ConfigHome(), name)
+		for _, dir := range []string{
+			vpn.configDir(),
+			vpn.stateDir(),
+		} {
+			subs, err := certificates(dir)
+			if err == nil {
+				vpn.subscribers =
+					append(vpn.subscribers, subs...)
+				for _, c := range subs {
+					cn := c.Subject.CommonName
+					vpn.subscriberNamed[cn] = c
+				}
+			} else if !os.IsNotExist(err) {
+				return err
 			}
-		}
-		vpn.subscribers, err = certificates(vpn.subscribersDfn)
-		if err == nil {
-			for _, c := range vpn.subscribers {
-				vpn.subscriberNamed[c.Subject.CommonName] = c
-			}
-		} else if !os.IsNotExist(err) {
-			return err
 		}
 	}
 
@@ -484,7 +476,7 @@ func (vpn *regVpn) approve(req *http.Request) error {
 	for i, c := range vpn.pending {
 		if c.Subject.CommonName == sub {
 			vpn.pending = slices.Delete(vpn.pending, i, i+1)
-			err = addCertificate(vpn.subscribersDfn, c)
+			err = addCertificate(vpn.stateDir(), c)
 			if err == nil {
 				vpn.subscribers = append(vpn.subscribers, c)
 				vpn.subscriberNamed[c.Subject.CommonName] = c
@@ -805,6 +797,16 @@ func (vpn *regVpn) subscribe(req *http.Request) error {
 	return nil
 }
 
+func (vpn *regVpn) nameDir(dir string) string {
+	if vpn.name != "vpn" {
+		dir = filepath.Join(dir, vpn.name)
+	}
+	return dir
+}
+
+func (vpn *regVpn) configDir() string { return vpn.nameDir(ConfigDir()) }
+func (vpn *regVpn) stateDir() string  { return vpn.nameDir(StateDir()) }
+
 func (vpn *regVpn) unsubscribe(req *http.Request) error {
 	sub, err := reqsub(req)
 	if err != nil {
@@ -813,7 +815,7 @@ func (vpn *regVpn) unsubscribe(req *http.Request) error {
 	vpn.mutex.Lock()
 	defer vpn.mutex.Unlock()
 	delete(vpn.admin, sub)
-	return removeCertificate(vpn.subscribersDfn, sub, vpn.subscribers)
+	return removeCertificate(vpn.stateDir(), sub, vpn.subscribers)
 }
 
 func (vpn *regVpn) whois(w http.ResponseWriter, req *http.Request) error {

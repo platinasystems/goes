@@ -6,7 +6,7 @@ secure, Virtual Private Network.
 
   - [Certificate] creates a PEM encoded x509 certificate file.
 
-    <goes> new vpn {exchange, guest, registry} [flags]
+    <goes> new vpn certificate [flags]
 
   - [Ed25519] creates a PEM encoded ed25519 signature key file.
 
@@ -14,8 +14,9 @@ secure, Virtual Private Network.
 
 # Daemons
 
-  - [Registry] is a web server providing a REST interface to persistent
-    files and ephemeral tables.
+  - [Registry] is a web server providing a REST interface to its
+    ephemeral tables; and persistent, read-only [ConfigDir] and
+    read-write [StateDir] subscriber certificates.
 
   - [Exchange] is a UDP server that forwards ciphered packets between guest's.
 

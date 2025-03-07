@@ -40,7 +40,6 @@ RESTful registry administration.
 
 {{flags .}}`)
 
-	rest.xFlag = AdminFlag()
 	err := rest.flags(args)
 	if err != nil {
 		return err
@@ -68,7 +67,7 @@ RESTful registry administration.
 	return err
 }
 
-// Rest.certify adds the peer certificate to CONFIG_HOME/registry.pem.
+// Rest.certify adds the peer certificate to [RegFlag].
 func RestCertify(ctx context.Context, args []string) error {
 	var rest rest
 
@@ -78,7 +77,6 @@ Import registry certificate.
 
 {{flags .}}`)
 
-	rest.xFlag = GuestFlag()
 	err := rest.flags(args)
 	if err != nil {
 		return err
@@ -126,7 +124,7 @@ Import registry certificate.
 		return err
 	}
 
-	fmt.Fprintf(w, `Enter "yes" to write above to %s: `, *rest.rFlag)
+	fmt.Fprintf(w, `Enter "yes" to write above to %s: `, *rest.regFlag)
 	s, err := r.ReadString('\n')
 	if err != nil && strings.TrimSpace(s) != "yes" {
 		return err
@@ -136,7 +134,7 @@ Import registry certificate.
 		Type:  "CERTIFICATE",
 		Bytes: resp.TLS.PeerCertificates[0].Raw,
 	}
-	wc, err := os.OpenFile(*rest.rFlag, oCreate, 0644)
+	wc, err := os.OpenFile(*rest.regFlag, oCreate, 0644)
 	if err != nil {
 		return err
 	}
@@ -153,7 +151,6 @@ RESTful ping registry.
 
 {{flags .}}`)
 
-	rest.xFlag = AdminFlag()
 	err := rest.flags(args)
 	if err != nil {
 		return err
@@ -186,7 +183,6 @@ RESTful query and print registry object.
 
 {{flags .}}`)
 
-	rest.xFlag = AdminFlag()
 	err := rest.flags(args)
 	if err != nil {
 		return err
@@ -223,7 +219,6 @@ RESTful subscribe to VPN.
 
 {{flags .}}`)
 
-	rest.xFlag = GuestFlag()
 	err := rest.flags(args)
 	if err != nil {
 		return err
@@ -250,17 +245,17 @@ RESTful subscribe to VPN.
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		err = errors.New(resp.Status)
-	} else {
+	} else if *rest.regFlag == "-" {
 		_, err = io.Copy(os.Stdout, resp.Body)
 	}
 	return err
 }
 
 type rest struct {
-	kFlag,
-	rFlag,
-	vpnFlag,
-	xFlag *string
+	certFlag,
+	regFlag,
+	sigFlag,
+	vpnFlag *string
 	crt,
 	reg *x509.Certificate
 	sig *Signatures
@@ -335,8 +330,9 @@ func (rest *rest) do(req *http.Request) (*http.Response, error) {
 }
 
 func (rest *rest) flags(args []string) error {
-	rest.kFlag = KeyFlag()
-	rest.rFlag = RegistryFlag()
+	rest.certFlag = CertFlag()
+	rest.regFlag = RegFlag()
+	rest.sigFlag = SigFlag()
 	rest.vpnFlag = VpnFlag()
 
 	err := qvFlags(args)
@@ -344,31 +340,32 @@ func (rest *rest) flags(args []string) error {
 		return err
 	}
 
-	cs, err := certificates(*rest.xFlag)
+	cs, err := certificates(*rest.certFlag)
 	if err != nil {
 		return err
 	} else if len(cs) == 0 {
-		return xerrors.Invalid(*rest.xFlag)
+		return xerrors.Invalid(*rest.certFlag)
 	} else {
 		rest.crt = cs[0]
 	}
-	verbose.Println("crt file:", *rest.xFlag)
 
-	if rest.sig, err = NewSignatures(*rest.kFlag); err != nil {
+	if rest.sig, err = NewSignatures(*rest.sigFlag); err != nil {
 		return err
 	}
-	verbose.Println("sig file:", *rest.kFlag)
 
-	cs, err = certificates(*rest.rFlag)
-	if err != nil {
-		if !strings.HasSuffix(flag.CommandLine.Name(), "certify") ||
-			!os.IsNotExist(err) {
-			return err
+	if *rest.regFlag != *rest.certFlag {
+		cs, err = certificates(*rest.regFlag)
+		if err != nil {
+			clname := flag.CommandLine.Name()
+			if !strings.HasSuffix(clname, "certify") ||
+				!os.IsNotExist(err) {
+				return err
+			}
+		} else if len(cs) == 0 {
+			return xerrors.Invalid(*rest.regFlag)
+		} else {
+			rest.reg = cs[0]
 		}
-	} else if len(cs) == 0 {
-		return xerrors.Invalid(*rest.rFlag)
-	} else {
-		rest.reg = cs[0]
 	}
 
 	if err = rest.xregurl(); err != nil {
@@ -377,7 +374,6 @@ func (rest *rest) flags(args []string) error {
 	if len(*rest.vpnFlag) > 0 {
 		rest.url = rest.url.JoinPath(*rest.vpnFlag)
 	}
-	verbose.Println("url file:", rest.url)
 
 	cfg := &tls.Config{
 		MinVersion: tls.VersionTLS13,

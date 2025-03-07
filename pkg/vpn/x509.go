@@ -102,12 +102,13 @@ Create PEM encoded x509 certificate file.
 
 {{flags .}}`)
 
-	cf := xflag.LastName(flag.CommandLine)
-	kflag := KeyFlag()
-	dfn := filepath.Join(ConfigDir(), fmt.Sprint(cf, ".pem"))
-	oflag := flag.String("o", dfn, "Output file name, “-” for stdout.")
+	certFlag := CertFlag()
+	sigFlag := SigFlag()
 
-	hostname, _ := os.Hostname()
+	hostname, err := os.Hostname()
+	if err != nil {
+		return err
+	}
 
 	name := flag.String("name", hostname, "VPN identfier.")
 	sn := flag.Int64("serial-number", 1, "")
@@ -124,12 +125,11 @@ Create PEM encoded x509 certificate file.
 	postalCode := flag.String("postal-code", "", "aka. zip.")
 	uris := flag.String("uri", "", "Comma separated URLs.")
 
-	err := flag.CommandLine.Parse(args)
-	if err != nil {
+	if err = flag.CommandLine.Parse(args); err != nil {
 		return err
 	}
 
-	sig, err := NewSignatures(*kflag)
+	sig, err := NewSignatures(*sigFlag)
 	if err != nil {
 		return err
 	}
@@ -208,15 +208,15 @@ Create PEM encoded x509 certificate file.
 		Headers: map[string]string{},
 		Bytes:   der,
 	}
-	if *oflag == "-" {
+	if *certFlag == "-" {
 		return pem.Encode(os.Stdout, blk)
 	}
-	if _, err = os.Stat(*oflag); err == nil {
-		return fmt.Errorf("%s: exists", *oflag)
+	if _, err = os.Stat(*certFlag); err == nil {
+		return fmt.Errorf("%s: exists", *certFlag)
 	} else if !os.IsNotExist(err) {
 		return err
 	}
-	w, err := os.OpenFile(*oflag, oCreate, 0644)
+	w, err := os.OpenFile(*certFlag, oCreate, 0644)
 	if err != nil {
 		return err
 	}
@@ -232,24 +232,21 @@ Print parsed certificate.
 
 {{flags .}}`)
 
-	cf := xflag.LastName(flag.CommandLine)
-	dfn := filepath.Join(ConfigDir(), fmt.Sprint(cf, ".pem"))
-	iflag := flag.String("i", dfn,
-		"X509 certificate file name, “-” for stdin.")
+	certFlag := CertFlag()
 
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
 		return err
 	}
 
-	cs, err := certificates(*iflag)
+	cs, err := certificates(*certFlag)
 	if err != nil {
 		return err
-	}
-	if len(cs) == 0 {
+	} else if len(cs) == 0 {
 		fmt.Println("# none")
 		return nil
 	}
+
 	t, err := CertificatesTemplate()
 	if err != nil {
 		return err
