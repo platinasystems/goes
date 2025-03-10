@@ -353,26 +353,17 @@ func (rest *rest) flags(args []string) error {
 		return err
 	}
 
-	if *rest.regFlag != *rest.certFlag {
-		cs, err = certificates(*rest.regFlag)
-		if err != nil {
-			clname := flag.CommandLine.Name()
-			if !strings.HasSuffix(clname, "certify") ||
-				!os.IsNotExist(err) {
-				return err
-			}
-		} else if len(cs) == 0 {
-			return xerrors.Invalid(*rest.regFlag)
-		} else {
-			rest.reg = cs[0]
+	if cl := flag.CommandLine.Name(); !strings.HasSuffix(cl, "certify") {
+		if cs, err = certificates(*rest.regFlag); err != nil {
+			return err
 		}
-	}
-
-	if err = rest.xregurl(); err != nil {
-		return err
-	}
-	if len(*rest.vpnFlag) > 0 {
-		rest.url = rest.url.JoinPath(*rest.vpnFlag)
+		rest.reg = cs[0]
+		if err = rest.xregurl(); err != nil {
+			return err
+		}
+		if len(*rest.vpnFlag) > 0 {
+			rest.url = rest.url.JoinPath(*rest.vpnFlag)
+		}
 	}
 
 	cfg := &tls.Config{
