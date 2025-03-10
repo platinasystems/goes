@@ -1,4 +1,4 @@
-// Copyright © 2023-2024 Platina Systems, Inc. All rights reserved.
+// Copyright © 2023-2025 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -11,7 +11,6 @@ import (
 	"os/exec"
 
 	"github.com/platinasystems/goes/v2/pkg/goes"
-	"github.com/platinasystems/goes/v2/pkg/xdg"
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xexec"
 	"github.com/platinasystems/goes/v2/pkg/xflag"
@@ -67,7 +66,7 @@ the system logger; otherwise, perform within the current process context.
 	cmd.Stderr = nil
 	cmd.Args[0] = xprogram.MainName()
 	cmd.Env = DaemonEnv()
-	cmd.Dir = xdg.RunTimeDir()
+	cmd.Dir = DaemonWorkingDirectory
 	attr, err := xexec.DaemonSysProcAttr()
 	if err == nil {
 		cmd.SysProcAttr = attr
