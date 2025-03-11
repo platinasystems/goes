@@ -15,8 +15,8 @@ secure, Virtual Private Network.
 # Daemons
 
   - [Registry] is a web server providing a REST interface to its
-    ephemeral tables; and persistent, read-only [ConfigDir] and
-    read-write [StateDir] subscriber certificates.
+    ephemeral tables; and persistent, read-only [PathConfigDir] and
+    read-write [PathStateDir] subscriber certificates.
 
   - [Exchange] is a UDP server that forwards ciphered packets between guest's.
 

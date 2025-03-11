@@ -22,26 +22,28 @@ import (
 )
 
 const (
-	oAppend = os.O_WRONLY | os.O_CREATE | os.O_APPEND
-	oCreate = os.O_WRONLY | os.O_CREATE | os.O_TRUNC
+	DefaultCertFile   = "cert.pem"
+	DefaultConfigFile = "config.yaml"
+	DefaultRegFile    = "registry.pem"
+	DefaultSigFile    = "sig.pk8"
 )
 
-var (
-	mutable = log.New(os.Stdout, "", log.Lshortfile)
-
-	errata  = xlog.Unmute(mutable)
-	verbose = xlog.Mute(mutable)
-
-	udpRxTrace = xlog.Mute(mutable)
-	udpTxTrace = xlog.Mute(mutable)
-
-	goRoutineTrace = xlog.Mute(mutable)
+const (
+	NameCertFlag      = "cert"
+	NameConfigFlag    = "config"
+	NameConfigDirFlag = "config-dir"
+	NameNatFlag       = "nat"
+	NameQuietFlag     = "q"
+	NameRegFlag       = "reg"
+	NameSigFlag       = "sig"
+	NameStateDirFlag  = "state-dir"
+	NameTunnelFlag    = "t"
+	NameVerboseFlag   = "v"
+	NameVpnFlag       = "vpn"
 )
-
-var ErrLLAddrUnderrun = errors.New("link-local address underrun")
 
 // [xdg.ConfigHome] or [fhs.Config] + GOES/vpn
-var ConfigDir = sync.OnceValue(func() string {
+var DefaultConfigDir = sync.OnceValue(func() string {
 	mn := xprogram.MainName()
 	sys := filepath.Join(fhs.Config(), mn, "vpn")
 	if s := xdg.ConfigHome(); len(s) > 0 {
@@ -57,8 +59,10 @@ var ConfigDir = sync.OnceValue(func() string {
 	return sys
 })
 
+var ErrLLAddrUnderrun = errors.New("link-local address underrun")
+
 // [xdg.StateHome] or [fhs.State] + GOES/vpn
-var StateDir = sync.OnceValue(func() string {
+var DefaultStateDir = sync.OnceValue(func() string {
 	mn := xprogram.MainName()
 	sys := filepath.Join(fhs.State(), mn, "vpn")
 	if s := xdg.StateHome(); len(s) > 0 {
@@ -105,24 +109,19 @@ var Features = map[string]any{
 	},
 }
 
-func CertFlag() *string {
-	return flag.String("cert",
-		filepath.Join(ConfigDir(), "cert.pem"),
-		"Certificate file name.")
+// [ValueOfStringFlag]([NameConfigDirFlag])
+func PathConfigDir() string {
+	return ValueOfStringFlag(NameConfigDirFlag)
 }
 
-func ConfigFlag() *string {
-	return flag.String("config",
-		filepath.Join(ConfigDir(), "config.yaml"),
-		"Configuration file name.")
-}
-
-func NatFlag() *netip.AddrPort {
-	ap := new(netip.AddrPort)
-	dap := netip.AddrPortFrom(netip.IPv4Unspecified(), 0)
-	flag.TextVar(ap, "nat", dap, `NAT'd service {addr}:{port}.
-Ignored if 0.0.0.0:0.`)
-	return ap
+// [ValueOfStringFlag]([NameStateDirFlag]) +
+// "/" + [ValueOfStringFlag]([NameVpnFlag])
+func PathStateDir() string {
+	path := ValueOfStringFlag(NameStateDirFlag)
+	if vpn := ValueOfStringFlag(NameVpnFlag); len(vpn) > 0 {
+		path = filepath.Join(path, vpn)
+	}
+	return path
 }
 
 func RandLinkLocalAddr() (lladdr netip.Addr, err error) {
@@ -140,39 +139,44 @@ func RandLinkLocalAddr() (lladdr netip.Addr, err error) {
 	return
 }
 
-func RegFlag() *string {
-	return flag.String("reg",
-		filepath.Join(ConfigDir(), "registry.pem"),
-		"Registry certificate file name.")
+func ValueOfStringFlag(name string) (s string) {
+	if f := flag.Lookup(name); f != nil {
+		s = f.Value.String()
+	}
+	return
 }
 
-func ServiceFlag(defport uint16) *netip.AddrPort {
-	ap := new(netip.AddrPort)
-	dap := netip.AddrPortFrom(netip.IPv4Unspecified(), defport)
-	flag.TextVar(ap, "s", dap, `Service {addr}:{port}.
-If “addr” is 0.0.0.0 or [::], listen on all ipv4 or ipv6
-interface addresses.  If “port” is 0, allocate from system.`)
-	return ap
-}
+const (
+	oAppend = os.O_WRONLY | os.O_CREATE | os.O_APPEND
+	oCreate = os.O_WRONLY | os.O_CREATE | os.O_TRUNC
+)
 
-func SigFlag() *string {
-	return flag.String("sig",
-		filepath.Join(ConfigDir(), "sig.pk8"),
-		"Signature file name.")
-}
+var (
+	mutable = log.New(os.Stdout, "", log.Lshortfile)
 
-func TunnelFlag() *uint {
-	return flag.Uint("t", 0, "Tunnel unit number.")
-}
+	errata  = xlog.Unmute(mutable)
+	verbose = xlog.Mute(mutable)
 
-func VpnFlag() *string {
-	return flag.String("vpn", "",
-		"Named VPN, default unnamed.")
-}
+	udpRxTrace = xlog.Mute(mutable)
+	udpTxTrace = xlog.Mute(mutable)
 
-func qvFlags(args []string) error {
-	qFlag := flag.Bool("q", false, "Quiet logging.")
-	vFlag := flag.Bool("v", false, "Verbose logging.")
+	goRoutineTrace = xlog.Mute(mutable)
+)
+
+func defineAndParseFlags(args []string) error {
+	qFlag := flag.Bool(NameQuietFlag, false, "Quiet logging.")
+	vFlag := flag.Bool(NameVerboseFlag, false, "Verbose logging.")
+
+	flag.String(NameCertFlag, DefaultCertFile,
+		"Certificate file name w/in config-dir.")
+	flag.String(NameConfigDirFlag, DefaultConfigDir(),
+		"Configuration directory.")
+	flag.String(NameRegFlag, DefaultRegFile,
+		"Registry certificate file name w/in config-dir.")
+	flag.String(NameSigFlag, DefaultSigFile,
+		"Signature file name w/in config-dir.")
+	flag.String(NameVpnFlag, "", "Named VPN. (default unnamed)")
+
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
 		return err
@@ -183,4 +187,20 @@ func qvFlags(args []string) error {
 		verbose = xlog.Unmute(verbose)
 	}
 	return nil
+}
+
+func pathCertFile() string {
+	return filepath.Join(PathConfigDir(), ValueOfStringFlag(NameCertFlag))
+}
+
+func pathConfigFile() string {
+	return filepath.Join(PathConfigDir(), ValueOfStringFlag(NameConfigFlag))
+}
+
+func pathRegFile() string {
+	return filepath.Join(PathConfigDir(), ValueOfStringFlag(NameRegFlag))
+}
+
+func pathSigFile() string {
+	return filepath.Join(PathConfigDir(), ValueOfStringFlag(NameSigFlag))
 }

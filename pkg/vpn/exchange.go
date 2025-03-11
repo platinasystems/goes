@@ -27,6 +27,7 @@ func Exchange(ctx context.Context, args []string) error {
 	const defport = 8003
 	var wg sync.WaitGroup
 	var ex exchange
+	var nat netip.AddrPort
 
 	xflag.UsageTemplate(flag.CommandLine, `
 usage: {{.Name}} [flags] [vpn]
@@ -34,9 +35,11 @@ Exchange ciphered packets between guests.
 
 {{flags .}}`)
 
-	nflag := NatFlag()
+	flag.TextVar(&nat, NameNatFlag,
+		netip.AddrPortFrom(netip.IPv4Unspecified(), 0),
+		`NAT'd service {addr}:{port}. (0.0.0.0:0 ignored)`)
 
-	err := ex.flags(ctx, defport, args)
+	err := ex.defineAndParseFlags(ctx, defport, args)
 	if err != nil {
 		return err
 	}
@@ -70,8 +73,8 @@ Exchange ciphered packets between guests.
 		return xerrors.Label(err, "LocalAddr")
 	}
 	sap := lap
-	if !(*nflag).Addr().IsUnspecified() {
-		sap = *nflag
+	if !nat.Addr().IsUnspecified() {
+		sap = nat
 	}
 	if err = ex.register(ctx, sap); err != nil {
 		return err

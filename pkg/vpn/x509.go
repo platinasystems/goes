@@ -102,9 +102,6 @@ Create PEM encoded x509 certificate file.
 
 {{flags .}}`)
 
-	certFlag := CertFlag()
-	sigFlag := SigFlag()
-
 	hostname, err := os.Hostname()
 	if err != nil {
 		return err
@@ -125,11 +122,11 @@ Create PEM encoded x509 certificate file.
 	postalCode := flag.String("postal-code", "", "aka. zip.")
 	uris := flag.String("uri", "", "Comma separated URLs.")
 
-	if err = flag.CommandLine.Parse(args); err != nil {
+	if err = defineAndParseFlags(args); err != nil {
 		return err
 	}
 
-	sig, err := NewSignatures(*sigFlag)
+	sig, err := NewSignatures(pathSigFile())
 	if err != nil {
 		return err
 	}
@@ -208,15 +205,16 @@ Create PEM encoded x509 certificate file.
 		Headers: map[string]string{},
 		Bytes:   der,
 	}
-	if *certFlag == "-" {
+	cfn := pathCertFile()
+	if cfn == "-" {
 		return pem.Encode(os.Stdout, blk)
 	}
-	if _, err = os.Stat(*certFlag); err == nil {
-		return fmt.Errorf("%s: exists", *certFlag)
+	if _, err = os.Stat(cfn); err == nil {
+		return fmt.Errorf("%s: exists", cfn)
 	} else if !os.IsNotExist(err) {
 		return err
 	}
-	w, err := os.OpenFile(*certFlag, oCreate, 0644)
+	w, err := os.OpenFile(cfn, oCreate, 0644)
 	if err != nil {
 		return err
 	}
@@ -232,14 +230,12 @@ Print parsed certificate.
 
 {{flags .}}`)
 
-	certFlag := CertFlag()
-
-	err := flag.CommandLine.Parse(args)
+	err := defineAndParseFlags(args)
 	if err != nil {
 		return err
 	}
 
-	cs, err := certificates(*certFlag)
+	cs, err := certificates(pathCertFile())
 	if err != nil {
 		return err
 	} else if len(cs) == 0 {

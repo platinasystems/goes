@@ -40,7 +40,7 @@ RESTful registry administration.
 
 {{flags .}}`)
 
-	err := rest.flags(args)
+	err := rest.defineAndParseFlags(args)
 	if err != nil {
 		return err
 	}
@@ -77,7 +77,7 @@ Import registry certificate.
 
 {{flags .}}`)
 
-	err := rest.flags(args)
+	err := rest.defineAndParseFlags(args)
 	if err != nil {
 		return err
 	}
@@ -124,7 +124,8 @@ Import registry certificate.
 		return err
 	}
 
-	fmt.Fprintf(w, `Enter "yes" to write above to %s: `, *rest.regFlag)
+	rfn := pathRegFile()
+	fmt.Fprintf(w, `Enter "yes" to write above to %s: `, rfn)
 	s, err := r.ReadString('\n')
 	if err != nil && strings.TrimSpace(s) != "yes" {
 		return err
@@ -134,7 +135,7 @@ Import registry certificate.
 		Type:  "CERTIFICATE",
 		Bytes: resp.TLS.PeerCertificates[0].Raw,
 	}
-	wc, err := os.OpenFile(*rest.regFlag, oCreate, 0644)
+	wc, err := os.OpenFile(rfn, oCreate, 0644)
 	if err != nil {
 		return err
 	}
@@ -151,7 +152,7 @@ RESTful ping registry.
 
 {{flags .}}`)
 
-	err := rest.flags(args)
+	err := rest.defineAndParseFlags(args)
 	if err != nil {
 		return err
 	}
@@ -183,7 +184,7 @@ RESTful query and print registry object.
 
 {{flags .}}`)
 
-	err := rest.flags(args)
+	err := rest.defineAndParseFlags(args)
 	if err != nil {
 		return err
 	}
@@ -219,7 +220,7 @@ RESTful subscribe to VPN.
 
 {{flags .}}`)
 
-	err := rest.flags(args)
+	err := rest.defineAndParseFlags(args)
 	if err != nil {
 		return err
 	}
@@ -245,17 +246,13 @@ RESTful subscribe to VPN.
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		err = errors.New(resp.Status)
-	} else if *rest.regFlag == "-" {
+	} else if pathRegFile() == "-" {
 		_, err = io.Copy(os.Stdout, resp.Body)
 	}
 	return err
 }
 
 type rest struct {
-	certFlag,
-	regFlag,
-	sigFlag,
-	vpnFlag *string
 	crt,
 	reg *x509.Certificate
 	sig *Signatures
@@ -329,40 +326,36 @@ func (rest *rest) do(req *http.Request) (*http.Response, error) {
 	return resp, err
 }
 
-func (rest *rest) flags(args []string) error {
-	rest.certFlag = CertFlag()
-	rest.regFlag = RegFlag()
-	rest.sigFlag = SigFlag()
-	rest.vpnFlag = VpnFlag()
-
-	err := qvFlags(args)
+func (rest *rest) defineAndParseFlags(args []string) error {
+	err := defineAndParseFlags(args)
 	if err != nil {
 		return err
 	}
 
-	cs, err := certificates(*rest.certFlag)
+	fn := pathCertFile()
+	cs, err := certificates(fn)
 	if err != nil {
 		return err
 	} else if len(cs) == 0 {
-		return xerrors.Invalid(*rest.certFlag)
+		return xerrors.Invalid(fn)
 	} else {
 		rest.crt = cs[0]
 	}
 
-	if rest.sig, err = NewSignatures(*rest.sigFlag); err != nil {
+	if rest.sig, err = NewSignatures(pathSigFile()); err != nil {
 		return err
 	}
 
 	if cl := flag.CommandLine.Name(); !strings.HasSuffix(cl, "certify") {
-		if cs, err = certificates(*rest.regFlag); err != nil {
+		if cs, err = certificates(pathRegFile()); err != nil {
 			return err
 		}
 		rest.reg = cs[0]
 		if err = rest.xregurl(); err != nil {
 			return err
 		}
-		if len(*rest.vpnFlag) > 0 {
-			rest.url = rest.url.JoinPath(*rest.vpnFlag)
+		if vpn := ValueOfStringFlag(NameVpnFlag); len(vpn) > 0 {
+			rest.url = rest.url.JoinPath(vpn)
 		}
 	}
 

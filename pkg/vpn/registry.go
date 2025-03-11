@@ -34,8 +34,6 @@ import (
 type registry struct {
 	mutex sync.RWMutex
 
-	configFlag *string
-
 	sig  *Signatures
 	crt  *x509.Certificate
 	url  *url.URL
@@ -101,25 +99,30 @@ A RESTful WWW server.
 
 {{flags .}}`)
 
-	certFlag := CertFlag()
-	reg.configFlag = ConfigFlag()
-	sigFlag := SigFlag()
+	flag.String(NameConfigFlag, DefaultConfigFile,
+		"Configuration file name w/in config-dir.")
+	flag.String(NameStateDirFlag, DefaultStateDir(),
+		"State directory to save approved client certificates.")
 
-	err := qvFlags(args)
+	err := defineAndParseFlags(args)
 	if err != nil {
 		return err
 	}
-	if _, err = os.Stat(*reg.configFlag); err != nil {
+	if _, err = os.Stat(pathConfigFile()); err != nil {
 		return err
 	}
-	if cs, err := certificates(*certFlag); err != nil {
+
+	cfn := pathCertFile()
+	if cs, err := certificates(cfn); err != nil {
 		return err
 	} else if len(cs) == 0 {
-		return xerrors.Invalid(*certFlag)
+		return xerrors.Invalid(cfn)
 	} else {
 		reg.crt = cs[0]
 	}
-	if reg.sig, err = NewSignatures(*sigFlag); err != nil {
+
+	sfn := pathSigFile()
+	if reg.sig, err = NewSignatures(sfn); err != nil {
 		return err
 	}
 
@@ -158,7 +161,7 @@ A RESTful WWW server.
 	wg.Add(1)
 	go reg.shutdown(cctx, &wg)
 
-	err = reg.http.ListenAndServeTLS(*certFlag, *sigFlag)
+	err = reg.http.ListenAndServeTLS(cfn, sfn)
 	if errors.Is(err, http.ErrServerClosed) {
 		err = nil
 	}
@@ -381,7 +384,7 @@ func (reg *registry) shutdown(ctx context.Context, wg *sync.WaitGroup) {
 }
 
 func (reg *registry) reload() error {
-	data, err := os.ReadFile(*reg.configFlag)
+	data, err := os.ReadFile(pathConfigFile())
 	if err != nil {
 		return err
 	}
@@ -431,8 +434,8 @@ func (reg *registry) reload() error {
 		}
 
 		for _, dir := range []string{
-			vpn.configDir(),
-			vpn.stateDir(),
+			PathConfigDir(),
+			PathStateDir(),
 		} {
 			subs, err := certificates(dir)
 			if err == nil {
@@ -476,7 +479,7 @@ func (vpn *regVpn) approve(req *http.Request) error {
 	for i, c := range vpn.pending {
 		if c.Subject.CommonName == sub {
 			vpn.pending = slices.Delete(vpn.pending, i, i+1)
-			err = addCertificate(vpn.stateDir(), c)
+			err = addCertificate(PathStateDir(), c)
 			if err == nil {
 				vpn.subscribers = append(vpn.subscribers, c)
 				vpn.subscriberNamed[c.Subject.CommonName] = c
@@ -804,9 +807,6 @@ func (vpn *regVpn) nameDir(dir string) string {
 	return dir
 }
 
-func (vpn *regVpn) configDir() string { return vpn.nameDir(ConfigDir()) }
-func (vpn *regVpn) stateDir() string  { return vpn.nameDir(StateDir()) }
-
 func (vpn *regVpn) unsubscribe(req *http.Request) error {
 	sub, err := reqsub(req)
 	if err != nil {
@@ -815,7 +815,7 @@ func (vpn *regVpn) unsubscribe(req *http.Request) error {
 	vpn.mutex.Lock()
 	defer vpn.mutex.Unlock()
 	delete(vpn.admin, sub)
-	return removeCertificate(vpn.stateDir(), sub, vpn.subscribers)
+	return removeCertificate(PathStateDir(), sub, vpn.subscribers)
 }
 
 func (vpn *regVpn) whois(w http.ResponseWriter, req *http.Request) error {

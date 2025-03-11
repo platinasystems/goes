@@ -41,9 +41,9 @@ Forward ciphered packets between exchange and tunnel interface.
 
 {{flags .}}`)
 
-	tflag := TunnelFlag()
+	tflag := flag.Uint(NameTunnelFlag, 0, "Tunnel unit number.")
 
-	err := g.flags(ctx, defport, args)
+	err := g.defineAndParseFlags(ctx, defport, args)
 	if err != nil {
 		return err
 	}

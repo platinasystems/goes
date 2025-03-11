@@ -182,7 +182,7 @@ spec:
     - "vpn"
     - "registry"
     - "-cert"
-    - "/etc/goes/vpn/registry.pem"
+    - "registry.pem"
     - "-v"
     ports:
     - protocol: TCP
@@ -231,7 +231,7 @@ spec:
     - "vpn"
     - "exchange"
     - "-cert"
-    - "/etc/goes/vpn/exchange0.pem"
+    - "exchange0.pem"
     - "-v"
     ports:
     - protocol: UDP
@@ -275,7 +275,7 @@ spec:
     - "vpn"
     - "guest"
     - "-cert"
-    - "/etc/goes/vpn/hosta.pem"
+    - "hosta.pem"
     - "-v"
     securityContext:
       allowPrivilegeEscalation: true
@@ -325,7 +325,7 @@ spec:
     - "vpn"
     - "guest"
     - "-cert"
-    - "/etc/goes/vpn/hostb.pem"
+    - "hostb.pem"
     - "-v"
     securityContext:
       allowPrivilegeEscalation: true
@@ -376,7 +376,7 @@ spec:
     - "vpn"
     - "guest"
     - "-cert"
-    - "/etc/goes/vpn/hostc.pem"
+    - "hostc.pem"
     - "-v"
     securityContext:
       allowPrivilegeEscalation: true

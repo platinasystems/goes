@@ -29,12 +29,12 @@ Create PEM encoded ed25519 signature key file.
 
 {{flags .}}`)
 
-	sigFlag := SigFlag()
-
-	err := flag.CommandLine.Parse(args)
+	err := defineAndParseFlags(args)
 	if err != nil {
 		return err
 	}
+
+	sfn := pathSigFile()
 
 	_, priv, err := ed25519.GenerateKey(nil)
 	if err != nil {
@@ -49,15 +49,15 @@ Create PEM encoded ed25519 signature key file.
 		Headers: map[string]string{},
 		Bytes:   der,
 	}
-	if *sigFlag == "-" {
+	if sfn == "-" {
 		return pem.Encode(os.Stdout, blk)
 	}
-	if _, err = os.Stat(*sigFlag); err == nil {
-		return fmt.Errorf("%s: exists", *sigFlag)
+	if _, err = os.Stat(sfn); err == nil {
+		return fmt.Errorf("%s: exists", sfn)
 	} else if !os.IsNotExist(err) {
 		return err
 	}
-	dn := filepath.Dir(*sigFlag)
+	dn := filepath.Dir(sfn)
 	if _, err = os.Stat(dn); err != nil {
 		if !os.IsNotExist(err) {
 			return err
@@ -66,7 +66,7 @@ Create PEM encoded ed25519 signature key file.
 			return err
 		}
 	}
-	w, err := os.OpenFile(*sigFlag, oCreate, 0600)
+	w, err := os.OpenFile(sfn, oCreate, 0600)
 	if err != nil {
 		return err
 	}

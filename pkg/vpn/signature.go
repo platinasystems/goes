@@ -32,14 +32,12 @@ Print algorithm.
 
 {{flags .}}`)
 
-	sigflag := SigFlag()
-
-	err := flag.CommandLine.Parse(args)
+	err := defineAndParseFlags(args)
 	if err != nil {
 		return err
 	}
 
-	sig, err := NewSignatures(*sigflag)
+	sig, err := NewSignatures(pathSigFile())
 	if err == nil {
 		err = sig.Show(os.Stdout)
 	}
