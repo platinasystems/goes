@@ -27,34 +27,76 @@ spec:
 apiVersion: v1
 kind: Secret
 metadata:
-  name: vpn
+  name: vpn-registry
 type: Opaque
 stringData:
-  registry.pk8: |
+  sig.pk8: |
     -----BEGIN PRIVATE KEY-----
     MC4CAQAwBQYDK2VwBCIEIDDVRrX6dNC03w/uF5Ce7sY4KvEMWUhlgjyeMxVkshiO
     -----END PRIVATE KEY-----
-  exchange0.pk8: |
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: vpn-exchange0
+type: Opaque
+stringData:
+  sig.pk8: |
     -----BEGIN PRIVATE KEY-----
     MC4CAQAwBQYDK2VwBCIEIPvT0Mvd90IQW3Pgp+IuY/eZID9XxHUEi8cIiwHV8D95
     -----END PRIVATE KEY-----
-  exchange1.pk8: |
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: vpn-exchange1
+type: Opaque
+stringData:
+  sig.pk8: |
     -----BEGIN PRIVATE KEY-----
     MC4CAQAwBQYDK2VwBCIEICQ0BD6LTiDvjI9eHzgaaiuQyq6pf8rFKt1Ki7joRk/J
     -----END PRIVATE KEY-----
-  exchange2.pk8: |
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: vpn-exchange2
+type: Opaque
+stringData:
+  sig.pk8: |
     -----BEGIN PRIVATE KEY-----
     MC4CAQAwBQYDK2VwBCIEIK3Op5w66jxolZ3ioW9IWhaoCsXmItJixdCULSnatH29
     -----END PRIVATE KEY-----
-  hosta.pk8: |
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: vpn-hosta
+type: Opaque
+stringData:
+  sig.pk8: |
     -----BEGIN PRIVATE KEY-----
     MC4CAQAwBQYDK2VwBCIEIPvh9JiiTf5+a/3ezk7a2ky1c34FirvHoP4iIUvhQUoC
     -----END PRIVATE KEY-----
-  hostb.pk8: |
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: vpn-hostb
+type: Opaque
+stringData:
+  sig.pk8: |
     -----BEGIN PRIVATE KEY-----
     MC4CAQAwBQYDK2VwBCIEIIiKZwJ9mmrVkVCPqwS16pw0yrWnLh6YfZYNQI3oMdDh
     -----END PRIVATE KEY-----
-  hostc.pk8: |
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: vpn-hostc
+type: Opaque
+stringData:
+  sig.pk8: |
     -----BEGIN PRIVATE KEY-----
     MC4CAQAwBQYDK2VwBCIEIHPKQS91IyAafjs6vdqq6SkKv0IEaEBII3cUup+sNFTR
     -----END PRIVATE KEY-----
@@ -198,10 +240,7 @@ spec:
     projected:
       sources:
       - secret:
-          name: vpn
-          items:
-          - key: registry.pk8
-            path: sig.pk8
+          name: vpn-registry
       - configMap:
           name: vpn
   - name: state
@@ -219,9 +258,6 @@ spec:
   restartPolicy: Never
   hostname: exchange0
   subdomain: vpn
-  securityContext:
-    runAsUser: 0
-    runAsGroup: 0
   containers:
   - name: goes
     imagePullPolicy: IfNotPresent
@@ -245,11 +281,7 @@ spec:
     projected:
       sources:
       - secret:
-          name: vpn
-          items:
-          - key: exchange0.pk8
-            path: sig.pk8
-            mode: 400
+          name: vpn-exchange0
       - configMap:
           name: vpn
 ---
@@ -295,11 +327,7 @@ spec:
     projected:
       sources:
       - secret:
-          name: vpn
-          items:
-          - key: hosta.pk8
-            path: sig.pk8
-            mode: 400
+          name: vpn-hosta
       - configMap:
           name: vpn
 ---
@@ -345,11 +373,7 @@ spec:
     projected:
       sources:
       - secret:
-          name: vpn
-          items:
-          - key: hostb.pk8
-            path: sig.pk8
-            mode: 400
+          name: vpn-hostb
       - configMap:
           name: vpn
 ---
@@ -395,11 +419,7 @@ spec:
     projected:
       sources:
       - secret:
-          name: vpn
-          items:
-          - key: hostc.pk8
-            path: sig.pk8
-            mode: 400
+          name: vpn-hostc
       - configMap:
           name: vpn
 ---
