@@ -346,19 +346,6 @@ func (rest *rest) defineAndParseFlags(args []string) error {
 		return err
 	}
 
-	if cl := flag.CommandLine.Name(); !strings.HasSuffix(cl, "certify") {
-		if cs, err = certificates(pathRegFile()); err != nil {
-			return err
-		}
-		rest.reg = cs[0]
-		if err = rest.xregurl(); err != nil {
-			return err
-		}
-		if vpn := ValueOfStringFlag(NameVpnFlag); len(vpn) > 0 {
-			rest.url = rest.url.JoinPath(vpn)
-		}
-	}
-
 	cfg := &tls.Config{
 		MinVersion: tls.VersionTLS13,
 		Certificates: []tls.Certificate{
@@ -375,7 +362,19 @@ func (rest *rest) defineAndParseFlags(args []string) error {
 		cfg.RootCAs = rcas
 	}
 
-	cfg.RootCAs.AddCert(rest.reg)
+	if cl := flag.CommandLine.Name(); !strings.HasSuffix(cl, "certify") {
+		if cs, err = certificates(pathRegFile()); err != nil {
+			return err
+		}
+		rest.reg = cs[0]
+		if err = rest.xregurl(); err != nil {
+			return err
+		}
+		cfg.RootCAs.AddCert(rest.reg)
+		if vpn := ValueOfStringFlag(NameVpnFlag); len(vpn) > 0 {
+			rest.url = rest.url.JoinPath(vpn)
+		}
+	}
 
 	rest.tp = http.DefaultTransport.(*http.Transport).Clone()
 	rest.tp.TLSClientConfig = cfg
