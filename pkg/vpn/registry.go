@@ -476,10 +476,19 @@ func (vpn *regVpn) approve(req *http.Request) error {
 	}
 	vpn.mutex.Lock()
 	defer vpn.mutex.Unlock()
+	sd := vpn.StateDir()
+	if _, err = os.Stat(sd); err != nil {
+		if os.IsNotExist(err) {
+			err = os.MkdirAll(sd, 0755)
+		}
+		if err != nil {
+			return err
+		}
+	}
 	for i, c := range vpn.pending {
 		if c.Subject.CommonName == sub {
 			vpn.pending = slices.Delete(vpn.pending, i, i+1)
-			err = addCertificate(PathStateDir(), c)
+			err = addCertificate(sd, c)
 			if err == nil {
 				vpn.subscribers = append(vpn.subscribers, c)
 				vpn.subscriberNamed[c.Subject.CommonName] = c
@@ -800,8 +809,9 @@ func (vpn *regVpn) subscribe(req *http.Request) error {
 	return nil
 }
 
-func (vpn *regVpn) nameDir(dir string) string {
-	if vpn.name != "vpn" {
+func (vpn *regVpn) StateDir() string {
+	dir := ValueOfStringFlag(NameStateDirFlag)
+	if len(vpn.name) > 0 && vpn.name != "vpn" {
 		dir = filepath.Join(dir, vpn.name)
 	}
 	return dir
@@ -815,7 +825,7 @@ func (vpn *regVpn) unsubscribe(req *http.Request) error {
 	vpn.mutex.Lock()
 	defer vpn.mutex.Unlock()
 	delete(vpn.admin, sub)
-	return removeCertificate(PathStateDir(), sub, vpn.subscribers)
+	return removeCertificate(vpn.StateDir(), sub, vpn.subscribers)
 }
 
 func (vpn *regVpn) whois(w http.ResponseWriter, req *http.Request) error {
