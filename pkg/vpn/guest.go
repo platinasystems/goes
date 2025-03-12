@@ -51,8 +51,8 @@ Forward ciphered packets between exchange and tunnel interface.
 	cctx, cancel := context.WithCancel(ctx)
 
 	udp, err := net.ListenUDP(g.udpv, &net.UDPAddr{
-		IP:   g.sap.Addr().AsSlice(),
-		Port: int(g.sap.Port()),
+		IP:   g.lap.Addr().AsSlice(),
+		Port: int(g.lap.Port()),
 	})
 	if err != nil {
 		return xerrors.Label(err, "ListenUDP")
@@ -64,7 +64,7 @@ Forward ciphered packets between exchange and tunnel interface.
 	if err != nil {
 		return xerrors.Label(err, "LocalAddr")
 	}
-	if err = g.register(ctx, ap0); err != nil {
+	if err = g.register(ctx, netip.AddrPort{}); err != nil {
 		return err
 	}
 

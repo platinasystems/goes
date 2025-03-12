@@ -23,14 +23,12 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xnet/netph"
 )
 
-var ap0 netip.AddrPort
-
 // common to guest and exchange
 type client struct {
 	name,
 	udpv string
 	rest
-	sap    netip.AddrPort
+	lap    netip.AddrPort
 	priv   *ecdh.PrivateKey
 	pub    *ecdh.PublicKey
 	pubder []byte
@@ -51,7 +49,7 @@ func (cl *client) defineAndParseFlags(
 	defport uint16,
 	args []string,
 ) error {
-	flag.TextVar(&cl.sap, "s",
+	flag.TextVar(&cl.lap, NameListenFlag,
 		netip.AddrPortFrom(netip.IPv4Unspecified(), defport),
 		`Service {addr}:{port}.
 If “addr” is 0.0.0.0 or [::], listen on all ipv4 or ipv6
@@ -60,11 +58,11 @@ interface addresses.  If “port” is 0, allocate from system.`)
 	if err != nil {
 		return err
 	}
-	sa := cl.sap.Addr()
+	a := cl.lap.Addr()
 	cl.udpv = "udp"
-	if sa.Is4() {
+	if a.Is4() {
 		cl.udpv = "udp4"
-	} else if sa.Is6() {
+	} else if a.Is6() {
 		cl.udpv = "udp6"
 	}
 	return nil
