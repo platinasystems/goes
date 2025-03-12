@@ -109,21 +109,6 @@ var Features = map[string]any{
 	},
 }
 
-// [ValueOfStringFlag]([NameConfigDirFlag])
-func PathConfigDir() string {
-	return ValueOfStringFlag(NameConfigDirFlag)
-}
-
-// [ValueOfStringFlag]([NameStateDirFlag]) +
-// "/" + [ValueOfStringFlag]([NameVpnFlag])
-func PathStateDir() string {
-	path := ValueOfStringFlag(NameStateDirFlag)
-	if vpn := ValueOfStringFlag(NameVpnFlag); len(vpn) > 0 {
-		path = filepath.Join(path, vpn)
-	}
-	return path
-}
-
 func RandLinkLocalAddr() (lladdr netip.Addr, err error) {
 	var a [netph.IPv6len]byte
 	a[0] = 0xfe
@@ -190,17 +175,21 @@ func defineAndParseFlags(args []string) error {
 }
 
 func pathCertFile() string {
-	return filepath.Join(PathConfigDir(), ValueOfStringFlag(NameCertFlag))
+	return filepath.Join(pathConfigDir(), ValueOfStringFlag(NameCertFlag))
 }
 
 func pathConfigFile() string {
-	return filepath.Join(PathConfigDir(), ValueOfStringFlag(NameConfigFlag))
+	return filepath.Join(pathConfigDir(), ValueOfStringFlag(NameConfigFlag))
+}
+
+func pathConfigDir() string {
+	return ValueOfStringFlag(NameConfigDirFlag)
 }
 
 func pathRegFile() string {
-	return filepath.Join(PathConfigDir(), ValueOfStringFlag(NameRegFlag))
+	return filepath.Join(pathConfigDir(), ValueOfStringFlag(NameRegFlag))
 }
 
 func pathSigFile() string {
-	return filepath.Join(PathConfigDir(), ValueOfStringFlag(NameSigFlag))
+	return filepath.Join(pathConfigDir(), ValueOfStringFlag(NameSigFlag))
 }

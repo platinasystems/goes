@@ -433,14 +433,20 @@ func (reg *registry) reload() error {
 			}
 		}
 
-		for _, dir := range []string{
-			PathConfigDir(),
-			PathStateDir(),
-		} {
-			subs, err := certificates(dir)
+		var sources []string
+		if name == "vpn" {
+			sources = append(sources,
+				ValueOfStringFlag(NameConfigDirFlag))
+		} else {
+			sources = append(sources,
+				pathCertFile(), pathRegFile())
+		}
+		sources = append(sources, vpn.StateDir())
+		for _, src := range sources {
+			subs, err := certificates(src)
 			if err == nil {
-				vpn.subscribers =
-					append(vpn.subscribers, subs...)
+				vpn.subscribers = append(vpn.subscribers,
+					subs...)
 				for _, c := range subs {
 					cn := c.Subject.CommonName
 					vpn.subscriberNamed[cn] = c

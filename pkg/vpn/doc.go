@@ -12,11 +12,29 @@ secure, Virtual Private Network.
 
     <goes> new vpn signature [flags]
 
+  - [ValueOfStringFlag]([NameConfigFlag]), an admin supplied file
+    defining the VPN's prefix and persistent address assignments.
+
+# Config Example
+
+	vpn:
+	  prefix: fc00:1234::/64
+	  address:
+	    guesta: fc00:1234::1
+	    guestb: fc00:1234::2
+	    guestc: fc00:1234::3
+	    exchange0: fc00:1234::10
+	    exchange1: fc00:1234::11
+	    exchange2: fc00:1234::12
+
 # Daemons
 
   - [Registry] is a web server providing a REST interface to its
-    ephemeral tables; and persistent, read-only [PathConfigDir] and
-    read-write [PathStateDir] subscriber certificates.
+    ephemeral tables; and persistent, read-only
+    ValueOfStringFlag(NameConfigDirFlag)
+    and read-write
+    [ValueOfStringFlag]([NameStateDirFlag])
+    subscriber certificates.
 
   - [Exchange] is a UDP server that forwards ciphered packets between guest's.
 
