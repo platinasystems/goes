@@ -28,6 +28,7 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/box"
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xflag"
+	"github.com/platinasystems/goes/v2/pkg/xmaps"
 	"gopkg.in/yaml.v3"
 )
 
@@ -761,17 +762,23 @@ func (vpn *regVpn) showPending(w io.Writer) error {
 }
 
 func (vpn *regVpn) showSubscriber(w http.ResponseWriter, qv url.Values) error {
+	vpn.mutex.RLock()
+	defer vpn.mutex.RUnlock()
+
 	if !qv.Has("arg0") {
-		return xerrors.Incomplete("name")
+		names := xmaps.Keys(vpn.subscriberNamed)
+		sort.Strings(names)
+		for _, name := range names {
+			fmt.Fprintln(w, name)
+		}
+		return nil
 	}
+
 	name := qv.Get("arg0")
 	t, err := CertificatesTemplate()
 	if err != nil {
 		return err
 	}
-
-	vpn.mutex.RLock()
-	defer vpn.mutex.RUnlock()
 
 	sub, ok := vpn.subscriberNamed[name]
 	if !ok {
