@@ -757,7 +757,7 @@ func (vpn *regVpn) showPending(w io.Writer) error {
 	}
 	vpn.mutex.RLock()
 	defer vpn.mutex.RUnlock()
-	return t.Execute(os.Stdout, vpn.pending)
+	return t.Execute(w, vpn.pending)
 }
 
 func (vpn *regVpn) showSubscriber(w http.ResponseWriter, qv url.Values) error {
