@@ -818,6 +818,11 @@ func (vpn *regVpn) subscribe(req *http.Request) error {
 	if _, present := vpn.subscriberNamed[cn]; present {
 		return xerrors.Unavailable(cn)
 	}
+	for _, p := range vpn.pending {
+		if p.Subject.CommonName == cn {
+			return xerrors.Unavailable(cn)
+		}
+	}
 	vpn.pending = append(vpn.pending, c)
 	return nil
 }
