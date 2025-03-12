@@ -103,6 +103,7 @@ var Features = map[string]any{
 		"exchange":    Exchange,
 		"guest":       Guest,
 		"ping":        RestPing,
+		"reload":      RestReload,
 		"registry":    Registry,
 		"subscribe":   RestSubscribe,
 		"unsubscribe": RestAdmin,

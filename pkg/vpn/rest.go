@@ -175,6 +175,38 @@ RESTful ping registry.
 	return err
 }
 
+func RestReload(ctx context.Context, args []string) error {
+	var rest rest
+
+	xflag.UsageTemplate(flag.CommandLine, `
+usage: {{.Name}} [flags] [args]
+RESTful reload registry configuration.
+
+{{flags .}}`)
+
+	err := rest.defineAndParseFlags(args)
+	if err != nil {
+		return err
+	}
+
+	clone := *rest.url
+	q := clone.Query()
+	q.Set("op", "reload")
+	clone.RawQuery = q.Encode()
+	req, err := http.
+		NewRequestWithContext(ctx, http.MethodPut, clone.String(), nil)
+	if err != nil {
+		return xerrors.Mark(err)
+	}
+	resp, err := rest.do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	_, err = io.Copy(os.Stdout, resp.Body)
+	return err
+}
+
 func RestShow(ctx context.Context, args []string) error {
 	var rest rest
 
