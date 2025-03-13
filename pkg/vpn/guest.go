@@ -21,6 +21,7 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/nettun"
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xflag"
+	"github.com/platinasystems/goes/v2/pkg/xlog"
 	"github.com/platinasystems/goes/v2/pkg/xnet"
 	"github.com/platinasystems/goes/v2/pkg/xnet/netpdu"
 	"github.com/platinasystems/goes/v2/pkg/xnet/netph"
@@ -41,11 +42,16 @@ Forward ciphered packets between exchange and tunnel interface.
 
 {{flags .}}`)
 
-	tflag := flag.Uint(NameTunnelFlag, 0, "Tunnel unit number.")
-
+	pktTraceFlag := flag.Bool(NamePktTraceFlag, false,
+		"Log packet forwarding.")
+	tflag := flag.Uint(NameTunnelFlag, 0,
+		"Tunnel unit number.")
 	err := g.defineAndParseFlags(ctx, defport, args)
 	if err != nil {
 		return err
+	}
+	if *pktTraceFlag {
+		pktTrace = xlog.Unmute(pktTrace)
 	}
 
 	cctx, cancel := context.WithCancel(ctx)

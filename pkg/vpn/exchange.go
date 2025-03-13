@@ -17,6 +17,7 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/box"
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xflag"
+	"github.com/platinasystems/goes/v2/pkg/xlog"
 	"github.com/platinasystems/goes/v2/pkg/xnet"
 	"github.com/platinasystems/goes/v2/pkg/xnet/netpdu"
 	"github.com/platinasystems/goes/v2/pkg/xnet/netph"
@@ -38,10 +39,14 @@ Exchange ciphered packets between guests.
 	flag.TextVar(&pub, NamePublicFlag,
 		netip.AddrPortFrom(netip.IPv4Unspecified(), 0),
 		`NAT'd listen {addr}:{port}. (0.0.0.0:0 ignored)`)
-
+	pktTraceFlag := flag.Bool(NamePktTraceFlag, false,
+		"Log packet forwarding.")
 	err := ex.defineAndParseFlags(ctx, defport, args)
 	if err != nil {
 		return err
+	}
+	if *pktTraceFlag {
+		pktTrace = xlog.Unmute(pktTrace)
 	}
 
 	ex.pem.addressed = make(map[netip.Addr]*pem.Block)

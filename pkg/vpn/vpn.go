@@ -33,6 +33,7 @@ const (
 	NameConfigFlag    = "config"
 	NameConfigDirFlag = "config-dir"
 	NameListenFlag    = "listen"
+	NamePktTraceFlag  = "packet-trace"
 	NamePublicFlag    = "public"
 	NameQuietFlag     = "q"
 	NameRegFlag       = "reg"
@@ -144,10 +145,9 @@ var (
 	errata  = xlog.Unmute(mutable)
 	verbose = xlog.Mute(mutable)
 
-	udpRxTrace = xlog.Mute(mutable)
-	udpTxTrace = xlog.Mute(mutable)
-
 	goRoutineTrace = xlog.Mute(mutable)
+
+	pktTrace = xlog.Mute(mutable)
 )
 
 func defineAndParseFlags(args []string) error {

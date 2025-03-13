@@ -38,7 +38,7 @@ func pktRxRoutine(
 			verbose.Print(err)
 			break
 		} else if bx, err := box.NewRx(udp); err == nil {
-			udpRxTrace.Printf("rx %d bytes from %v",
+			pktTrace.Printf("rx %d bytes from %v",
 				bx.Len(), bx.AddrPort)
 			ch <- bx
 		} else if operr, ok := err.(*net.OpError); ok {
@@ -82,7 +82,7 @@ func pktTxRoutine(
 				verbose.Printf("tx from %v to %v: %v",
 					la, tap, err)
 			} else {
-				udpTxTrace.Printf("tx %d bytes from %v to %v",
+				pktTrace.Printf("tx %d bytes from %v to %v",
 					n, la, tap)
 			}
 			bx.Return()
