@@ -52,6 +52,17 @@ func Mute(printer Printer) WritePrinter {
 	return Muted{printer}
 }
 
+// Toggle a [Printer]'s [Mute]/[Unmute].
+func ToggleMute(printer Printer) WritePrinter {
+	if m, ok := printer.(Muted); ok {
+		return Unmute(m.printer)
+	}
+	if um, ok := printer.(Unmuted); ok {
+		return Mute(um.Mutable)
+	}
+	return Unmuted{printer.(Mutable)}
+}
+
 // Unmute either de-encapsulates a [Muted] [Printer] or encapsulates a [Logger]
 // with a Write method.
 func Unmute(printer Printer) WritePrinter {

@@ -9,86 +9,52 @@ import (
 	"os"
 )
 
-func ExampleUnmuteWrite() {
+func ExampleUnmute() {
 	l := log.New(os.Stdout, "", 0)
-	Unmute(l).Write([]byte("example\n"))
-	// Output: example
+	Unmute(l).Write([]byte("write slice\n"))
+	Unmute(l).Println("print string")
+	Unmute(Mute(l)).Println("UnmuteMutePrint")
+	Unmute(Unmute(l)).Println("UnmuteUnmutePrint")
+	Unmute(Mute(Unmute(l))).Println("UnmuteMuteUnmutePrint")
+	// Output:
+	// write slice
+	// print string
+	// UnmuteMutePrint
+	// UnmuteUnmutePrint
+	// UnmuteMuteUnmutePrint
 }
 
-func ExampleUnmutePrint() {
+func ExampleMute() {
 	l := log.New(os.Stdout, "", 0)
-	Unmute(l).Print("example\n")
-	// Output: example
-}
-
-func ExampleUnmuteMutePrint() {
-	l := log.New(os.Stdout, "", 0)
-	Unmute(Mute(l)).Print("example\n")
-	// Output: example
-}
-
-func ExampleUnmuteUnmutePrint() {
-	l := log.New(os.Stdout, "", 0)
-	Unmute(Unmute(l)).Print("example\n")
-	// Output: example
-}
-
-func ExampleUnmuteMuteUnmutePrint() {
-	l := log.New(os.Stdout, "", 0)
-	Unmute(Mute(Unmute(l))).Print("example\n")
-	// Output: example
-}
-
-func ExampleMuteWrite() {
-	l := log.New(os.Stdout, "", 0)
-	Mute(l).Write([]byte("example\n"))
+	Mute(l).Write([]byte("write slice"))
+	Mute(l).Println("print string")
+	Mute(Unmute(l)).Println("MuteUnmutePrint")
+	Mute(Mute(l)).Println("MutedMutePrint")
+	Mute(Unmute(Mute(l))).Println("MuteUnmuteMutePrint")
 	// Output:
 }
 
-func ExampleMutePrint() {
+func ExampleIsMuted() {
 	l := log.New(os.Stdout, "", 0)
-	Mute(l).Print("example\n")
+	l.Println("Unmute", IsMuted(Unmute(l)))
+	l.Println("Unmute/Mute", IsMuted(Unmute(Mute(l))))
+	l.Println("Mute", IsMuted(Mute(l)))
+	l.Println("Mute/Unmute", IsMuted(Mute(Unmute(l))))
 	// Output:
+	// Unmute false
+	// Unmute/Mute false
+	// Mute true
+	// Mute/Unmute true
 }
 
-func ExampleMuteUnmutePrint() {
-	l := log.New(os.Stdout, "", 0)
-	Mute(Unmute(l)).Print("example\n")
+func ExampleToggleMute() {
+	mutable := ToggleMute(log.New(os.Stdout, "", 0))
+	mutable.Println("unmuted")
+	mutable = ToggleMute(mutable)
+	mutable.Println("muted")
+	mutable = ToggleMute(mutable)
+	mutable.Println("unmuted")
 	// Output:
-}
-
-func ExampleMutedMutePrint() {
-	l := log.New(os.Stdout, "", 0)
-	Mute(Mute(l)).Print("example\n")
-	// Output:
-}
-
-func ExampleMuteUnmuteMutePrint() {
-	l := log.New(os.Stdout, "", 0)
-	Mute(Unmute(Mute(l))).Print("example\n")
-	// Output:
-}
-
-func ExampleIsMutedUnmute() {
-	l := log.New(os.Stdout, "", 0)
-	l.Print(IsMuted(Unmute(l)))
-	// Output: false
-}
-
-func ExampleIsMutedUnmuteMute() {
-	l := log.New(os.Stdout, "", 0)
-	l.Print(IsMuted(Unmute(Mute(l))))
-	// Output: false
-}
-
-func ExampleIsMutedMute() {
-	l := log.New(os.Stdout, "", 0)
-	l.Print(IsMuted(Mute(l)))
-	// Output: true
-}
-
-func ExampleIsMutedMuteUnmute() {
-	l := log.New(os.Stdout, "", 0)
-	l.Print(IsMuted(Mute(Unmute(l))))
-	// Output: true
+	// unmuted
+	// unmuted
 }
