@@ -172,6 +172,7 @@ func defineAndParseFlags(args []string) error {
 		errata = xlog.Mute(errata)
 	} else if *vFlag {
 		verbose = xlog.Unmute(verbose)
+		goRoutineTrace = xlog.Unmute(goRoutineTrace)
 	}
 	return nil
 }
