@@ -94,6 +94,8 @@ func Registry(ctx context.Context, args []string) error {
 	var wg sync.WaitGroup
 	var reg registry
 
+	mutable.SetPrefix("registry")
+
 	xflag.UsageTemplate(flag.CommandLine, `
 usage: {{.Name}} [flags]
 A RESTful WWW server.

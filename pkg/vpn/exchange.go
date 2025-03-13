@@ -30,6 +30,8 @@ func Exchange(ctx context.Context, args []string) error {
 	var ex exchange
 	var pub netip.AddrPort
 
+	mutable.SetPrefix("exchange")
+
 	xflag.UsageTemplate(flag.CommandLine, `
 usage: {{.Name}} [flags] [vpn]
 Exchange ciphered packets between guests.
