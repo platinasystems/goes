@@ -88,6 +88,7 @@ var Features = map[string]any{
 			"address":     RestShow,
 			"admins":      RestShow,
 			"certificate": ShowCertificate,
+			"hosts":       RestShow,
 			"pending":     RestShow,
 			"signature":   ShowSignature,
 			"subscriber":  RestShow,

@@ -323,6 +323,8 @@ func (reg *registry) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 				for _, s := range ConfigByName[name].Admins {
 					fmt.Fprintln(w, "-", s)
 				}
+			case "hosts":
+				err = vpn.showHosts(w, qv)
 			case "pending":
 				err = vpn.showPending(w)
 			case "subscriber":
@@ -751,6 +753,35 @@ func (vpn *regVpn) showAddress(w http.ResponseWriter, qv url.Values) error {
 		sort.Strings(names)
 		for _, name := range names {
 			fmt.Fprintf(w, "%s: %v\n", name, vpn.addr.named[name])
+		}
+	}
+	return nil
+}
+
+func (vpn *regVpn) showHosts(w http.ResponseWriter, qv url.Values) error {
+	vpn.mutex.RLock()
+	defer vpn.mutex.RUnlock()
+
+	if qv.Has("arg0") {
+		addr, err := netip.ParseAddr(qv.Get("arg0"))
+		if err != nil {
+			return err
+		}
+		name, ok := vpn.addr.name[addr]
+		if !ok {
+			return xerrors.Unknown(addr.String())
+		}
+		fmt.Fprintln(w, name)
+	} else {
+		addrs := make([]netip.Addr, 0, len(vpn.addr.name))
+		for addr := range vpn.addr.name {
+			addrs = append(addrs, addr)
+		}
+		slices.SortFunc(addrs, func(a, b netip.Addr) int {
+			return a.Compare(b)
+		})
+		for _, addr := range addrs {
+			fmt.Fprintf(w, "%v\t%s\n", addr, vpn.addr.name[addr])
 		}
 	}
 	return nil
