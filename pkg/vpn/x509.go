@@ -1,4 +1,4 @@
-// Copyright © 2022-2024 Platina Systems, Inc. All rights reserved.
+// Copyright © 2022-2025 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -27,7 +27,6 @@ import (
 
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xflag"
-	"github.com/platinasystems/goes/v2/pkg/xlog"
 )
 
 const BlockTypeCertificate = "CERTIFICATE"
@@ -287,8 +286,6 @@ func certificates(dfn string) (cs []*x509.Certificate, err error) {
 	return
 }
 
-var readCertificateTrace = xlog.Mute(mutable)
-
 func readCertificates(r io.Reader) (cs []*x509.Certificate, err error) {
 	var eof bool
 
@@ -298,7 +295,6 @@ func readCertificates(r io.Reader) (cs []*x509.Certificate, err error) {
 	for {
 		if !eof {
 			n, erŕ := ŕ.Read(b[len(b):cap(b)])
-			readCertificateTrace.Println("read:", n, erŕ)
 			if n > 0 {
 				b = b[:len(b)+n]
 			} else {

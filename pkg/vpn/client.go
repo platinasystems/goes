@@ -1,4 +1,4 @@
-// Copyright © 2023-2024 Platina Systems, Inc. All rights reserved.
+// Copyright © 2023-2025 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -19,6 +19,7 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/gcm"
 	"github.com/platinasystems/goes/v2/pkg/nonce"
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
+	"github.com/platinasystems/goes/v2/pkg/xlog"
 	"github.com/platinasystems/goes/v2/pkg/xnet"
 	"github.com/platinasystems/goes/v2/pkg/xnet/netph"
 )
@@ -120,7 +121,7 @@ func (cl *client) register(
 		cl.hostPrefix = netip.PrefixFrom(cl.addr, 128)
 	}
 
-	verbose.Printf("assigned id %d @ %v, via %v, vpn %v",
+	xlog.Info.Printf("assigned id %d @ %v, via %v, vpn %v",
 		cl.id, cl.hostPrefix, via, cl.vpnPrefix)
 
 	return nil
@@ -165,7 +166,7 @@ func (cl *client) hello(ch chan<- *box.Box, to box.Id, now time.Time) error {
 	bx.CloseWith(cto)
 	bx.SealWith(cvia)
 	bx.NonBlockingPut(ch)
-	verbose.Printf("tx %d@%v hello %d", ivia, svc, ito)
+	xlog.Info.Printf("tx %d@%v hello %d", ivia, svc, ito)
 	return nil
 }
 
@@ -216,7 +217,7 @@ func (cl *client) waitForDNS(ctx context.Context) error {
 	hostname := cl.url.Hostname()
 	ips, err := PatientLookupIP(ctx, "ip", hostname, timeout)
 	if err == nil {
-		verbose.Println(hostname, ips)
+		xlog.Info.Println(hostname, ips)
 	}
 	return err
 }

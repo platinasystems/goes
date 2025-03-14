@@ -1,4 +1,4 @@
-// Copyright © 2023-2024 Platina Systems, Inc. All rights reserved.
+// Copyright © 2023-2025 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -16,7 +16,9 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xprogram"
 )
 
-func Daemons() ([]int, error) {
+const daemonCriterion = "all matching process executables and /dev/null stdin"
+
+func Daemons() ([]*os.Process, error) {
 	var pids []int
 
 	thisPid := os.Getpid()
@@ -25,7 +27,7 @@ func Daemons() ([]int, error) {
 
 	procexes, err := filepath.Glob("/proc/*/exe")
 	if err != nil {
-		return pids, xerrors.Label(err, "glob")
+		return nil, xerrors.Label(err, "glob")
 	}
 
 	for _, procexe := range procexes {
@@ -56,5 +58,11 @@ func Daemons() ([]int, error) {
 		}
 	}
 	sort.Reverse(sort.IntSlice(pids))
-	return pids, nil
+	procs := make([]*os.Process, len(pids))
+	for i, pid := range pids {
+		if procs[i], err = os.FindProcess(pid); err != nil {
+			break
+		}
+	}
+	return procs, err
 }

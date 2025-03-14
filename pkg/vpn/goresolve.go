@@ -1,4 +1,4 @@
-// Copyright © 2023-2024 Platina Systems, Inc. All rights reserved.
+// Copyright © 2023-2025 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
+	"github.com/platinasystems/goes/v2/pkg/xlog"
 )
 
 const (
@@ -37,7 +38,7 @@ func PatientLookupIP(
 		ips, err := Resolver.LookupIP(ctx, network, hostname)
 		if err == nil {
 			if total > MinResolveRetryInterval {
-				verbose.Println("found", hostname, ips, total)
+				xlog.Info.Println("found", hostname, ips, total)
 			}
 			return ips, err
 		}
@@ -51,7 +52,7 @@ func PatientLookupIP(
 			return ips, ctx.Err()
 		case <-time.After(dur):
 			if total == 0 {
-				verbose.Println("wait for", hostname, "...")
+				xlog.Info.Println("wait for", hostname, "...")
 			}
 			total += dur
 			if dur *= 2; dur > MaxResolveRetryInterval {

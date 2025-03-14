@@ -15,7 +15,27 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xexec"
 	"github.com/platinasystems/goes/v2/pkg/xflag"
 	"github.com/platinasystems/goes/v2/pkg/xprogram"
+	"github.com/platinasystems/goes/v2/pkg/xsignal"
 )
+
+func AlarmDaemons(ctx context.Context, args []string) error {
+	xflag.UsageTemplate(flag.CommandLine, `
+usage: {{.Name}}
+Send alarm to `+daemonCriterion+".\n")
+	err := flag.CommandLine.Parse(args)
+	if err != nil {
+		return err
+	}
+	procs, err := Daemons()
+	if err == nil {
+		for _, proc := range procs {
+			if t := proc.Signal(xsignal.Alarm); err == nil {
+				err = t
+			}
+		}
+	}
+	return err
+}
 
 func ShowDaemons(ctx context.Context, args []string) error {
 	xflag.UsageTemplate(flag.CommandLine, `
@@ -78,20 +98,17 @@ the system logger; otherwise, perform within the current process context.
 func StopDaemons(ctx context.Context, args []string) error {
 	xflag.UsageTemplate(flag.CommandLine, `
 usage: {{.Name}}
-Terminate all processes with this same executable and /dev/null stdin.
-`)
+Terminate `+daemonCriterion+".\n")
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
 		return err
 	}
-	pids, err := Daemons()
-	if err != nil {
-		return err
-	}
-	for _, pid := range pids {
-		terr := Terminate(pid)
-		if err == nil {
-			err = terr
+	procs, err := Daemons()
+	if err == nil {
+		for _, proc := range procs {
+			if t := proc.Signal(xsignal.Terminate); err == nil {
+				err = t
+			}
 		}
 	}
 	return err

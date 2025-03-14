@@ -1,10 +1,32 @@
-// Copyright © 2021-2024 Platina Systems, Inc. All rights reserved.
+// Copyright © 2021-2025 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
 package xlog
 
-import "io"
+import (
+	"context"
+	"io"
+	"log"
+	"os"
+	"os/signal"
+	"sync"
+
+	"github.com/platinasystems/goes/v2/pkg/xsignal"
+)
+
+var (
+	ErrLog = log.New(os.Stderr, "", log.Lshortfile)
+	OutLog = log.New(os.Stdout, "", log.Lshortfile)
+	Errata = Mute(ErrLog)
+	Info   = Mute(OutLog)
+	Trace  = Mute(OutLog)
+)
+
+func SetPrefixes(s string) {
+	ErrLog.SetPrefix(s)
+	OutLog.SetPrefix(s)
+}
 
 func IsMuted(printer Printer) bool {
 	_, ok := printer.(Muted)
@@ -74,3 +96,42 @@ func Unmute(printer Printer) WritePrinter {
 	}
 	return Unmuted{printer.(Mutable)}
 }
+
+// Toggle [Info] [Mute] on recept of [xsignal.Alarm].
+func AlarmHandler(ctx context.Context, wg *sync.WaitGroup) {
+	const startStopMsg = "alarm handler"
+	defer wg.Done()
+
+	Info.Println("start", startStopMsg)
+	defer Info.Println("stopped", startStopMsg)
+
+	ch := make(chan os.Signal, 2)
+	signal.Notify(ch, xsignal.Alarm)
+	for {
+		select {
+		case <-ctx.Done():
+			signal.Stop(ch)
+			return
+		case sig, ok := <-ch:
+			if !ok {
+				Errata.Println("Alarm channel closed")
+				return
+			}
+			if sig != xsignal.Alarm {
+				Errata.Println("unexpected", sig)
+				continue
+			}
+			if m, ok := Info.(Muted); ok {
+				Info = Unmute(m)
+				Info.Println("enable info")
+			} else if um, ok := Info.(Unmuted); ok {
+				Info.Println("disable info")
+				Info = Mute(um.Mutable)
+			}
+		}
+	}
+}
+
+func MuteErrata()  { Errata = Mute(Errata) }
+func UnmuteInfo()  { Info = Unmute(Info) }
+func UnmuteTrace() { Trace = Unmute(Trace) }

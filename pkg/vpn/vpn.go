@@ -1,15 +1,12 @@
-// Copyright © 2023-2024 Platina Systems, Inc. All rights reserved.
+// Copyright © 2023-2025 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
 package vpn
 
 import (
-	"crypto/rand"
 	"errors"
 	"flag"
-	"log"
-	"net/netip"
 	"os"
 	"path/filepath"
 	"sync"
@@ -17,7 +14,6 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/fhs"
 	"github.com/platinasystems/goes/v2/pkg/xdg"
 	"github.com/platinasystems/goes/v2/pkg/xlog"
-	"github.com/platinasystems/goes/v2/pkg/xnet/netph"
 	"github.com/platinasystems/goes/v2/pkg/xprogram"
 )
 
@@ -33,12 +29,12 @@ const (
 	NameConfigFlag    = "config"
 	NameConfigDirFlag = "config-dir"
 	NameListenFlag    = "listen"
-	NamePktTraceFlag  = "packet-trace"
 	NamePublicFlag    = "public"
 	NameQuietFlag     = "q"
 	NameRegFlag       = "reg"
 	NameSigFlag       = "sig"
 	NameStateDirFlag  = "state-dir"
+	NameTraceFlag     = "trace"
 	NameTunnelFlag    = "t"
 	NameVerboseFlag   = "v"
 	NameVpnFlag       = "vpn"
@@ -112,21 +108,6 @@ var Features = map[string]any{
 	},
 }
 
-func RandLinkLocalAddr() (lladdr netip.Addr, err error) {
-	var a [netph.IPv6len]byte
-	a[0] = 0xfe
-	a[1] = 0x80
-	n, err := rand.Read(a[8:])
-	if err != nil {
-	} else if n != len(a[8:]) {
-		err = ErrLLAddrUnderrun
-	} else {
-		lladdr = netip.AddrFrom16(a)
-		verbose.Println("link-local address:", lladdr)
-	}
-	return
-}
-
 func ValueOfStringFlag(name string) (s string) {
 	if f := flag.Lookup(name); f != nil {
 		s = f.Value.String()
@@ -137,17 +118,6 @@ func ValueOfStringFlag(name string) (s string) {
 const (
 	oAppend = os.O_WRONLY | os.O_CREATE | os.O_APPEND
 	oCreate = os.O_WRONLY | os.O_CREATE | os.O_TRUNC
-)
-
-var (
-	mutable = log.New(os.Stdout, "", log.Lshortfile)
-
-	errata  = xlog.Unmute(mutable)
-	verbose = xlog.Mute(mutable)
-
-	goRoutineTrace = xlog.Mute(mutable)
-
-	pktTrace = xlog.Mute(mutable)
 )
 
 func defineAndParseFlags(args []string) error {
@@ -169,10 +139,9 @@ func defineAndParseFlags(args []string) error {
 		return err
 	}
 	if *qFlag {
-		errata = xlog.Mute(errata)
+		xlog.MuteErrata()
 	} else if *vFlag {
-		verbose = xlog.Unmute(verbose)
-		goRoutineTrace = xlog.Unmute(goRoutineTrace)
+		xlog.UnmuteInfo()
 	}
 	return nil
 }

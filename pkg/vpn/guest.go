@@ -1,4 +1,4 @@
-// Copyright © 2023-2024 Platina Systems, Inc. All rights reserved.
+// Copyright © 2023-2025 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -42,16 +42,14 @@ Forward ciphered packets between exchange and tunnel interface.
 
 {{flags .}}`)
 
-	pktTraceFlag := flag.Bool(NamePktTraceFlag, false,
-		"Log packet forwarding.")
-	tflag := flag.Uint(NameTunnelFlag, 0,
-		"Tunnel unit number.")
+	trace := flag.Bool(NameTraceFlag, false, "Log packet forwarding.")
+	tflag := flag.Uint(NameTunnelFlag, 0, "Tunnel unit number.")
 	err := g.defineAndParseFlags(ctx, defport, args)
 	if err != nil {
 		return err
 	}
-	if *pktTraceFlag {
-		pktTrace = xlog.Unmute(pktTrace)
+	if *trace {
+		xlog.UnmuteTrace()
 	}
 
 	cctx, cancel := context.WithCancel(ctx)
@@ -78,11 +76,11 @@ Forward ciphered packets between exchange and tunnel interface.
 	via := g.via[iguest]
 
 	svc := fmt.Sprintf("(%d via %d@%v)", iguest, via, lap)
-	goRoutineTrace.Println("start", svc)
-	defer goRoutineTrace.Println("stopped", svc)
+	xlog.Info.Println("start", svc)
+	defer xlog.Info.Println("stopped", svc)
 	defer wg.Wait()
 	defer cancel()
-	defer goRoutineTrace.Println("stopping", svc, "...")
+	defer xlog.Info.Println("stopping", svc, "...")
 
 	viaBlk, err := g.whoisIdentified(cctx, via)
 	if err != nil {
@@ -141,6 +139,8 @@ Forward ciphered packets between exchange and tunnel interface.
 	maps.Copy(netpdu.TunPIprotos, TunPIprotos)
 
 	wg.Add(1)
+	go xlog.AlarmHandler(cctx, &wg)
+	wg.Add(1)
 	go pktRxRoutine(cctx, &wg, udp, pktRxCh)
 	wg.Add(1)
 	go pktTxRoutine(cctx, &wg, udp, pktTxCh)
@@ -158,8 +158,8 @@ Forward ciphered packets between exchange and tunnel interface.
 	kat := time.NewTicker(30 * time.Second)
 	defer kat.Stop()
 
-	goRoutineTrace.Printf("start (%s, %v)", nif.Name, g.hostPrefix)
-	defer goRoutineTrace.Printf("stopped (%s, %v)", nif.Name, g.hostPrefix)
+	xlog.Info.Printf("start (%s, %v)", nif.Name, g.hostPrefix)
+	defer xlog.Info.Printf("stopped (%s, %v)", nif.Name, g.hostPrefix)
 
 	var tunpi netph.TunPI
 	var tund []byte
@@ -168,19 +168,20 @@ guestLoop:
 	for {
 		select {
 		case <-cctx.Done():
-			verbose.Println("done")
+			xlog.Info.Println("done")
 			break guestLoop
 		case t := <-kat.C:
-			if err = g.hello(pktTxCh, g.via[iguest], t); err != nil {
-				errata.Println(err)
+			err = g.hello(pktTxCh, g.via[iguest], t)
+			if err != nil {
+				xlog.Errata.Println(err)
 			}
 		case bx, ok := <-tunReadCh:
 			if !ok {
-				verbose.Println("tun read ch closed")
+				xlog.Info.Println("tun read ch closed")
 				break guestLoop
 			}
 			if ato := g.toWhom(bx.Contents); !ato.IsValid() {
-				verbose.Println("dropped non-ip[6]")
+				xlog.Info.Println("dropped non-ip[6]")
 				bx.Return()
 			} else if ato.IsMulticast() {
 				g.multicast(pktTxCh, bx)
@@ -189,25 +190,27 @@ guestLoop:
 			}
 		case bx, ok := <-pktRxCh:
 			if !ok {
-				verbose.Println("pkt tx ch closed")
+				xlog.Info.Println("pkt tx ch closed")
 				break guestLoop
 			}
 			avia := bx.AddrPort
 			ex, ok := g.via[iguest]
 			ivia := IdIndex(ex)
 			if !ok {
-				errata.Printf("no cipher for exchange %d", ivia)
+				xlog.Errata.Printf("no cipher for exchange %d",
+					ivia)
 				bx.Return()
 				continue guestLoop
 			}
 			cex, ok := g.gcm[ivia]
 			if !ok {
-				errata.Printf("no cipher for exchange %d", ivia)
+				xlog.Errata.Printf("no cipher for exchange %d",
+					ivia)
 				bx.Return()
 				continue guestLoop
 			}
 			if svc := g.service[ivia]; avia != svc {
-				verbose.Println(avia, "!=", svc)
+				xlog.Info.Println(avia, "!=", svc)
 				bx.Return()
 				continue guestLoop
 			}
@@ -222,12 +225,13 @@ guestLoop:
 			}
 			cfrom, ok := g.gcm[ifrom]
 			if !ok {
-				errata.Printf("no cipher for guest %d", ifrom)
+				xlog.Errata.Printf("no cipher for guest %d",
+					ifrom)
 				bx.Return()
 				continue guestLoop
 			}
 			if err = bx.UnsealWith(cex); err != nil {
-				verbose.Println("unseal:", err)
+				xlog.Info.Println("unseal:", err)
 				bx.Return()
 				continue guestLoop
 			}
@@ -235,25 +239,25 @@ guestLoop:
 			if to != g.id {
 				err = g.hello(pktTxCh, from, time.Now())
 				if err != nil {
-					errata.Println(err)
+					xlog.Errata.Println(err)
 				}
 				bx.Return()
 				continue guestLoop
 			}
 			if err = bx.OpenWith(cfrom); err != nil {
-				verbose.Print(err)
+				xlog.Info.Print(err)
 				bx.Return()
 				continue guestLoop
 			}
 			tunpi, tund, err = netpdu.TunPI(bx.Contents).Parse()
 			if err != nil {
-				verbose.Println(err)
+				xlog.Info.Println(err)
 				bx.Return()
 				continue guestLoop
 			}
 			switch tunpi.Proto {
 			case VPN_P_HELLO:
-				verbose.Printf("rx %d@%v hello %v",
+				xlog.Info.Printf("rx %d@%v hello %v",
 					ifrom, afrom, VpnHelloPDU(tund))
 				bx.Return()
 				// FIXME re-checkin if registry era mismatch
@@ -262,15 +266,15 @@ guestLoop:
 			case VPN_P_PUBLIC_KEY:
 				blk, _ := pem.Decode(tund)
 				if blk == nil {
-					verbose.Println("encoding")
+					xlog.Info.Println("encoding")
 				} else if err = g.peer(blk); err != nil {
-					verbose.Println(err)
+					xlog.Info.Println(err)
 				}
 				bx.Return()
 			case netph.ETH_P_IP, netph.ETH_P_IPV6:
 				tunWriteCh <- bx
 			default:
-				verbose.Printf("proto[%#x]", tunpi.Proto)
+				xlog.Info.Printf("proto[%#x]", tunpi.Proto)
 				bx.Return()
 			}
 		}
@@ -308,7 +312,7 @@ func (g *guest) unicast(ch chan<- *box.Box, bx *box.Box, addr netip.Addr) {
 	ito := IdIndex(to)
 	cto, ok := g.gcm[ito]
 	if !ok {
-		verbose.Printf("%d@%v: %s", ito, addr, "no guest cipher")
+		xlog.Info.Printf("%d@%v: %s", ito, addr, "no guest cipher")
 		bx.Return()
 		return
 	}
@@ -318,7 +322,7 @@ func (g *guest) unicast(ch chan<- *box.Box, bx *box.Box, addr netip.Addr) {
 		if _, ok := g.service[ito]; ok {
 			via = to
 		} else {
-			errata.Printf("%d@%v: %s",
+			xlog.Errata.Printf("%d@%v: %s",
 				ito, addr, "no guest exchange")
 			bx.Return()
 			return
@@ -334,7 +338,7 @@ func (g *guest) unicast(ch chan<- *box.Box, bx *box.Box, addr netip.Addr) {
 	}
 	bx.AddrPort, ok = g.service[ivia]
 	if !ok {
-		errata.Printf("%d: %s", ivia, "no exchange service")
+		xlog.Errata.Printf("%d: %s", ivia, "no exchange service")
 		bx.Return()
 		return
 	}
@@ -365,14 +369,14 @@ func (g *guest) whoisAddressed(ch chan<- *box.Box, addr netip.Addr) {
 	if bx.Contents, err = xnet.Add(bx.Contents, netph.TunPI{
 		Proto: VPN_P_WHOIS_ADDRESSED,
 	}); err != nil {
-		errata.Print(err)
+		xlog.Errata.Print(err)
 		bx.Return()
 	} else if bx.Contents, err = xnet.
 		Add(bx.Contents, a16[:]); err != nil {
-		errata.Print(err)
+		xlog.Errata.Print(err)
 		bx.Return()
 	} else {
-		verbose.Println("whois", addr)
+		xlog.Info.Println("whois", addr)
 		g.whois(ch, bx)
 	}
 }
@@ -383,13 +387,13 @@ func (g *guest) whoisId(ch chan<- *box.Box, id box.Id) {
 	if bx.Contents, err = xnet.Add(bx.Contents, netph.TunPI{
 		Proto: VPN_P_WHOIS_IDENTIFIED,
 	}); err != nil {
-		errata.Print(err)
+		xlog.Errata.Print(err)
 		bx.Return()
 	} else if bx.Contents, err = xnet.Add(bx.Contents, id); err != nil {
-		errata.Print(err)
+		xlog.Errata.Print(err)
 		bx.Return()
 	} else {
-		verbose.Println("whois", id)
+		xlog.Info.Println("whois", id)
 		g.whois(ch, bx)
 	}
 }
@@ -397,20 +401,20 @@ func (g *guest) whoisId(ch chan<- *box.Box, id box.Id) {
 func (g *guest) whois(ch chan<- *box.Box, bx *box.Box) {
 	via, ok := g.via[IdIndex(g.id)]
 	if !ok {
-		errata.Print("no assigned exchange")
+		xlog.Errata.Print("no assigned exchange")
 		bx.Return()
 		return
 	}
 	ivia := IdIndex(via)
 	cvia, ok := g.gcm[ivia]
 	if !ok {
-		errata.Print("no shared cipher")
+		xlog.Errata.Print("no shared cipher")
 		bx.Return()
 		return
 	}
 	svc, ok := g.service[ivia]
 	if !ok {
-		errata.Print("no assigned service")
+		xlog.Errata.Print("no assigned service")
 		bx.Return()
 		return
 	}
@@ -431,15 +435,15 @@ func tunReadRoutine(
 	ch chan<- *box.Box,
 ) {
 	defer wg.Done()
-	defer goRoutineTrace.Println("stopped", name, "read routine")
-	goRoutineTrace.Println("start", name, "read routine")
+	defer xlog.Info.Println("stopped", name, "read routine")
+	xlog.Info.Println("start", name, "read routine")
 	for ctx.Err() == nil {
 		bx, err := box.NewReadContents(r)
 		if err != nil {
-			errata.Print(name, ": ", err)
+			xlog.Errata.Print(name, ": ", err)
 			break
 		}
-		verbose.Println(name, "read", netpdu.TunPI(bx.Contents))
+		xlog.Info.Println(name, "read", netpdu.TunPI(bx.Contents))
 		ch <- bx
 	}
 }
@@ -452,23 +456,24 @@ func tunWriteRoutine(
 	ch <-chan *box.Box,
 ) {
 	defer wg.Done()
-	defer goRoutineTrace.Println("stopped", name, "write routine")
-	goRoutineTrace.Println("start", name, "write routine")
+	defer xlog.Info.Println("stopped", name, "write routine")
+	xlog.Info.Println("start", name, "write routine")
 	for {
 		select {
 		case <-ctx.Done():
-			goRoutineTrace.Print("done")
+			xlog.Info.Print("done")
 			return
 		case bx, ok := <-ch:
 			if !ok {
-				goRoutineTrace.Println(name, "write ch closed")
+				xlog.Info.Println(name, "write ch closed")
 				return
 			}
-			verbose.Println(name, "write", netpdu.TunPI(bx.Contents))
+			xlog.Info.Println(name, "write",
+				netpdu.TunPI(bx.Contents))
 			_, err := bx.WriteTo(w)
 			bx.Return()
 			if err != nil {
-				errata.Print(name, ": ", err)
+				xlog.Errata.Print(name, ": ", err)
 				return
 			}
 		}

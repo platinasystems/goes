@@ -1,4 +1,4 @@
-// Copyright © 2023-2024 Platina Systems, Inc. All rights reserved.
+// Copyright © 2023-2025 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -26,6 +26,7 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/box"
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xflag"
+	"github.com/platinasystems/goes/v2/pkg/xlog"
 )
 
 const contextApplicationPKCS8 = "application/pkcs8"
@@ -306,7 +307,7 @@ func (rest *rest) checkin(
 	const period = 5 * time.Second
 	for try := 1; true; try++ {
 		var resp *http.Response
-		verbose.Println("checkin try", try)
+		xlog.Info.Println("checkin try", try)
 		id, via, addr, prefix, resp, err = rest.tryCheckin(
 			ctx, pubder, nonce, optsvc,
 		)

@@ -1,4 +1,4 @@
-// Copyright © 2023-2024 Platina Systems, Inc. All rights reserved.
+// Copyright © 2023-2025 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -28,6 +28,7 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/box"
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xflag"
+	"github.com/platinasystems/goes/v2/pkg/xlog"
 	"github.com/platinasystems/goes/v2/pkg/xmaps"
 	"gopkg.in/yaml.v3"
 )
@@ -94,7 +95,7 @@ func Registry(ctx context.Context, args []string) error {
 	var wg sync.WaitGroup
 	var reg registry
 
-	mutable.SetPrefix("registry")
+	xlog.SetPrefixes("registry/")
 
 	xflag.UsageTemplate(flag.CommandLine, `
 usage: {{.Name}} [flags]
@@ -155,12 +156,14 @@ A RESTful WWW server.
 		},
 	}
 
-	goRoutineTrace.Println("start", svc)
-	defer goRoutineTrace.Println("stopped", svc)
+	xlog.Info.Println("start", svc)
+	defer xlog.Info.Println("stopped", svc)
 	defer wg.Wait()
 	defer cancel()
-	defer goRoutineTrace.Println("stopping", svc, "...")
+	defer xlog.Info.Println("stopping", svc, "...")
 
+	wg.Add(1)
+	go xlog.AlarmHandler(cctx, &wg)
 	wg.Add(1)
 	go reg.shutdown(cctx, &wg)
 
@@ -175,12 +178,12 @@ func (reg *registry) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	var err error
 	defer req.Body.Close()
 	if !req.TLS.HandshakeComplete {
-		verbose.Println("incomplete handshake")
+		xlog.Info.Println("incomplete handshake")
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
 	if len(req.TLS.PeerCertificates) == 0 {
-		verbose.Println("no certificates")
+		xlog.Info.Println("no certificates")
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
@@ -201,7 +204,7 @@ func (reg *registry) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 	defer func() {
 		if err != nil {
-			verbose.Print(op, ": ", err, "\n")
+			xlog.Info.Print(op, ": ", err, "\n")
 		}
 	}()
 	switch op {
@@ -382,7 +385,7 @@ func (reg *registry) shutdown(ctx context.Context, wg *sync.WaitGroup) {
 	cctx, cancel := context.
 		WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
-	verbose.Print("shutdown ", reg.http.Addr, "...")
+	xlog.Info.Print("shutdown ", reg.http.Addr, "...")
 	reg.http.Shutdown(cctx)
 }
 
@@ -538,11 +541,11 @@ func (vpn *regVpn) checkin(w http.ResponseWriter, req *http.Request) error {
 			}
 			svc = netip.AddrPortFrom(rap.Addr(), svc.Port())
 		}
-		verbose.Printf("new service %s @ %v", cn, svc)
+		xlog.Info.Printf("new service %s @ %v", cn, svc)
 	} else if via, err = vpn.exchange.Next(); err != nil {
 		return err
 	} else {
-		verbose.Printf("new quest %s via %d", cn, IdIndex(via))
+		xlog.Info.Printf("new quest %s via %d", cn, IdIndex(via))
 	}
 
 	data, err := io.ReadAll(req.Body)
@@ -617,10 +620,10 @@ func (vpn *regVpn) checkin(w http.ResponseWriter, req *http.Request) error {
 	fmt.Fprintln(w, "prefix:", ConfigByName[vpn.name].Prefix)
 	if !svc.IsValid() {
 		fmt.Fprintln(w, "via:", via)
-		verbose.Printf("%s assigned %d @ %v via %v\n",
+		xlog.Info.Printf("%s assigned %d @ %v via %v\n",
 			cn, id, addr, via)
 	} else {
-		verbose.Printf("%s assigned %d @ %v\n", cn, id, addr)
+		xlog.Info.Printf("%s assigned %d @ %v\n", cn, id, addr)
 	}
 	return nil
 }

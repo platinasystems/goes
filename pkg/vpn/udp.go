@@ -1,4 +1,4 @@
-// Copyright © 2023-2024 Platina Systems, Inc. All rights reserved.
+// Copyright © 2023-2025 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/platinasystems/goes/v2/pkg/box"
+	"github.com/platinasystems/goes/v2/pkg/xlog"
 )
 
 const (
@@ -29,25 +30,25 @@ func pktRxRoutine(
 	defer wg.Done()
 	defer close(ch)
 	la := udp.LocalAddr()
-	goRoutineTrace.Printf("start %v rx routine", la)
-	defer goRoutineTrace.Printf("stopped %v rx routine", la)
+	xlog.Info.Printf("start %v rx routine", la)
+	defer xlog.Info.Printf("stopped %v rx routine", la)
 	udp.SetReadDeadline(time.Time{})
 	for dur := minPktRxDeadline; ctx.Err() == nil; {
 		err := udp.SetReadDeadline(time.Now().Add(dur))
 		if err != nil {
-			verbose.Print(err)
+			xlog.Errata.Print(err)
 			break
 		} else if bx, err := box.NewRx(udp); err == nil {
-			pktTrace.Printf("rx %d bytes from %v",
+			xlog.Trace.Printf("rx %d bytes from %v",
 				bx.Len(), bx.AddrPort)
 			ch <- bx
 		} else if operr, ok := err.(*net.OpError); ok {
 			if !operr.Timeout() {
-				verbose.Print(err)
+				xlog.Errata.Print(err)
 				break
 			}
 		} else if !errors.Is(err, os.ErrDeadlineExceeded) {
-			verbose.Print(err)
+			xlog.Errata.Print(err)
 			break
 		} else if dur < maxPktRxDeadline {
 			if dur *= 2; dur > maxPktRxDeadline {
@@ -65,24 +66,24 @@ func pktTxRoutine(
 ) {
 	defer wg.Done()
 	la := udp.LocalAddr()
-	goRoutineTrace.Printf("start %v tx routine", la)
-	defer goRoutineTrace.Printf("stopped %v tx routine", la)
+	xlog.Info.Printf("start %v tx routine", la)
+	defer xlog.Info.Printf("stopped %v tx routine", la)
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case bx, ok := <-ch:
 			if !ok {
-				goRoutineTrace.Println("pkt tx ch closed")
+				xlog.Info.Println("pkt tx ch closed")
 				return
 			}
 			if tap := bx.AddrPort; !tap.IsValid() {
-				errata.Println("no DAP")
+				xlog.Errata.Println("no DAP")
 			} else if n, err := bx.Tx(udp); err != nil {
-				verbose.Printf("tx from %v to %v: %v",
+				xlog.Info.Printf("tx from %v to %v: %v",
 					la, tap, err)
 			} else {
-				pktTrace.Printf("tx %d bytes from %v to %v",
+				xlog.Trace.Printf("tx %d bytes from %v to %v",
 					n, la, tap)
 			}
 			bx.Return()
