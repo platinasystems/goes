@@ -79,25 +79,30 @@ func (nif *NetIf) Format(w fmt.State, verb rune) {
 	buf := new(bytes.Buffer)
 	t, _ := fmt.Fprintf(w, "%s[%d]:", nif.Name, nif.Index)
 	wrap := func() {
-		if t+buf.Len() > 80 {
+		if t+1+buf.Len() > 80 {
 			fmt.Fprint(w, "\n\t")
 			t = 8
-		} else {
+		} else if t > 8 {
 			fmt.Fprint(w, " ")
 			t += 1
 		}
 		n, _ := w.Write(buf.Bytes())
+		buf.Reset()
 		t += n
 	}
 	bprintf := func(format string, args ...any) {
-		buf.Reset()
 		fmt.Fprintf(buf, format, args...)
 		wrap()
 	}
 	bprint := func(args ...any) {
-		buf.Reset()
 		fmt.Fprint(buf, args...)
 		wrap()
+	}
+	flush := func() {
+		if t > 8 {
+			fmt.Fprint(w, "\n\t")
+			t = 8
+		}
 	}
 	bprintf("flags=%04x<%s>", uint(nif.Flags), nif.Flags)
 	bprint("type ", xnet.IFTName(nif.Type))
@@ -114,6 +119,7 @@ func (nif *NetIf) Format(w fmt.State, verb rune) {
 		bprint(k, " ", nif.Extra[k])
 	}
 	for _, prefix := range nif.Prefixes {
+		flush()
 		if prefix.Addr().Is6() {
 			bprint("inet6 ", prefix)
 		} else {
