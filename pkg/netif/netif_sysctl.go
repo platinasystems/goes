@@ -131,17 +131,26 @@ func List(ctx context.Context) (nifs []*NetIf, err error) {
 			}
 			switch i {
 			case unix.RTAX_DST:
-				nif.Extra["dst"] = xnet.SAIP(body)
+				if a := xnet.SAIP(body); a.IsValid() {
+					nif.Extra["dst"] = a
+				}
 			case unix.RTAX_GATEWAY:
-				nif.Extra["gw"] = xnet.SAIP(body)
+				if a := xnet.SAIP(body); a.IsValid() {
+					nif.Extra["gw"] = a
+				}
 			case unix.RTAX_NETMASK:
-				ip := xnet.SAIP(body)
-				bits, _ = net.IPMask(ip.AsSlice()).Size()
+				if a := xnet.SAIP(body); a.IsValid() {
+					bits, _ = net.IPMask(a.AsSlice()).Size()
+				}
 			case unix.RTAX_IFA:
-				addr = xnet.SAIP(body)
+				if a := xnet.SAIP(body); a.IsValid() {
+					addr = a
+				}
 			case unix.RTAX_AUTHOR:
 			case unix.RTAX_BRD:
-				nif.Extra["brd"] = xnet.SAIP(body)
+				if a := xnet.SAIP(body); a.IsValid() {
+					nif.Extra["brd"] = a
+				}
 			}
 			body = body[xnet.SysctlAlign(sal):]
 		}

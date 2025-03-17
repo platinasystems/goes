@@ -87,14 +87,14 @@ func SAIP6(data []byte) (ip netip.Addr) {
 	return
 }
 
-func SAIP(data []byte) (ip netip.Addr) {
+func SAIP(data []byte) netip.Addr {
 	switch SAFamily(data) {
 	case AF_INET:
-		ip = SAIP4(data)
+		return SAIP4(data)
 	case AF_INET6:
-		ip = SAIP6(data)
+		return SAIP6(data)
 	}
-	return
+	return netip.Addr{}
 }
 
 func (dl *SADataLink) NAS(body []byte) (
