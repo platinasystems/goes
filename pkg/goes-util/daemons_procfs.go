@@ -7,6 +7,7 @@
 package goes_util
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -18,7 +19,7 @@ import (
 
 const daemonCriterion = "all matching process executables and /dev/null stdin"
 
-func Daemons() ([]*os.Process, error) {
+func Daemons(context.Context) ([]*os.Process, error) {
 	var pids []int
 
 	thisPid := os.Getpid()
@@ -57,6 +58,7 @@ func Daemons() ([]*os.Process, error) {
 			pids = append(pids, pid)
 		}
 	}
+	err = nil
 	sort.Reverse(sort.IntSlice(pids))
 	procs := make([]*os.Process, len(pids))
 	for i, pid := range pids {

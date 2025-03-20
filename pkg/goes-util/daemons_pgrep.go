@@ -7,9 +7,10 @@
 package goes_util
 
 import (
-	"errors"
+	"bufio"
+	"bytes"
+	"context"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -19,57 +20,44 @@ import (
 
 const daemonCriterion = "all processes whose parents are `goes log ...`"
 
-func Daemons() ([]*os.Process, error) {
-	var pids, parents []int
-
+func Daemons(ctx context.Context) (procs []*os.Process, err error) {
 	baseprog := filepath.Base(xprogram.Path())
 
-	cmd := exec.Command("pgrep", "-f", baseprog+" log")
-	stdout, err := cmd.StdoutPipe()
+	parents, err := pgrep(ctx, "-f", baseprog+" log")
 	if err != nil {
-		return nil, err
+		return
 	}
-	if err = cmd.Start(); err != nil {
-		return nil, err
-	}
-	for {
-		var pid int
-		if _, err = fmt.Fscan(stdout, &pid); err != nil {
-			if errors.Is(err, io.EOF) {
-				err = nil
-			}
-			break
-		}
-		parents = append(parents, pid)
-	}
-	if err = cmd.Wait(); err != nil {
-		return nil, err
+	if len(parents) == 0 {
+		return nil, nil
 	}
 	for _, parent := range parents {
-		cmd = exec.Command("pgrep", "-P", fmt.Sprint(parent))
-		if stdout, err = cmd.StdoutPipe(); err != nil {
-			return nil, err
-		}
-		if err = cmd.Start(); err != nil {
-			return nil, err
-		}
-		for {
-			var pid int
-			_, err = fmt.Fscan(stdout, &pid)
-			if err != nil && !errors.Is(err, io.EOF) {
-				return nil, err
-			}
-			pids = append(pids, pid)
-		}
-		if err = cmd.Wait(); err != nil {
-			return nil, err
-		}
-	}
-	procs := make([]*os.Process, len(pids))
-	for i, pid := range pids {
-		if procs[i], err = os.FindProcess(pid); err != nil {
+		var pids []int
+		pids, err = pgrep(ctx, "-P", fmt.Sprint(parent))
+		if err != nil {
 			break
 		}
+		for _, pid := range pids {
+			if proc, e := os.FindProcess(pid); e == nil {
+				procs = append(procs, proc)
+			}
+		}
 	}
-	return procs, err
+	return
+}
+
+func pgrep(ctx context.Context, args ...string) (pids []int, err error) {
+	output, err := exec.CommandContext(ctx, "pgrep", args...).Output()
+	if err != nil {
+		return
+	}
+	scanner := bufio.NewScanner(bytes.NewReader(output))
+	for scanner.Scan() {
+		var pid int
+		line := scanner.Text()
+		if _, err = fmt.Sscan(line, &pid); err != nil {
+			return
+		}
+		pids = append(pids, pid)
+	}
+	return
 }

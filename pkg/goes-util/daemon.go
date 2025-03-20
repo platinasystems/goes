@@ -8,6 +8,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"os"
 	"os/exec"
 
 	"github.com/platinasystems/goes/v2/pkg/goes"
@@ -26,12 +27,21 @@ Send alarm to `+daemonCriterion+".\n")
 	if err != nil {
 		return err
 	}
-	procs, err := Daemons()
-	if err == nil {
-		for _, proc := range procs {
-			if t := proc.Signal(xsignal.Alarm); err == nil {
-				err = t
-			}
+	return DoDaemons(ctx, func(proc *os.Process) error {
+		return proc.Signal(xsignal.Alarm)
+	})
+}
+
+func DoDaemons(ctx context.Context, f func(*os.Process) error) error {
+	procs, err := Daemons(ctx)
+	if err != nil {
+		return err
+	}
+	for _, proc := range procs {
+		if t := f(proc); t != nil && err == nil {
+			err = fmt.Errorf("%d: %w", proc.Pid, t)
+		} else {
+			fmt.Println(proc.Pid)
 		}
 	}
 	return err
@@ -46,14 +56,9 @@ List PIDs with this same executable and /dev/null stdin.
 	if err != nil {
 		return err
 	}
-	pids, err := Daemons()
-	if err != nil {
-		return err
-	}
-	for _, pid := range pids {
-		fmt.Println(pid)
-	}
-	return nil
+	return DoDaemons(ctx, func(proc *os.Process) error {
+		return nil
+	})
 }
 
 // If not a /ko-app, execute feature as a detached process with output piped to
@@ -103,13 +108,7 @@ Terminate `+daemonCriterion+".\n")
 	if err != nil {
 		return err
 	}
-	procs, err := Daemons()
-	if err == nil {
-		for _, proc := range procs {
-			if t := proc.Signal(xsignal.Terminate); err == nil {
-				err = t
-			}
-		}
-	}
-	return err
+	return DoDaemons(ctx, func(proc *os.Process) error {
+		return proc.Signal(xsignal.Terminate)
+	})
 }
