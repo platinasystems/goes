@@ -21,8 +21,20 @@ func (pdu TunPI) Format(w fmt.State, verb rune) {
 	}
 	if f, ok := TunPIprotos[h.Proto]; ok {
 		fmt.Fprint(w, Mark, f(d))
-	} else {
-		fmt.Fprintf(w, " proto %#x", h.Proto)
+		return
+	}
+	if len(d) == 0 {
+		fmt.Fprint(w, " no data")
+		return
+	}
+	v := d[0] >> 4
+	switch {
+	case v == 4:
+		fmt.Fprint(w, Mark, IP(d))
+	case v == 6:
+		fmt.Fprint(w, Mark, IP6(d))
+	default:
+		fmt.Fprintf(w, " unknown proto(%#x)", h.Proto)
 	}
 }
 
