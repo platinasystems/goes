@@ -18,7 +18,7 @@ import (
 var (
 	ErrLog = log.New(os.Stderr, "", log.Lshortfile)
 	OutLog = log.New(os.Stdout, "", log.Lshortfile)
-	Errata = Mute(ErrLog)
+	Errata = Unmute(ErrLog)
 	Info   = Mute(OutLog)
 	Trace  = Mute(OutLog)
 )
