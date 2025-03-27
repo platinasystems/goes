@@ -10,7 +10,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"maps"
 	"net"
 	"net/netip"
 	"sync"
@@ -28,6 +27,10 @@ import (
 )
 
 const MTU = box.ContentMTU - netph.TunPISize
+
+type guest struct {
+	client
+}
 
 // Guest is a UDP server that forwards ciphered packets between an exchange
 // and a network tunnel interface.
@@ -96,7 +99,7 @@ Forward ciphered packets between exchange and tunnel interface.
 
 	ha := netif.NewHardwareAddr()
 	if err = ha.Rand(); err != nil {
-		return xerrors.Label(err, "rand_")
+		return xerrors.Label(err, "rand")
 	}
 
 	const (
@@ -117,11 +120,21 @@ Forward ciphered packets between exchange and tunnel interface.
 		return xerrors.NotFound(tun.Name())
 	}
 
-	mtu := fmt.Sprint(MTU)
-	err = nif.Add(cctx, g.hostPrefix, dst, "up", "mtu", mtu)
+	err = nif.Config(cctx, "up", "mtu", fmt.Sprint(MTU))
 	if err != nil {
-		return xerrors.Label(err, "ifconfig", nif.Name,
-			g.hostPrefix.String(), "mtu", mtu)
+		return xerrors.Label(err, nif.Name, "mtu", MTU)
+	}
+	xlog.Info.Println("OK", nif.Name, "up", "mtu", MTU)
+
+	addr := g.hostPrefix.Addr()
+	if addr.Is6() {
+		addr = addr.WithZone(nif.Name)
+	}
+	// FIXME probably still need dst w/ ipv4
+	_ = dst
+	err = nif.Add(cctx, addr, netip.Addr{}, g.hostPrefix.Bits())
+	if err != nil {
+		return err
 	}
 
 	err = routeAdd(cctx, g.vpnPrefix, nif)
@@ -131,12 +144,34 @@ Forward ciphered packets between exchange and tunnel interface.
 	}
 	defer routeDelete(cctx, g.vpnPrefix, nif)
 
+	var llu6 netip.Addr
+	var addrs []net.Addr
+
+	// FIXME nif.Addrs returns empty
+	if addrs, err = nif.Addrs(); err != nil {
+		xlog.Errata.Println(err)
+	} else if len(addrs) > 0 {
+		xlog.Info.Println(nif.Name, "addrs", addrs)
+	} else if itf, err := net.InterfaceByName(nif.Name); err != nil {
+		xlog.Errata.Println(err)
+	} else if addrs, err = itf.Addrs(); err != nil {
+		xlog.Errata.Println(err)
+	}
+	for _, addr := range addrs {
+		p, err := netip.ParsePrefix(addr.String())
+		if err == nil {
+			pa := p.Addr()
+			if pa.IsLinkLocalUnicast() {
+				llu6 = pa
+				break
+			}
+		}
+	}
+
 	pktRxCh := make(chan *box.Box, 4)
 	pktTxCh := make(chan *box.Box, 4)
 	tunReadCh := make(chan *box.Box, 4)
 	tunWriteCh := make(chan *box.Box, 4)
-
-	maps.Copy(netpdu.TunPIprotos, TunPIprotos)
 
 	wg.Add(1)
 	go xlog.AlarmHandler(cctx, &wg)
@@ -161,9 +196,6 @@ Forward ciphered packets between exchange and tunnel interface.
 	xlog.Info.Printf("start (%s, %v)", nif.Name, g.hostPrefix)
 	defer xlog.Info.Printf("stopped (%s, %v)", nif.Name, g.hostPrefix)
 
-	var tunpi netph.TunPI
-	var tund []byte
-
 guestLoop:
 	for {
 		select {
@@ -180,13 +212,25 @@ guestLoop:
 				xlog.Info.Println("tun read ch closed")
 				break guestLoop
 			}
-			if ato := g.toWhom(bx.Contents); !ato.IsValid() {
+			if ato, err := g.toWhom(bx.Contents); err != nil {
+				xlog.Errata.Println(err)
+				bx.Return()
+			} else if !ato.IsValid() {
 				xlog.Info.Println("dropped non-ip[6]")
 				bx.Return()
+			} else if ato.Compare(g.addr) == 0 {
+				xlog.Info.Println("loopback", ato)
+				tunWriteCh <- bx
+			} else if llu6.IsValid() && ato.Compare(llu6) == 0 {
+				xlog.Info.Println("link-local loopback", ato)
+				tunWriteCh <- bx
 			} else if ato.IsMulticast() {
-				g.multicast(pktTxCh, bx)
-			} else {
+				g.multicast(pktTxCh, bx, ato)
+			} else if g.vpnPrefix.Contains(ato) {
 				g.unicast(pktTxCh, bx, ato)
+			} else {
+				xlog.Info.Println(ato, "out of", g.vpnPrefix)
+				bx.Return()
 			}
 		case bx, ok := <-pktRxCh:
 			if !ok {
@@ -214,7 +258,7 @@ guestLoop:
 				bx.Return()
 				continue guestLoop
 			}
-			afrom := bx.AddrPort
+			// afrom := bx.AddrPort
 			from := bx.FromWhom()
 			ifrom, vfrom := IdIndex(from), IdVersion(from)
 			ver, ok := g.ver[ifrom]
@@ -249,32 +293,39 @@ guestLoop:
 				bx.Return()
 				continue guestLoop
 			}
-			tunpi, tund, err = netpdu.TunPI(bx.Contents).Parse()
+			pdu := VpnPDU(bx.Contents)
+			xlog.Info.Print(pdu)
+			h, d, err := pdu.Parse()
 			if err != nil {
-				xlog.Info.Println(err)
+				xlog.Errata.Println(err)
 				bx.Return()
 				continue guestLoop
 			}
-			switch tunpi.Proto {
+			switch h.Proto {
 			case VPN_P_HELLO:
-				xlog.Info.Printf("rx %d@%v hello %v",
-					ifrom, afrom, VpnHelloPDU(tund))
-				bx.Return()
 				// FIXME re-checkin if registry era mismatch
 				// else re-query exchange from registry
 				// if that era is mismatched
+				bx.Return()
 			case VPN_P_PUBLIC_KEY:
-				blk, _ := pem.Decode(tund)
+				blk, _ := pem.Decode(d)
 				if blk == nil {
 					xlog.Info.Println("encoding")
 				} else if err = g.peer(blk); err != nil {
 					xlog.Info.Println(err)
 				}
 				bx.Return()
-			case netph.ETH_P_IP, netph.ETH_P_IPV6:
+			case VPN_P_IP:
+				xnet.Overwrite(bx.Contents, netph.TunPI{
+					Proto: netph.TUN_P_IP,
+				})
+				tunWriteCh <- bx
+			case VPN_P_IP6:
+				xnet.Overwrite(bx.Contents, netph.TunPI{
+					Proto: netph.TUN_P_IP6,
+				})
 				tunWriteCh <- bx
 			default:
-				xlog.Info.Printf("proto[%#x]", tunpi.Proto)
 				bx.Return()
 			}
 		}
@@ -282,11 +333,9 @@ guestLoop:
 	return err
 }
 
-type guest struct {
-	client
-}
-
-func (g *guest) multicast(ch chan<- *box.Box, bx *box.Box) {
+func (g *guest) multicast(ch chan<- *box.Box, bx *box.Box, addr netip.Addr) {
+	setVpnProto(bx, addr.Is6())
+	xlog.Info.Println("multicast", VpnPDU(bx.Contents))
 	iguest := IdIndex(g.id)
 	via := g.via[iguest]
 	ivia := IdIndex(via)
@@ -301,6 +350,8 @@ func (g *guest) multicast(ch chan<- *box.Box, bx *box.Box) {
 }
 
 func (g *guest) unicast(ch chan<- *box.Box, bx *box.Box, addr netip.Addr) {
+	setVpnProto(bx, addr.Is6())
+	xlog.Info.Println("unicast", VpnPDU(bx.Contents))
 	bx.From(g.id)
 	to, ok := g.addressed[addr]
 	if !ok {
@@ -346,16 +397,30 @@ func (g *guest) unicast(ch chan<- *box.Box, bx *box.Box, addr netip.Addr) {
 	bx.NonBlockingPut(ch)
 }
 
-func (*guest) toWhom(pdu netpdu.TunPI) (addr netip.Addr) {
-	pi, d, err := pdu.Parse()
-	switch {
-	case err != nil:
-	case pi.Proto == netph.ETH_P_IP:
-		if ip, _, err := netpdu.IP(d).Parse(); err == nil {
+func setVpnProto(bx *box.Box, is6 bool) {
+	ethp := uint16(VPN_P_IP)
+	if is6 {
+		ethp = VPN_P_IP6
+	}
+	xnet.Overwrite(bx.Contents, netph.TunPI{
+		Proto: ethp,
+	})
+}
+
+func (*guest) toWhom(pdu netpdu.TunPI) (addr netip.Addr, err error) {
+	h, d, err := pdu.Parse()
+	if err != nil {
+		return
+	}
+	switch h.Proto {
+	case netph.TUN_P_IP:
+		var ip netph.IP
+		if ip, _, err = netpdu.IP(d).Parse(); err == nil {
 			addr.UnmarshalBinary(ip.DA[:])
 		}
-	case pi.Proto == netph.ETH_P_IPV6:
-		if ip6, _, err := netpdu.IP6(d).Parse(); err == nil {
+	case netph.TUN_P_IP6:
+		var ip6 netph.IP6
+		if ip6, _, err = netpdu.IP6(d).Parse(); err == nil {
 			addr.UnmarshalBinary(ip6.DA[:])
 		}
 	}
@@ -436,6 +501,7 @@ func tunReadRoutine(
 ) {
 	defer wg.Done()
 	defer xlog.Info.Println("stopped", name, "read routine")
+	defer close(ch)
 	xlog.Info.Println("start", name, "read routine")
 	for ctx.Err() == nil {
 		bx, err := box.NewReadContents(r)

@@ -52,7 +52,7 @@ var ConfigSIOC = map[string]uintptr{
 	"mtu": unix.SIOCSIFMTU,
 }
 
-func (nif *NetIf) Config(ctx context.Context, args []string) error {
+func (nif *NetIf) Config(ctx context.Context, args ...string) error {
 	inet, err := xnet.OpenInet()
 	if err != nil {
 		return xerrors.Mark(err)

@@ -178,7 +178,8 @@ func Ifconfig(ctx context.Context, complete bool, args []string) error {
 	case pat != nil:
 		for _, nif := range netif.Interfaces() {
 			if pat.MatchString(nif.Name) {
-				if err = nif.Config(ctx, args[1:]); err != nil {
+				err = nif.Config(ctx, args[1:]...)
+				if err != nil {
 					return err
 				}
 			}
@@ -206,58 +207,89 @@ func Ifconfig(ctx context.Context, complete bool, args []string) error {
 	}
 	if slices.Index(inets, args[0]) >= 0 ||
 		unicode.IsNumber([]rune(args[0])[0]) {
-		return ifconfigAddr(ctx, nif, args)
+		args, err = ifconfigAddr(ctx, nif, args)
+		if err != nil {
+			return err
+		}
 	}
-	return nif.Config(ctx, args)
+	return nif.Config(ctx, args...)
 }
 
-func ifconfigAddr(ctx context.Context, nif *netif.NetIf, args []string) error {
+func ifconfigAddr(ctx context.Context, nif *netif.NetIf, args []string) (
+	[]string, error,
+) {
 	var (
 		prefix netip.Prefix
-		dest   netip.Addr
-		err    error
+		addr,
+		dest netip.Addr
+		bits  int
+		parms []string
+		err   error
 	)
 	if slices.Index(inets, args[0]) >= 0 {
 		args = args[1:]
 	}
-	if (nif.Flags & net.FlagPointToPoint) != 0 {
-		if len(args) == 0 {
-			return xerrors.Incomplete("address")
-		}
-		if addr, err := netip.ParseAddr(args[0]); err != nil {
-			return xerrors.Label(err, "address", args[0])
-		} else if addr.Is4() {
-			prefix = netip.PrefixFrom(addr, 32)
-		} else if addr.Is6() {
-			prefix = netip.PrefixFrom(addr, 128)
-		} else {
-			return xerrors.Invalid("address", args[0])
-		}
-		if args = args[1:]; len(args) == 0 {
-			return xerrors.Incomplete("destination")
-		}
-		if dest, err = netip.ParseAddr(args[0]); err != nil {
-			return xerrors.Label(err, "destination", args[0])
-		}
-		args = args[1:]
-	} else if len(args) == 0 {
-		return xerrors.Incomplete("prefix")
-	} else if prefix, err = netip.ParsePrefix(args[0]); err != nil {
-		return xerrors.Label(err, "prefix", args[0])
-	} else {
-		args = args[1:]
+	if len(args) == 0 {
+		return args, xerrors.Incomplete("address")
 	}
-	if len(args) > 0 {
+	slash := strings.IndexRune(args[0], '/')
+	percent := strings.IndexRune(args[0], '%')
+	switch {
+	case 0 < slash && slash < percent:
+		prefix, err = netip.ParsePrefix(args[0][:percent])
+		if err != nil {
+			return args, err
+		}
+		addr = prefix.Addr().WithZone(args[0][percent+1:])
+		bits = prefix.Bits()
+	case 0 < percent && percent < slash:
+		addr, err = netip.ParseAddr(args[0][:slash])
+		if err != nil {
+			return args, err
+		}
+		_, err = fmt.Sscan(args[0][slash+1:], &bits)
+		if err != nil {
+			return args, err
+		}
+	case slash < 0:
+		addr, err = netip.ParseAddr(args[0][:slash])
+		if err != nil {
+			return args, err
+		}
+		if addr.Is4() {
+			bits = 32
+		} else if addr.Is6() {
+			bits = 128
+		} else {
+			return args, xerrors.Invalid("address", args[0])
+		}
+	}
+	if args = args[1:]; len(args) > 0 {
+		if (nif.Flags & net.FlagPointToPoint) != 0 {
+			dest, err = netip.ParseAddr(args[0])
+			if err == nil {
+				args = args[1:]
+			}
+		}
+	}
+	for len(args) > 0 {
 		switch args[0] {
 		case "add", "alias":
-			return nif.Add(ctx, prefix, dest, args[1:]...)
+			return args[1:],
+				nif.Add(ctx, addr, dest, bits, parms...)
 		case "del", "delete", "-alias":
-			return nif.Del(ctx, prefix, dest, args[1:]...)
+			return args[1:],
+				nif.Del(ctx, addr, dest, bits, parms...)
 		case "change":
-			return nif.Change(ctx, prefix, dest, args[1:]...)
+			return args[1:],
+				nif.Change(ctx, addr, dest, bits, parms...)
 		case "replace":
-			return nif.Replace(ctx, prefix, dest, args[1:]...)
+			return args[1:],
+				nif.Replace(ctx, addr, dest, bits, parms...)
+		default:
+			parms = append(parms, args[0])
+			args = args[1:]
 		}
 	}
-	return nif.Add(ctx, prefix, dest, args...)
+	return args, nif.Add(ctx, addr, dest, bits, parms...)
 }

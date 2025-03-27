@@ -21,74 +21,74 @@ const AddressCommands = `
   add	Add (default) network address to network interface.
   del	Remove network address to network interface.
   change
-  	Change <prefix> parameters.
+	Change address parameters.
   replace
-	If necessary, create or just change <prefix> parameters.
+	If necessary, create or just change address parameters.
 `
 
 const AddressParameters = ""
 
 func (nif *NetIf) Add(
 	ctx context.Context,
-	prefix netip.Prefix,
-	dest netip.Addr,
+	addr, dest netip.Addr,
+	bits int,
 	args ...string,
 ) (err error) {
 	const (
 		cmd   = rtnetlink.RTM_NEWADDR
 		flags = netlink.NLM_F_CREATE | netlink.NLM_F_EXCL
 	)
-	args, err = nif.addr(ctx, cmd, flags, prefix, dest, args)
+	args, err = nif.addr(ctx, cmd, flags, addr, dest, bits, args)
 	if err == nil && len(args) > 0 {
-		err = nif.Config(ctx, args)
+		err = nif.Config(ctx, args...)
 	}
 	return
 }
 
 func (nif *NetIf) Change(
 	ctx context.Context,
-	prefix netip.Prefix,
-	dest netip.Addr,
+	addr, dest netip.Addr,
+	bits int,
 	args ...string,
 ) (err error) {
 	const (
 		cmd   = rtnetlink.RTM_NEWADDR
 		flags = netlink.NLM_F_REPLACE
 	)
-	args, err = nif.addr(ctx, cmd, flags, prefix, dest, args)
+	args, err = nif.addr(ctx, cmd, flags, addr, dest, bits, args)
 	if err == nil && len(args) > 0 {
-		err = nif.Config(ctx, args)
+		err = nif.Config(ctx, args...)
 	}
 	return
 }
 
 func (nif *NetIf) Del(
 	ctx context.Context,
-	prefix netip.Prefix,
-	dest netip.Addr,
+	addr, dest netip.Addr,
+	bits int,
 	args ...string,
 ) error {
 	const (
 		cmd   = rtnetlink.RTM_DELADDR
 		flags = 0
 	)
-	_, err := nif.addr(ctx, cmd, flags, prefix, dest, args)
+	_, err := nif.addr(ctx, cmd, flags, addr, dest, bits, args)
 	return err
 }
 
 func (nif *NetIf) Replace(
 	ctx context.Context,
-	prefix netip.Prefix,
-	dest netip.Addr,
+	addr, dest netip.Addr,
+	bits int,
 	args ...string,
 ) (err error) {
 	const (
 		cmd   = rtnetlink.RTM_NEWADDR
 		flags = netlink.NLM_F_CREATE | netlink.NLM_F_REPLACE
 	)
-	args, err = nif.addr(ctx, cmd, flags, prefix, dest, args)
+	args, err = nif.addr(ctx, cmd, flags, addr, dest, bits, args)
 	if err == nil && len(args) > 0 {
-		err = nif.Config(ctx, args)
+		err = nif.Config(ctx, args...)
 	}
 	return
 }
@@ -96,8 +96,8 @@ func (nif *NetIf) Replace(
 func (nif *NetIf) addr(
 	ctx context.Context,
 	cmd, flags uint16,
-	prefix netip.Prefix,
-	dest netip.Addr,
+	addr, dest netip.Addr,
+	bits int,
 	args []string,
 ) ([]string, error) {
 	nl, err := netlink.Open()
@@ -105,8 +105,6 @@ func (nif *NetIf) addr(
 		return args, err
 	}
 	defer nl.Close()
-
-	addr, bits := prefix.Addr(), prefix.Bits()
 
 	hdr, req := netlink.ExpandMsgHdr(nil)
 	hdr.Type = cmd

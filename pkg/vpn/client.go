@@ -121,8 +121,9 @@ func (cl *client) register(
 		cl.hostPrefix = netip.PrefixFrom(cl.addr, 128)
 	}
 
-	xlog.Info.Printf("assigned id %d @ %v, via %v, vpn %v",
-		cl.id, cl.hostPrefix, via, cl.vpnPrefix)
+	xlog.Info.Printf("assigned id %d, ver %d, at %v, via %v, vpn %v",
+		IdIndex(cl.id), IdVersion(cl.id), cl.hostPrefix,
+		via, cl.vpnPrefix)
 
 	return nil
 }

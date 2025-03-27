@@ -90,7 +90,7 @@ var ConfigAttr = map[string]uint{
 	"state":        iflink.IFLA_OPERSTATE,
 }
 
-func (nif *NetIf) Config(ctx context.Context, args []string) error {
+func (nif *NetIf) Config(ctx context.Context, args ...string) error {
 	nl, err := netlink.Open()
 	if err != nil {
 		return err

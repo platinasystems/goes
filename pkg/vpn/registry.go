@@ -455,9 +455,9 @@ func (reg *registry) reload() error {
 			if err == nil {
 				vpn.subscribers = append(vpn.subscribers,
 					subs...)
-				for _, c := range subs {
-					cn := c.Subject.CommonName
-					vpn.subscriberNamed[cn] = c
+				for _, sub := range subs {
+					cn := sub.Subject.CommonName
+					vpn.subscriberNamed[cn] = sub
 				}
 			} else if !os.IsNotExist(err) {
 				return err
@@ -810,16 +810,18 @@ func (vpn *regVpn) showSubscriber(w http.ResponseWriter, qv url.Values) error {
 		return nil
 	}
 
-	name := qv.Get("arg0")
+	arg0 := qv.Get("arg0")
+
+	sub, ok := vpn.subscriberNamed[arg0]
+	if !ok {
+		return xerrors.NotFound(arg0)
+	}
+
 	t, err := CertificatesTemplate()
 	if err != nil {
 		return err
 	}
 
-	sub, ok := vpn.subscriberNamed[name]
-	if !ok {
-		return xerrors.NotFound(name)
-	}
 	return t.Execute(w, []*x509.Certificate{sub})
 }
 

@@ -24,6 +24,11 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xnet/netph"
 )
 
+type exchangeWhoisResponse struct {
+	blk *pem.Block
+	err error
+}
+
 // Exchange is a UDP server that forwards ciphered packets between guest's.
 func Exchange(ctx context.Context, args []string) error {
 	const defport = 8003
@@ -57,7 +62,7 @@ Exchange ciphered packets between guests.
 	ex.pktRxCh = make(chan *box.Box, 4)
 	ex.pktTxCh = make(chan *box.Box, 4)
 
-	ex.whoisResponseCh = make(chan *pem.Block)
+	ex.whoisResponseCh = make(chan exchangeWhoisResponse)
 
 	if ex.lladdr, err = randLinkLocalAddr(); err != nil {
 		return err
@@ -187,17 +192,19 @@ pktRxLoop:
 				bx.Return()
 			} else {
 				xlog.Info.Printf("%d@%v reseal and send to "+
-					"%d @ %v", ifrom, afrom, ito, ato)
+					"%d@%v", ifrom, afrom, ito, ato)
 				bx.AddrPort = ato
 				bx.SealWith(cto)
 				bx.NonBlockingPut(ex.pktTxCh)
 			}
-		case blk, ok := <-ex.whoisResponseCh:
+		case rsp, ok := <-ex.whoisResponseCh:
 			if !ok {
 				xlog.Info.Println("closed whois response ch")
 				break pktRxLoop
 			}
-			if err = ex.whoisResponse(blk); err != nil {
+			if rsp.err != nil {
+				xlog.Errata.Print(rsp.err)
+			} else if err = ex.whoisResponse(rsp.blk); err != nil {
 				xlog.Info.Println(err)
 			}
 		}
@@ -214,7 +221,7 @@ type exchange struct {
 		addressed  map[netip.Addr]*pem.Block
 		identified map[int]*pem.Block
 	}
-	whoisResponseCh chan *pem.Block
+	whoisResponseCh chan exchangeWhoisResponse
 	all6nodes,
 	all6routers netip.Addr
 }
@@ -230,22 +237,23 @@ func (ex *exchange) rx(
 	afrom := bx.AddrPort
 	from := bx.FromWhom()
 	ifrom := IdIndex(from)
-	pi, d, err := netpdu.TunPI(bx.Contents).Parse()
+	pdu := VpnPDU(bx.Contents)
+	h, d, err := pdu.Parse()
 	if err != nil {
-		xlog.Info.Println("rx %d@%v pi %v", ifrom, afrom, err)
+		xlog.Errata.Print(err)
 		return
 	}
-	switch pi.Proto {
+	xlog.Info.Printf("rx %d@%v %v", ifrom, afrom, pdu)
+	switch h.Proto {
 	case VPN_P_HELLO:
-		xlog.Info.Printf("rx %d@%v hello %v", ifrom, afrom,
-			VpnHelloPDU(d))
 		ex.txHelloAck(from)
 	case VPN_P_WHOIS_ADDRESSED:
 		if addr := VpnWhoisAddress(d); !addr.IsValid() {
-			xlog.Info.Printf("rx %d@%v whois underrun", ifrom, afrom)
+			xlog.Errata.Printf("rx %d@%v whois underrun; %v",
+				ifrom, afrom, pdu)
 		} else if blk := ex.pem.addressed[addr]; blk == nil {
-			xlog.Info.Printf("rx %d@%v whois %v", ifrom, afrom,
-				addr)
+			xlog.Info.Printf("rx %d@%v whois %v",
+				ifrom, afrom, addr)
 			wg.Add(1)
 			go ex.whoisAddressedRoutine(ctx, wg, addr)
 		} else {
@@ -253,9 +261,11 @@ func (ex *exchange) rx(
 		}
 	case VPN_P_WHOIS_IDENTIFIED:
 		if id, err := VpnWhoisId(d); err != nil {
-			xlog.Info.Printf("rx %d@%v whois %v", ifrom, afrom, err)
+			xlog.Errata.Printf("rx %d@%v whois %v",
+				ifrom, afrom, err)
 		} else if blk := ex.pem.identified[IdIndex(id)]; blk == nil {
-			xlog.Info.Printf("rx %d@%v whois %d", ifrom, afrom, id)
+			xlog.Info.Printf("rx %d@%v whois %d",
+				ifrom, afrom, id)
 			wg.Add(1)
 			go ex.whoisIdRoutine(ctx, wg, id)
 		} else {
@@ -264,12 +274,12 @@ func (ex *exchange) rx(
 	case VPN_P_WHOIS_SERVICE:
 		xlog.Info.Printf("rx %d@%v whois %v", ifrom, afrom,
 			VpnWhoisService(d))
-	case netph.ETH_P_IP:
+	case VPN_P_IP:
 		xlog.Info.Printf("dropped %d@%v %v", ifrom, afrom, netpdu.IP(d))
-	case netph.ETH_P_IPV6:
+	case VPN_P_IP6:
 		ex.rxIP6(from, netpdu.IP6(d))
 	default:
-		xlog.Info.Printf("rx %d@%v unknown %#x", ifrom, afrom, pi.Proto)
+		xlog.Info.Printf("rx %d@%v unknown %#x", ifrom, afrom, h.Proto)
 	}
 }
 
@@ -590,10 +600,9 @@ func (ex *exchange) whoisAddressedRoutine(
 	defer wg.Done()
 	blk, err := ex.whoisAddressed(ctx, addr)
 	if err != nil {
-		xlog.Info.Printf("whois %v: %v", addr, err)
-	} else {
-		ex.whoisResponseCh <- blk
+		err = fmt.Errorf("%w (whois %v)", err, addr)
 	}
+	ex.whoisResponseCh <- exchangeWhoisResponse{blk, err}
 }
 
 func (ex *exchange) whoisIdRoutine(
@@ -602,10 +611,9 @@ func (ex *exchange) whoisIdRoutine(
 	defer wg.Done()
 	blk, err := ex.whoisIdentified(ctx, id)
 	if err != nil {
-		xlog.Info.Printf("whois %v: %v", IdIndex(id), err)
-	} else {
-		ex.whoisResponseCh <- blk
+		err = fmt.Errorf("%w (whois %d)", err, IdIndex(id))
 	}
+	ex.whoisResponseCh <- exchangeWhoisResponse{blk, err}
 }
 
 func (ex *exchange) whoisResponse(blk *pem.Block) error {

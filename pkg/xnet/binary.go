@@ -18,6 +18,11 @@ func Add(buf []byte, val any) ([]byte, error) {
 	return buf, err
 }
 
+// [binary.BigEndian] encode “val” to beginning of “buf”.
+func Overwrite(buf []byte, val any) (int, error) {
+	return binary.Encode(buf, binary.BigEndian, val)
+}
+
 // [binary.BigEndian] decode from beginning of “data” to “ptr” and,
 // if successful, return remainder.
 func Subtract(data []byte, ptr any) ([]byte, error) {
