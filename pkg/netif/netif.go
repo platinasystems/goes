@@ -10,12 +10,10 @@ import (
 	"fmt"
 	"net"
 	"net/netip"
-	"os/signal"
 	"sort"
-	"sync"
 
+	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xnet"
-	"github.com/platinasystems/goes/v2/pkg/xos"
 )
 
 type Parameter uint8
@@ -52,6 +50,8 @@ type NetIf struct {
 	}
 	Collisions uint64
 }
+
+type NetIfs []*NetIf
 
 func (nif *NetIf) Addrs() (addrs []net.Addr, err error) {
 	for _, prefix := range nif.Prefixes {
@@ -131,54 +131,60 @@ func (nif *NetIf) Format(w fmt.State, verb rune) {
 	}
 }
 
-func Indexed(i int) *NetIf {
-	return cache().byIndex[i]
-}
-
-func Interfaces() []*NetIf {
-	return cache().list
-}
-
-func Name(i int) string {
-	if nif := Indexed(i); nif != nil {
-		return nif.Name
+func Name(ctx context.Context, i int) (s string, err error) {
+	nif, err := Indexed(ctx, i)
+	if err == nil {
+		s = nif.Name
 	}
-	return fmt.Sprintf("%d", i)
+	return
 }
 
-func Named(s string) *NetIf {
-	return cache().byName[s]
-}
-
-func Range(f func(*NetIf) bool) {
-	for _, nif := range Interfaces() {
-		if !f(nif) {
-			break
+// Call function `f` with each interface but stops if `f` returns falses
+func Range(ctx context.Context, f func(context.Context, *NetIf) bool) {
+	nifs, err := List(ctx)
+	if err == nil {
+		for _, nif := range nifs {
+			if !f(ctx, nif) {
+				break
+			}
 		}
 	}
 }
 
-var cache = sync.OnceValue(func() (nifs struct {
-	list    []*NetIf
-	byIndex map[int]*NetIf
-	byName  map[string]*NetIf
-}) {
-
-	var err error
-
-	ctx := context.Background()
-
-	ctx, stop := signal.NotifyContext(ctx, xos.Termination...)
-	defer stop()
-
-	if nifs.list, err = List(ctx); err != nil {
-		panic(err)
+func (nifs NetIfs) Indexed(i int) (*NetIf, error) {
+	for _, nif := range nifs {
+		if nif.Index == i {
+			return nif, nil
+		}
 	}
-	nifs.byIndex = make(map[int]*NetIf)
-	nifs.byName = make(map[string]*NetIf)
-	for _, nif := range nifs.list {
-		nifs.byIndex[nif.Index] = nif
-		nifs.byName[nif.Name] = nif
+	return nil, xerrors.NotFound(i)
+}
+
+func (nifs NetIfs) Named(s string) (*NetIf, error) {
+	for _, nif := range nifs {
+		if nif.Name == s {
+			return nif, nil
+		}
 	}
-	return nifs
-})
+	return nil, xerrors.NotFound(s)
+}
+
+// FIXME implement ioctl/sysctl and netlink versions of these nif fetches.
+
+// Returns indexed interface which may be nil.
+func Indexed(ctx context.Context, i int) (*NetIf, error) {
+	nifs, err := List(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return nifs.Indexed(i)
+}
+
+// Returns named interface which may be nil.
+func Named(ctx context.Context, s string) (*NetIf, error) {
+	nifs, err := List(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return nifs.Named(s)
+}

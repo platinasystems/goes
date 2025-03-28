@@ -102,7 +102,7 @@ func (opts *modOptions) mod(
 			}
 			return err
 		} else if op == "get" {
-			show(nrt)
+			show(ctx, nrt)
 		}
 	}
 	return nil
@@ -141,7 +141,7 @@ func sscanFibs(args []string) ([]int, error) {
 	return fibs, nil
 }
 
-func show(nrt netrt.NetRt) {
+func show(ctx context.Context, nrt netrt.NetRt) {
 	dstip := nrt.Dst()
 	gwip := nrt.GW()
 	line := nrt.Line()
@@ -158,7 +158,7 @@ func show(nrt netrt.NetRt) {
 	} else if ha := nrt.HA(); len(ha) > 0 {
 		s := strings.Replace(ha.String(), ":", ".", -1)
 		fmt.Print(s)
-	} else if nif := netif.Indexed(line); nif != nil {
+	} else if nif, err := netif.Indexed(ctx, line); err == nil {
 		fmt.Print(nif.Name)
 	} else {
 		fmt.Print("line#", line)

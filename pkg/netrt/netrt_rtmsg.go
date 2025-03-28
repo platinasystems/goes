@@ -7,6 +7,7 @@
 package netrt
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net"
@@ -173,7 +174,13 @@ func (nrt *netrt) Format(w fmt.State, verb rune) {
 			fmt.Fprintf(w, "%11s: %s\n", s, rtname(v))
 		}
 	}
-	fmt.Fprintf(w, "%11s: %s\n", "interface", netif.Name(nrt.Index()))
+	name, err := netif.Name(context.TODO(), nrt.Index())
+	fmt.Fprintf(w, "%11s: ", "interface")
+	if err != nil {
+		fmt.Fprintln(w, err)
+		return
+	}
+	fmt.Fprintln(w, name)
 	fmt.Fprintf(w, "%11s: <%s>\n", "flags", xnet.IFFNames(nrt.flags))
 	tw := tabwriter.NewWriter(w, 9, 0, 1, ' ', tabwriter.AlignRight)
 	defer tw.Flush()
@@ -217,10 +224,14 @@ func rtname(v any) string {
 		}
 		return t.String()
 	case *link:
-		if len(t.ha) == 0 {
-			return netif.Name(int(t.line))
+		name, err := netif.Name(context.TODO(), int(t.line))
+		if err != nil {
+			return err.Error()
+		} else if len(t.ha) == 0 {
+			return name
+		} else {
+			return fmt.Sprintf("%s[%v]", name, t.ha)
 		}
-		return fmt.Sprintf("%s[%v]", netif.Name(int(t.line)), t.ha)
 	default:
 		return fmt.Sprintf("%#v", v)
 	}

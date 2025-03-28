@@ -91,13 +91,19 @@ func Ifconfig(ctx context.Context, complete bool, args []string) error {
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
 		return err
-	} else if args = flag.Args(); complete {
+	}
+
+	nifs, err := netif.List(ctx)
+	if err != nil {
+		return err
+	}
+
+	if args = flag.Args(); complete {
 		if len(args) < 2 {
 			var s string
 			if len(args) == 1 {
 				s = args[0]
 			}
-			nifs := netif.Interfaces()
 			namecap := len(nifs) + len(netif.Cloneable)
 			names := make([]string, len(nifs), namecap)
 			for i, nif := range nifs {
@@ -132,7 +138,7 @@ func Ifconfig(ctx context.Context, complete bool, args []string) error {
 		return nil
 	case *lFlag:
 		var sep string
-		for _, nif := range netif.Interfaces() {
+		for _, nif := range nifs {
 			isup := (nif.Flags & net.FlagUp) == net.FlagUp
 			if (*dFlag && !isup) || (*uFlag && isup) ||
 				(!*dFlag && !*uFlag) {
@@ -148,7 +154,7 @@ func Ifconfig(ctx context.Context, complete bool, args []string) error {
 	case *aFlag || len(args) == 0:
 		switch {
 		case *dFlag:
-			for _, nif := range netif.Interfaces() {
+			for _, nif := range nifs {
 				if pat == nil || pat.MatchString(nif.Name) {
 					if nif.Flags&net.FlagUp == 0 {
 						fmt.Print(nif)
@@ -156,7 +162,7 @@ func Ifconfig(ctx context.Context, complete bool, args []string) error {
 				}
 			}
 		case *uFlag:
-			for _, nif := range netif.Interfaces() {
+			for _, nif := range nifs {
 				if pat == nil || pat.MatchString(nif.Name) {
 					if nif.Flags&net.FlagUp == net.FlagUp {
 						fmt.Print(nif)
@@ -164,19 +170,19 @@ func Ifconfig(ctx context.Context, complete bool, args []string) error {
 				}
 			}
 		case pat != nil:
-			for _, nif := range netif.Interfaces() {
+			for _, nif := range nifs {
 				if pat.MatchString(nif.Name) {
 					fmt.Print(nif)
 				}
 			}
 		default:
-			for _, nif := range netif.Interfaces() {
+			for _, nif := range nifs {
 				fmt.Print(nif)
 			}
 		}
 		return nil
 	case pat != nil:
-		for _, nif := range netif.Interfaces() {
+		for _, nif := range nifs {
 			if pat.MatchString(nif.Name) {
 				err = nif.Config(ctx, args[1:]...)
 				if err != nil {
@@ -185,17 +191,16 @@ func Ifconfig(ctx context.Context, complete bool, args []string) error {
 			}
 		}
 		return err
-	}
-	if len(args) > 1 && args[1] == "create" {
+	case len(args) > 1 && args[1] == "create":
 		nif, err := netif.Create(ctx, args[0], args[2:]...)
 		if err == nil {
 			fmt.Println(nif.Name)
 		}
 		return err
 	}
-	nif := netif.Named(args[0])
-	if nif == nil {
-		return xerrors.NotFound("ifname", args[0])
+	nif, err := nifs.Named(args[0])
+	if err != nil {
+		return err
 	}
 	args = args[1:]
 	if len(args) == 0 {
@@ -208,11 +213,11 @@ func Ifconfig(ctx context.Context, complete bool, args []string) error {
 	if slices.Index(inets, args[0]) >= 0 ||
 		unicode.IsNumber([]rune(args[0])[0]) {
 		args, err = ifconfigAddr(ctx, nif, args)
-		if err != nil {
-			return err
-		}
 	}
-	return nif.Config(ctx, args...)
+	if err == nil && len(args) > 0 {
+		err = nif.Config(ctx, args...)
+	}
+	return err
 }
 
 func ifconfigAddr(ctx context.Context, nif *netif.NetIf, args []string) (

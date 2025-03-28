@@ -36,7 +36,7 @@ func Sizeof[T Msgs](p *T) int {
 	return int(unsafe.Sizeof(*p))
 }
 
-func List(ctx context.Context) (nifs []*NetIf, err error) {
+func List(ctx context.Context) (nifs NetIfs, err error) {
 	rib, err := xnet.SysctlGet(
 		unix.CTL_NET,
 		xnet.AF_ROUTE,
@@ -46,7 +46,7 @@ func List(ctx context.Context) (nifs []*NetIf, err error) {
 		0,
 	)
 	if err != nil {
-		return nifs, err
+		return
 	}
 	nifByIndex := make(map[int]*NetIf)
 	for data := rib; len(data) > xnet.SysctlMsgMin; {
@@ -159,5 +159,5 @@ func List(ctx context.Context) (nifs []*NetIf, err error) {
 			nif.Prefixes = append(nif.Prefixes, prefix)
 		}
 	}
-	return nifs, nil
+	return
 }

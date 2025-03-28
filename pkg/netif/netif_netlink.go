@@ -19,7 +19,7 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xnet"
 )
 
-func List(ctx context.Context) ([]*NetIf, error) {
+func List(ctx context.Context) (NetIfs, error) {
 	nl, err := netlink.Open()
 	if err != nil {
 		return nil, err
@@ -36,8 +36,8 @@ func List(ctx context.Context) ([]*NetIf, error) {
 	return nifs, err
 }
 
-func ifinfos(ctx context.Context, nl *netlink.NL) ([]*NetIf, error) {
-	var nifs []*NetIf
+func ifinfos(ctx context.Context, nl *netlink.NL) (NetIfs, error) {
+	var nifs NetIfs
 	hdr, req := netlink.ExpandMsgHdr(nil)
 	hdr.Type = rtnetlink.RTM_GETLINK
 	hdr.Flags = netlink.NLM_F_REQUEST | netlink.NLM_F_DUMP

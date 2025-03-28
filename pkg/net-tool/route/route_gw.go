@@ -17,12 +17,7 @@ func (opts *gatewayOptions) lookup(ctx context.Context, arg string) (
 	any, error,
 ) {
 	if opts.iface != nil && *opts.iface {
-		nif := netif.Named(arg)
-		if nif == nil {
-			return nil, xerrors.
-				NotFound("gateway", "interface", arg)
-		}
-		return nif, nil
+		return netif.Named(ctx, arg)
 	}
 	if isNumericAddr(arg) {
 		ga, err := netip.ParseAddr(arg)

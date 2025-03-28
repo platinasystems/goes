@@ -115,8 +115,10 @@ Forward ciphered packets between exchange and tunnel interface.
 	}
 	defer tun.Close()
 
-	nif := netif.Named(tun.Name())
-	if nif == nil {
+	nif, err := netif.Named(ctx, tun.Name())
+	if err != nil {
+		return xerrors.Mark(err)
+	} else if nif == nil {
 		return xerrors.NotFound(tun.Name())
 	}
 

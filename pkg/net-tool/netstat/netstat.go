@@ -125,13 +125,16 @@ func netstati(ctx context.Context, opts *options) error {
 		fmt.Println()
 	}
 	if opts.I != nil && len(*opts.I) > 0 {
-		if nif := netif.Named(*opts.I); nif == nil {
-			return xerrors.NotFound(*opts.I)
+		nif, err := netif.Named(ctx, *opts.I)
+		if err != nil {
+			return err
 		} else {
 			show(nif)
 		}
+	} else if nifs, err := netif.List(ctx); err != nil {
+		return err
 	} else {
-		for _, nif := range netif.Interfaces() {
+		for _, nif := range nifs {
 			select {
 			case <-ctx.Done():
 				return nil
@@ -182,7 +185,8 @@ func netstatr(ctx context.Context, opts *options) error {
 		}
 		if dstip.Is6() && !gwip.IsValid() {
 			if line > 0 {
-				if nif := netif.Indexed(line); nif != nil {
+				nif, err := netif.Indexed(ctx, line)
+				if err == nil {
 					fmt.Fprint(dstbuf, "%", nif.Name)
 				} else {
 					fmt.Fprint(dstbuf, "%line#", line)
@@ -197,7 +201,7 @@ func netstatr(ctx context.Context, opts *options) error {
 		} else if ha := nrt.HA(); len(ha) > 0 {
 			s := ha.String()
 			gwbuf.WriteString(strings.Replace(s, ":", ".", -1))
-		} else if nif := netif.Indexed(line); nif != nil {
+		} else if nif, err := netif.Indexed(ctx, line); err == nil {
 			gwbuf.WriteString(nif.Name)
 		} else {
 			fmt.Fprint(gwbuf, "line#", line)
@@ -212,7 +216,7 @@ func netstatr(ctx context.Context, opts *options) error {
 		gws = append(gws, gwbuf.String())
 		flags = append(flags, flagbuf.String())
 		i := nrt.Index()
-		if nif := netif.Indexed(i); nif != nil {
+		if nif, err := netif.Indexed(ctx, i); err == nil {
 			ifnames = append(ifnames, nif.Name)
 		} else {
 			ifnames = append(ifnames, fmt.Sprint(i))
