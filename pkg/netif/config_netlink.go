@@ -93,7 +93,7 @@ var ConfigAttr = map[string]uint{
 func (nif *NetIf) Config(ctx context.Context, args ...string) error {
 	nl, err := netlink.Open()
 	if err != nil {
-		return err
+		return xerrors.Mark(err)
 	}
 	defer nl.Close()
 
@@ -196,33 +196,4 @@ func (nif *NetIf) Config(ctx context.Context, args ...string) error {
 		err = nl.Wait(ctx, req.SEQ)
 	}
 	return err
-}
-
-func (nif *NetIf) refresh(ctx context.Context, nl *netlink.NL) error {
-	hdr, req := netlink.ExpandMsgHdr(nil)
-	hdr.Type = rtnetlink.RTM_GETLINK
-	hdr.Flags = netlink.NLM_F_REQUEST | netlink.NLM_F_ACK
-	ifinfo, req := netlink.ExpandIfInfoMsg(req)
-	ifinfo.Family = xnet.AF_UNSPEC
-	ifinfo.Index = int32(nif.Index)
-	if err := nl.Request(req); err != nil {
-		return err
-	}
-	seq := hdr.SEQ
-	for {
-		rsp, data, err := nl.Next(ctx)
-		if err != nil {
-			return err
-		} else if rsp.SEQ != seq {
-			continue
-		} else if rsp.Type == netlink.NLMSG_DONE {
-			return nil
-		} else if rsp.Type == netlink.NLMSG_ERROR {
-			e, _ := netlink.ExtractMsgErr(data)
-			return e.Err()
-		} else if rsp.Type != rtnetlink.RTM_NEWLINK {
-			continue
-		}
-		return nif.ifinfo(data)
-	}
 }

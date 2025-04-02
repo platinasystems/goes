@@ -198,10 +198,15 @@ func Ifconfig(ctx context.Context, complete bool, args []string) error {
 		}
 		return err
 	}
-	nif, err := nifs.Named(args[0])
-	if err != nil {
+
+	nif := new(netif.NetIf)
+	if _, err = fmt.Sscan(args[0], &nif.Index); err != nil {
+		nif.Name = args[0]
+	}
+	if err = nif.Refresh(ctx); err != nil {
 		return err
 	}
+
 	args = args[1:]
 	if len(args) == 0 {
 		fmt.Print(nif)

@@ -1,4 +1,4 @@
-// Copyright © 2023-2024 Platina Systems, Inc. All rights reserved.
+// Copyright © 2023-2025 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -16,6 +16,7 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/netlink/ifaddr"
 	"github.com/platinasystems/goes/v2/pkg/netlink/iflink"
 	"github.com/platinasystems/goes/v2/pkg/netlink/rtnetlink"
+	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xnet"
 )
 
@@ -26,13 +27,14 @@ func List(ctx context.Context) (NetIfs, error) {
 	}
 	defer nl.Close()
 	nifs, err := ifinfos(ctx, nl)
-	indexed := make(map[int]*NetIf)
-	if err == nil {
-		for _, nif := range nifs {
-			indexed[nif.Index] = nif
-		}
-		err = ifaddrs(ctx, nl, indexed)
+	if err != nil {
+		return nifs, err
 	}
+	indexed := make(map[int]*NetIf)
+	for _, nif := range nifs {
+		indexed[nif.Index] = nif
+	}
+	err = ifaddrs(ctx, nl, indexed)
 	return nifs, err
 }
 
@@ -62,9 +64,9 @@ func ifinfos(ctx context.Context, nl *netlink.NL) (NetIfs, error) {
 			continue
 		}
 		nif := new(NetIf)
-		if err = nif.ifinfo(data); err != nil {
-			return nifs, err
-		}
+		m, data := netlink.ExtractIfInfoMsg(data)
+		integer.Assign(&nif.Index, m.Index)
+		nif.importIfInfo(m, data)
 		nifs = append(nifs, nif)
 	}
 	return nifs, nil
@@ -99,62 +101,101 @@ func ifaddrs(
 			continue
 		}
 		m, data := netlink.ExtractIfAddrMsg(data)
-		nif := indexed[int(m.Index)]
-		if nif == nil {
-			continue
-		}
-		var addr, local netip.Addr
-		for netlink.HasAttr(data) {
-			t, v, datá := netlink.ExtractAttr(data)
-			data = datá
-			switch ifaddr.Ifa(t) {
-			case ifaddr.IFA_UNSPEC:
-			case
-				ifaddr.IFA_ADDRESS,
-				ifaddr.IFA_LOCAL,
-				ifaddr.IFA_BROADCAST,
-				ifaddr.IFA_ANYCAST,
-				ifaddr.IFA_MULTICAST:
-				a, aok := netlink.IP(m.Family, v)
-				if !aok {
-					continue
-				}
-				switch ifaddr.Ifa(t) {
-				case ifaddr.IFA_ADDRESS:
-					addr = a
-				case ifaddr.IFA_LOCAL:
-					local = a
-				case ifaddr.IFA_BROADCAST:
-					nif.Extra["l3broadcast"] = a
-				case ifaddr.IFA_ANYCAST:
-					nif.Extra["anycast"] = a
-				case ifaddr.IFA_MULTICAST:
-					nif.Multicasts =
-						append(nif.Multicasts, a)
-				}
-			case ifaddr.IFA_LABEL:
-				nif.Extra["label"] = netlink.CloneString(v)
-			}
-		}
-		if addr.IsValid() {
-			if local.IsValid() && local.Compare(addr) != 0 {
-				nif.Extra["peer"] = addr
-				addr = local
-			}
-			prefix := netip.PrefixFrom(addr, int(m.PrefixLen))
-			nif.Prefixes = append(nif.Prefixes, prefix)
+		if nif := indexed[int(m.Index)]; nif != nil {
+			nif.importIfAddr(m, data)
 		}
 	}
 	return nil
 }
 
-func (nif *NetIf) ifinfo(data []byte) error {
-	var s64 *iflink.Stats[uint64]
-	m, data := netlink.ExtractIfInfoMsg(data)
-	if nif.Index != 0 && int(m.Index) != nif.Index {
-		return nil
+func (nif *NetIf) Refresh(ctx context.Context) error {
+	nl, err := netlink.Open()
+	if err != nil {
+		return err
 	}
-	integer.Assign(&nif.Index, m.Index)
+	defer nl.Close()
+	return nif.refresh(ctx, nl)
+}
+
+func (nif *NetIf) refresh(ctx context.Context, nl *netlink.NL) error {
+	// Set opt to GETADDR of ifindex.
+	err := nl.SetOpt(netlink.NETLINK_GET_STRICT_CHK, 1)
+	if err != nil {
+		return xerrors.Mark(err)
+	}
+	hdr, req := netlink.ExpandMsgHdr(nil)
+	hdr.Type = rtnetlink.RTM_GETLINK
+	hdr.Flags = netlink.NLM_F_REQUEST
+	ifinfo, req := netlink.ExpandIfInfoMsg(req)
+	if nif.Index != 0 {
+		integer.Assign(&ifinfo.Index, nif.Index)
+	} else {
+		req = netlink.CatStringAttr(req, iflink.IFLA_IFNAME, nif.Name)
+	}
+
+	if err := nl.Request(req); err != nil {
+		return xerrors.Mark(err)
+	}
+	seq := hdr.SEQ
+
+	for {
+		rsp, data, err := nl.Next(ctx)
+		if err != nil {
+			return xerrors.Mark(err)
+		} else if rsp.SEQ != seq {
+			continue
+		} else if rsp.Type == netlink.NLMSG_DONE {
+			break
+		} else if rsp.Type == netlink.NLMSG_ERROR {
+			e, _ := netlink.ExtractMsgErr(data)
+			return xerrors.Mark(e.Err())
+		} else if rsp.Type != rtnetlink.RTM_NEWLINK {
+			continue
+		}
+		nif.importIfInfo(netlink.ExtractIfInfoMsg(data))
+		break
+	}
+
+	nif.Prefixes = nif.Prefixes[:0]
+
+	hdr, req = netlink.ExpandMsgHdr(nil)
+	hdr.Type = rtnetlink.RTM_GETADDR
+	hdr.Flags = netlink.NLM_F_REQUEST | netlink.NLM_F_DUMP
+	ifa, req := netlink.ExpandIfAddrMsg(req)
+	integer.Assign(&ifa.Index, nif.Index)
+
+	if err := nl.Request(req); err != nil {
+		return xerrors.Mark(err)
+	}
+	seq = hdr.SEQ
+
+	for {
+		rsp, data, err := nl.Next(ctx)
+		if err != nil {
+			return xerrors.Mark(err)
+		} else if rsp.SEQ != seq {
+			continue
+		} else if rsp.Type == netlink.NLMSG_DONE {
+			return nil
+		} else if rsp.Type == netlink.NLMSG_ERROR {
+			e, _ := netlink.ExtractMsgErr(data)
+			return xerrors.Mark(e.Err())
+		} else if rsp.Type != rtnetlink.RTM_NEWADDR {
+			continue
+		}
+		m, data := netlink.ExtractIfAddrMsg(data)
+		if integer.Equal(m.Index, nif.Index) {
+			nif.importIfAddr(m, data)
+		}
+	}
+	return nil
+}
+
+func (nif *NetIf) importIfInfo(m *rtnetlink.IfInfoMsg, data []byte) {
+	var s64 *iflink.Stats[uint64]
+	if nif.Index == 0 {
+		integer.Assign(&nif.Index, m.Index)
+	}
 	integer.Assign(&nif.Type, m.Type)
 	if nif.Extra == nil {
 		nif.Extra = make(map[string]any)
@@ -295,5 +336,48 @@ func (nif *NetIf) ifinfo(data []byte) error {
 		case iflink.IFLA_EVENT:
 		}
 	}
-	return nil
+}
+
+func (nif *NetIf) importIfAddr(m *ifaddr.Msg, data []byte) {
+	var addr, local netip.Addr
+	for netlink.HasAttr(data) {
+		t, v, datá := netlink.ExtractAttr(data)
+		data = datá
+		switch ifaddr.Ifa(t) {
+		case ifaddr.IFA_UNSPEC:
+		case
+			ifaddr.IFA_ADDRESS,
+			ifaddr.IFA_LOCAL,
+			ifaddr.IFA_BROADCAST,
+			ifaddr.IFA_ANYCAST,
+			ifaddr.IFA_MULTICAST:
+			a, aok := netlink.IP(m.Family, v)
+			if !aok {
+				continue
+			}
+			switch ifaddr.Ifa(t) {
+			case ifaddr.IFA_ADDRESS:
+				addr = a
+			case ifaddr.IFA_LOCAL:
+				local = a
+			case ifaddr.IFA_BROADCAST:
+				nif.Extra["l3broadcast"] = a
+			case ifaddr.IFA_ANYCAST:
+				nif.Extra["anycast"] = a
+			case ifaddr.IFA_MULTICAST:
+				nif.Multicasts =
+					append(nif.Multicasts, a)
+			}
+		case ifaddr.IFA_LABEL:
+			nif.Extra["label"] = netlink.CloneString(v)
+		}
+	}
+	if addr.IsValid() {
+		if local.IsValid() && local.Compare(addr) != 0 {
+			nif.Extra["peer"] = addr
+			addr = local
+		}
+		prefix := netip.PrefixFrom(addr, int(m.PrefixLen))
+		nif.Prefixes = append(nif.Prefixes, prefix)
+	}
 }

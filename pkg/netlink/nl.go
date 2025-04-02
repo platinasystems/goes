@@ -205,6 +205,10 @@ func (nl *NL) Request(msg []byte) error {
 	return xnet.Sendto(nl.sock, msg, 0, nl.addr)
 }
 
+func (nl *NL) SetOpt(opt, val int) error {
+	return unix.SetsockoptInt(int(nl.sock), SOL_NETLINK, opt, val)
+}
+
 // Wait for DONE or ERROR response to the identified request.
 func (nl *NL) Wait(ctx context.Context, seq uint32) error {
 	for {

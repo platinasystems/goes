@@ -37,6 +37,46 @@ const (
 	StateParameter
 )
 
+func Indexed(ctx context.Context, i int) (*NetIf, error) {
+	nif := new(NetIf)
+	nif.Index = i
+	err := nif.Refresh(ctx)
+	if err != nil {
+		nif = nil
+	}
+	return nif, err
+}
+
+func Name(ctx context.Context, i int) (s string, err error) {
+	nif, err := Indexed(ctx, i)
+	if err == nil {
+		s = nif.Name
+	}
+	return
+}
+
+func Named(ctx context.Context, name string) (*NetIf, error) {
+	nif := new(NetIf)
+	nif.Name = name
+	err := nif.Refresh(ctx)
+	if err != nil {
+		nif = nil
+	}
+	return nif, err
+}
+
+// Call function `f` with each interface but stops if `f` returns falses
+func Range(ctx context.Context, f func(context.Context, *NetIf) bool) {
+	nifs, err := List(ctx)
+	if err == nil {
+		for _, nif := range nifs {
+			if !f(ctx, nif) {
+				break
+			}
+		}
+	}
+}
+
 type NetIf struct {
 	net.Interface
 	Type int
@@ -76,8 +116,8 @@ func (nif *NetIf) MulticastAddrs() (addrs []net.Addr, err error) {
 }
 
 func (nif *NetIf) Format(w fmt.State, verb rune) {
+	var t int
 	buf := new(bytes.Buffer)
-	t, _ := fmt.Fprintf(w, "%s[%d]:", nif.Name, nif.Index)
 	wrap := func() {
 		if t+1+buf.Len() > 80 {
 			fmt.Fprint(w, "\n\t")
@@ -104,7 +144,8 @@ func (nif *NetIf) Format(w fmt.State, verb rune) {
 			t = 8
 		}
 	}
-	bprintf("flags=%04x<%s>", uint(nif.Flags), nif.Flags)
+	bprintf("%s[%d]: flags=%04x<%s>", nif.Name, nif.Index,
+		uint(nif.Flags), nif.Flags)
 	bprint("type ", xnet.IFTName(nif.Type))
 	bprintf("mtu %d", nif.MTU)
 	if len(nif.HardwareAddr) == 6 && nif.HardwareAddr[0] != 0 {
@@ -131,26 +172,6 @@ func (nif *NetIf) Format(w fmt.State, verb rune) {
 	}
 }
 
-func Name(ctx context.Context, i int) (s string, err error) {
-	nif, err := Indexed(ctx, i)
-	if err == nil {
-		s = nif.Name
-	}
-	return
-}
-
-// Call function `f` with each interface but stops if `f` returns falses
-func Range(ctx context.Context, f func(context.Context, *NetIf) bool) {
-	nifs, err := List(ctx)
-	if err == nil {
-		for _, nif := range nifs {
-			if !f(ctx, nif) {
-				break
-			}
-		}
-	}
-}
-
 func (nifs NetIfs) Indexed(i int) (*NetIf, error) {
 	for _, nif := range nifs {
 		if nif.Index == i {
@@ -167,24 +188,4 @@ func (nifs NetIfs) Named(s string) (*NetIf, error) {
 		}
 	}
 	return nil, xerrors.NotFound(s)
-}
-
-// FIXME implement ioctl/sysctl and netlink versions of these nif fetches.
-
-// Returns indexed interface which may be nil.
-func Indexed(ctx context.Context, i int) (*NetIf, error) {
-	nifs, err := List(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return nifs.Indexed(i)
-}
-
-// Returns named interface which may be nil.
-func Named(ctx context.Context, s string) (*NetIf, error) {
-	nifs, err := List(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return nifs.Named(s)
 }
