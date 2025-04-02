@@ -8,7 +8,6 @@ package netrt
 
 import (
 	"context"
-	"errors"
 	"os"
 	"sync/atomic"
 
@@ -22,11 +21,11 @@ type appendAddrFunc func(context.Context, []byte) ([]byte, error)
 var seq atomic.Int32
 
 func Flush(ctx context.Context) error {
-	return FIXME
+	return xerrors.ErrFIXME
 }
 
 func Monitor(ctx context.Context) (Streamer, error) {
-	return nil, FIXME
+	return nil, xerrors.ErrFIXME
 }
 
 func NewRtMsg() []byte {
@@ -54,20 +53,7 @@ func Request(msg []byte, fib int) (NetRt, error) {
 		}
 	}
 	if _, err = xnet.Write(sock, msg); err != nil {
-		switch {
-		case errors.Is(err, unix.ESRCH):
-			return nil, ErrSRCH
-		case errors.Is(err, unix.EBUSY):
-			return nil, ErrBUSY
-		case errors.Is(err, unix.ENOBUFS):
-			return nil, ErrNOBUFS
-		case errors.Is(err, unix.EADDRINUSE):
-			return nil, ErrADDRINUSE
-		case errors.Is(err, unix.EEXIST):
-			return nil, ErrEXIST
-		default:
-			return nil, xerrors.Markf("%w\n%#v", err, rtm)
-		}
+		return nil, xerrors.Label(err, rtm)
 	} else if rtm.Type != unix.RTM_GET {
 		return nil, nil
 	}

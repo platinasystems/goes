@@ -39,7 +39,7 @@ func (nif *NetIf) Change(
 	bits int,
 	parms ...string,
 ) error {
-	return ErrUnsupported
+	return xerrors.ErrUnsupported
 }
 
 func (nif *NetIf) Del(
@@ -57,7 +57,7 @@ func (nif *NetIf) Replace(
 	bits int,
 	parms ...string,
 ) error {
-	return ErrUnsupported
+	return xerrors.ErrUnsupported
 }
 
 func (nif *NetIf) ifconfig(

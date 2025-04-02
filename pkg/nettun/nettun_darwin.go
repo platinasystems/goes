@@ -33,13 +33,13 @@ func New(
 	ha netif.HardwareAddr,
 ) (*os.File, error) {
 	if isTAP {
-		return nil, ErrCantTAP
+		return nil, xerrors.Unsupported("tap")
 	} else if persist {
-		return nil, ErrCantPersist
+		return nil, xerrors.Unsupported("persist")
 	} else if owner != Unset {
-		return nil, ErrCantChangeOwner
+		return nil, xerrors.Unsupported("change-owner")
 	} else if group != Unset {
-		return nil, ErrCantChangeGroup
+		return nil, xerrors.Unsupported("change-group")
 	}
 
 	fd, err := unix.Socket(PF_SYSTEM, unix.SOCK_DGRAM, SYSPROTO_CONTROL)

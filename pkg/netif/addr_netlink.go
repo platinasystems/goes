@@ -118,7 +118,7 @@ func (nif *NetIf) addr(
 	} else if addr.Is6() {
 		ifa.Family = xnet.AF_INET6
 	} else {
-		return args, xerrors.Label(ErrWrongFamily, addr.String())
+		return args, xerrors.Invalid(addr)
 	}
 
 	if dest.IsValid() {
@@ -126,14 +126,12 @@ func (nif *NetIf) addr(
 			if dest.Is4() {
 				ifa.PrefixLen = 32
 			} else {
-				return args, xerrors.Markf("%v %w",
-					dest, ErrWrongFamily)
+				return args, xerrors.Invalid(dest)
 			}
 		} else if dest.Is6() {
 			ifa.PrefixLen = 128
 		} else {
-			return args, xerrors.
-				Label(ErrWrongFamily, dest.String())
+			return args, xerrors.Invalid(dest)
 		}
 		req = netlink.
 			CatBytesAttr(req, ifaddr.IFA_ADDRESS, dest.AsSlice())

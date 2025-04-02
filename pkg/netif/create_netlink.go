@@ -8,7 +8,6 @@ package netif
 
 import (
 	"context"
-	"fmt"
 	"strings"
 
 	"github.com/platinasystems/goes/v2/pkg/netlink"
@@ -53,7 +52,7 @@ func Create(ctx context.Context, name string, args ...string) (*NetIf, error) {
 		}
 	}
 	if len(kind) == 0 {
-		return nil, fmt.Errorf("%q %w", name, ErrUnsupported)
+		return nil, xerrors.Unsupported(name)
 	}
 
 	before := make(map[int]*NetIf)

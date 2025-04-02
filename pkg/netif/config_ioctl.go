@@ -61,7 +61,7 @@ func (nif *NetIf) Config(ctx context.Context, args ...string) error {
 	for err == nil && len(args) > 0 {
 		switch ConfigParameter[args[0]] {
 		case UnknownParameter:
-			return xerrors.Markf("%q %w", args[0], ErrInvalid)
+			return xerrors.Invalid(args[0])
 		case TrueFlagParameter:
 			err = netioctl.Admin(nif.Name, ConfigIFF[args[0]], 0)
 			if err != nil {
@@ -82,8 +82,7 @@ func (nif *NetIf) Config(ctx context.Context, args ...string) error {
 			args = args[1:]
 		case Uint32Parameter:
 			if len(args) < 2 {
-				return xerrors.Markf("%q %w", args[0],
-					ErrIncomplete)
+				return xerrors.Incomplete(args[0])
 			}
 			req := netioctl.NewIfReqUint32(nif.Name)
 			_, err = fmt.Sscan(args[1], &req.Value)
@@ -94,7 +93,7 @@ func (nif *NetIf) Config(ctx context.Context, args ...string) error {
 			err = xerrors.Mark(netioctl.Inet(sioc, req))
 			args = args[2:]
 		default:
-			return xerrors.Markf("%q %w", args[0], ErrNotFound)
+			return xerrors.NotFound(args[0])
 		}
 	}
 	return err

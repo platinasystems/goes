@@ -9,7 +9,6 @@ package netlink
 import (
 	"context"
 	"errors"
-	"fmt"
 	"os"
 	"sync/atomic"
 
@@ -120,7 +119,7 @@ func (nl *NL) IfIndex(ctx context.Context, ifname string) (int32, error) {
 			return ifindex, nil
 		}
 	}
-	return -1, fmt.Errorf("%q %w", ifname, ErrNotFound)
+	return -1, xerrors.NotFound(ifname)
 }
 
 func IsDone(ctx context.Context) bool {

@@ -6,6 +6,8 @@
 
 package netrt
 
+import "github.com/platinasystems/goes/v2/pkg/xerrors"
+
 func SetFib[FD ~int](sock FD, fib int) error {
-	return ErrUnsupported
+	return xerrors.ErrUnsupported
 }

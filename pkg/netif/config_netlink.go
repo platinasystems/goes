@@ -189,7 +189,7 @@ func (nif *NetIf) Config(ctx context.Context, args ...string) error {
 			msg = netlink.CatAttr(msg, ifla, op)
 			args = args[2:]
 		default:
-			return fmt.Errorf("%q %w", args[0], ErrInvalid)
+			return xerrors.Invalid(args[0])
 		}
 	}
 	if err = nl.Request(msg); err == nil {
