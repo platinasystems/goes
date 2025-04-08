@@ -2,13 +2,9 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-package vpn
+package box
 
-import (
-	"sync"
-
-	"github.com/platinasystems/goes/v2/pkg/box"
-)
+import "sync"
 
 const (
 	IdBookPageSize = 4 << 10
@@ -28,7 +24,7 @@ func NewIdBookPage() IdBookPage {
 	return make(IdBookPage, IdBookPageSize, IdBookPageSize)
 }
 
-func (book *IdBook) New() box.Id {
+func (book *IdBook) New() Id {
 	book.Lock()
 	defer book.Unlock()
 
@@ -38,9 +34,9 @@ func (book *IdBook) New() box.Id {
 				bit := uint8(1 << k)
 				if (bits & bit) == 0 {
 					pg[j] |= bit
-					id := box.Id(i * IdBookPageSize)
-					id += box.Id(j * IdBookByteBits)
-					id += box.Id(k)
+					id := Id(i * IdBookPageSize)
+					id += Id(j * IdBookByteBits)
+					id += Id(k)
 					return id
 				}
 			}
@@ -49,12 +45,12 @@ func (book *IdBook) New() box.Id {
 
 	pg := NewIdBookPage()
 	pg[0] = 1
-	id := box.Id(len(book.bits) * IdBookPageSize)
+	id := Id(len(book.bits) * IdBookPageSize)
 	book.bits = append(book.bits, pg)
 	return id
 }
 
-func (book *IdBook) InUse(id box.Id) bool {
+func (book *IdBook) InUse(id Id) bool {
 	book.Lock()
 	defer book.Unlock()
 	i, j, k := IdBookMark(id.Index())
@@ -64,7 +60,7 @@ func (book *IdBook) InUse(id box.Id) bool {
 	return book.bits[i][j]&(1<<k) != 0
 }
 
-func (book *IdBook) Put(id box.Id) {
+func (book *IdBook) Put(id Id) {
 	book.Lock()
 	defer book.Unlock()
 	i, j, k := IdBookMark(id.Index())
@@ -72,7 +68,7 @@ func (book *IdBook) Put(id box.Id) {
 	book.bits[i][j] &^= 1 << k
 }
 
-func (book *IdBook) Reserve(id box.Id) {
+func (book *IdBook) Reserve(id Id) {
 	book.Lock()
 	defer book.Unlock()
 	i, j, k := IdBookMark(id.Index())

@@ -2,35 +2,34 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-package vpn
+package box
 
 import (
 	"fmt"
 	"slices"
 	"sync"
 
-	"github.com/platinasystems/goes/v2/pkg/box"
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 )
 
 type IdRing struct {
 	sync.Mutex
-	ids  []box.Id
+	ids  []Id
 	next int
 }
 
-func (r *IdRing) Append(id box.Id) {
+func (r *IdRing) Append(id Id) {
 	r.Lock()
 	defer r.Unlock()
 	r.ids = append(r.ids, id)
 }
 
-func (r *IdRing) Next() (box.Id, error) {
+func (r *IdRing) Next() (Id, error) {
 	r.Lock()
 	defer r.Unlock()
 	n := len(r.ids)
 	if n == 0 {
-		return box.InvalidId, xerrors.Unavailable("id")
+		return InvalidId, xerrors.Unavailable("id")
 	}
 	id := r.ids[r.next]
 	if r.next += 1; r.next == n {
@@ -39,7 +38,7 @@ func (r *IdRing) Next() (box.Id, error) {
 	return id, nil
 }
 
-func (r *IdRing) Remove(id box.Id) error {
+func (r *IdRing) Remove(id Id) error {
 	r.Lock()
 	defer r.Unlock()
 	iid := id.Index()
@@ -55,7 +54,7 @@ func (r *IdRing) Remove(id box.Id) error {
 	return xerrors.NotFound("id", fmt.Sprint(id))
 }
 
-func (r *IdRing) Update(id box.Id) error {
+func (r *IdRing) Update(id Id) error {
 	r.Lock()
 	defer r.Unlock()
 	iid := id.Index()

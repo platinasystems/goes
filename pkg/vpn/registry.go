@@ -71,9 +71,8 @@ type regVpn struct {
 		named      map[string]*pem.Block
 	}
 
-	idbook IdBook
-
-	exchange IdRing
+	idbook   box.IdBook
+	exchange box.IdRing
 }
 
 // [Registry] unmarshals the [Flags.FN.Cfg] YAML file into ConfigByName.
