@@ -1,4 +1,4 @@
-// Copyright © 2023-2024 Platina Systems, Inc. All rights reserved.
+// Copyright © 2023-2025 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -6,10 +6,13 @@ package box
 
 import (
 	"context"
-	"strings"
+	"crypto/ecdh"
+	"crypto/rand"
+	"io"
 	"testing"
 
 	"github.com/platinasystems/goes/v2/pkg/gcm"
+	"github.com/platinasystems/goes/v2/pkg/nonce"
 )
 
 // Simulate a secure message from one host to another through an exchange.
@@ -18,6 +21,7 @@ func TestBox(t *testing.T) {
 		hello   = "hello"
 		bonjour = "bonjour"
 	)
+	const xId, h1Id, h2Id Id = 0, 1, 2
 
 	assert := func(err error) {
 		t.Helper()
@@ -30,88 +34,93 @@ func TestBox(t *testing.T) {
 		}
 	}
 
-	box := New()
-
-	x, err := gcm.New()
+	xKey, err := ecdh.X25519().GenerateKey(rand.Reader)
 	assert(err)
-	h1, err := gcm.New()
+	h1Key, err := ecdh.X25519().GenerateKey(rand.Reader)
 	assert(err)
-	h2, err := gcm.New()
-	assert(err)
-	h1h2, err := h1.Peer(h2.PublicKey.Local)
-	assert(err)
-	h2h1, err := h2.Peer(h1.PublicKey.Local)
-	assert(err)
-	h1x, err := h1.Peer(x.PublicKey.Local)
-	assert(err)
-	xh1, err := x.Peer(h1.PublicKey.Local)
-	assert(err)
-	h2x, err := h2.Peer(x.PublicKey.Local)
-	assert(err)
-	xh2, err := x.Peer(h2.PublicKey.Local)
+	h2Key, err := ecdh.X25519().GenerateKey(rand.Reader)
 	assert(err)
 
-	box = box.Empty().Append(hello).From(1).To(2).Close(h1h2)
-	box.Seal(h1x)
-	if len(box) != len(hello)+Overhead {
-		t.Fatal(ErrOverrun)
-	}
-	if from := box.FromWhom(); from != 1 {
-		t.Fatalf("wrong from address: %dd", from)
-	}
-	if to := box.ToWhom(); to == 2 {
-		t.Fatalf("unsealed to address: %d", to)
-	}
-	if got := string(box.Contents()); strings.Index(got, hello) >= 0 {
-		t.Fatal("unsealed contents")
-	}
-	assert(box.Unseal(xh1))
-	box.Seal(xh2)
-	if from := box.FromWhom(); from != 1 {
-		t.Fatalf("wrong from address: %d", from)
-	}
-	if to := box.ToWhom(); to == 2 {
-		t.Fatalf("unsealed to address")
-	}
-	if got := string(box.Contents()); strings.Index(got, hello) >= 0 {
-		t.Fatal("unsealed contents")
-	}
-	assert(box.Unseal(h2x))
-	if to := box.ToWhom(); to != 2 {
-		t.Fatalf("misaddressed: %d", to)
-	}
-	box, err = box.Open(h2h1)
+	xNonce := make([]byte, nonce.Size)
+	h1Nonce := make([]byte, nonce.Size)
+	h2Nonce := make([]byte, nonce.Size)
+
+	_, err = rand.Read(xNonce)
 	assert(err)
-	if got := string(box.Contents()); got != hello {
-		t.Errorf("%q", got)
-	} else {
-		t.Log(got)
-	}
-	box = box.Empty().Append(bonjour).From(2).To(1).Close(h2h1)
-	box.Seal(h2x)
-	if from := box.FromWhom(); from != 2 {
-		t.Fatalf("wrong from address: %d", from)
-	}
-	if to := box.ToWhom(); to == 1 {
-		t.Fatalf("unsealed to address")
-	}
-	if got := string(box.Contents()); strings.Index(got, bonjour) >= 0 {
-		t.Fatal("unsealed contents")
-	}
-	if len(box) != len(bonjour)+Overhead {
-		t.Fatal(ErrOverrun)
-	}
-	assert(box.Unseal(xh2))
-	if to := box.ToWhom(); to != 1 {
-		t.Errorf("misaddressed: %d", to)
-	}
-	box.Seal(xh1)
-	assert(box.Unseal(h1x))
-	box, err = box.Open(h1h2)
+	_, err = rand.Read(h1Nonce)
 	assert(err)
-	if got := string(box.Contents()); got != bonjour {
-		t.Errorf("%q", got)
-	} else {
-		t.Log(got)
+	_, err = rand.Read(h2Nonce)
+	assert(err)
+
+	xh1, err := gcm.New(xKey, h1Key.PublicKey(), xNonce, h1Nonce)
+	assert(err)
+	xh2, err := gcm.New(xKey, h2Key.PublicKey(), xNonce, h2Nonce)
+	assert(err)
+
+	h1x, err := gcm.New(h1Key, xKey.PublicKey(), h1Nonce, xNonce)
+	assert(err)
+	h2x, err := gcm.New(h2Key, xKey.PublicKey(), h2Nonce, xNonce)
+	assert(err)
+
+	h1h2, err := gcm.New(h1Key, h2Key.PublicKey(), h1Nonce, h2Nonce)
+	assert(err)
+
+	h2h1, err := gcm.New(h2Key, h1Key.PublicKey(), h2Nonce, h1Nonce)
+	assert(err)
+
+	bx := New()
+	_, err = io.WriteString(bx, hello)
+	assert(err)
+	bx.From(h1Id)
+	bx.To(h2Id)
+	bx.Via(xId)
+	bx.CloseWith(h1h2)
+	bx.SealWith(h1x)
+
+	if from := bx.FromWhom(); from != h1Id {
+		t.Fatal(from, "!=", h1Id)
+	}
+	if via := bx.ViaWhom(); via != xId {
+		t.Fatal(via, "!=", xId)
+	}
+
+	assert(bx.UnsealWith(xh1))
+	bx.SealWith(xh2)
+	assert(bx.UnsealWith(h2x))
+	if to := bx.ToWhom(); to != h2Id {
+		t.Fatal(to, "!=", h2Id)
+	}
+
+	assert(bx.OpenWith(h2h1))
+	if contents := string(bx.Contents); contents != hello {
+		t.Fatal(contents, "!=", hello)
+	}
+
+	bx.Empty()
+	_, err = io.WriteString(bx, bonjour)
+	assert(err)
+	bx.From(h2Id)
+	bx.To(h1Id)
+	bx.Via(xId)
+	bx.CloseWith(h2h1)
+	bx.SealWith(h2x)
+
+	if from := bx.FromWhom(); from != h2Id {
+		t.Fatal(from, "!=", h2Id)
+	}
+	if via := bx.ViaWhom(); via != xId {
+		t.Fatal(via, "!=", xId)
+	}
+
+	assert(bx.UnsealWith(xh2))
+	bx.SealWith(xh1)
+	assert(bx.UnsealWith(h1x))
+	if to := bx.ToWhom(); to != h1Id {
+		t.Fatal(to, "!=", h2Id)
+	}
+
+	assert(bx.OpenWith(h1h2))
+	if contents := string(bx.Contents); contents != bonjour {
+		t.Fatal(contents, "!=", bonjour)
 	}
 }
