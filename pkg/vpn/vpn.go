@@ -5,7 +5,6 @@
 package vpn
 
 import (
-	"errors"
 	"flag"
 	"os"
 	"path/filepath"
@@ -56,8 +55,6 @@ var DefaultConfigDir = sync.OnceValue(func() string {
 	}
 	return sys
 })
-
-var ErrLLAddrUnderrun = errors.New("link-local address underrun")
 
 // [xdg.StateHome] or [fhs.State] + GOES/vpn
 var DefaultStateDir = sync.OnceValue(func() string {

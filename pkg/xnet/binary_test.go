@@ -1,4 +1,4 @@
-// Copyright © 2023-2024 Platina Systems, Inc. All rights reserved.
+// Copyright © 2023-2025 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -19,10 +19,10 @@ func TestNetUint64(t *testing.T) {
 	b := make([]byte, 0, len(samples)*8)
 	for _, want := range samples {
 		b = b[:0]
-		if b, err = Add(b, want); err != nil {
+		if b, err = Attach(b, want); err != nil {
 			t.Fatalf("%#x: %v", want, err)
 		}
-		if _, err = Subtract(b, &got); err != nil {
+		if _, err = Remove(b, &got); err != nil {
 			t.Fatalf("%#x: %v", want, err)
 		}
 		if got != want {
@@ -31,12 +31,12 @@ func TestNetUint64(t *testing.T) {
 	}
 	b = b[:0]
 	for _, want := range samples {
-		if b, err = Add(b, want); err != nil {
+		if b, err = Attach(b, want); err != nil {
 			t.Fatalf("%#x: %v", want, err)
 		}
 	}
 	for i, want := range samples {
-		if b, err = Subtract(b, &got); err != nil {
+		if b, err = Remove(b, &got); err != nil {
 			t.Fatalf("%d:%#x: %v", i, want, err)
 		}
 		if got != want {
@@ -58,10 +58,10 @@ func TestNetStruct(t *testing.T) {
 	want.U32 = 0x456789ab
 	want.U64 = 0xcdef0123
 	b := make([]byte, 0, 2+2+4+4+8)
-	if b, err = Add(b, want); err != nil {
+	if b, err = Attach(b, want); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = Subtract(b, &got); err != nil {
+	if _, err = Remove(b, &got); err != nil {
 		t.Fatal(err)
 	}
 	if got.U16 != want.U16 {

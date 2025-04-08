@@ -1,4 +1,4 @@
-// Copyright © 2023-2024 Platina Systems, Inc. All rights reserved.
+// Copyright © 2023-2025 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -15,7 +15,7 @@ import (
 
 type IdRing struct {
 	sync.Mutex
-	ids  []uint32
+	ids  []box.Id
 	next int
 }
 
@@ -30,7 +30,7 @@ func (r *IdRing) Next() (box.Id, error) {
 	defer r.Unlock()
 	n := len(r.ids)
 	if n == 0 {
-		return InvalidId, xerrors.Unavailable("id")
+		return box.InvalidId, xerrors.Unavailable("id")
 	}
 	id := r.ids[r.next]
 	if r.next += 1; r.next == n {
@@ -39,12 +39,12 @@ func (r *IdRing) Next() (box.Id, error) {
 	return id, nil
 }
 
-func (r *IdRing) Remove(id uint32) error {
+func (r *IdRing) Remove(id box.Id) error {
 	r.Lock()
 	defer r.Unlock()
-	iid := IdIndex(id)
+	iid := id.Index()
 	for i, ex := range r.ids {
-		if IdIndex(ex) == iid {
+		if ex.Index() == iid {
 			r.ids = slices.Delete(r.ids, i, i+1)
 			if r.next >= len(r.ids) {
 				r.next = 0
@@ -55,12 +55,12 @@ func (r *IdRing) Remove(id uint32) error {
 	return xerrors.NotFound("id", fmt.Sprint(id))
 }
 
-func (r *IdRing) Update(id uint32) error {
+func (r *IdRing) Update(id box.Id) error {
 	r.Lock()
 	defer r.Unlock()
-	iid := IdIndex(id)
+	iid := id.Index()
 	for i, entry := range r.ids {
-		if IdIndex(entry) == iid {
+		if entry.Index() == iid {
 			r.ids[i] = id
 			return nil
 		}

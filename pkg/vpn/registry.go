@@ -190,8 +190,8 @@ func (reg *registry) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	peer0 := req.TLS.PeerCertificates[0]
 	cn := peer0.Subject.CommonName
 	qv := req.URL.Query()
-	op := qv.Get("op")
-	obj := qv.Get("obj")
+	op := qv.Get(RestKeyOp)
+	obj := qv.Get(RestKeyObj)
 	name := strings.TrimLeft(req.URL.Path, "/")
 	if len(name) == 0 {
 		name = "vpn"
@@ -208,7 +208,7 @@ func (reg *registry) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		}
 	}()
 	switch op {
-	case "approve":
+	case RestOpApprove:
 		if err = vpn.selfOrSubscriber(peer0); err != nil {
 			w.WriteHeader(http.StatusForbidden)
 			fmt.Fprint(w, cn)
@@ -224,7 +224,7 @@ func (reg *registry) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		} else {
 			fmt.Fprintln(w, "OK")
 		}
-	case "certify":
+	case RestOpCertify:
 		if req.Method != http.MethodGet {
 			w.WriteHeader(http.StatusMethodNotAllowed)
 			fmt.Fprint(w, req.Method)
@@ -233,7 +233,7 @@ func (reg *registry) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			// certificate from TLS negotiation.
 			w.WriteHeader(http.StatusOK)
 		}
-	case "checkin":
+	case RestOpCheckin:
 		if err = vpn.selfOrSubscriber(peer0); err != nil {
 			w.WriteHeader(http.StatusForbidden)
 			fmt.Fprint(w, cn)
@@ -248,7 +248,7 @@ func (reg *registry) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 				fmt.Fprint(w, err)
 			}
 		}
-	case "deny":
+	case RestOpDeny:
 		if err = vpn.selfOrSubscriber(peer0); err != nil {
 			w.WriteHeader(http.StatusForbidden)
 			fmt.Fprint(w, cn)
@@ -264,7 +264,7 @@ func (reg *registry) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		} else {
 			fmt.Fprintln(w, "OK")
 		}
-	case "dump":
+	case RestOpDump:
 		switch obj {
 		case "subscribers":
 			if err = vpn.selfOrSubscriber(peer0); err != nil {
@@ -280,7 +280,7 @@ func (reg *registry) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		default:
 			w.WriteHeader(http.StatusBadRequest)
 		}
-	case "ping":
+	case RestOpPing:
 		if err = vpn.selfOrSubscriber(peer0); err != nil {
 			w.WriteHeader(http.StatusForbidden)
 			fmt.Fprint(w, cn)
@@ -290,7 +290,7 @@ func (reg *registry) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		} else {
 			fmt.Fprintln(w, "OK")
 		}
-	case "reload":
+	case RestOpReload:
 		if name != "vpn" {
 			w.WriteHeader(http.StatusNotAcceptable)
 			fmt.Fprint(w, name, ": unacceptable")
@@ -306,7 +306,7 @@ func (reg *registry) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		} else {
 			fmt.Fprintln(w, "OK")
 		}
-	case "show":
+	case RestOpShow:
 		if err = vpn.selfOrSubscriber(peer0); err != nil {
 			w.WriteHeader(http.StatusForbidden)
 			fmt.Fprint(w, cn)
@@ -339,7 +339,7 @@ func (reg *registry) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 				fmt.Fprint(w, err)
 			}
 		}
-	case "subscribe":
+	case RestOpSubscribe:
 		if req.Method != http.MethodPut {
 			w.WriteHeader(http.StatusMethodNotAllowed)
 			fmt.Fprint(w, req.Method)
@@ -349,7 +349,7 @@ func (reg *registry) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		} else {
 			fmt.Fprintln(w, "OK")
 		}
-	case "unsubscribe":
+	case RestOpUnsubscribe:
 		if err = vpn.selfOrSubscriber(peer0); err != nil {
 			w.WriteHeader(http.StatusForbidden)
 			fmt.Fprint(w, cn)
@@ -365,7 +365,7 @@ func (reg *registry) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		} else {
 			fmt.Fprintln(w, "OK")
 		}
-	case "whois":
+	case RestOpWhois:
 		if err = vpn.selfOrSubscriber(peer0); err != nil {
 			w.WriteHeader(http.StatusForbidden)
 			fmt.Fprint(w, cn)
@@ -480,7 +480,7 @@ func reqsub(req *http.Request) (string, error) {
 	if !qv.Has("subscriber") {
 		return "", xerrors.Incomplete("subscriber")
 	}
-	return qv.Get("subscriber"), nil
+	return qv.Get(RestKeySubscriber), nil
 }
 
 func (vpn *regVpn) approve(req *http.Request) error {
@@ -531,10 +531,10 @@ func (vpn *regVpn) checkin(w http.ResponseWriter, req *http.Request) error {
 
 	cn := req.TLS.PeerCertificates[0].Subject.CommonName
 
-	if qv.Has("service") {
-		svc, err = netip.ParseAddrPort(qv.Get("service"))
+	if qv.Has(RestKeyService) {
+		svc, err = netip.ParseAddrPort(qv.Get(RestKeyService))
 		if err != nil {
-			return xerrors.Label(err, "service")
+			return xerrors.Label(err, RestKeyService)
 		}
 		if svc.Addr().IsUnspecified() {
 			rap, err := netip.ParseAddrPort(req.RemoteAddr)
@@ -547,7 +547,7 @@ func (vpn *regVpn) checkin(w http.ResponseWriter, req *http.Request) error {
 	} else if via, err = vpn.exchange.Next(); err != nil {
 		return err
 	} else {
-		xlog.Info.Printf("new quest %s via %d", cn, IdIndex(via))
+		xlog.Info.Printf("new quest %s via %d", cn, via.Index())
 	}
 
 	data, err := io.ReadAll(req.Body)
@@ -576,7 +576,7 @@ func (vpn *regVpn) checkin(w http.ResponseWriter, req *http.Request) error {
 		if id, err = idHeader(entry); err != nil {
 			return xerrors.Label(err, "existing_id_header")
 		}
-		id = BumpIdVersion(id)
+		id.BumpVersion()
 		entry.Headers["id"] = fmt.Sprint(id)
 		if svc.IsValid() {
 			err = vpn.exchange.Update(id)
@@ -605,7 +605,7 @@ func (vpn *regVpn) checkin(w http.ResponseWriter, req *http.Request) error {
 		blk.Headers["id"] = fmt.Sprint(id)
 		if svc.IsValid() {
 			vpn.exchange.Append(id)
-			blk.Headers["service"] = svc.String()
+			blk.Headers["service"] = fmt.Sprint(svc)
 		} else if via, err = vpn.exchange.Next(); err != nil {
 			return xerrors.Label(err, "exchange_id")
 		} else {
@@ -614,14 +614,14 @@ func (vpn *regVpn) checkin(w http.ResponseWriter, req *http.Request) error {
 
 		vpn.block.named[cn] = blk
 		vpn.block.addressed[addr] = blk
-		vpn.block.identified[IdIndex(id)] = blk
+		vpn.block.identified[id.Index()] = blk
 	}
 
 	fmt.Fprintln(w, "id:", id)
 	fmt.Fprintln(w, "address:", addr)
 	fmt.Fprintln(w, "prefix:", ConfigByName[vpn.name].Prefix)
 	if !svc.IsValid() {
-		fmt.Fprintln(w, "via:", via)
+		fmt.Fprintln(w, "via:", int(via))
 		xlog.Info.Printf("%s assigned %d @ %v via %v\n",
 			cn, id, addr, via)
 	} else {
@@ -715,7 +715,7 @@ func (vpn *regVpn) showActive(w http.ResponseWriter) error {
 		if err != nil {
 			continue
 		}
-		fmt.Fprintf(w, "%s (%d, %d", name, IdIndex(id), IdVersion(id))
+		fmt.Fprintf(w, "%s (%d, %d", name, id.Index(), id.Version())
 		addr, err := addressHeader(blk)
 		if err == nil {
 			fmt.Fprintf(w, ", %v", addr)
@@ -723,7 +723,7 @@ func (vpn *regVpn) showActive(w http.ResponseWriter) error {
 		fmt.Fprint(w, ")")
 		via, err := viaHeader(blk)
 		if err == nil {
-			fmt.Fprintf(w, " via %d", IdIndex(via))
+			fmt.Fprintf(w, " via %d", via.Index())
 		}
 		svc, err := serviceHeader(blk)
 		if err == nil {
@@ -899,17 +899,17 @@ func (vpn *regVpn) whois(w http.ResponseWriter, req *http.Request) error {
 		k = qv.Get("name")
 		blk, ok = vpn.block.named[k]
 	} else if qv.Has("id") {
-		id, err := xerrors.MarkResult(ParseId(qv.Get("id")))
+		id, err := xerrors.MarkResult(box.ParseId(qv.Get(RestKeyId)))
 		if err != nil {
-			return xerrors.Label(err, "id")
+			return xerrors.Label(err, RestKeyId)
 		}
 		k = fmt.Sprint(id)
-		blk, ok = vpn.block.identified[IdIndex(id)]
+		blk, ok = vpn.block.identified[id.Index()]
 	} else if qv.Has("address") {
 		addr, err := xerrors.MarkResult(netip.
-			ParseAddr(qv.Get("address")))
+			ParseAddr(qv.Get(RestKeyAddress)))
 		if err != nil {
-			return xerrors.Label(err, "address")
+			return xerrors.Label(err, RestKeyAddress)
 		}
 		k = fmt.Sprint(addr)
 		blk, ok = vpn.block.addressed[addr]

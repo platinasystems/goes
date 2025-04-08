@@ -11,7 +11,6 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"flag"
-	"fmt"
 	"net/netip"
 	"time"
 
@@ -20,8 +19,6 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/nonce"
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xlog"
-	"github.com/platinasystems/goes/v2/pkg/xnet"
-	"github.com/platinasystems/goes/v2/pkg/xnet/netph"
 )
 
 // common to guest and exchange
@@ -109,8 +106,8 @@ func (cl *client) register(
 	if err != nil {
 		return err
 	}
-	idi := IdIndex(cl.id)
-	if via != InvalidId {
+	idi := cl.id.Index()
+	if via != box.InvalidId {
 		cl.via[idi] = via
 	}
 	cl.service[idi] = optsvc
@@ -122,52 +119,9 @@ func (cl *client) register(
 	}
 
 	xlog.Info.Printf("assigned id %d, ver %d, at %v, via %v, vpn %v",
-		IdIndex(cl.id), IdVersion(cl.id), cl.hostPrefix,
+		cl.id.Index(), cl.id.Version(), cl.hostPrefix,
 		via, cl.vpnPrefix)
 
-	return nil
-}
-
-func (cl *client) hello(ch chan<- *box.Box, to box.Id, now time.Time) error {
-	var err error
-	ito := IdIndex(to)
-	cto, ok := cl.gcm[ito]
-	if !ok {
-		return fmt.Errorf("%d: no cipher", ito)
-	}
-	via, ok := cl.via[ito]
-	if !ok {
-		via = to
-	}
-	ivia := IdIndex(via)
-	cvia, ok := cl.gcm[ivia]
-	if !ok {
-		return fmt.Errorf("%d: no exchange cipher", ivia)
-	}
-	svc, ok := cl.service[ivia]
-	if !ok {
-		return fmt.Errorf("%d: no exchange service", ivia)
-	}
-	bx := box.New()
-	if bx.Contents, err = xnet.Add(bx.Contents, netph.TunPI{
-		Proto: VPN_P_HELLO,
-	}); err != nil {
-		bx.Return()
-		return err
-	}
-	if bx.Contents, err = xnet.Add(bx.Contents,
-		now.UnixMicro()); err != nil {
-		bx.Return()
-		return err
-	}
-	bx.AddrPort = svc
-	bx.From(cl.id)
-	bx.To(to)
-	bx.Via(via)
-	bx.CloseWith(cto)
-	bx.SealWith(cvia)
-	bx.NonBlockingPut(ch)
-	xlog.Info.Printf("tx %d@%v hello %d", ivia, svc, ito)
 	return nil
 }
 
@@ -189,8 +143,8 @@ func (cl *client) peer(blk *pem.Block) error {
 		return xerrors.Label(err, "AssignedId")
 	}
 
-	idi := IdIndex(id)
-	cl.ver[idi] = IdVersion(id)
+	idi := id.Index()
+	cl.ver[idi] = id.Version()
 
 	addr, err := addressHeader(blk)
 	if err != nil {

@@ -24,10 +24,24 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xnet/netph"
 )
 
+type exchange struct {
+	client
+	lladdr netip.Addr
+	pktRxCh,
+	pktTxCh chan *box.Box
+	pem struct {
+		addressed  map[netip.Addr]*pem.Block
+		identified map[box.Id]*pem.Block
+	}
+	whoisResponseCh chan exchangeWhoisResponse
+}
+
 type exchangeWhoisResponse struct {
 	blk *pem.Block
 	err error
 }
+
+var exAll6nodes, exAll6routers netip.Addr
 
 // Exchange is a UDP server that forwards ciphered packets between guest's.
 func Exchange(ctx context.Context, args []string) error {
@@ -56,8 +70,11 @@ Exchange ciphered packets between guests.
 		xlog.UnmuteTrace()
 	}
 
+	exAll6nodes = netip.IPv6LinkLocalAllNodes()
+	exAll6routers = netip.IPv6LinkLocalAllRouters()
+
 	ex.pem.addressed = make(map[netip.Addr]*pem.Block)
-	ex.pem.identified = make(map[int]*pem.Block)
+	ex.pem.identified = make(map[box.Id]*pem.Block)
 
 	ex.pktRxCh = make(chan *box.Box, 4)
 	ex.pktTxCh = make(chan *box.Box, 4)
@@ -66,6 +83,8 @@ Exchange ciphered packets between guests.
 
 	if ex.lladdr, err = randLinkLocalAddr(); err != nil {
 		return err
+	} else {
+		xlog.Info.Println("link-local address:", ex.lladdr)
 	}
 
 	cctx, cancel := context.WithCancel(ctx)
@@ -92,9 +111,9 @@ Exchange ciphered packets between guests.
 		return err
 	}
 
-	iex, vex := IdIndex(ex.id), IdVersion(ex.id)
+	iex, vex := ex.id.Index(), ex.id.Version()
 
-	svc := fmt.Sprintf("%d@%v", iex, sap)
+	svc := fmt.Sprintf("%v@%v", ex.id, sap)
 	xlog.Info.Println("start", svc)
 	defer xlog.Info.Println("stopped", svc)
 	defer wg.Wait()
@@ -120,86 +139,78 @@ pktRxLoop:
 				xlog.Info.Println("pkt rx ch closed")
 				break pktRxLoop
 			}
-			afrom := bx.AddrPort
+			ap := bx.AddrPort
 			from := bx.FromWhom()
-			ifrom, vfrom := IdIndex(from), IdVersion(from)
+			ifrom, vfrom := from.Index(), from.Version()
 			via := bx.ViaWhom()
-			ivia, vvia := IdIndex(via), IdVersion(via)
+			ivia, vvia := via.Index(), via.Version()
 			if ivia != iex {
-				xlog.Info.Printf("via %d != exchange %d",
-					ivia, iex)
+				xlog.Errata.Printf("via %d != %d", ivia, iex)
 				bx.Return()
 				continue pktRxLoop
 			}
 			if vvia != vex {
-				xlog.Info.Printf("FIXME version via "+
+				xlog.Errata.Printf("FIXME version via "+
 					"%d != exchange %d", vvia, vex)
 				bx.Return()
 				continue pktRxLoop
 			}
 			if vfrom != ex.ver[ifrom] {
+				xlog.Info.Println("update", ifrom)
 				wg.Add(1)
-				go ex.whoisIdRoutine(cctx, &wg, from)
+				go ex.whoisRoutine(cctx, &wg, RestKeyId, from)
 				bx.Return()
 				continue pktRxLoop
 			}
-			ex.service[ifrom] = afrom
+			ex.service[ifrom] = ap
 			cfrom, ok := ex.gcm[ifrom]
 			if !ok {
-				xlog.Info.Printf("whois %d@%v", ifrom, afrom)
+				xlog.Info.Println("whois", ifrom)
 				wg.Add(1)
-				go ex.whoisIdRoutine(cctx, &wg, from)
+				go ex.whoisRoutine(cctx, &wg, RestKeyId, from)
 				bx.Return()
 				continue pktRxLoop
 			}
 			if err := bx.UnsealWith(cfrom); err != nil {
-				xlog.Info.Printf("%d@%v unseal %v",
-					ifrom, afrom, err)
+				xlog.Errata.Println("unseal", bx, err)
 				bx.Return()
 				continue pktRxLoop
 			}
 			to := bx.ToWhom()
-			ito, vto := IdIndex(to), IdVersion(to)
+			ito, vto := to.Index(), to.Version()
 			if ito == iex {
 				if vto != vex {
-					xlog.Info.Printf("%d@%v "+
-						"FIXME prompt exchange update",
-						ifrom, afrom)
-					bx.Return()
+					// FIXME prompt exchange update
+					xlog.Errata.Print("mismatch", bx)
 				} else {
 					err = bx.OpenWith(cfrom)
 					if err != nil {
-						xlog.Info.Printf("%d@%v "+
-							"open %v",
-							ifrom, afrom, err)
-						bx.Return()
+						xlog.Errata.Print("open",
+							bx, err)
 					} else {
-						ex.rx(cctx, &wg, bx)
+						ex.rx(cctx, &wg, Box{bx})
 					}
 				}
+				bx.Return()
 			} else if vto != ex.ver[ito] {
-				xlog.Info.Printf("%d@%v "+
-					"FIXME prompt host %d update",
-					ifrom, afrom, ito)
+				// FIXME prompt host %d update
+				xlog.Errata.Print("mismatch", bx)
 				bx.Return()
 			} else if ato, ok := ex.service[ito]; !ok {
-				xlog.Info.Printf("%d@%v no service to %d",
-					ifrom, afrom, ito)
+				xlog.Errata.Print("no service", bx)
 				bx.Return()
 			} else if cto, ok := ex.gcm[ito]; !ok {
-				xlog.Info.Printf("%d@%v not peered with %d",
-					ifrom, afrom, ito)
+				xlog.Errata.Print("not peered", bx)
 				bx.Return()
 			} else {
-				xlog.Info.Printf("%d@%v reseal and send to "+
-					"%d@%v", ifrom, afrom, ito, ato)
 				bx.AddrPort = ato
+				xlog.Info.Println("fwd", bx)
 				bx.SealWith(cto)
 				bx.NonBlockingPut(ex.pktTxCh)
 			}
 		case rsp, ok := <-ex.whoisResponseCh:
 			if !ok {
-				xlog.Info.Println("closed whois response ch")
+				xlog.Errata.Println("closed whois response ch")
 				break pktRxLoop
 			}
 			if rsp.err != nil {
@@ -212,117 +223,85 @@ pktRxLoop:
 	return nil
 }
 
-type exchange struct {
-	client
-	lladdr netip.Addr
-	pktRxCh,
-	pktTxCh chan *box.Box
-	pem struct {
-		addressed  map[netip.Addr]*pem.Block
-		identified map[int]*pem.Block
-	}
-	whoisResponseCh chan exchangeWhoisResponse
-	all6nodes,
-	all6routers netip.Addr
-}
-
 func (ex *exchange) rx(
 	ctx context.Context,
 	wg *sync.WaitGroup,
-	bx *box.Box,
+	bx Box,
 ) {
-	defer bx.Return()
-	ex.all6nodes = netip.IPv6LinkLocalAllNodes()
-	ex.all6routers = netip.IPv6LinkLocalAllRouters()
-	afrom := bx.AddrPort
+	xlog.Info.Println("rx", bx)
 	from := bx.FromWhom()
-	ifrom := IdIndex(from)
-	pdu := VpnPDU(bx.Contents)
-	h, d, err := pdu.Parse()
+	h, d, err := bx.PDU().Parse()
 	if err != nil {
-		xlog.Errata.Print(err)
 		return
 	}
-	xlog.Info.Printf("rx %d@%v %v", ifrom, afrom, pdu)
 	switch h.Proto {
 	case VPN_P_HELLO:
 		ex.txHelloAck(from)
+		ex.replicate("relay", bx.Box, from)
 	case VPN_P_WHOIS_ADDRESSED:
-		if addr := VpnWhoisAddress(d); !addr.IsValid() {
-			xlog.Errata.Printf("rx %d@%v whois underrun; %v",
-				ifrom, afrom, pdu)
+		if addr := WhoisAddress(d); !addr.IsValid() {
+			xlog.Errata.Println("rx whois underrun")
 		} else if blk := ex.pem.addressed[addr]; blk == nil {
-			xlog.Info.Printf("rx %d@%v whois %v",
-				ifrom, afrom, addr)
+			xlog.Info.Println("rx whois:", addr)
 			wg.Add(1)
-			go ex.whoisAddressedRoutine(ctx, wg, addr)
+			go ex.whoisRoutine(ctx, wg, RestKeyAddress, addr)
 		} else {
-			ex.txPubKey(from, blk)
+			ex.txPubKey("whois addressed rsponse", from, blk)
 		}
 	case VPN_P_WHOIS_IDENTIFIED:
-		if id, err := VpnWhoisId(d); err != nil {
-			xlog.Errata.Printf("rx %d@%v whois %v",
-				ifrom, afrom, err)
-		} else if blk := ex.pem.identified[IdIndex(id)]; blk == nil {
-			xlog.Info.Printf("rx %d@%v whois %d",
-				ifrom, afrom, id)
+		if id, err := WhoisId(d); err != nil {
+			xlog.Errata.Print("rx whois:", err)
+		} else if blk := ex.pem.identified[id]; blk == nil {
+			xlog.Info.Println("rx whois:", id)
 			wg.Add(1)
-			go ex.whoisIdRoutine(ctx, wg, id)
+			go ex.whoisRoutine(ctx, wg, RestKeyId, id)
 		} else {
-			ex.txPubKey(from, blk)
+			ex.txPubKey("whois identified response", from, blk)
 		}
 	case VPN_P_WHOIS_SERVICE:
-		xlog.Info.Printf("rx %d@%v whois %v", ifrom, afrom,
-			VpnWhoisService(d))
+		xlog.Info.Println("FIXME rx whois:", WhoisService(d))
 	case VPN_P_IP:
-		xlog.Info.Printf("dropped %d@%v %v", ifrom, afrom, netpdu.IP(d))
+		xlog.Info.Println("rx dropped", bx)
 	case VPN_P_IP6:
-		ex.rxIP6(from, netpdu.IP6(d))
+		ex.rxIP6(bx, from, netpdu.IP6(d))
 	default:
-		xlog.Info.Printf("rx %d@%v unknown %#x", ifrom, afrom, h.Proto)
+		xlog.Info.Println("rx unknown proto:", h.Proto)
 	}
 }
 
-func (ex *exchange) rxIP6(from box.Id, pdu netpdu.IP6) {
-	h, d, err := pdu.Parse()
+func (ex *exchange) rxIP6(bx Box, from box.Id, ip6pdu netpdu.IP6) {
+	ip6h, ip6d, err := ip6pdu.Parse()
 	if err != nil {
 		xlog.Info.Print(err)
 		return
 	}
-	sum := pdu.Checksum(h.NextHeader, d)
+	sum := ip6pdu.Checksum(ip6h.NextHeader, ip6d)
 	if sum != 0 {
 		xlog.Info.Print("bad sum")
 		return
 	}
-	switch h.NextHeader {
-	case netph.IPPROTO_ICMPV6:
-		ex.rxICMP6(from, &h, netpdu.ICMP6(d))
-	case netph.IPPROTO_UDP:
-		if da := netip.AddrFrom16(h.DA); ex.tome(da) {
-			ex.rxUDP6(from, &h, netpdu.UDP(d))
-		} else {
-			xlog.Info.Println("dropped udp to", da)
-		}
-	default:
-		xlog.Info.Println("dropped", pdu)
+	da := netip.AddrFrom16(ip6h.DA)
+	if da.IsMulticast() {
+		ex.replicate("multicast", bx.Box, from)
+		return
 	}
-}
-
-func (ex *exchange) rxICMP6(
-	from box.Id,
-	req6 *netph.IP6,
-	pdu netpdu.ICMP6,
-) {
-	switch pdu.Type() {
-	case netph.ICMP6TypeEchoRequest:
-		if da := netip.AddrFrom16(req6.DA); ex.tome(da) {
-			req := netpdu.ICMP6EchoRequest(pdu)
-			ex.txICMP6EchoReply(from, req6, req)
+	if !ex.tome(da) {
+		xlog.Info.Println("!me", bx)
+		return
+	}
+	switch ip6h.NextHeader {
+	case netph.IPPROTO_ICMPV6:
+		icmp6pdu := netpdu.ICMP6(ip6d)
+		if icmp6pdu.Type() == netph.ICMP6TypeEchoRequest {
+			echo6req := netpdu.ICMP6EchoRequest(icmp6pdu)
+			ex.txICMP6EchoReply(from, &ip6h, echo6req)
 		} else {
-			xlog.Info.Println("dropped icmp6 echo req to", da)
+			xlog.Info.Println("!echo", icmp6pdu)
 		}
-	case netph.ICMP6TypeRouterSolicitation:
-		ex.txICMP6RouterAdvertisement(from, req6)
+	case netph.IPPROTO_UDP:
+		ex.rxUDP6(from, &ip6h, netpdu.UDP(ip6d))
+	default:
+		xlog.Info.Println("!(icmp|udp)", ip6pdu)
 	}
 }
 
@@ -340,7 +319,7 @@ func (ex *exchange) rxUDP6(
 	case netph.UDPEcho:
 		ex.txUDP6EchoReply(from, req6, &h, d)
 	case netph.UDPDomain:
-		// FIXME
+		xlog.Info.Println("FIXME reply", pdu)
 	default:
 		xlog.Info.Println("dropped", pdu)
 	}
@@ -350,27 +329,49 @@ func (ex *exchange) tome(a netip.Addr) bool {
 	return a.Compare(ex.lladdr) == 0 || a.Compare(ex.addr) == 0
 }
 
+func (ex *exchange) replicate(lbl string, bx *box.Box, from box.Id) {
+	iex, ifrom := ex.id.Index(), from.Index()
+	for id := range ex.pem.identified {
+		if i := id.Index(); i != ifrom && i != iex {
+			gcm := ex.gcm[i]
+			clone := bx.Clone()
+			clone.To(ex.id)
+			clone.Via(ex.id)
+			clone.From(from)
+			clone.AddrPort = ex.service[i]
+			xlog.Info.Println(lbl, Box{clone})
+			clone.CloseWith(gcm)
+			clone.SealWith(gcm)
+			clone.NonBlockingPut(ex.pktTxCh)
+		}
+	}
+}
+
 func (ex *exchange) txHelloAck(to box.Id) {
 	var err error
+	ito := to.Index()
+	c, ok := ex.gcm[ito]
+	if !ok {
+		xlog.Errata.Println("%d: no GCM", ito)
+		return
+	}
 	bx := box.New()
-	toi := IdIndex(to)
-	bx.AddrPort = ex.service[toi]
+	bx.AddrPort = ex.service[ito]
 	bx.From(ex.id)
 	bx.To(to)
-	bx.Contents, err = xnet.Add(bx.Contents, netph.TunPI{
+	bx.Contents, err = xnet.Attach(bx.Contents, netph.TunPI{
 		Proto: VPN_P_HELLO,
 	})
 	if err != nil {
 		bx.Return()
 		return
 	}
-	bx.Contents, err = xnet.Add(bx.Contents, time.Now().UnixMicro())
+	bx.Contents, err = xnet.Attach(bx.Contents, time.Now().UnixMicro())
 	if err != nil {
 		bx.Return()
 		return
 	}
-	xlog.Info.Printf("tx %d@%v hello ack", toi, bx.AddrPort)
-	c := ex.gcm[toi]
+	xlog.Info.Println("hello ack", Box{bx})
 	bx.CloseWith(c)
 	bx.SealWith(c)
 	bx.NonBlockingPut(ex.pktTxCh)
@@ -381,16 +382,21 @@ func (ex *exchange) txICMP6EchoReply(
 	req6 *netph.IP6,
 	req netpdu.ICMP6EchoRequest,
 ) {
-	toi := IdIndex(to)
+	ito := to.Index()
+	c, ok := ex.gcm[ito]
+	if !ok {
+		xlog.Errata.Println("%d: no GCM", ito)
+		return
+	}
 	reqh, reqd, err := req.Parse()
 	if err != nil {
 		return
 	}
 	bx := box.New()
-	bx.AddrPort = ex.service[toi]
+	bx.AddrPort = ex.service[ito]
 	bx.From(ex.id)
 	bx.To(to)
-	bx.Contents, err = xnet.Add(bx.Contents, netph.TunPI{
+	bx.Contents, err = xnet.Attach(bx.Contents, netph.TunPI{
 		Proto: netph.ETH_P_IPV6,
 	})
 	if err != nil {
@@ -398,7 +404,7 @@ func (ex *exchange) txICMP6EchoReply(
 		return
 	}
 	ip6i := len(bx.Contents)
-	bx.Contents, err = xnet.Add(bx.Contents, netph.IP6{
+	bx.Contents, err = xnet.Attach(bx.Contents, netph.IP6{
 		VCF:        req6.VCF,
 		NextHeader: netph.IPPROTO_ICMPV6,
 		HopLimit:   255,
@@ -410,7 +416,7 @@ func (ex *exchange) txICMP6EchoReply(
 		return
 	}
 	icmp6i := len(bx.Contents)
-	bx.Contents, err = xnet.Add(bx.Contents, netph.ICMP6EchoReply{
+	bx.Contents, err = xnet.Attach(bx.Contents, netph.ICMP6EchoReply{
 		ICMP6: netph.ICMP6{
 			Type: netph.ICMP6TypeEchoReply,
 			Code: 0,
@@ -422,7 +428,7 @@ func (ex *exchange) txICMP6EchoReply(
 		bx.Return()
 		return
 	}
-	bx.Contents, err = xnet.Add(bx.Contents, reqd)
+	bx.Contents, err = xnet.Attach(bx.Contents, reqd)
 	if err != nil {
 		bx.Return()
 		return
@@ -432,97 +438,25 @@ func (ex *exchange) txICMP6EchoReply(
 	icmp6 := netpdu.ICMP6(bx.Contents[icmp6i:])
 	sum := ip6.Checksum(netph.IPPROTO_ICMPV6, icmp6)
 	icmp6.SetSum(sum)
-	xlog.Info.Printf("tx %d@%v %v", toi, bx.AddrPort, ip6)
-	c := ex.gcm[toi]
+	xlog.Info.Println("reply", Box{bx})
 	bx.CloseWith(c)
 	bx.SealWith(c)
 	bx.NonBlockingPut(ex.pktTxCh)
 }
 
-func (ex *exchange) txICMP6RouterAdvertisement(to box.Id, req6 *netph.IP6) {
-	const infiniteLifetime = 0xffffffff
+func (ex *exchange) txPubKey(lbl string, to box.Id, blk *pem.Block) {
 	var err error
-	toi := IdIndex(to)
+	ito := to.Index()
+	c, ok := ex.gcm[ito]
+	if !ok {
+		xlog.Errata.Println("%d: no GCM", ito)
+		return
+	}
 	bx := box.New()
-	bx.AddrPort = ex.service[toi]
+	bx.AddrPort = ex.service[ito]
 	bx.From(ex.id)
 	bx.To(to)
-	bx.Contents, err = xnet.Add(bx.Contents, netph.TunPI{
-		Proto: netph.ETH_P_IPV6,
-	})
-	if err != nil {
-		bx.Return()
-		return
-	}
-	ip6i := len(bx.Contents)
-	bx.Contents, err = xnet.Add(bx.Contents, netph.IP6{
-		VCF:        req6.VCF,
-		NextHeader: netph.IPPROTO_ICMPV6,
-		HopLimit:   255, // 1 ir 2 ?
-		SA:         ex.lladdr.As16(),
-		DA:         req6.SA,
-	})
-	if err != nil {
-		bx.Return()
-		return
-	}
-	icmp6i := len(bx.Contents)
-	bx.Contents, err = xnet.Add(bx.Contents, netph.ICMP6RouterAdvertisement{
-		ICMP6: netph.ICMP6{
-			Type: netph.ICMP6TypeRouterAdvertisement,
-			Code: 0,
-		},
-		CurHopLimit: 2, // ?
-		// netph.ICMP6RouterAdvertisementOtherConfiguration |
-		// netph.ICMP6RouterAdvertisementManagedAddress
-		Flags: 0,
-		// not default
-		RouterLifetime: 0,
-		// unspecified
-		ReachableTime: 0,
-		// unspecified
-		RetransTimer: 0,
-	})
-	if err != nil {
-		bx.Return()
-		return
-	}
-	prefixopti := len(bx.Contents)
-	bx.Contents, err = xnet.Add(bx.Contents, netph.ICMP6PrefixInformation{
-		ICMP6Option: netph.ICMP6Option{
-			Type:   netph.ICMP6OptionTypePrefixInformation,
-			Length: 0, // updated later
-		},
-		// FIXME 96 or 98 for ID derrived address?
-		PrefixLength: 64,
-		Flags: netph.ICMP6PrefixAutonomousAddressConfiguration |
-			netph.ICMP6PrefixOnLink,
-		ValidLifetime:     infiniteLifetime,
-		PreferredLifetime: infiniteLifetime,
-		Prefix:            netip.MustParseAddr("fc00:5678::").As16(),
-	})
-	bx.Contents[prefixopti+netph.ICMP6OptionLengthIndex] =
-		uint8(len(bx.Contents) - prefixopti)
-	// FIXME add MTU, RDNSS and DNSSL options
-	ip6 := netpdu.IP6(bx.Contents[ip6i:])
-	ip6.SetLen()
-	icmp6 := netpdu.ICMP6(bx.Contents[icmp6i:])
-	icmp6.SetSum(ip6.Checksum(netph.IPPROTO_ICMPV6, icmp6))
-	xlog.Info.Printf("tx %d@%v %v", toi, bx.AddrPort, ip6)
-	c := ex.gcm[toi]
-	bx.CloseWith(c)
-	bx.SealWith(c)
-	bx.NonBlockingPut(ex.pktTxCh)
-}
-
-func (ex *exchange) txPubKey(to box.Id, blk *pem.Block) {
-	var err error
-	toi := IdIndex(to)
-	bx := box.New()
-	bx.AddrPort = ex.service[toi]
-	bx.From(ex.id)
-	bx.To(to)
-	bx.Contents, err = xnet.Add(bx.Contents, netph.TunPI{
+	bx.Contents, err = xnet.Attach(bx.Contents, netph.TunPI{
 		Proto: VPN_P_PUBLIC_KEY,
 	})
 	if err != nil {
@@ -530,8 +464,7 @@ func (ex *exchange) txPubKey(to box.Id, blk *pem.Block) {
 		return
 	}
 	pem.Encode(bx, blk)
-	xlog.Info.Printf("tx %d@%v pub-key", toi, bx.AddrPort)
-	c := ex.gcm[toi]
+	xlog.Info.Println(lbl, Box{bx})
 	bx.CloseWith(c)
 	bx.SealWith(c)
 	bx.NonBlockingPut(ex.pktTxCh)
@@ -544,12 +477,17 @@ func (ex *exchange) txUDP6EchoReply(
 	data []byte,
 ) {
 	var err error
-	toi := IdIndex(to)
+	ito := to.Index()
+	c, ok := ex.gcm[ito]
+	if !ok {
+		xlog.Errata.Println("%d: no GCM", ito)
+		return
+	}
 	bx := box.New()
 	bx.From(ex.id)
 	bx.To(to)
-	bx.AddrPort = ex.service[toi]
-	bx.Contents, err = xnet.Add(bx.Contents, netph.TunPI{
+	bx.AddrPort = ex.service[ito]
+	bx.Contents, err = xnet.Attach(bx.Contents, netph.TunPI{
 		Proto: netph.ETH_P_IPV6,
 	})
 	if err != nil {
@@ -557,7 +495,7 @@ func (ex *exchange) txUDP6EchoReply(
 		return
 	}
 	ip6i := len(bx.Contents)
-	bx.Contents, err = xnet.Add(bx.Contents, netph.IP6{
+	bx.Contents, err = xnet.Attach(bx.Contents, netph.IP6{
 		VCF:        req6.VCF,
 		NextHeader: netph.IPPROTO_UDP,
 		HopLimit:   255,
@@ -569,7 +507,7 @@ func (ex *exchange) txUDP6EchoReply(
 		return
 	}
 	udpi := len(bx.Contents)
-	bx.Contents, err = xnet.Add(bx.Contents, netph.UDP{
+	bx.Contents, err = xnet.Attach(bx.Contents, netph.UDP{
 		SP: requdp.DP,
 		DP: requdp.SP,
 	})
@@ -577,7 +515,7 @@ func (ex *exchange) txUDP6EchoReply(
 		bx.Return()
 		return
 	}
-	bx.Contents, err = xnet.Add(bx.Contents, data)
+	bx.Contents, err = xnet.Attach(bx.Contents, data)
 	if err != nil {
 		bx.Return()
 		return
@@ -587,31 +525,19 @@ func (ex *exchange) txUDP6EchoReply(
 	udp := netpdu.UDP(bx.Contents[udpi:])
 	udp.SetLen()
 	udp.SetSum(ip6.Checksum(netph.IPPROTO_UDP, udp))
-	xlog.Info.Printf("tx %d@%v %v", toi, bx.AddrPort, ip6)
-	c := ex.gcm[toi]
+	xlog.Info.Println("tx", Box{bx})
 	bx.CloseWith(c)
 	bx.SealWith(c)
 	bx.NonBlockingPut(ex.pktTxCh)
 }
 
-func (ex *exchange) whoisAddressedRoutine(
-	ctx context.Context, wg *sync.WaitGroup, addr netip.Addr,
+func (ex *exchange) whoisRoutine(
+	ctx context.Context, wg *sync.WaitGroup, key string, value any,
 ) {
 	defer wg.Done()
-	blk, err := ex.whoisAddressed(ctx, addr)
+	blk, err := ex.whois(ctx, key, value)
 	if err != nil {
-		err = fmt.Errorf("%w (whois %v)", err, addr)
-	}
-	ex.whoisResponseCh <- exchangeWhoisResponse{blk, err}
-}
-
-func (ex *exchange) whoisIdRoutine(
-	ctx context.Context, wg *sync.WaitGroup, id box.Id,
-) {
-	defer wg.Done()
-	blk, err := ex.whoisIdentified(ctx, id)
-	if err != nil {
-		err = fmt.Errorf("%w (whois %d)", err, IdIndex(id))
+		err = fmt.Errorf("%w (whois %s %v)", err, key, value)
 	}
 	ex.whoisResponseCh <- exchangeWhoisResponse{blk, err}
 }
@@ -625,12 +551,11 @@ func (ex *exchange) whoisResponse(blk *pem.Block) error {
 	if err != nil {
 		return xerrors.Label(err, "HeaderId")
 	}
-	idi := IdIndex(id)
 	if err = ex.peer(blk); err != nil {
 		return err
 	}
 	ex.pem.addressed[addr] = blk
-	ex.pem.identified[idi] = blk
+	ex.pem.identified[id] = blk
 	return nil
 }
 
@@ -641,10 +566,9 @@ func randLinkLocalAddr() (lladdr netip.Addr, err error) {
 	n, err := rand.Read(a[8:])
 	if err != nil {
 	} else if n != len(a[8:]) {
-		err = ErrLLAddrUnderrun
+		err = xerrors.Underrun("rand-link-local")
 	} else {
 		lladdr = netip.AddrFrom16(a)
-		xlog.Info.Println("link-local address:", lladdr)
 	}
 	return
 }

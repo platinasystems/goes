@@ -1,4 +1,4 @@
-// Copyright © 2023-2024 Platina Systems, Inc. All rights reserved.
+// Copyright © 2023-2025 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -7,16 +7,16 @@
 package box
 
 import (
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
 	"net"
 	"net/netip"
 	"sync/atomic"
-	"unsafe"
+	_ "unsafe"
 
 	"github.com/platinasystems/goes/v2/pkg/gcm"
+	"github.com/platinasystems/goes/v2/pkg/xnet"
 	"github.com/platinasystems/goes/v2/pkg/xnet/netph"
 )
 
@@ -44,9 +44,11 @@ const (
 	Stamp
 )
 
+const SizeofZipCode = 4
 const Content = Stamp + gcm.Overhead
 const ContentMTU = Cap - Content - gcm.Overhead
 
+var EncodeZip = xnet.Encode32[uint32]
 var zap netip.AddrPort
 
 type Box struct {
@@ -56,10 +58,6 @@ type Box struct {
 	Contents []byte
 }
 
-type Id = uint32
-
-const SizeofId = int(unsafe.Sizeof(Id(0)))
-
 type Opener interface {
 	Open(dst, inv, ciphertext, data []byte) ([]byte, error)
 }
@@ -67,12 +65,6 @@ type Opener interface {
 type Sealer interface {
 	Seal(dst, inv, plaintext, data []byte) []byte
 }
-
-var (
-	GetId  = binary.BigEndian.Uint32
-	SetId  = binary.BigEndian.PutUint32
-	SetZip = binary.BigEndian.PutUint32
-)
 
 var (
 	ErrEmpty      = errors.New("empty")
@@ -151,8 +143,21 @@ func (box *Box) Empty() {
 	box.Contents = box.data[Content:Content]
 }
 
-func (box *Box) From(from Id) { SetId(box.data[From:], from) }
-func (box *Box) FromWhom() Id { return GetId(box.data[From:]) }
+func (box *Box) Format(w fmt.State, verb rune) {
+	from := box.FromWhom()
+	to := box.ToWhom()
+	via := box.ViaWhom()
+	fmt.Fprint(w, "box")
+	if box.AddrPort.Addr().IsValid() {
+		fmt.Fprint(w, " ", box.AddrPort, ",")
+	}
+	fmt.Fprint(w, " ", to.Index(), ".", to.Version())
+	fmt.Fprint(w, " <- ", via.Index(), ".", via.Version())
+	fmt.Fprint(w, " <- ", from.Index(), ".", from.Version())
+}
+
+func (box *Box) From(from Id) { from.Encode(box.data[From:]) }
+func (box *Box) FromWhom() Id { return DecodeId(box.data[From:]) }
 
 // Size of label plus length of contents.
 func (box *Box) Len() int {
@@ -186,7 +191,7 @@ func (box *Box) OpenWith(v Opener) error {
 func runtime_randn(n uint32) uint32
 
 func (box *Box) RandZipCode() {
-	SetZip(box.data[ZipCode:], runtime_randn(4))
+	EncodeZip(box.data[ZipCode:], runtime_randn(SizeofZipCode))
 }
 
 func (box *Box) Return() {
@@ -200,8 +205,8 @@ func (box *Box) SealWith(v Sealer) {
 	v.Seal(box.data[To:To], nil, box.data[To:Stamp], nil)
 }
 
-func (box *Box) To(to Id)   { SetId(box.data[To:], to) }
-func (box *Box) ToWhom() Id { return GetId(box.data[To:]) }
+func (box *Box) To(to Id)   { to.Encode(box.data[To:]) }
+func (box *Box) ToWhom() Id { return DecodeId(box.data[To:]) }
 
 // Send closed box with sealed label.
 func (box Box) Tx(udp *net.UDPConn) (int, error) {
@@ -238,5 +243,5 @@ func (box *Box) WriteTo(w io.Writer) (int64, error) {
 	return int64(n), err
 }
 
-func (box *Box) Via(via Id)  { SetId(box.data[Via:], via) }
-func (box *Box) ViaWhom() Id { return GetId(box.data[Via:]) }
+func (box *Box) Via(via Id)  { via.Encode(box.data[Via:]) }
+func (box *Box) ViaWhom() Id { return DecodeId(box.data[Via:]) }

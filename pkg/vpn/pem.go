@@ -1,4 +1,4 @@
-// Copyright © 2023-2024 Platina Systems, Inc. All rights reserved.
+// Copyright © 2023-2025 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -17,11 +17,11 @@ import (
 )
 
 func idHeader(blk *pem.Block) (box.Id, error) {
-	return ParseId(blk.Headers["id"])
+	return box.ParseId(blk.Headers["id"])
 }
 
 func viaHeader(blk *pem.Block) (box.Id, error) {
-	return ParseId(blk.Headers["via"])
+	return box.ParseId(blk.Headers["via"])
 }
 
 func addressHeader(blk *pem.Block) (netip.Addr, error) {

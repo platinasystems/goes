@@ -32,6 +32,29 @@ import (
 const contextApplicationPKCS8 = "application/pkcs8"
 const dnsLookupTimeout = 30 * time.Second
 
+const (
+	RestKeyAddress    = "address"
+	RestKeyId         = "id"
+	RestKeyObj        = "obj"
+	RestKeyOp         = "op"
+	RestKeyService    = "service"
+	RestKeySubscriber = "subscriber"
+)
+
+const (
+	RestOpApprove     = "approve"
+	RestOpCertify     = "certify"
+	RestOpCheckin     = "checkin"
+	RestOpDeny        = "deny"
+	RestOpDump        = "dump"
+	RestOpPing        = "ping"
+	RestOpReload      = "reload"
+	RestOpShow        = "show"
+	RestOpSubscribe   = "subscribe"
+	RestOpUnsubscribe = "unsubscribe"
+	RestOpWhois       = "whois"
+)
+
 func RestAdmin(ctx context.Context, args []string) error {
 	var rest rest
 
@@ -51,8 +74,8 @@ RESTful registry administration.
 
 	clone := *rest.url
 	q := clone.Query()
-	q.Set("op", xflag.LastName(flag.CommandLine))
-	q.Set("subscriber", args[0])
+	q.Set(RestKeyOp, xflag.LastName(flag.CommandLine))
+	q.Set(RestKeySubscriber, args[0])
 	clone.RawQuery = q.Encode()
 	req, err := http.
 		NewRequestWithContext(ctx, http.MethodPut, clone.String(), nil)
@@ -94,7 +117,7 @@ Import registry certificate.
 
 	clone := *rest.url
 	q := clone.Query()
-	q.Set("op", xflag.LastName(flag.CommandLine))
+	q.Set(RestKeyOp, xflag.LastName(flag.CommandLine))
 	clone.RawQuery = q.Encode()
 
 	req, err := http.
@@ -160,7 +183,7 @@ RESTful ping registry.
 
 	clone := *rest.url
 	q := clone.Query()
-	q.Set("op", xflag.LastName(flag.CommandLine))
+	q.Set(RestKeyOp, xflag.LastName(flag.CommandLine))
 	clone.RawQuery = q.Encode()
 	req, err := http.
 		NewRequestWithContext(ctx, http.MethodGet, clone.String(), nil)
@@ -192,7 +215,7 @@ RESTful reload registry configuration.
 
 	clone := *rest.url
 	q := clone.Query()
-	q.Set("op", "reload")
+	q.Set(RestKeyOp, RestOpReload)
 	clone.RawQuery = q.Encode()
 	req, err := http.
 		NewRequestWithContext(ctx, http.MethodPut, clone.String(), nil)
@@ -224,8 +247,8 @@ RESTful query and print registry object.
 
 	clone := *rest.url
 	q := clone.Query()
-	q.Set("op", "show")
-	q.Set("obj", xflag.LastName(flag.CommandLine))
+	q.Set(RestKeyOp, RestOpShow)
+	q.Set(RestKeyObj, xflag.LastName(flag.CommandLine))
 	for i, arg := range flag.Args() {
 		q.Set(fmt.Sprint("arg", i), arg)
 	}
@@ -260,7 +283,7 @@ RESTful subscribe to VPN.
 
 	clone := *rest.url
 	q := clone.Query()
-	q.Set("op", xflag.LastName(flag.CommandLine))
+	q.Set(RestKeyOp, xflag.LastName(flag.CommandLine))
 	clone.RawQuery = q.Encode()
 	req, err := http.
 		NewRequestWithContext(ctx, http.MethodPut, clone.String(), nil)
@@ -428,9 +451,9 @@ func (rest *rest) tryCheckin(
 ) {
 	clone := *rest.url
 	q := clone.Query()
-	q.Set("op", "checkin")
+	q.Set(RestKeyOp, RestOpCheckin)
 	if optsvc.Addr().IsValid() {
-		q.Set("service", optsvc.String())
+		q.Set(RestKeyService, optsvc.String())
 	}
 	clone.RawQuery = q.Encode()
 	body := new(bytes.Buffer)
@@ -464,9 +487,9 @@ func (rest *rest) tryCheckin(
 		val := scanner.Text()
 		switch key {
 		case "id:":
-			id, err = xerrors.MarkResult(ParseId(val))
+			id, err = xerrors.MarkResult(box.ParseId(val))
 		case "via:":
-			via, err = xerrors.MarkResult(ParseId(val))
+			via, err = xerrors.MarkResult(box.ParseId(val))
 		case "address:":
 			addr, err = xerrors.MarkResult(netip.ParseAddr(val))
 		case "prefix:":
@@ -476,13 +499,13 @@ func (rest *rest) tryCheckin(
 	return
 }
 
-func (rest *rest) whois(ctx context.Context, qname, qvalue string) (
+func (rest *rest) whois(ctx context.Context, key string, value any) (
 	*pem.Block, error,
 ) {
 	clone := *rest.url
 	q := clone.Query()
-	q.Set("op", "whois")
-	q.Set(qname, qvalue)
+	q.Set(RestKeyOp, RestOpWhois)
+	q.Set(key, fmt.Sprint(value))
 	clone.RawQuery = q.Encode()
 	req, err := xerrors.MarkResult(http.
 		NewRequestWithContext(ctx, http.MethodGet, clone.String(), nil))
@@ -503,19 +526,6 @@ func (rest *rest) whois(ctx context.Context, qname, qvalue string) (
 		return blk, xerrors.Invalid("encoding")
 	}
 	return blk, nil
-}
-
-func (rest *rest) whoisAddressed(ctx context.Context, addr netip.Addr) (
-	*pem.Block, error,
-) {
-	return rest.whois(ctx, "address", addr.String())
-
-}
-
-func (rest *rest) whoisIdentified(ctx context.Context, id box.Id) (
-	*pem.Block, error,
-) {
-	return rest.whois(ctx, "id", fmt.Sprint(IdIndex(id)))
 }
 
 // eXtract registry url from its certificate.

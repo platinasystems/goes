@@ -75,17 +75,18 @@ Forward ciphered packets between exchange and tunnel interface.
 		return err
 	}
 
-	iguest := IdIndex(g.id)
+	iguest := g.id.Index()
+	vguest := g.id.Version()
 	via := g.via[iguest]
 
-	svc := fmt.Sprintf("(%d via %d@%v)", iguest, via, lap)
+	svc := fmt.Sprintf("%v via %v@%v", iguest, via, lap)
 	xlog.Info.Println("start", svc)
 	defer xlog.Info.Println("stopped", svc)
 	defer wg.Wait()
 	defer cancel()
 	defer xlog.Info.Println("stopping", svc, "...")
 
-	viaBlk, err := g.whoisIdentified(cctx, via)
+	viaBlk, err := g.client.rest.whois(cctx, RestKeyId, via)
 	if err != nil {
 		return err
 	} else if err = g.peer(viaBlk); err != nil {
@@ -228,7 +229,8 @@ guestLoop:
 				tunWriteCh <- bx
 			} else if ato.IsMulticast() {
 				g.multicast(pktTxCh, bx, ato)
-			} else if g.vpnPrefix.Contains(ato) {
+			} else if ato.IsLinkLocalUnicast() ||
+				g.vpnPrefix.Contains(ato) {
 				g.unicast(pktTxCh, bx, ato)
 			} else {
 				xlog.Info.Println(ato, "out of", g.vpnPrefix)
@@ -236,98 +238,110 @@ guestLoop:
 			}
 		case bx, ok := <-pktRxCh:
 			if !ok {
-				xlog.Info.Println("pkt tx ch closed")
+				xlog.Errata.Println("pkt tx ch closed")
 				break guestLoop
 			}
-			avia := bx.AddrPort
-			ex, ok := g.via[iguest]
-			ivia := IdIndex(ex)
-			if !ok {
-				xlog.Errata.Printf("no cipher for exchange %d",
-					ivia)
-				bx.Return()
-				continue guestLoop
-			}
-			cex, ok := g.gcm[ivia]
-			if !ok {
-				xlog.Errata.Printf("no cipher for exchange %d",
-					ivia)
-				bx.Return()
-				continue guestLoop
-			}
-			if svc := g.service[ivia]; avia != svc {
-				xlog.Info.Println(avia, "!=", svc)
-				bx.Return()
-				continue guestLoop
-			}
-			// afrom := bx.AddrPort
 			from := bx.FromWhom()
-			ifrom, vfrom := IdIndex(from), IdVersion(from)
-			ver, ok := g.ver[ifrom]
-			if !ok || ver != vfrom {
+			ifrom, vfrom := from.Index(), from.Version()
+			if v, ok := g.ver[ifrom]; !ok || v != vfrom {
 				g.whoisId(pktTxCh, from)
 				bx.Return()
 				continue guestLoop
 			}
-			cfrom, ok := g.gcm[ifrom]
-			if !ok {
-				xlog.Errata.Printf("no cipher for guest %d",
-					ifrom)
+			via := bx.ViaWhom()
+			ivia, vvia := via.Index(), via.Version()
+			if v, ok := g.ver[ivia]; !ok || v != vvia {
+				xlog.Errata.Println("FIXME ask registry",
+					"whois id", via)
 				bx.Return()
 				continue guestLoop
 			}
-			if err = bx.UnsealWith(cex); err != nil {
-				xlog.Info.Println("unseal:", err)
+			svc, ok := g.service[ivia]
+			if !ok || svc.Compare(bx.AddrPort) != 0 {
+				g.service[ivia] = bx.AddrPort
+			}
+			opener, ok := g.gcm[ivia]
+			if !ok {
+				xlog.Errata.Print("no cipher for exchange %d",
+					ivia)
+				bx.Return()
+				continue guestLoop
+			}
+			if err = bx.UnsealWith(opener); err != nil {
+				xlog.Errata.Println("unseal:", err)
 				bx.Return()
 				continue guestLoop
 			}
 			to := bx.ToWhom()
-			if to != g.id {
-				err = g.hello(pktTxCh, from, time.Now())
-				if err != nil {
-					xlog.Errata.Println(err)
+			ito, vto := to.Index(), to.Version()
+			if ito == iguest {
+				if vto != vguest {
+					xlog.Errata.Print("wrong version")
+					bx.Return()
+					continue guestLoop
 				}
-				bx.Return()
-				continue guestLoop
+				if opener, ok = g.gcm[ifrom]; !ok {
+					xlog.Errata.Printf("no cipher for "+
+						"guest %d", ifrom)
+					bx.Return()
+					continue guestLoop
+				}
 			}
-			if err = bx.OpenWith(cfrom); err != nil {
+			if err = bx.OpenWith(opener); err != nil {
 				xlog.Info.Print(err)
 				bx.Return()
 				continue guestLoop
 			}
-			pdu := VpnPDU(bx.Contents)
-			xlog.Info.Print(pdu)
-			h, d, err := pdu.Parse()
+			xlog.Info.Println("rx", Box{bx})
+			hvpn, dvpn, err := Box{bx}.PDU().Parse()
 			if err != nil {
 				xlog.Errata.Println(err)
 				bx.Return()
 				continue guestLoop
 			}
-			switch h.Proto {
+			switch hvpn.Proto {
 			case VPN_P_HELLO:
 				// FIXME re-checkin if registry era mismatch
 				// else re-query exchange from registry
 				// if that era is mismatched
 				bx.Return()
 			case VPN_P_PUBLIC_KEY:
-				blk, _ := pem.Decode(d)
+				blk, _ := pem.Decode(dvpn)
 				if blk == nil {
-					xlog.Info.Println("encoding")
+					xlog.Errata.Println("encoding?")
 				} else if err = g.peer(blk); err != nil {
 					xlog.Info.Println(err)
 				}
 				bx.Return()
 			case VPN_P_IP:
-				xnet.Overwrite(bx.Contents, netph.TunPI{
+				xnet.Encode(bx.Contents, netph.TunPI{
 					Proto: netph.TUN_P_IP,
 				})
-				tunWriteCh <- bx
+				if ip, _, err := netpdu.
+					IP(dvpn).Parse(); err != nil {
+					xlog.Errata.Print(err)
+					bx.Return()
+				} else {
+					sa := netip.AddrFrom4(ip.SA)
+					g.addressed[sa] = from
+					tunWriteCh <- bx
+				}
 			case VPN_P_IP6:
-				xnet.Overwrite(bx.Contents, netph.TunPI{
+				xnet.Encode(bx.Contents, netph.TunPI{
 					Proto: netph.TUN_P_IP6,
 				})
-				tunWriteCh <- bx
+				if ip, _, err := netpdu.
+					IP6(dvpn).Parse(); err != nil {
+					xlog.Errata.Print(err)
+					bx.Return()
+				} else {
+					sa := netip.AddrFrom16(ip.SA)
+					g.addressed[sa] = from
+					tunWriteCh <- bx
+				}
 			default:
+				xlog.Errata.Printf("invalid proto %#x",
+					hvpn.Proto)
 				bx.Return()
 			}
 		}
@@ -335,16 +349,60 @@ guestLoop:
 	return err
 }
 
+func (g *guest) hello(ch chan<- *box.Box, to box.Id, now time.Time) error {
+	var err error
+	ito := to.Index()
+	cto, ok := g.gcm[ito]
+	if !ok {
+		return fmt.Errorf("%d: no cipher", ito)
+	}
+	via, ok := g.via[ito]
+	if !ok {
+		via = to
+	}
+	ivia := via.Index()
+	cvia, ok := g.gcm[ivia]
+	if !ok {
+		return fmt.Errorf("%d: no exchange cipher", ivia)
+	}
+	avia, ok := g.service[ivia]
+	if !ok {
+		return fmt.Errorf("%d: no exchange service", ivia)
+	}
+	bx := box.New()
+	bx.Contents, err = xnet.Attach(bx.Contents, netph.TunPI{
+		Proto: VPN_P_HELLO,
+	})
+	if err != nil {
+		bx.Return()
+		return err
+	}
+	bx.Contents, err = xnet.Attach(bx.Contents, now.UnixMicro())
+	if err != nil {
+		bx.Return()
+		return err
+	}
+	bx.AddrPort = avia
+	bx.From(g.id)
+	bx.To(to)
+	bx.Via(via)
+	xlog.Info.Println("tx", Box{bx})
+	bx.CloseWith(cto)
+	bx.SealWith(cvia)
+	bx.NonBlockingPut(ch)
+	return nil
+}
+
 func (g *guest) multicast(ch chan<- *box.Box, bx *box.Box, addr netip.Addr) {
 	setVpnProto(bx, addr.Is6())
-	xlog.Info.Println("multicast", VpnPDU(bx.Contents))
-	iguest := IdIndex(g.id)
+	iguest := g.id.Index()
 	via := g.via[iguest]
-	ivia := IdIndex(via)
+	ivia := via.Index()
 	c := g.gcm[ivia]
 	bx.From(g.id)
 	bx.To(via)
 	bx.Via(via)
+	xlog.Info.Println("multicast", Box{bx})
 	bx.CloseWith(c)
 	bx.SealWith(c)
 	bx.AddrPort = g.service[ivia]
@@ -353,7 +411,6 @@ func (g *guest) multicast(ch chan<- *box.Box, bx *box.Box, addr netip.Addr) {
 
 func (g *guest) unicast(ch chan<- *box.Box, bx *box.Box, addr netip.Addr) {
 	setVpnProto(bx, addr.Is6())
-	xlog.Info.Println("unicast", VpnPDU(bx.Contents))
 	bx.From(g.id)
 	to, ok := g.addressed[addr]
 	if !ok {
@@ -362,27 +419,26 @@ func (g *guest) unicast(ch chan<- *box.Box, bx *box.Box, addr netip.Addr) {
 		return
 	}
 	bx.To(to)
-	ito := IdIndex(to)
+	ito := to.Index()
 	cto, ok := g.gcm[ito]
 	if !ok {
-		xlog.Info.Printf("%d@%v: %s", ito, addr, "no guest cipher")
+		xlog.Errata.Printf("%v@%v: %s", to, addr, "no guest cipher")
 		bx.Return()
 		return
 	}
-	bx.CloseWith(cto)
 	via, ok := g.via[ito]
 	if !ok {
 		if _, ok := g.service[ito]; ok {
 			via = to
 		} else {
-			xlog.Errata.Printf("%d@%v: %s",
-				ito, addr, "no guest exchange")
+			xlog.Errata.Printf("%v@%v: %s", to, addr,
+				"no guest exchange")
 			bx.Return()
 			return
 		}
 	}
 	bx.Via(via)
-	ivia := IdIndex(via)
+	ivia := via.Index()
 	cvia, ok := g.gcm[ivia]
 	if !ok {
 		g.whoisId(ch, via)
@@ -395,6 +451,8 @@ func (g *guest) unicast(ch chan<- *box.Box, bx *box.Box, addr netip.Addr) {
 		bx.Return()
 		return
 	}
+	xlog.Info.Println("unicast", Box{bx})
+	bx.CloseWith(cto)
 	bx.SealWith(cvia)
 	bx.NonBlockingPut(ch)
 }
@@ -404,7 +462,7 @@ func setVpnProto(bx *box.Box, is6 bool) {
 	if is6 {
 		ethp = VPN_P_IP6
 	}
-	xnet.Overwrite(bx.Contents, netph.TunPI{
+	xnet.Encode(bx.Contents, netph.TunPI{
 		Proto: ethp,
 	})
 }
@@ -433,13 +491,13 @@ func (g *guest) whoisAddressed(ch chan<- *box.Box, addr netip.Addr) {
 	var err error
 	a16 := addr.As16()
 	bx := box.New()
-	if bx.Contents, err = xnet.Add(bx.Contents, netph.TunPI{
+	if bx.Contents, err = xnet.Attach(bx.Contents, netph.TunPI{
 		Proto: VPN_P_WHOIS_ADDRESSED,
 	}); err != nil {
 		xlog.Errata.Print(err)
 		bx.Return()
 	} else if bx.Contents, err = xnet.
-		Add(bx.Contents, a16[:]); err != nil {
+		Attach(bx.Contents, a16[:]); err != nil {
 		xlog.Errata.Print(err)
 		bx.Return()
 	} else {
@@ -451,12 +509,12 @@ func (g *guest) whoisAddressed(ch chan<- *box.Box, addr netip.Addr) {
 func (g *guest) whoisId(ch chan<- *box.Box, id box.Id) {
 	var err error
 	bx := box.New()
-	if bx.Contents, err = xnet.Add(bx.Contents, netph.TunPI{
+	if bx.Contents, err = xnet.Attach(bx.Contents, netph.TunPI{
 		Proto: VPN_P_WHOIS_IDENTIFIED,
 	}); err != nil {
 		xlog.Errata.Print(err)
 		bx.Return()
-	} else if bx.Contents, err = xnet.Add(bx.Contents, id); err != nil {
+	} else if bx.Contents, err = xnet.Attach(bx.Contents, id); err != nil {
 		xlog.Errata.Print(err)
 		bx.Return()
 	} else {
@@ -466,13 +524,13 @@ func (g *guest) whoisId(ch chan<- *box.Box, id box.Id) {
 }
 
 func (g *guest) whois(ch chan<- *box.Box, bx *box.Box) {
-	via, ok := g.via[IdIndex(g.id)]
+	via, ok := g.via[g.id.Index()]
 	if !ok {
 		xlog.Errata.Print("no assigned exchange")
 		bx.Return()
 		return
 	}
-	ivia := IdIndex(via)
+	ivia := via.Index()
 	cvia, ok := g.gcm[ivia]
 	if !ok {
 		xlog.Errata.Print("no shared cipher")
@@ -511,7 +569,7 @@ func tunReadRoutine(
 			xlog.Errata.Print(name, ": ", err)
 			break
 		}
-		xlog.Info.Println(name, "read", netpdu.TunPI(bx.Contents))
+		xlog.Info.Println("read", name, netpdu.TunPI(bx.Contents))
 		ch <- bx
 	}
 }
@@ -536,7 +594,7 @@ func tunWriteRoutine(
 				xlog.Info.Println(name, "write ch closed")
 				return
 			}
-			xlog.Info.Println(name, "write",
+			xlog.Info.Println("write", name,
 				netpdu.TunPI(bx.Contents))
 			_, err := bx.WriteTo(w)
 			bx.Return()

@@ -1,4 +1,4 @@
-// Copyright © 2023-2024 Platina Systems, Inc. All rights reserved.
+// Copyright © 2023-2025 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -6,7 +6,6 @@ package net_tool
 
 import (
 	"context"
-	"errors"
 	"flag"
 	"fmt"
 	"time"
@@ -26,8 +25,8 @@ Send ICMP ECHO_REQUEST packets to network “host”, default 127.0.0.1.
 
 	iFlag := flag.Duration("i", time.Second, "Interval.")
 	mFlag := flag.Uint("m", 0, "IP Time To Live for outgoing packets.")
-	oFlag := flag.Bool("o", false,
-		"Exit successfully after receiving one reply packet.")
+	tFlag := flag.Duration("t", 3*time.Second, `
+Timeout before ping exits, regardless of how many received packets.`[1:])
 	qFlag := flag.Bool("q", false, "Quiet.")
 	vFlag := flag.Bool("v", false, "Verbose.")
 
@@ -53,16 +52,17 @@ Send ICMP ECHO_REQUEST packets to network “host”, default 127.0.0.1.
 	pinger.Count = int(*cFlag)
 	pinger.Interval = *iFlag
 
+	if *tFlag != 0 {
+		pinger.Timeout = *tFlag
+	}
 	if *mFlag != 0 {
 		pinger.TTL = int(*mFlag)
 	}
-
 	if !isNumericHost {
 		if err = pinger.Resolve(); err != nil {
 			return err
 		}
 	}
-	cctx, cancel := context.WithCancel(ctx)
 
 	/* e.g.
 	PING localhost (127.0.0.1): 56 data bytes
@@ -78,16 +78,16 @@ Send ICMP ECHO_REQUEST packets to network “host”, default 127.0.0.1.
 		fmt.Printf("PING %s (%v); %d data bytes\n",
 			pinger.Addr(), pinger.IPAddr(), pinger.Size)
 	}
-	pinger.OnSend = func(pkt *probing.Packet) {
-		if *vFlag {
+	if *vFlag {
+		pinger.OnSend = func(pkt *probing.Packet) {
 			fmt.Printf("%d bytes to %v; icmp_seq=%d\n",
 				pkt.Nbytes,
 				pkt.IPAddr,
 				pkt.Seq)
 		}
 	}
-	pinger.OnRecv = func(pkt *probing.Packet) {
-		if !*qFlag {
+	if !*qFlag {
+		pinger.OnRecv = func(pkt *probing.Packet) {
 			fmt.Printf("%d bytes from %v; "+
 				"icmp_seq=%d ttl=%d time=%v\n",
 				pkt.Nbytes,
@@ -96,12 +96,7 @@ Send ICMP ECHO_REQUEST packets to network “host”, default 127.0.0.1.
 				pkt.TTL,
 				pkt.Rtt)
 		}
-		if *oFlag {
-			cancel()
-		}
-	}
-	pinger.OnFinish = func(stats *probing.Statistics) {
-		if !*qFlag {
+		pinger.OnFinish = func(stats *probing.Statistics) {
 			fmt.Printf("\n--- %s ping statistics ---\n",
 				stats.Addr)
 			fmt.Printf("%d packets transmitted, "+
@@ -117,9 +112,5 @@ Send ICMP ECHO_REQUEST packets to network “host”, default 127.0.0.1.
 				stats.StdDevRtt)
 		}
 	}
-	err = pinger.RunWithContext(cctx)
-	if errors.Is(err, context.Canceled) {
-		err = nil
-	}
-	return err
+	return pinger.RunWithContext(ctx)
 }

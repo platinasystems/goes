@@ -1,4 +1,4 @@
-// Copyright © 2023-2024 Platina Systems, Inc. All rights reserved.
+// Copyright © 2023-2025 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -57,7 +57,7 @@ func (book *IdBook) New() box.Id {
 func (book *IdBook) InUse(id box.Id) bool {
 	book.Lock()
 	defer book.Unlock()
-	i, j, k := IdBookMark(IdIndex(id))
+	i, j, k := IdBookMark(id.Index())
 	if i >= len(book.bits) || j >= IdBookPageSize {
 		return false
 	}
@@ -67,7 +67,7 @@ func (book *IdBook) InUse(id box.Id) bool {
 func (book *IdBook) Put(id box.Id) {
 	book.Lock()
 	defer book.Unlock()
-	i, j, k := IdBookMark(IdIndex(id))
+	i, j, k := IdBookMark(id.Index())
 	_ = book.bits[i][j]
 	book.bits[i][j] &^= 1 << k
 }
@@ -75,7 +75,7 @@ func (book *IdBook) Put(id box.Id) {
 func (book *IdBook) Reserve(id box.Id) {
 	book.Lock()
 	defer book.Unlock()
-	i, j, k := IdBookMark(IdIndex(id))
+	i, j, k := IdBookMark(id.Index())
 	for pg := len(book.bits); pg <= i; pg++ {
 		book.bits = append(book.bits, NewIdBookPage())
 	}
