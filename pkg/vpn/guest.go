@@ -13,7 +13,6 @@ import (
 	"net"
 	"net/netip"
 	"sync"
-	"time"
 
 	"github.com/platinasystems/goes/v2/pkg/box"
 	"github.com/platinasystems/goes/v2/pkg/netif"
@@ -189,13 +188,6 @@ Forward ciphered packets between exchange and tunnel interface.
 	go tunWriteRoutine(cctx, &wg, tun.Name(), tun, tunWriteCh)
 	defer close(tunWriteCh)
 
-	if err = g.hello(pktTxCh, via, time.Now()); err != nil {
-		return err
-	}
-
-	kat := time.NewTicker(30 * time.Second)
-	defer kat.Stop()
-
 	xlog.Info.Printf("start (%s, %v)", nif.Name, g.hostPrefix)
 	defer xlog.Info.Printf("stopped (%s, %v)", nif.Name, g.hostPrefix)
 
@@ -205,11 +197,6 @@ guestLoop:
 		case <-cctx.Done():
 			xlog.Info.Println("done")
 			break guestLoop
-		case t := <-kat.C:
-			err = g.hello(pktTxCh, g.via[iguest], t)
-			if err != nil {
-				xlog.Errata.Println(err)
-			}
 		case bx, ok := <-tunReadCh:
 			if !ok {
 				xlog.Info.Println("tun read ch closed")
@@ -301,9 +288,7 @@ guestLoop:
 			}
 			switch hvpn.Proto {
 			case VPN_P_HELLO:
-				// FIXME re-checkin if registry era mismatch
-				// else re-query exchange from registry
-				// if that era is mismatched
+				xlog.Info.Println("ignore hello")
 				bx.Return()
 			case VPN_P_PUBLIC_KEY:
 				blk, _ := pem.Decode(dvpn)
@@ -347,50 +332,6 @@ guestLoop:
 		}
 	}
 	return err
-}
-
-func (g *guest) hello(ch chan<- *box.Box, to box.Id, now time.Time) error {
-	var err error
-	ito := to.Index()
-	cto, ok := g.gcm[ito]
-	if !ok {
-		return fmt.Errorf("%d: no cipher", ito)
-	}
-	via, ok := g.via[ito]
-	if !ok {
-		via = to
-	}
-	ivia := via.Index()
-	cvia, ok := g.gcm[ivia]
-	if !ok {
-		return fmt.Errorf("%d: no exchange cipher", ivia)
-	}
-	avia, ok := g.service[ivia]
-	if !ok {
-		return fmt.Errorf("%d: no exchange service", ivia)
-	}
-	bx := box.New()
-	bx.Contents, err = xnet.Attach(bx.Contents, netph.TunPI{
-		Proto: VPN_P_HELLO,
-	})
-	if err != nil {
-		bx.Return()
-		return err
-	}
-	bx.Contents, err = xnet.Attach(bx.Contents, now.UnixMicro())
-	if err != nil {
-		bx.Return()
-		return err
-	}
-	bx.AddrPort = avia
-	bx.From(g.id)
-	bx.To(to)
-	bx.Via(via)
-	xlog.Info.Println("tx", Box{bx})
-	bx.CloseWith(cto)
-	bx.SealWith(cvia)
-	bx.NonBlockingPut(ch)
-	return nil
 }
 
 func (g *guest) multicast(ch chan<- *box.Box, bx *box.Box, addr netip.Addr) {

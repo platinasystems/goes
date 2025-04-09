@@ -13,7 +13,6 @@ import (
 	"net"
 	"net/netip"
 	"sync"
-	"time"
 
 	"github.com/platinasystems/goes/v2/pkg/box"
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
@@ -236,8 +235,7 @@ func (ex *exchange) rx(
 	}
 	switch h.Proto {
 	case VPN_P_HELLO:
-		ex.txHelloAck(from)
-		ex.replicate("relay", bx.Box, from)
+		xlog.Info.Println("ignore hello")
 	case VPN_P_WHOIS_ADDRESSED:
 		if addr := WhoisAddress(d); !addr.IsValid() {
 			xlog.Errata.Println("rx whois underrun")
@@ -345,36 +343,6 @@ func (ex *exchange) replicate(lbl string, bx *box.Box, from box.Id) {
 			clone.NonBlockingPut(ex.pktTxCh)
 		}
 	}
-}
-
-func (ex *exchange) txHelloAck(to box.Id) {
-	var err error
-	ito := to.Index()
-	c, ok := ex.gcm[ito]
-	if !ok {
-		xlog.Errata.Println("%d: no GCM", ito)
-		return
-	}
-	bx := box.New()
-	bx.AddrPort = ex.service[ito]
-	bx.From(ex.id)
-	bx.To(to)
-	bx.Contents, err = xnet.Attach(bx.Contents, netph.TunPI{
-		Proto: VPN_P_HELLO,
-	})
-	if err != nil {
-		bx.Return()
-		return
-	}
-	bx.Contents, err = xnet.Attach(bx.Contents, time.Now().UnixMicro())
-	if err != nil {
-		bx.Return()
-		return
-	}
-	xlog.Info.Println("hello ack", Box{bx})
-	bx.CloseWith(c)
-	bx.SealWith(c)
-	bx.NonBlockingPut(ex.pktTxCh)
 }
 
 func (ex *exchange) txICMP6EchoReply(
