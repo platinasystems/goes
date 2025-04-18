@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/platinasystems/goes/v2/pkg/integer"
+	"github.com/platinasystems/goes/v2/pkg/netrt"
 	"golang.org/x/sys/unix"
 )
 
@@ -30,11 +31,11 @@ var gwFlagValues = map[string]uint{
 	"static":    unix.RTF_STATIC,
 }
 
-func rtmdel(rtm *unix.RtMsghdr) {
+func rtmdel(rtm *netrt.RtMsghdr2) {
 	integer.Set(&rtm.Flags, unix.RTF_PINNED)
 }
 
-func rtmmetrics(rtm *unix.RtMsghdr, metrics []string) {
+func rtmmetrics(rtm *netrt.RtMsghdr2, metrics []string) {
 	for _, metric := range metrics {
 		eq := strings.Index(metric, "=")
 		if eq < 1 {

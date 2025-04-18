@@ -1,4 +1,4 @@
-// Copyright © 2023-2024 Platina Systems, Inc. All rights reserved.
+// Copyright © 2023-2025 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -153,17 +153,17 @@ func netstatr(ctx context.Context, opts *options) error {
 	} else if *opts.afinet6 {
 		family = xnet.AF_INET6
 	}
-	streamer, err := netrt.NewList(ctx, family)
+	rter, err := netrt.Routes(ctx, family)
 	if err != nil {
 		return err
 	}
-	defer streamer.Close()
+	defer rter.Close()
 	dstbuf := new(strings.Builder)
 	gwbuf := new(strings.Builder)
 	flagbuf := new(strings.Builder)
 	var dsts, gws, flags, ifnames []string
 	for {
-		nrt, err := streamer.Next(ctx)
+		nrt, err := rter.NextRt(ctx)
 		if err != nil {
 			return err
 		} else if nrt == nil {

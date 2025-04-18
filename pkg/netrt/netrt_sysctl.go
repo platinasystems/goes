@@ -1,4 +1,4 @@
-// Copyright © 2023-2024 Platina Systems, Inc. All rights reserved.
+// Copyright © 2023-2025 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -13,50 +13,86 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-type list struct{ data []byte }
+type sysctlRsp struct {
+	data []byte
+}
 
-func NewList(ctx context.Context, family int) (Streamer, error) {
-	data, err := xnet.SysctlGet(
+func Neighbors(ctx context.Context, family int) (NextNdCloser, error) {
+	mib := []int32{
+		unix.CTL_NET,
+		xnet.AF_ROUTE,
+		0,
+		int32(family),
+		unix.NET_RT_FLAGS,
+		unix.RTF_LLINFO,
+	}
+	data, err := xnet.SysctlGet(mib...)
+	if err != nil {
+		return nil, err
+	}
+	return &sysctlRsp{data}, nil
+}
+
+func Routes(ctx context.Context, family int) (NextRtCloser, error) {
+	mib := []int32{
 		unix.CTL_NET,
 		xnet.AF_ROUTE,
 		0,
 		int32(family),
 		unix.NET_RT_DUMP,
 		0,
-		// FIXME fib?
-	)
+	}
+	data, err := xnet.SysctlGet(mib...)
 	if err != nil {
 		return nil, err
 	}
-	return &list{data}, nil
+	return &sysctlRsp{data}, nil
 }
 
-func (l *list) Close() error {
-	l.data = l.data[:0]
+func (rsp *sysctlRsp) Close() error {
+	rsp.data = []byte{}[:0]
 	return nil
 }
 
-func (l *list) Next(ctx context.Context) (NetRt, error) {
-	for len(l.data) > xnet.SysctlMsgMin {
-		rtm := PointerRtMsghdr(l.data)
-		if len(l.data) < Sizeof(rtm) {
+func (rsp *sysctlRsp) NextNd(ctx context.Context) (Nd, error) {
+	for len(rsp.data) > xnet.SysctlMsgMin {
+		rtm, body, data := Extract[RtMsghdr2](rsp.data)
+		if rtm == nil {
 			break
 		}
-		n := xnet.SysctlAlign(int(rtm.Msglen))
-		msg := l.data[:n]
-		l.data = l.data[n:]
+		rsp.data = data
 		if rtm.Version != unix.RTM_VERSION {
 			continue
 		}
 		if rtm.Type != unix.RTM_GET {
 			continue
 		}
-		// macOS seems to filter routes with both of these flags
-		const gh = unix.RTF_GATEWAY | unix.RTF_HOST
+		if (rtm.Flags & unix.RTF_HOST) == 0 {
+			continue
+		}
+		return newNetRt(rtm, body), nil
+	}
+	return nil, nil
+}
+
+func (rsp *sysctlRsp) NextRt(ctx context.Context) (Rt, error) {
+	const gh = unix.RTF_GATEWAY | unix.RTF_HOST
+	for len(rsp.data) > xnet.SysctlMsgMin {
+		rtm, body, data := Extract[RtMsghdr2](rsp.data)
+		if rtm == nil {
+			break
+		}
+		rsp.data = data
+		if rtm.Version != unix.RTM_VERSION {
+			continue
+		}
+		if rtm.Type != unix.RTM_GET {
+			continue
+		}
 		if (rtm.Flags & gh) == gh {
 			continue
 		}
-		return newNetRt(msg), nil
+		return newNetRt(rtm, body), nil
 	}
 	return nil, nil
 }

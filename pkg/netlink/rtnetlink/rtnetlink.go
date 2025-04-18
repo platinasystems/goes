@@ -500,6 +500,34 @@ const (
 	TCA_DUMP_FLAGS_TERSE = 1 << iota
 )
 
+type NdMsg struct {
+	Family  uint8
+	_       uint8
+	_       uint16
+	IfIndex int32
+	State   uint16
+	Flags   uint8
+	Type    uint8
+}
+
+type Nda = uint16
+
+const (
+	NDA_UNSPEC Nda = iota
+	NDA_DST
+	NDA_LLADDR
+	NDA_CACHEINFO
+	NDA_PROBES
+	NDA_VLAN
+	NDA_PORT
+	NDA_VNI
+	NDA_IFINDEX
+	NDA_MASTER
+	NDA_LINK_NETNSID
+	NDA_CNT
+)
+const NDA_MAX = NDA_CNT - 1
+
 type NdUserOptMsg struct {
 	Family   uint8
 	_        uint8

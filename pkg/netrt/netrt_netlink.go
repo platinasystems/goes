@@ -1,4 +1,4 @@
-// Copyright © 2023-2024 Platina Systems, Inc. All rights reserved.
+// Copyright © 2023-2025 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -11,17 +11,22 @@ import (
 	"net"
 	"net/netip"
 
+	"github.com/platinasystems/goes/v2/pkg/integer"
 	"github.com/platinasystems/goes/v2/pkg/netlink"
 	"github.com/platinasystems/goes/v2/pkg/netlink/rtnetlink"
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xnet"
 )
 
+type netrts struct{ nl }
+
 type netrt struct {
-	index int32
-	line  int32
-	flags int32
-	bits  int
+	bits,
+	index,
+	line,
+	expire,
+	state int
+	flags uint
 	dst   netip.Addr
 	ifa   netip.Addr
 	gw    netip.Addr
@@ -29,45 +34,38 @@ type netrt struct {
 }
 
 func (nrt *netrt) Bits() int            { return nrt.bits }
-func (nrt *netrt) Index() int           { return int(nrt.index) }
-func (nrt *netrt) Line() int            { return int(nrt.line) }
-func (nrt *netrt) Flags() uint          { return uint(nrt.flags) }
+func (nrt *netrt) Index() int           { return nrt.index }
+func (nrt *netrt) Line() int            { return nrt.line }
+func (nrt *netrt) Flags() uint          { return nrt.flags }
 func (nrt *netrt) Dst() netip.Addr      { return nrt.dst }
 func (nrt *netrt) IFA() netip.Addr      { return nrt.ifa }
 func (nrt *netrt) GW() netip.Addr       { return nrt.gw }
 func (nrt *netrt) HA() net.HardwareAddr { return nrt.ha }
+func (nrt *netrt) Expire() int          { return nrt.expire }
+func (nrt *netrt) State() int           { return nrt.state }
 
-type stream struct {
-	nl  *netlink.NL
-	seq uint32
-}
-
-func NewList(ctx context.Context, family int) (Streamer, error) {
+func Routes(ctx context.Context, family int) (NextRtCloser, error) {
 	hdr, req := netlink.ExpandMsgHdr(nil)
 	hdr.Type = rtnetlink.RTM_GETROUTE
 	hdr.Flags = netlink.NLM_F_REQUEST | netlink.NLM_F_DUMP
 	gen, req := netlink.ExpandRtGenMsg(req)
-	gen.Family = uint8(family)
-	nl, err := netlink.Open()
+	integer.Assign(&gen.Family, family)
+	sock, err := netlink.Open()
 	if err != nil {
 		return nil, err
 	}
-	if err = nl.Request(req); err != nil {
+	if err = sock.Request(req); err != nil {
 		return nil, err
 	}
-	return &stream{nl, hdr.SEQ}, nil
+	return netrts{nl{hdr.SEQ, sock}}, nil
 }
 
-func (strm *stream) Close() error {
-	return strm.nl.Close()
-}
-
-func (strm *stream) Next(ctx context.Context) (NetRt, error) {
+func (rts netrts) NextRt(ctx context.Context) (Rt, error) {
 	for {
-		rsp, data, err := strm.nl.Next(ctx)
+		rsp, data, err := rts.sock.Next(ctx)
 		if err != nil {
 			return nil, err
-		} else if rsp.SEQ != strm.seq {
+		} else if rsp.SEQ != rts.seq {
 			continue
 		} else if rsp.Type == netlink.NLMSG_DONE {
 			break
@@ -77,27 +75,27 @@ func (strm *stream) Next(ctx context.Context) (NetRt, error) {
 		} else if rsp.Type != rtnetlink.RTM_NEWROUTE {
 			continue
 		}
-		m, data := netlink.ExtractRtMsg(data)
-		if m.Family != xnet.AF_INET && m.Family != xnet.AF_INET6 {
+		rtm, data := netlink.ExtractRtMsg(data)
+		if rtm.Family != xnet.AF_INET && rtm.Family != xnet.AF_INET6 {
 			continue
 		}
-		nrt := &netrt{
-			bits: int(m.DstLen),
-		}
+		rt := new(netrt)
+		integer.Assign(&rt.bits, rtm.DstLen)
 		for netlink.HasAttr(data) {
 			t, v, datá := netlink.ExtractAttr(data)
 			data = datá
 			switch rtnetlink.Rta(t) {
 			case rtnetlink.RTA_UNSPEC:
 			case rtnetlink.RTA_DST:
-				nrt.dst, _ = netlink.IP(m.Family, v)
+				rt.dst, _ = netlink.IP(rtm.Family, v)
 			case rtnetlink.RTA_SRC:
 			case rtnetlink.RTA_IIF:
 			case rtnetlink.RTA_OIF:
-				nrt.index = *(netlink.Pointer[int32](v))
-				nrt.line = nrt.index
+				integer.Assign(&rt.index,
+					*(netlink.Pointer[int32](v)))
+				integer.Assign(&rt.line, rt.index)
 			case rtnetlink.RTA_GATEWAY:
-				nrt.gw, _ = netlink.IP(m.Family, v)
+				rt.gw, _ = netlink.IP(rtm.Family, v)
 			case rtnetlink.RTA_PRIORITY:
 			case rtnetlink.RTA_PREFSRC:
 			case rtnetlink.RTA_METRICS:
@@ -112,7 +110,7 @@ func (strm *stream) Next(ctx context.Context) (NetRt, error) {
 			case rtnetlink.RTA_MARK:
 			case rtnetlink.RTA_MFC_STATS:
 			case rtnetlink.RTA_VIA:
-				nrt.gw, _ = netlink.Via(v)
+				rt.gw, _ = netlink.Via(v)
 			case rtnetlink.RTA_NEWDST:
 			case rtnetlink.RTA_PREF:
 			case rtnetlink.RTA_ENCAP_TYPE:
@@ -127,29 +125,29 @@ func (strm *stream) Next(ctx context.Context) (NetRt, error) {
 			case rtnetlink.RTA_NH_ID:
 			}
 		}
-		return nrt, nil
+		return rt, nil
 	}
 	return nil, nil
 }
 
-func OneReq(ctx context.Context, req []byte) (NetRt, error) {
-	nl, err := xerrors.MarkResult(netlink.Open())
+func OneRtReq(ctx context.Context, req []byte) (Rt, error) {
+	sock, err := xerrors.MarkResult(netlink.Open())
 	if err != nil {
 		return nil, err
 	}
-	defer nl.Close()
-	seq, err := xerrors.MarkResult(Req(nl, req))
+	defer sock.Close()
+	seq, err := xerrors.MarkResult(Req(sock, req))
 	if err != nil {
 		return nil, err
 	}
-	strm := stream{nl, seq}
-	return xerrors.MarkResult(strm.Next(ctx))
+	rts := netrts{nl{seq, sock}}
+	return xerrors.MarkResult(rts.NextRt(ctx))
 }
 
 // If successful, this returns the request sequence number.
-func Req(nl *netlink.NL, req []byte) (uint32, error) {
-	hdr := netlink.Pointer[netlink.MsgHdr](req)
-	err := nl.Request(req)
+func Req(sock *netlink.NL, req []byte) (uint32, error) {
+	hdr := netlink.PointerMsgHdr(req)
+	err := sock.Request(req)
 	return hdr.SEQ, err
 }
 

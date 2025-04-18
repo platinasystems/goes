@@ -1,4 +1,4 @@
-// Copyright © 2023-2024 Platina Systems, Inc. All rights reserved.
+// Copyright © 2023-2025 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -21,7 +21,8 @@ type Messages interface {
 		ifaddr.Msg |
 		rtnetlink.IfInfoMsg |
 		rtnetlink.RtGenMsg |
-		rtnetlink.RtMsg
+		rtnetlink.RtMsg |
+		rtnetlink.NdMsg
 }
 
 type Attributes interface {
@@ -107,6 +108,7 @@ var (
 	ExpandIfInfoMsg = Expand[rtnetlink.IfInfoMsg]
 	ExpandRtGenMsg  = Expand[rtnetlink.RtGenMsg]
 	ExpandRtMsg     = Expand[rtnetlink.RtMsg]
+	ExpandNdMsg     = Expand[rtnetlink.NdMsg]
 )
 
 // Return type at beginning of data along with the aligned remainder.
@@ -123,6 +125,7 @@ var (
 	ExtractIfAddrMsg = ExtractMsg[ifaddr.Msg]
 	ExtractIfInfoMsg = ExtractMsg[rtnetlink.IfInfoMsg]
 	ExtractRtMsg     = ExtractMsg[rtnetlink.RtMsg]
+	ExtractNdMsg     = ExtractMsg[rtnetlink.NdMsg]
 )
 
 func (m *MsgErr) Err() error {

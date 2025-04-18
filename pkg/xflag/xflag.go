@@ -1,4 +1,4 @@
-// Copyright © 2023-2024 Platina Systems, Inc. All rights reserved.
+// Copyright © 2023-2025 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -10,6 +10,19 @@ import (
 	"strings"
 	"text/template"
 )
+
+func Get[T any](name string) T {
+	return GetFrom[T](flag.CommandLine, name)
+}
+
+func GetFrom[T any](flags *flag.FlagSet, name string) (v T) {
+	if f := flags.Lookup(name); f != nil {
+		if getter, ok := f.Value.(flag.Getter); ok {
+			v, _ = getter.Get().(T)
+		}
+	}
+	return
+}
 
 func LastName(flags *flag.FlagSet) string {
 	name := flags.Name()

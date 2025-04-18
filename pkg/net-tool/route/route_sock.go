@@ -1,4 +1,4 @@
-// Copyright © 2023-2024 Platina Systems, Inc. All rights reserved.
+// Copyright © 2023-2025 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -118,9 +118,9 @@ func (opts *modOptions) req(
 	fib int,
 	dst netip.Prefix,
 	gw any,
-) (netrt.NetRt, error) {
+) (netrt.Rt, error) {
 	msg := netrt.NewRtMsg()
-	rtm := netrt.PointerRtMsghdr(msg)
+	rtm := netrt.PointerRtMsghdr2(msg)
 	switch op {
 	case "add", "change":
 		if gw == nil {
@@ -153,12 +153,12 @@ func (opts *modOptions) req(
 		return nil, xerrors.Invalid("command", op)
 	}
 	msg = xnet.SAAppend(msg, dst.Addr())
-	rtm = netrt.PointerRtMsghdr(msg)
+	rtm = netrt.PointerRtMsghdr2(msg)
 	integer.Set(&rtm.Addrs, 1<<unix.RTAX_DST)
 	switch t := gw.(type) {
 	case netip.Addr:
 		msg = xnet.SAAppend(msg, t)
-		rtm = netrt.PointerRtMsghdr(msg)
+		rtm = netrt.PointerRtMsghdr2(msg)
 		integer.Set(&rtm.Addrs, 1<<unix.RTAX_GATEWAY)
 		integer.Set(&rtm.Flags, unix.RTF_GATEWAY)
 	case []net.IPAddr:
@@ -168,7 +168,7 @@ func (opts *modOptions) req(
 			return nil, xerrors.Invalid("resolved", ipa.String())
 		}
 		msg = xnet.SAAppend(msg, gwaddr)
-		rtm = netrt.PointerRtMsghdr(msg)
+		rtm = netrt.PointerRtMsghdr2(msg)
 		integer.Set(&rtm.Addrs, 1<<unix.RTAX_GATEWAY)
 		integer.Set(&rtm.Flags, unix.RTF_GATEWAY)
 	case *netif.NetIf:
@@ -178,7 +178,7 @@ func (opts *modOptions) req(
 			t.Name,
 			t.HardwareAddr,
 			[]byte{})
-		rtm = netrt.PointerRtMsghdr(msg)
+		rtm = netrt.PointerRtMsghdr2(msg)
 		integer.Set(&rtm.Addrs, 1<<unix.RTAX_GATEWAY)
 	default:
 		return nil, xerrors.Invalid("gateway")
@@ -190,7 +190,7 @@ func (opts *modOptions) req(
 			return nil, xerrors.Invalid("mask")
 		}
 		msg = xnet.SAAppend(msg, maskaddr)
-		rtm = netrt.PointerRtMsghdr(msg)
+		rtm = netrt.PointerRtMsghdr2(msg)
 		integer.Set(&rtm.Addrs, 1<<unix.RTAX_NETMASK)
 	}
 	if len(*opts.gw.genmask) > 0 {

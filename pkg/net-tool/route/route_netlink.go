@@ -1,4 +1,4 @@
-// Copyright © 2023-2024 Platina Systems, Inc. All rights reserved.
+// Copyright © 2023-2025 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -200,7 +200,7 @@ func (opts *modOptions) req(
 	fib int,
 	dst netip.Prefix,
 	gw any,
-) (netrt.NetRt, error) {
+) (netrt.Rt, error) {
 	var mx []byte
 	hdr, req := netlink.ExpandMsgHdr(nil)
 	hdr.Flags = netlink.NLM_F_REQUEST
@@ -318,5 +318,5 @@ func (opts *modOptions) req(
 		req = netlink.CatBytesAttr(req, rtnetlink.RTA_METRICS, mx)
 	}
 	netlink.PointerMsgHdr(req).Len = uint32(len(req))
-	return netrt.OneReq(ctx, req)
+	return netrt.OneRtReq(ctx, req)
 }

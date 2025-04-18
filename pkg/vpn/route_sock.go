@@ -27,7 +27,7 @@ func route(
 	gw any,
 ) error {
 	msg := netrt.NewRtMsg()
-	rtm := netrt.PointerRtMsghdr(msg)
+	rtm := netrt.PointerRtMsghdr2(msg)
 	if add {
 		rtm.Type = unix.RTM_ADD
 		integer.Set(&rtm.Flags, unix.RTF_UP)
@@ -37,12 +37,12 @@ func route(
 		integer.Set(&rtm.Flags, RTF_PINNED)
 	}
 	msg = xnet.SAAppend(msg, dst.Addr())
-	rtm = netrt.PointerRtMsghdr(msg)
+	rtm = netrt.PointerRtMsghdr2(msg)
 	integer.Set(&rtm.Addrs, 1<<unix.RTAX_DST)
 	switch t := gw.(type) {
 	case netip.Addr:
 		msg = xnet.SAAppend(msg, t)
-		rtm = netrt.PointerRtMsghdr(msg)
+		rtm = netrt.PointerRtMsghdr2(msg)
 		integer.Set(&rtm.Addrs, 1<<unix.RTAX_GATEWAY)
 		integer.Set(&rtm.Flags, unix.RTF_GATEWAY)
 	case *netif.NetIf:
@@ -52,7 +52,7 @@ func route(
 			t.Name,
 			t.HardwareAddr,
 			[]byte{})
-		rtm = netrt.PointerRtMsghdr(msg)
+		rtm = netrt.PointerRtMsghdr2(msg)
 		integer.Set(&rtm.Addrs, 1<<unix.RTAX_GATEWAY)
 	default:
 		return xerrors.Invalid("gateway", fmt.Sprintf("%T", gw))
@@ -63,7 +63,7 @@ func route(
 		return xerrors.Invalid("mask")
 	}
 	msg = xnet.SAAppend(msg, maskaddr)
-	rtm = netrt.PointerRtMsghdr(msg)
+	rtm = netrt.PointerRtMsghdr2(msg)
 	integer.Set(&rtm.Addrs, 1<<unix.RTAX_NETMASK)
 	_, err := netrt.Request(msg, -1)
 	return err

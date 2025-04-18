@@ -1,4 +1,4 @@
-// Copyright © 2023-2024 Platina Systems, Inc. All rights reserved.
+// Copyright © 2023-2025 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -15,12 +15,6 @@ import (
 )
 
 const SAMin = 2
-
-const (
-	SizeofSAIn       = int(unsafe.Sizeof(&SAIn{}))
-	SizeofSAIn6      = int(unsafe.Sizeof(&SAIn6{}))
-	SizeofSADataLink = int(unsafe.Sizeof(&SADataLink{}))
-)
 
 var (
 	SAExpandIn    = SAExpand[SAIn]
@@ -40,10 +34,13 @@ var (
 	SAPointerSADataLink = SAPointer[SADataLink]
 )
 
+// sockaddr_in
 type SAIn struct{ unix.RawSockaddrInet4 }
+
+// sockaddr_in6
 type SAIn6 struct{ unix.RawSockaddrInet6 }
 
-// Replaced RawSockaddrDatalink b/c it's
+// Replaced sockaddr_dl [unix.RawSockaddrDatalink] b/c it's
 //
 //	Data   [12]int8
 //
@@ -211,10 +208,15 @@ func SAAppendDataLink[A ~[]byte, S ~[]byte](
 func SAExtract[T SAIn | SAIn6 | SADataLink](data []byte) (
 	t *T, body, rem []byte,
 ) {
-	l := int(data[0])
-	t = SAPointer[T](data)
-	body = data[Sizeof(t):]
-	rem = data[SysctlAlign(l):]
+	if n, i := len(data), Sizeof(t); n >= i {
+		t = SAPointer[T](data)
+		body = data[i:]
+		i = SysctlAlign(int(data[0]))
+		if n <= i {
+			i = n
+		}
+		rem = data[i:]
+	}
 	return
 }
 

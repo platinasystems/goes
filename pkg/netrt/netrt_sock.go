@@ -1,4 +1,4 @@
-// Copyright © 2023-2024 Platina Systems, Inc. All rights reserved.
+// Copyright © 2023-2025 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -24,14 +24,14 @@ func Flush(ctx context.Context) error {
 	return xerrors.ErrFIXME
 }
 
-func Monitor(ctx context.Context) (Streamer, error) {
+func Monitor(ctx context.Context) (NextRtCloser, error) {
 	return nil, xerrors.ErrFIXME
 }
 
 func NewRtMsg() []byte {
 	pgsz := os.Getpagesize()
 	msg := make([]byte, pgsz, pgsz)
-	rtm := PointerRtMsghdr(msg)
+	rtm := Pointer[RtMsghdr](msg)
 	msg = msg[:Sizeof(rtm)]
 	// rtm.Type = rtmt
 	rtm.Version = unix.RTM_VERSION
@@ -39,8 +39,8 @@ func NewRtMsg() []byte {
 	return msg
 }
 
-func Request(msg []byte, fib int) (NetRt, error) {
-	rtm := PointerRtMsghdr(msg)
+func Request(msg []byte, fib int) (Rt, error) {
+	rtm := Pointer[RtMsghdr2](msg)
 	rtm.Msglen = uint16(len(msg))
 	sock, err := xnet.OpenRoute()
 	if err != nil {
@@ -62,5 +62,6 @@ func Request(msg []byte, fib int) (NetRt, error) {
 	if err != nil {
 		return nil, xerrors.Mark(err)
 	}
-	return newNetRt(msg[:n]), nil
+	rtm, body, _ := Extract[RtMsghdr2](msg[:n])
+	return newNetRt(rtm, body), nil
 }

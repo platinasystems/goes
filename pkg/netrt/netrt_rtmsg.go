@@ -1,4 +1,4 @@
-// Copyright © 2023-2024 Platina Systems, Inc. All rights reserved.
+// Copyright © 2023-2025 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -12,38 +12,45 @@ import (
 	"log"
 	"net"
 	"net/netip"
-	"text/tabwriter"
 	"time"
 	"unsafe"
 
+	"github.com/platinasystems/goes/v2/pkg/integer"
 	"github.com/platinasystems/goes/v2/pkg/netif"
 	"github.com/platinasystems/goes/v2/pkg/xnet"
 	"golang.org/x/sys/unix"
 )
 
+const RTM_VERSION = unix.RTM_VERSION
+
 type RtMsghdr = unix.RtMsghdr
+type RtMsghdr2 = unix.RtMsghdr2
+type RtMetrics = unix.RtMetrics
 
-func Extract[T RtMsghdr](data []byte) (t *T, body, rem []byte) {
-	l := xnet.SysctlMsgLen(data)
-	t = Pointer[T](data)
-	body = data[Sizeof(t):]
-	rem = data[xnet.SysctlAlign(l):]
-	return
-}
-
-var ExtractRtMsghdr = Extract[RtMsghdr]
-
-func Pointer[T ~uint16 | RtMsghdr](data []byte) *T {
+func Pointer[T ~uint16 | RtMsghdr | RtMsghdr2](data []byte) *T {
 	return (*T)(unsafe.Pointer(&data[0]))
 }
 
-var PointerRtMsghdr = Pointer[RtMsghdr]
+var PointerRtMsghdr2 = Pointer[RtMsghdr2]
 
-func Sizeof[T RtMsghdr](p *T) int {
+func Sizeof[T RtMsghdr | RtMsghdr2 | RtMetrics](p *T) int {
 	return int(unsafe.Sizeof(*p))
 }
 
-var SizeofRtMsghdr = Sizeof[RtMsghdr]
+func Extract[T RtMsghdr | RtMsghdr2 | RtMetrics](data []byte) (
+	t *T, body, rem []byte,
+) {
+	if n, i := len(data), Sizeof(t); n >= i {
+		t = (*T)(unsafe.Pointer(&data[0]))
+		body = data[i:]
+		i = xnet.SysctlAlign(xnet.SysctlMsgLen(data))
+		if n < i {
+			i = n
+		}
+		rem = data[i:]
+	}
+	return
+}
 
 type link struct {
 	line uint16
@@ -51,22 +58,22 @@ type link struct {
 }
 
 type netrt struct {
-	index uint16
-	_     uint16
-	flags int32
-	rmx   unix.RtMetrics
+	expire,
+	index,
+	state int
+	flags,
+	probes uint
 	addrs [unix.RTAX_MAX]any
 }
 
-func newNetRt(msg []byte) NetRt {
-	rtm := PointerRtMsghdr(msg)
-	body := msg[xnet.SysctlAlign(Sizeof(rtm)):]
-	nrt := &netrt{
-		index: rtm.Index,
-		flags: rtm.Flags,
-		rmx:   rtm.Rmx,
-	}
+func newNetRt(rtm *RtMsghdr2, body []byte) *netrt {
 	const min = xnet.SAMin
+	nrt := new(netrt)
+	integer.Assign(&nrt.index, rtm.Index)
+	integer.Assign(&nrt.flags, rtm.Flags)
+	integer.Assign(&nrt.expire, rtm.Rmx.Expire)
+	integer.Assign(&nrt.state, rtm.Rmx.State)
+	integer.Assign(&nrt.probes, rtm.Rmx.Pksent)
 	for i := 0; i < len(nrt.addrs[:]) && len(body) > min; i++ {
 		if (int(rtm.Addrs) & (1 << i)) == 0 {
 			continue
@@ -159,6 +166,10 @@ func (nrt *netrt) Bits() int {
 	return 0
 }
 
+func (nrt *netrt) Expire() int  { return nrt.expire }
+func (nrt *netrt) Probes() uint { return nrt.probes }
+func (nrt *netrt) State() int   { return nrt.state }
+
 func (nrt *netrt) Format(w fmt.State, verb rune) {
 	for i, s := range []string{
 		"destination", //	RTAX_DST	= 0x0
@@ -182,32 +193,14 @@ func (nrt *netrt) Format(w fmt.State, verb rune) {
 	}
 	fmt.Fprintln(w, name)
 	fmt.Fprintf(w, "%11s: <%s>\n", "flags", xnet.IFFNames(nrt.flags))
-	tw := tabwriter.NewWriter(w, 9, 0, 1, ' ', tabwriter.AlignRight)
-	defer tw.Flush()
-	fmt.Fprint(tw, "recvpipe", "\t")
-	fmt.Fprint(tw, "sendpipe", "\t")
-	fmt.Fprint(tw, "ssthresh", "\t")
-	fmt.Fprint(tw, "rtt", "\t")
-	fmt.Fprint(tw, "rttvar", "\t")
-	fmt.Fprint(tw, "hopcount", "\t")
-	fmt.Fprint(tw, "mtu", "\t")
-	fmt.Fprint(tw, "expire", "\t")
-	fmt.Fprintln(tw)
-	fmt.Fprint(tw, nrt.rmx.Recvpipe, "\t")
-	fmt.Fprint(tw, nrt.rmx.Sendpipe, "\t")
-	fmt.Fprint(tw, nrt.rmx.Ssthresh, "\t")
-	fmt.Fprint(tw, nrt.rmx.Rtt, "\t")
-	fmt.Fprint(tw, nrt.rmx.Rttvar, "\t")
-	fmt.Fprint(tw, nrt.rmx.Hopcount, "\t")
-	fmt.Fprint(tw, nrt.rmx.Mtu, "\t")
-	if nrt.rmx.Expire == 0 {
-		fmt.Fprint(tw, 0, "\t")
+	fmt.Fprintf(w, "%11s: ", "expire")
+	if nrt.expire == 0 {
+		fmt.Fprint(w, 0, "\n")
 	} else {
-		ut := time.Unix(int64(nrt.rmx.Expire), 0)
+		ut := time.Unix(int64(nrt.expire), 0)
 		expire := ut.Sub(time.Now()).Round(time.Second).Seconds()
-		fmt.Fprint(tw, expire, "\t")
+		fmt.Fprint(w, expire, "\n")
 	}
-	fmt.Fprintln(tw)
 }
 
 func rtname(v any) string {

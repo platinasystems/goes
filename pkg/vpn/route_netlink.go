@@ -1,4 +1,4 @@
-// Copyright © 2023-2024 Platina Systems, Inc. All rights reserved.
+// Copyright © 2023-2025 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -70,7 +70,7 @@ func route(
 		}
 	}
 	netlink.PointerMsgHdr(req).Len = uint32(len(req))
-	ack, err := xerrors.MarkResult(netrt.OneReq(ctx, req))
+	ack, err := xerrors.MarkResult(netrt.OneRtReq(ctx, req))
 	_ = ack
 	return err
 
