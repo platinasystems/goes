@@ -1,4 +1,4 @@
-// Copyright © 2023-2024 Platina Systems, Inc. All rights reserved.
+// Copyright © 2023-2025 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -15,91 +15,85 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 )
 
-type destinationOptions struct {
-	inet,
-	inet6,
-	host,
-	net *bool
-	prefixlen *int
-}
-
-func newDestinationOptions() *destinationOptions {
-	opts := &destinationOptions{
-		inet: flag.Bool("inet", false,
-			"Address hint or filter."),
-		inet6: flag.Bool("inet6", false,
-			"Address hint or filter."),
-		host: flag.Bool("host", false,
-			"Host <destination>."),
-		net: flag.Bool("net", false,
-			"Network <destination>."),
-		prefixlen: flag.Int("prefixlen", -1,
-			"If >= 0, use instead of 1st arg/<suffix> or 3rd arg."),
-	}
-	flag.BoolVar(opts.inet, "4", *opts.inet, "aka -inet")
-	flag.BoolVar(opts.inet6, "6", *opts.inet6, "aka -inet6")
-	return opts
-}
-
-func (opts *destinationOptions) prefix(
-	ctx context.Context,
-	dstarg, maskarg string,
-) (netip.Prefix, error) {
+func (rt Route) dst(ctx context.Context) (dst netip.Prefix, gw any, err error) {
 	var (
-		err error
 		ok,
 		forceHost,
 		forceNet bool
 		addr netip.Addr
 		ipas []net.IPAddr
-		zero netip.Prefix
 	)
-	if *opts.host {
+	narg := flag.NArg()
+	if narg == 0 {
+		err = xerrors.Incomplete("destination")
+		return
+	}
+	dstarg := flag.Arg(0)
+	if HostFlag.Value() {
 		forceHost = true
-	} else if *opts.net {
+	} else if NetFlag.Value() {
 		forceNet = true
 	}
 
 	if dstarg == "default" {
-		if *opts.inet6 {
-			return netip.
-				PrefixFrom(netip.IPv6Unspecified(), 0), nil
+		if Inet6Flag.Value() {
+			dst = netip.PrefixFrom(netip.IPv4Unspecified(), 0)
+		} else {
+			dst = netip.PrefixFrom(netip.IPv6Unspecified(), 0)
 		}
-		return netip.PrefixFrom(netip.IPv4Unspecified(), 0), nil
+		if narg > 1 {
+			gw, err = lookupGW(ctx, flag.Arg(1))
+		}
+		return
 	}
-	bits := *opts.prefixlen
+	bits := PrefixlenFlag.Value()
 	if slash := strings.Index(dstarg, "/"); slash > 0 {
 		if slash == len(dstarg)-1 {
-			return zero, xerrors.Invalid("destination", dstarg)
+			err = xerrors.Invalid("destination", dstarg)
+			return
 		}
-		if _, err := fmt.Sscan(dstarg[slash+1:], &bits); err != nil {
-			return zero, xerrors.Label(err, "destination", dstarg)
+		if _, err = fmt.Sscan(dstarg[slash+1:], &bits); err != nil {
+			err = xerrors.Label(err, "destination", dstarg)
+			return
 		}
 		dstarg = dstarg[:slash]
-	} else if bits < 0 && len(maskarg) > 0 {
+	} else if bits < 0 && narg > 1 {
+		maskarg := flag.Arg(1)
 		if addr, err = netip.ParseAddr(maskarg); err != nil {
-			return zero, xerrors.Label(err, "mask", maskarg)
+			err = xerrors.Label(err, "mask", maskarg)
+			return
 		} else {
 			bits, _ = net.IPMask(addr.AsSlice()).Size()
+		}
+		if narg > 2 {
+			if gw, err = lookupGW(ctx, flag.Arg(2)); err != nil {
+				return
+			}
+		}
+	} else if narg > 1 {
+		if gw, err = lookupGW(ctx, flag.Arg(1)); err != nil {
+			return
 		}
 	}
 	if isNumericAddr(dstarg) {
 		if addr, err = netip.ParseAddr(dstarg); err != nil {
-			return zero, xerrors.Label(err, "destrination", dstarg)
+			err = xerrors.Label(err, "destrination", dstarg)
+			return
 		}
 	} else if ipas, err = net.DefaultResolver.
 		LookupIPAddr(ctx, dstarg); err != nil {
-		return zero, xerrors.Label(err, "destination", dstarg)
+		err = xerrors.Label(err, "destination", dstarg)
+		return
 	} else {
 		ipa := ipas[0]
-		if *opts.inet6 {
+		if Inet6Flag.Value() {
 			for _, t := range ipas {
 				if len(t.IP) == net.IPv6len {
 					ipa = t
 					break
 				}
 			}
-		} else if *opts.inet {
+		} else if InetFlag.Value() {
 			for _, t := range ipas {
 				if len(t.IP) == net.IPv4len {
 					ipa = t
@@ -108,7 +102,8 @@ func (opts *destinationOptions) prefix(
 			}
 		}
 		if addr, ok = netip.AddrFromSlice(ipa.IP); !ok {
-			return zero, xerrors.Invalid("ip", ipa.IP.String())
+			err = xerrors.Invalid("ip", ipa.IP.String())
+			return
 		}
 	}
 	if bits < 0 {
@@ -116,9 +111,13 @@ func (opts *destinationOptions) prefix(
 			bits = addr.BitLen()
 		} else if forceNet && addr.Is4() {
 			bits, _ = net.IP(addr.AsSlice()).DefaultMask().Size()
-		} else {
-			return zero, xerrors.Incomplete("mask")
+		} else if rt != Get {
+			err = xerrors.Incomplete("mask")
+			return
+		} else if bits = 32; addr.Is6() {
+			bits = 128
 		}
 	}
-	return netip.PrefixFrom(addr, bits), nil
+	dst = netip.PrefixFrom(addr, bits)
+	return
 }

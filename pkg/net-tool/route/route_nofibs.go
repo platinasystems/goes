@@ -6,14 +6,14 @@
 
 package route
 
-const haveFibs = false
+const HaveFibs = false
 
-const flushUsage = `
+const FlushUsage = `
 usage: {{.Name}}
 Remove all routes.
 `
 
-const monitorUsage = `
+const MonitorUsage = `
 usage: {{.Name}}
 Continuously report route changes.
 `

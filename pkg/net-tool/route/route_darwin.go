@@ -14,11 +14,11 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-const gwFlags = `{blackhole, cloning, proto1, proto2, proto3, reject,
- xresolve, static}`
+const gwFlags = `
+{blackhole, cloning, proto1, proto2, proto3, reject, xresolve, static}`
 
-const gwMetrics = `{mtu, hopcount, expire, recvpipe, sendpipe, ssthresh,
-rtt, rttvar}`
+const gwMetrics = `
+{mtu, hopcount, expire, recvpipe, sendpipe, ssthresh, rtt, rttvar}`
 
 var gwFlagValues = map[string]uint{
 	"blackhole": unix.RTF_BLACKHOLE,

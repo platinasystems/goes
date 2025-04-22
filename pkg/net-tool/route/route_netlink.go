@@ -8,7 +8,6 @@ package route
 
 import (
 	"context"
-	"flag"
 	"net"
 	"net/netip"
 	"time"
@@ -18,117 +17,68 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/netlink/rtnetlink"
 	"github.com/platinasystems/goes/v2/pkg/netrt"
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
-	"github.com/platinasystems/goes/v2/pkg/xflag"
 	"github.com/platinasystems/goes/v2/pkg/xnet"
 )
 
-type gatewayOptions struct {
-	iface  *bool
-	expire *int
-	protocol,
-	scope,
-	table,
-	to *string
-	hopcount,
-	metric,
-	mtu,
-	rtt,
-	rttvar,
-	ssthresh,
-	tos *uint
-}
+const gwFlags = ""
+const gwMetrics = ""
 
 var Features = map[string]any{
-	"add": func(ctx context.Context, args []string) error {
-		opts := newModOptions()
-		opts.dst = newDestinationOptions()
-		opts.gw = newGatewayOptions()
-		xflag.UsageTemplate(flag.CommandLine, `
+	string(Add):     Add.op,
+	string(Append):  Append.op,
+	string(Change):  Change.op,
+	string(Delete):  Delete.op,
+	string(Flush):   flush,
+	string(Get):     Get.op,
+	string(Monitor): monitor,
+	string(Prepend): Prepend.op,
+	string(Replace): Replace.op,
+	string(Test):    Test.op,
+}
+
+var Usage = map[Route]string{
+	Add: `
 usage: {{.Name}} [flags] <destination> [options] <gateway> [mask]
 Add a route.
 
-{{flags .}}`)
-		return opts.mod(ctx, "add", args)
-	},
-	"append": func(ctx context.Context, args []string) error {
-		opts := newModOptions()
-		opts.dst = newDestinationOptions()
-		opts.gw = newGatewayOptions()
-		xflag.UsageTemplate(flag.CommandLine, `
+{{flags .}}`,
+	Append: `
 usage: {{.Name}} [flags] <destination> [options] <gateway> [mask]
 Change aspects of a route (such as its gateway).
 
-{{flags .}}`)
-		return opts.mod(ctx, "append", args)
-	},
-	"change": func(ctx context.Context, args []string) error {
-		opts := newModOptions()
-		opts.dst = newDestinationOptions()
-		opts.gw = newGatewayOptions()
-		xflag.UsageTemplate(flag.CommandLine, `
+{{flags .}}`,
+	Change: `
 usage: {{.Name}} [flags] <destination> [options] <gateway> [mask]
 Change aspects of a route (such as its gateway).
 
-{{flags .}}`)
-		return opts.mod(ctx, "change", args)
-	},
-	"delete": func(ctx context.Context, args []string) error {
-		opts := newModOptions()
-		opts.dst = newDestinationOptions()
-		// delete doesn't define gatewayOptions
-		xflag.UsageTemplate(flag.CommandLine, `
+{{flags .}}`,
+	Delete: `
 usage: {{.Name}} [flags] <destination>
 Delete a specific route.
 
-{{flags .}}`)
-		return opts.mod(ctx, "delete", args)
-	},
-	"flush": flush,
-	"get": func(ctx context.Context, args []string) error {
-		opts := newModOptions()
-		opts.dst = newDestinationOptions()
-		// get doesn't define gatewayOptions
-		xflag.UsageTemplate(flag.CommandLine, `
+{{flags .}}`,
+	Flush: FlushUsage,
+	Get: `
 usage: {{.Name}} [flags] <destination>
 Lookup and display the route for a destination.
 
-{{flags .}}`)
-		return opts.mod(ctx, "get", args)
-	},
-	"monitor": monitor,
-	"prepend": func(ctx context.Context, args []string) error {
-		opts := newModOptions()
-		opts.dst = newDestinationOptions()
-		opts.gw = newGatewayOptions()
-		xflag.UsageTemplate(flag.CommandLine, `
+{{flags .}}`,
+	Monitor: MonitorUsage,
+	Prepend: `
 usage: {{.Name}} [flags] <destination> [options] <gateway> [mask]
 Prepend or add new route.
 
-{{flags .}}`)
-		return opts.mod(ctx, "prepend", args)
-	},
-	"replace": func(ctx context.Context, args []string) error {
-		opts := newModOptions()
-		opts.dst = newDestinationOptions()
-		opts.gw = newGatewayOptions()
-		xflag.UsageTemplate(flag.CommandLine, `
+{{flags .}}`,
+	Replace: `
 usage: {{.Name}} [flags] <destination> [options] <gateway> [mask]
 Replace or add new route.
 
-{{flags .}}`)
-		return opts.mod(ctx, "replace", args)
-	},
-	"test": func(ctx context.Context, args []string) error {
-		opts := newModOptions()
-		opts.dst = newDestinationOptions()
-		opts.gw = newGatewayOptions()
-		xflag.UsageTemplate(flag.CommandLine, `
+{{flags .}}`,
+	Test: `
 usage: {{.Name}} [flags] <destination> [options] <gateway> [mask]
 Verify change or addition.
 
-{{flags .}}`)
-		return opts.mod(ctx, "test", args)
-	},
+{{flags .}}`,
 }
 
 var protocols = map[string]uint8{
@@ -169,34 +119,27 @@ var types = map[string]uint8{
 	"cnt":         rtnetlink.RTN_CNT,
 }
 
-func newGatewayOptions() *gatewayOptions {
-	opts := &gatewayOptions{
-		expire: flag.Int("expire", 0, "Seconds from now."),
-		iface: flag.Bool("interface", false,
-			"<gateway> is a point-to-point interface name"),
-		protocol: flag.String("protocol", "boot",
-			"{boot, kernel, redirect, static}"),
-		scope: flag.String("scope", "global",
-			"{global, nowhere, host, link, site}"),
-		table: flag.String("table", "main",
-			"{compat, default, main, local}"),
-		to: flag.String("to", "unicast",
-			"{unicast, broadcast, blackhole, etc.}"),
-		hopcount: flag.Uint("hopcount", 0, "FIXME"),
-		metric:   flag.Uint("metric", 0, "FIXME"),
-		mtu:      flag.Uint("mtu", 1500, "FIXME"),
-		rtt:      flag.Uint("rtt", 0, "FIXME"),
-		rttvar:   flag.Uint("rttvar", 0, "FIXME"),
-		ssthresh: flag.Uint("ssthresh", 0, "FIXME"),
-		tos:      flag.Uint("tos", 0, "type-of-service"),
+func (rt Route) defineGWFlags() {
+	if rt == Delete || rt == Get {
+		return
 	}
-	flag.BoolVar(opts.iface, "iface", *opts.iface, "aka -interface")
-	return opts
+	ExpireFlag.Define(0)
+	HopCountFlag.Define(0)
+	IfaceFlag.Define(false, "interface")
+	MetricFlag.Define(0)
+	MTUFlag.Define(1500)
+	ProtocolFlag.Define("boot")
+	RTTFlag.Define(0)
+	RTTVarFlag.Define(0)
+	ScopeFlag.Define("global")
+	SSThreshFlag.Define(0)
+	TableFlag.Define("main")
+	ToFlag.Define("unicast")
+	TOSFlag.Define(0)
 }
 
-func (opts *modOptions) req(
+func (rt Route) req(
 	ctx context.Context,
-	cmd string,
 	fib int,
 	dst netip.Prefix,
 	gw any,
@@ -204,31 +147,31 @@ func (opts *modOptions) req(
 	var mx []byte
 	hdr, req := netlink.ExpandMsgHdr(nil)
 	hdr.Flags = netlink.NLM_F_REQUEST
-	switch cmd {
-	case "add":
+	switch rt {
+	case Add:
 		hdr.Type = rtnetlink.RTM_NEWROUTE
 		hdr.Flags |= netlink.NLM_F_CREATE | netlink.NLM_F_EXCL
-	case "append":
+	case Append:
 		hdr.Type = rtnetlink.RTM_NEWROUTE
 		hdr.Flags |= netlink.NLM_F_CREATE | netlink.NLM_F_APPEND
-	case "change":
+	case Change:
 		hdr.Type = rtnetlink.RTM_NEWROUTE
 		hdr.Flags |= netlink.NLM_F_CREATE | netlink.NLM_F_REPLACE
-	case "delete":
+	case Delete:
 		hdr.Type = rtnetlink.RTM_DELROUTE
-	case "get":
+	case Get:
 		hdr.Type = rtnetlink.RTM_GETROUTE
-	case "prepend":
+	case Prepend:
 		hdr.Type = rtnetlink.RTM_NEWROUTE
 		hdr.Flags |= netlink.NLM_F_CREATE
-	case "replace":
+	case Replace:
 		hdr.Type = rtnetlink.RTM_NEWROUTE
 		hdr.Flags |= netlink.NLM_F_CREATE | netlink.NLM_F_REPLACE
-	case "test":
+	case Test:
 		hdr.Type = rtnetlink.RTM_NEWROUTE
 		hdr.Flags |= netlink.NLM_F_EXCL
 	default:
-		return nil, xerrors.Invalid(cmd)
+		return nil, xerrors.Invalid(rt.String())
 	}
 	if hdr.Type != rtnetlink.RTM_GETROUTE {
 		hdr.Flags |= netlink.NLM_F_ACK
@@ -242,23 +185,23 @@ func (opts *modOptions) req(
 	rtm.Table = rtnetlink.RT_TABLE_MAIN
 	rtm.Scope = rtnetlink.RT_SCOPE_NOWHERE
 	if hdr.Type != rtnetlink.RTM_DELROUTE {
-		rtm.TOS = uint8(*opts.gw.tos)
-		if v, ok := protocols[*opts.gw.protocol]; ok {
+		rtm.TOS = uint8(TOSFlag.Value())
+		if v, ok := protocols[ProtocolFlag.Value()]; ok {
 			rtm.Protocol = v
 		} else {
 			return nil, xerrors.Invalid("protocol")
 		}
-		if v, ok := scopes[*opts.gw.scope]; ok {
+		if v, ok := scopes[ScopeFlag.Value()]; ok {
 			rtm.Scope = v
 		} else {
 			return nil, xerrors.Invalid("scope")
 		}
-		if v, ok := tables[*opts.gw.table]; ok {
+		if v, ok := tables[TableFlag.Value()]; ok {
 			rtm.Table = v
 		} else {
 			return nil, xerrors.Invalid("table")
 		}
-		if v, ok := types[*opts.gw.to]; ok {
+		if v, ok := types[ToFlag.Value()]; ok {
 			rtm.Type = v
 		} else {
 			return nil, xerrors.Invalid("to")
@@ -291,27 +234,27 @@ func (opts *modOptions) req(
 			return nil, xerrors.Invalid("gateway")
 		}
 	}
-	if mtu := uint32(*opts.gw.mtu); mtu != 1500 {
+	if mtu := uint32(MTUFlag.Value()); mtu != 1500 {
 		mx = netlink.CatAttr(mx, rtnetlink.RTAX_MTU, mtu)
 	}
-	if secs := *opts.gw.expire; secs != 0 {
+	if secs := ExpireFlag.Value(); secs != 0 {
 		elapse := time.Second * time.Duration(secs)
 		expire := uint32(time.Now().Add(elapse).Unix())
 		req = netlink.CatAttr(req, rtnetlink.RTA_EXPIRES, expire)
 	}
-	if hopcount := uint32(*opts.gw.hopcount); hopcount != 0 {
-		mx = netlink.CatAttr(mx, rtnetlink.RTAX_HOPLIMIT, hopcount)
+	if hc := uint32(HopCountFlag.Value()); hc != 0 {
+		mx = netlink.CatAttr(mx, rtnetlink.RTAX_HOPLIMIT, hc)
 	}
-	if metric := uint32(*opts.gw.metric); metric != 0 {
+	if metric := uint32(MetricFlag.Value()); metric != 0 {
 		req = netlink.CatAttr(req, rtnetlink.RTA_PRIORITY, metric)
 	}
-	if t := uint32(*opts.gw.ssthresh); t != 0 {
+	if t := uint32(SSThreshFlag.Value()); t != 0 {
 		mx = netlink.CatAttr(mx, rtnetlink.RTAX_SSTHRESH, t)
 	}
-	if rtt := uint32(*opts.gw.rtt); rtt != 0 {
+	if rtt := uint32(RTTFlag.Value()); rtt != 0 {
 		mx = netlink.CatAttr(mx, rtnetlink.RTAX_RTT, rtt)
 	}
-	if rttvar := uint32(*opts.gw.rttvar); rttvar != 0 {
+	if rttvar := uint32(RTTVarFlag.Value()); rttvar != 0 {
 		mx = netlink.CatAttr(mx, rtnetlink.RTAX_RTTVAR, rttvar)
 	}
 	if len(mx) > 0 {

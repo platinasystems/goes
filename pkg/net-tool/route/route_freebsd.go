@@ -14,12 +14,12 @@ import (
 )
 
 const (
-	haveFibs   = true
-	flushUsage = `
+	HaveFibs   = true
+	FlushUsage = `
 usage: {{.Name}} [fibs]
 Remove all routes in default or given FIBs.
 `
-	monitorUsage = `
+	MonitorUsage = `
 usage: {{.Name}} [fibs]
 Continuously report route changes in default or given FIBs.
 `

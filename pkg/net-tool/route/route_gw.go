@@ -13,10 +13,8 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 )
 
-func (opts *gatewayOptions) lookup(ctx context.Context, arg string) (
-	any, error,
-) {
-	if opts.iface != nil && *opts.iface {
+func lookupGW(ctx context.Context, arg string) (any, error) {
+	if IfaceFlag.Value() {
 		return netif.Named(ctx, arg)
 	}
 	if isNumericAddr(arg) {

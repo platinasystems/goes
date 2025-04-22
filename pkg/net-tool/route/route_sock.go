@@ -8,7 +8,6 @@ package route
 
 import (
 	"context"
-	"flag"
 	"net"
 	"net/netip"
 	"strings"
@@ -17,67 +16,42 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/netif"
 	"github.com/platinasystems/goes/v2/pkg/netrt"
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
-	"github.com/platinasystems/goes/v2/pkg/xflag"
 	"github.com/platinasystems/goes/v2/pkg/xnet"
 	"golang.org/x/sys/unix"
 )
 
-type gatewayOptions struct {
-	iface *bool
-	flags,
-	genmask,
-	ifa,
-	ifp,
-	metrics *string
+var Features = map[string]any{
+	string(Add):     Add.op,
+	string(Change):  Change.op,
+	string(Delete):  Delete.op,
+	string(Flush):   flush,
+	string(Get):     Get.op,
+	string(Monitor): monitor,
 }
 
-var Features = map[string]any{
-	"add": func(ctx context.Context, args []string) error {
-		opts := newModOptions()
-		opts.dst = newDestinationOptions()
-		opts.gw = newGatewayOptions()
-		xflag.UsageTemplate(flag.CommandLine, `
+var Usage = map[Route]string{
+	Add: `
 usage: {{.Name}} [flags] <destination> <gateway> [mask]
 Add a route.
 
-{{flags .}}`)
-		return opts.mod(ctx, "add", args)
-	},
-	"change": func(ctx context.Context, args []string) error {
-		opts := newModOptions()
-		opts.dst = newDestinationOptions()
-		opts.gw = newGatewayOptions()
-		xflag.UsageTemplate(flag.CommandLine, `
+{{flags .}}`,
+	Change: `
 usage: {{.Name}} [flags] <destination> <gateway> [mask]
 Change aspects of a route (such as its gateway).
 
-{{flags .}}`)
-		return opts.mod(ctx, "change", args)
-	},
-	"delete": func(ctx context.Context, args []string) error {
-		opts := newModOptions()
-		opts.dst = newDestinationOptions()
-		// delete doesn't define gatewayOptions
-		xflag.UsageTemplate(flag.CommandLine, `
+{{flags .}}`,
+	Delete: `
 usage: {{.Name}} [flags] <destination>
 Delete specific route.
 
-{{flags .}}`)
-		return opts.mod(ctx, "delete", args)
-	},
-	"flush": flush,
-	"get": func(ctx context.Context, args []string) error {
-		opts := newModOptions()
-		opts.dst = newDestinationOptions()
-		// get doesn't define gatewayOptions
-		xflag.UsageTemplate(flag.CommandLine, `
+{{flags .}}`,
+	Flush: FlushUsage,
+	Get: `
 usage: {{.Name}} [flags] <destination>
 Lookup and display the route for a destination.
 
-{{flags .}}`)
-		return opts.mod(ctx, "get", args)
-	},
-	"monitor": monitor,
+{{flags .}}`,
+	Monitor: MonitorUsage,
 }
 
 type gwflag struct {
@@ -93,69 +67,64 @@ type gwmetric struct {
 	dsc  string
 }
 
-func newGatewayOptions() *gatewayOptions {
-	opts := &gatewayOptions{
-		flags: flag.String("flags", "",
-			"comma separated names\n"+gwFlags),
-		genmask: flag.String("genmask", "",
-			"generate netmask"),
-		ifa: flag.String("ifa", "",
-			"A MAC address of a point-to-point peer?"),
-		ifp: flag.String("ifp", "",
-			"A point-to-point peer interface and MAC?"),
-		iface: flag.Bool("interface", false,
-			"<gateway> is a point-to-point interface name"),
-		metrics: flag.String("metrics", "",
-			"comma separated NAME=VALUE\n"+gwMetrics),
+func (rt Route) defineGWFlags() {
+	if rt == Get {
+		return
 	}
-	flag.BoolVar(opts.iface, "iface", *opts.iface, "aka -interface")
-	return opts
+	FlagsFlag.Define("")
+	GenmaskFlag.Define("")
+	IfaFlag.Define("")
+	IfaceFlag.Define(false, "interface")
+	IfpFlag.Define("")
+	MetricsFlag.Define("")
 }
 
-func (opts *modOptions) req(
+func (rt Route) req(
 	ctx context.Context,
-	op string,
 	fib int,
 	dst netip.Prefix,
 	gw any,
 ) (netrt.Rt, error) {
 	msg := netrt.NewRtMsg()
 	rtm := netrt.PointerRtMsghdr2(msg)
-	switch op {
-	case "add", "change":
+	switch rt {
+	case Add, Change:
 		if gw == nil {
 			return nil, xerrors.Incomplete("gateway")
 		}
-		switch op {
-		case "add":
+		switch rt {
+		case Add:
 			rtm.Type = unix.RTM_ADD
-		case "change":
+		case Change:
 			rtm.Type = unix.RTM_CHANGE
 		}
 		integer.Set(&rtm.Flags, unix.RTF_UP)
 		if dst.Bits() == dst.Addr().BitLen() {
 			integer.Set(&rtm.Flags, unix.RTF_HOST)
 		}
-		for _, name := range strings.Split(*opts.gw.flags, ",") {
+		ff := strings.Split(FlagsFlag.Value(), ",")
+		for _, name := range ff {
 			if val, ok := gwFlagValues[name]; ok {
 				integer.Set(&rtm.Flags, val)
 			} else if val, ok = gwFlagValues["no"+name]; ok {
 				integer.Reset(&rtm.Flags, val)
 			}
 		}
-		rtmmetrics(rtm, strings.Split(*opts.gw.metrics, ","))
-	case "del":
+		metrics := strings.Split(MetricsFlag.Value(), ",")
+		rtmmetrics(rtm, metrics)
+	case Delete:
 		rtm.Type = unix.RTM_DELETE
 		rtmdel(rtm)
-	case "get":
+	case Get:
 		rtm.Type = unix.RTM_GET
 	default:
-		return nil, xerrors.Invalid("command", op)
+		return nil, xerrors.Invalid("command", string(rt))
 	}
 	msg = xnet.SAAppend(msg, dst.Addr())
 	rtm = netrt.PointerRtMsghdr2(msg)
 	integer.Set(&rtm.Addrs, 1<<unix.RTAX_DST)
 	switch t := gw.(type) {
+	case nil:
 	case netip.Addr:
 		msg = xnet.SAAppend(msg, t)
 		rtm = netrt.PointerRtMsghdr2(msg)
@@ -193,13 +162,13 @@ func (opts *modOptions) req(
 		rtm = netrt.PointerRtMsghdr2(msg)
 		integer.Set(&rtm.Addrs, 1<<unix.RTAX_NETMASK)
 	}
-	if len(*opts.gw.genmask) > 0 {
+	if s := GenmaskFlag.Value(); len(s) > 0 {
 		// FIXME e.g. 255.255.255.255 ?
 	}
-	if len(*opts.gw.ifp) > 0 {
+	if s := IfpFlag.Value(); len(s) > 0 {
 		// FIXME e.g. eth0:1.2.3.4.5.6 ?
 	}
-	if len(*opts.gw.ifa) > 0 {
+	if s := IfaFlag.Value(); len(s) > 0 {
 		// FIXME e.g. 1.2.3.4.5.6 ?
 	}
 	return netrt.Request(msg, fib)

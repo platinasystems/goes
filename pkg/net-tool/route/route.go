@@ -18,20 +18,128 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xflag"
 )
 
-type modOptions struct {
-	debug,
-	numeric,
-	quiet,
-	test,
-	verbose *bool
-	fibs,
-	jail *string
-	dst *destinationOptions
-	gw  *gatewayOptions
+type Route string
+
+const (
+	Add     Route = "add"
+	Append  Route = "append"
+	Change  Route = "change"
+	Delete  Route = "delete"
+	Flush   Route = "flush"
+	Get     Route = "get"
+	Monitor Route = "monitor"
+	Prepend Route = "prepend"
+	Replace Route = "replace"
+	Test    Route = "Test"
+)
+
+const (
+	DebugFlag  xflag.KeyUsage[bool]   = "d Debug mode."
+	ExpireFlag xflag.KeyUsage[int]    = "expire Seconds from now."
+	FibFlag    xflag.KeyUsage[string] = "fib " +
+		"A comma separated list of FIB IDs other than default."
+	FlagsFlag xflag.KeyUsage[string] = "flags " +
+		"A comma separated list." + gwFlags
+	GenmaskFlag  xflag.KeyUsage[string] = "genmask Generate netmask."
+	HopCountFlag xflag.KeyUsage[uint]   = "hopcount FIXME"
+	HostFlag     xflag.KeyUsage[bool]   = "host Host <destination>."
+	IfaFlag      xflag.KeyUsage[string] = "ifa " +
+		"A MAC address of a point-to-point peer?"
+	IfaceFlag xflag.KeyUsage[bool] = "iface " +
+		"Inticates <gateway> is a point-to-point interface name."
+	IfpFlag xflag.KeyUsage[string] = "ifp " +
+		"A point-to-point peer interface and MAC."
+	InetFlag    xflag.KeyUsage[bool]   = `inet Address hint or filter.`
+	Inet6Flag   xflag.KeyUsage[bool]   = `inet6 Address hint or filter.`
+	JailFlag    xflag.KeyUsage[string] = `j Run inside jail.`
+	MetricFlag  xflag.KeyUsage[uint]   = "metric FIXME"
+	MetricsFlag xflag.KeyUsage[string] = "metrics " +
+		"A comma separated NAME=VALUE." + gwMetrics
+	MTUFlag       xflag.KeyUsage[uint] = "mtu FIXME"
+	NetFlag       xflag.KeyUsage[bool] = "net Network <destination>."
+	NumericFlag   xflag.KeyUsage[bool] = "n Numeric address output."
+	PrefixlenFlag xflag.KeyUsage[int]  = "prefixlen " +
+		"If >= 0, use instead of 1st arg/<suffix> or 3rd arg."
+	ProtocolFlag xflag.KeyUsage[string] = "protocol " +
+		"{boot, kernel, redirect, static}"
+	QuietFlag  xflag.KeyUsage[bool]   = "q Suppress most output."
+	RTTFlag    xflag.KeyUsage[uint]   = "rtt FIXME"
+	RTTVarFlag xflag.KeyUsage[uint]   = "rttvar FIXME"
+	ScopeFlag  xflag.KeyUsage[string] = "scope " +
+		"{global, nowhere, host, link, site}"
+	SSThreshFlag xflag.KeyUsage[uint]   = "ssthresh FIXME"
+	TableFlag    xflag.KeyUsage[string] = "table " +
+		"{compat, default, main, local}"
+	TestFlag xflag.KeyUsage[bool]   = "t Test mode."
+	ToFlag   xflag.KeyUsage[string] = "to " +
+		"{unicast, broadcast, blackhole, etc.}"
+	TOSFlag     xflag.KeyUsage[uint] = "tos Set type-of-service."
+	VerboseFlag xflag.KeyUsage[bool] = "v Verbose output."
+)
+
+func (rt Route) op(ctx context.Context, args []string) error {
+	xflag.UsageTemplate(flag.CommandLine, Usage[rt])
+
+	DebugFlag.Define(false)
+	if HaveFibs {
+		FibFlag.Define("")
+	}
+	HostFlag.Define(false)
+	InetFlag.Define(false, "4")
+	Inet6Flag.Define(false, "6")
+	if xexec.CanJail {
+		JailFlag.Define("")
+	}
+	NetFlag.Define(false)
+	NumericFlag.Define(false)
+	PrefixlenFlag.Define(-1)
+	QuietFlag.Define(false)
+	TestFlag.Define(false)
+	VerboseFlag.Define(false)
+	rt.defineGWFlags()
+
+	err := flag.CommandLine.Parse(args)
+	if err != nil {
+		return err
+	}
+
+	if s := JailFlag.Value(); len(s) > 0 {
+		if err = xexec.Jail(ctx, s); err != nil {
+			return err
+		}
+	}
+
+	fibs := []int{-1}
+	if s := FibFlag.Value(); len(s) > 0 {
+		if fibs, err = sscanFibs(strings.Split(s, ",")); err != nil {
+			return err
+		}
+	}
+
+	dst, gw, err := rt.dst(ctx)
+	if err != nil {
+		return err
+	}
+
+	for _, fib := range fibs {
+		if nrt, e := rt.req(ctx, fib, dst, gw); e != nil {
+			if fib >= 0 {
+				err = fmt.Errorf("fib[%d]: %w", fib, e)
+			} else {
+				err = e
+			}
+			break
+		} else if rt == "get" {
+			show(ctx, nrt)
+		}
+	}
+	return err
 }
 
+func (rt Route) String() string { return string(rt) }
+
 func flush(ctx context.Context, args []string) error {
-	xflag.UsageTemplate(flag.CommandLine, flushUsage)
+	xflag.UsageTemplate(flag.CommandLine, Usage[Flush])
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
 		return err
@@ -45,71 +153,8 @@ func flush(ctx context.Context, args []string) error {
 	return xerrors.FIXME("tbd")
 }
 
-func (opts *modOptions) mod(
-	ctx context.Context,
-	op string,
-	args []string,
-) error {
-	err := flag.CommandLine.Parse(args)
-	if err != nil {
-		return err
-	} else if args = flag.Args(); len(args) == 0 {
-		return xerrors.Incomplete("destination")
-	}
-
-	if opts.jail != nil {
-		if err = xexec.Jail(ctx, *opts.jail); err != nil {
-			return err
-		}
-	}
-
-	fibs := []int{-1}
-	if opts.fibs != nil {
-		fibs, err = sscanFibs(strings.Split(*opts.fibs, ","))
-		if err != nil {
-			return err
-		}
-	}
-
-	dstarg := args[0]
-	args = args[1:]
-
-	var maskarg string
-	if len(args) > 1 {
-		maskarg = args[1]
-	}
-
-	dst, err := opts.dst.prefix(ctx, dstarg, maskarg)
-	if err != nil {
-		return err
-	}
-
-	var gw any
-	if opts.gw != nil {
-		if len(args) == 0 {
-			return xerrors.Incomplete("gateway")
-		}
-		if gw, err = opts.gw.lookup(ctx, args[0]); err != nil {
-			return err
-		}
-	}
-
-	for _, fib := range fibs {
-		nrt, err := opts.req(ctx, op, fib, dst, gw)
-		if err != nil {
-			if fib >= 0 {
-				err = fmt.Errorf("fib[%d]: %w", fib, err)
-			}
-			return err
-		} else if op == "get" {
-			show(ctx, nrt)
-		}
-	}
-	return nil
-}
-
 func monitor(ctx context.Context, args []string) error {
-	xflag.UsageTemplate(flag.CommandLine, monitorUsage)
+	xflag.UsageTemplate(flag.CommandLine, Usage[Monitor])
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
 		return err
@@ -129,7 +174,7 @@ func isNumericAddr(s string) bool {
 }
 
 func sscanFibs(args []string) ([]int, error) {
-	if !haveFibs {
+	if !HaveFibs {
 		return []int{-1}, nil
 	}
 	fibs := make([]int, len(args))
@@ -164,28 +209,4 @@ func show(ctx context.Context, nrt netrt.Rt) {
 		fmt.Print("line#", line)
 	}
 	fmt.Println()
-}
-
-func newModOptions() *modOptions {
-	opts := &modOptions{
-		debug: flag.Bool("d", false,
-			"Debug mode."),
-		numeric: flag.Bool("n", false,
-			"Numeric address output."),
-		quiet: flag.Bool("q", false,
-			"Suppress most output."),
-		test: flag.Bool("t", false,
-			"Test mode."),
-		verbose: flag.Bool("v", false,
-			"Verbose output."),
-	}
-	if haveFibs {
-		opts.fibs = flag.String("fib", "",
-			"A comma separated list of FIB IDs other than default.")
-	}
-	if xexec.CanJail {
-		opts.jail = flag.String("j", "",
-			"Run inside jail.")
-	}
-	return opts
 }
