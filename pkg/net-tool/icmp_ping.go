@@ -15,20 +15,33 @@ import (
 	probing "github.com/prometheus-community/pro-bing"
 )
 
+const (
+	ICMPPing_c_Flag xflag.KeyUsage[uint] = "c " +
+		"Count."
+	ICMPPing_i_Flag xflag.KeyUsage[time.Duration] = "i " +
+		"Interval."
+	ICMPPing_m_Flag xflag.KeyUsage[uint] = "m " +
+		"Request Time To Live."
+	ICMPPing_q_Flag xflag.KeyUsage[bool] = "q " +
+		"Quiet."
+	ICMPPing_t_Flag xflag.KeyUsage[time.Duration] = "t " +
+		"Timeout regardless of how many received packets."
+	ICMPPing_v_Flag xflag.KeyUsage[bool] = "v " +
+		"Verbose."
+)
+
 func ICMPPing(ctx context.Context, args []string) error {
 	xflag.TemplateUsage(`
 usage: {{.Name}} [flags] [host]
 Send ICMP ECHO_REQUEST packets to network “host”, default 127.0.0.1.
 {{flags .}}`)
 
-	cFlag := flag.Uint("c", 0, "Count.")
-
-	iFlag := flag.Duration("i", time.Second, "Interval.")
-	mFlag := flag.Uint("m", 0, "IP Time To Live for outgoing packets.")
-	tFlag := flag.Duration("t", 3*time.Second, `
-Timeout before ping exits, regardless of how many received packets.`[1:])
-	qFlag := flag.Bool("q", false, "Quiet.")
-	vFlag := flag.Bool("v", false, "Verbose.")
+	cFlag := ICMPPing_c_Flag.Define(0)
+	iFlag := ICMPPing_i_Flag.Define(time.Second)
+	mFlag := ICMPPing_m_Flag.Define(0)
+	qFlag := ICMPPing_q_Flag.Define(false)
+	tFlag := ICMPPing_t_Flag.Define(3 * time.Second)
+	vFlag := ICMPPing_v_Flag.Define(false)
 
 	err := flag.CommandLine.Parse(args)
 	if err != nil {

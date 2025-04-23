@@ -19,39 +19,75 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xnet"
 )
 
+const (
+	NDP_A_Flag xflag.KeyUsage[uint] = "A " +
+		"Repeat show interval (seconds)."
+	NDP_H_Flag xflag.KeyUsage[bool] = "H " +
+		"Harmonize routing and neighbor tables."
+	NDP_I_Flag xflag.KeyUsage[string] = "I " +
+		"Set, “show” or “delete” default interface."
+	NDP_P_Flag xflag.KeyUsage[bool] = "P " +
+		"Flush all the entries in the prefix list."
+	NDP_R_Flag xflag.KeyUsage[bool] = "R " +
+		"Flush all the entries in the default router list."
+	NDP_a_Flag xflag.KeyUsage[bool] = "a " +
+		"Show current entries."
+	NDP_c_Flag xflag.KeyUsage[bool] = "c " +
+		"Erase all entries."
+	NDP_d_Flag xflag.KeyUsage[string] = "d " +
+		"Delete specified entry."
+	NDP_f_Flag xflag.KeyUsage[string] = "f " +
+		"Table configuration file."
+	NDP_i_Flag xflag.KeyUsage[string] = "i " +
+		"View information for the specified interface."
+	NDP_l_Flag xflag.KeyUsage[bool] = "l " +
+		"Show link-layer reachability information."
+	NDP_n_Flag xflag.KeyUsage[bool] = "n " +
+		"Don't resolve numeric addresses to hostnames."
+	NDP_p_Flag xflag.KeyUsage[bool] = "p " +
+		"Show prefix list."
+	NDP_r_Flag xflag.KeyUsage[bool] = "r " +
+		"Show default router list."
+	NDP_s_Flag xflag.KeyUsage[bool] = "s " +
+		"Register an NDP entry for a node."
+	NDP_t_Flag xflag.KeyUsage[bool] = "t " +
+		"Show timestamp for each entry."
+	NDP_x_Flag xflag.KeyUsage[bool] = "x " +
+		"Show extended link-layer reachability information."
+	NDP_w_Flag xflag.KeyUsage[bool] = "w " +
+		"Show node's cryptographically generated address."
+)
+
 func NDP(ctx context.Context, args []string) error {
 	xflag.TemplateUsage(`
 usage: {{.Name}} [flags] [args]
 Control/diagnose IPv6 neighbor discovery protocol
 {{flags .}}`)
-	aFlag := flag.Bool("a", false, "Show current entries.")
-	flag.Uint("A", 0, "Repeat show interval (seconds).")
-	cFlag := flag.Bool("c", false, "Erase all entries.")
-	dFlag := flag.String("d", "", "Delete specified entry.")
-	fFlag := flag.String("f", "", "Table configuration file.")
-	HFlag := flag.Bool("H", false, "Harmonize routing and neighbor tables.")
-	iFlag := flag.String("i", "",
-		"View information for the specified interface.")
-	IFlag := flag.String("I", "",
-		"Set, “show” or “delete” default interface.")
-	flag.Bool("l", false, "Show link-layer reachability information.")
-	flag.Bool("n", false, "Don't resolve numeric addresses to hostnames.")
-	pFlag := flag.Bool("p", false, "Show prefix list.")
-	PFlag := flag.Bool("P", false,
-		"Flush all the entries in the prefix list.")
-	rFlag := flag.Bool("r", false, "Show default router list.")
-	RFlag := flag.Bool("R", false,
-		"Flush all the entries in the default router list.")
-	sFlag := flag.Bool("s", false, "Register an NDP entry for a node.")
-	flag.Bool("t", false, "Show timestamp for each entry.")
-	flag.Bool("x", false,
-		"Show extended link-layer reachability information.")
-	flag.Bool("w", false,
-		"Show node's cryptographically generated address.")
+
+	NDP_A_Flag.Define(0)
+	HFlag := NDP_H_Flag.Define(false)
+	IFlag := NDP_I_Flag.Define("")
+	PFlag := NDP_P_Flag.Define(false)
+	RFlag := NDP_R_Flag.Define(false)
+	aFlag := NDP_a_Flag.Define(false)
+	cFlag := NDP_c_Flag.Define(false)
+	dFlag := NDP_d_Flag.Define("")
+	fFlag := NDP_f_Flag.Define("")
+	iFlag := NDP_i_Flag.Define("")
+	NDP_l_Flag.Define(false)
+	NDP_n_Flag.Define(false)
+	pFlag := NDP_p_Flag.Define(false)
+	rFlag := NDP_r_Flag.Define(false)
+	sFlag := NDP_s_Flag.Define(false)
+	NDP_t_Flag.Define(false)
+	NDP_x_Flag.Define(false)
+	NDP_w_Flag.Define(false)
+
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
 		return err
 	}
+
 	switch {
 	case len(*fFlag) > 0:
 		err = script()

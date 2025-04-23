@@ -18,29 +18,38 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xnet"
 )
 
-type options struct {
-	i,
-	r,
-	afinet,
-	afinet6,
-	m,
-	mm,
-	n,
-	s,
-	ss *bool
-
-	F,
-	p *int
-
-	f,
-	I *string
-
-	w *time.Duration
-}
+const (
+	Netstat_F_Flag xflag.KeyUsage[int] = "F " +
+		"FIB number, -1 for current."
+	Netstat_I_Flag xflag.KeyUsage[string] = "I " +
+		"Interface name."
+	Netstat_f_Flag xflag.KeyUsage[string] = "f " +
+		"Address Family: inet, inet6, link."
+	Netstat_i_Flag xflag.KeyUsage[bool] = "i " +
+		"Show interface info."
+	Netstat_inet_Flag xflag.KeyUsage[bool] = "inet " +
+		"Address filter."
+	Netstat_inet6_Flag xflag.KeyUsage[bool] = "inet6 " +
+		"Address filter."
+	Netstat_m_Flag xflag.KeyUsage[bool] = "m " +
+		"Show memory stats."
+	Netstat_mm_Flag xflag.KeyUsage[bool] = "mm " +
+		"Show detailed memory stats."
+	Netstat_n_Flag xflag.KeyUsage[bool] = "n " +
+		"Show numeric address instead of lookup."
+	Netstat_p_Flag xflag.KeyUsage[int] = "p " +
+		"Protocol number."
+	Netstat_r_Flag xflag.KeyUsage[bool] = "r " +
+		"Show routing table."
+	Netstat_s_Flag xflag.KeyUsage[bool] = "s " +
+		"Show per-protocol stats."
+	Netstat_ss_Flag xflag.KeyUsage[bool] = "ss " +
+		"Show per-protocol, non-zero stats."
+	Netstat_w_Flag xflag.KeyUsage[time.Duration] = "w " +
+		"Wait interval."
+)
 
 func Feature(ctx context.Context, args []string) error {
-	var opts options
-
 	xflag.TemplateUsage(`
 usage: {{.Name}} [flags]
 Prints network status.
@@ -59,25 +68,20 @@ Flags:
 
 {{flags .}}`)
 
-	opts.i = flag.Bool("i", false, "Show interface info.")
-	opts.r = flag.Bool("r", false, "Show routing table.")
-	opts.afinet = flag.Bool("4", false, "Address filter.")
-	opts.afinet6 = flag.Bool("6", false, "Address filter.")
-	opts.f = flag.String("f", "", "Address Family: inet, inet6, link.")
-	opts.F = flag.Int("F", -1, "FIB number, -1 for current.")
-	opts.I = flag.String("I", "", "Interface name.")
-	opts.m = flag.Bool("m", false, "Show memory stats.")
-	opts.mm = flag.Bool("mm", false, "Show detailed memory stats.")
-	opts.n = flag.Bool("n", false,
-		"Show numeric address instead of lookup.")
-	opts.p = flag.Int("p", 0, "Protocol number.")
-	opts.s = flag.Bool("s", false, "Show per-protocol stats.")
-	opts.ss = flag.Bool("ss", false,
-		"Show per-protocol, non-zero stats.")
-	opts.w = flag.Duration("w", 0, "Wait interval.")
-
-	flag.BoolVar(opts.afinet, "inet", false, "aka -4.")
-	flag.BoolVar(opts.afinet6, "inet6", false, "aka -6.")
+	Netstat_F_Flag.Define(-1)
+	Netstat_I_Flag.Define("")
+	Netstat_f_Flag.Define("")
+	iFlag := Netstat_i_Flag.Define(false)
+	Netstat_inet_Flag.Define(false, "4")
+	Netstat_inet6_Flag.Define(false, "6")
+	Netstat_m_Flag.Define(false)
+	Netstat_mm_Flag.Define(false)
+	Netstat_n_Flag.Define(false)
+	Netstat_p_Flag.Define(0)
+	rFlag := Netstat_r_Flag.Define(false)
+	Netstat_s_Flag.Define(false)
+	Netstat_ss_Flag.Define(false)
+	Netstat_w_Flag.Define(0)
 
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
@@ -87,17 +91,17 @@ Flags:
 	args = flag.Args()
 
 	switch {
-	case *opts.i:
-		return netstati(ctx, &opts)
-	case *opts.r:
-		return netstatr(ctx, &opts)
+	case *iFlag:
+		return netstati(ctx)
+	case *rFlag:
+		return netstatr(ctx)
 	default:
 		return xerrors.FIXME("show active sockets")
 	}
 	return nil
 }
 
-func netstati(ctx context.Context, opts *options) error {
+func netstati(ctx context.Context) error {
 	fmt.Printf("%-15s", "Name")
 	fmt.Printf(" %5s", "MTU")
 	fmt.Printf(" %11s", "Ipkts")
@@ -124,8 +128,8 @@ func netstati(ctx context.Context, opts *options) error {
 		fmt.Printf(" %11d", nif.Collisions)
 		fmt.Println()
 	}
-	if opts.I != nil && len(*opts.I) > 0 {
-		nif, err := netif.Named(ctx, *opts.I)
+	if s := Netstat_I_Flag.Value(); len(s) > 0 {
+		nif, err := netif.Named(ctx, s)
 		if err != nil {
 			return err
 		} else {
@@ -146,11 +150,11 @@ func netstati(ctx context.Context, opts *options) error {
 	return nil
 }
 
-func netstatr(ctx context.Context, opts *options) error {
+func netstatr(ctx context.Context) error {
 	family := xnet.AF_UNSPEC
-	if *opts.afinet {
+	if Netstat_inet_Flag.Value() {
 		family = xnet.AF_INET
-	} else if *opts.afinet6 {
+	} else if Netstat_inet6_Flag.Value() {
 		family = xnet.AF_INET6
 	}
 	rter, err := netrt.Routes(ctx, family)

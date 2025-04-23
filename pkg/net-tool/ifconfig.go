@@ -65,6 +65,29 @@ Commands:
 Parameters:
 ` + netif.AddressParameters + netif.ConfigParameters + netif.CreateParameters
 
+const (
+	IfConfig_C_Flag xflag.KeyUsage[bool] = "C " +
+		"List cloneable devices."
+	IfConfig_L_Flag xflag.KeyUsage[bool] = "L " +
+		"Display IPv6 address lifetime as offset."
+	IfConfig_X_Flag xflag.KeyUsage[string] = "X " +
+		"Pattern match interface name."
+	IfConfig_a_Flag xflag.KeyUsage[bool] = "a " +
+		"Display all interfaces (implied unless -d, -u, -X)."
+	IfConfig_d_Flag xflag.KeyUsage[bool] = "d " +
+		"Only display down interfaces."
+	IfConfig_l_Flag xflag.KeyUsage[bool] = "l " +
+		"List available interfaces."
+	IfConfig_m_Flag xflag.KeyUsage[bool] = "m " +
+		"Display all supported media."
+	IfConfig_r_Flag xflag.KeyUsage[bool] = "r " +
+		"Display route references."
+	IfConfig_u_Flag xflag.KeyUsage[bool] = "u " +
+		"Only display up interfaces."
+	IfConfig_v_Flag xflag.KeyUsage[bool] = "v " +
+		"Verbose display."
+)
+
 var inets = []string{"inet", "inet6"}
 
 func Ifconfig(ctx context.Context, complete bool, args []string) error {
@@ -72,21 +95,16 @@ func Ifconfig(ctx context.Context, complete bool, args []string) error {
 
 	xflag.TemplateUsage(ifconfigUsage)
 
-	mFlag := flag.Bool("m", false, "Display all supported media.")
-	LFlag := flag.Bool("L", false,
-		"Display IPv6 address lifetime as offset.")
-	aFlag := flag.Bool("a", false,
-		"Display all interfaces (implied unless -d, -u, -X).")
-	dFlag := flag.Bool("d", false, "Only display down interfaces.")
-	uFlag := flag.Bool("u", false, "Only display up interfaces.")
-	lFlag := flag.Bool("l", false, "List available interfaces.")
-	vFlag := flag.Bool("v", false, "Verbose display.")
-	CFlag := flag.Bool("C", false, "List cloneable devices.")
-	rFlag := flag.Bool("r", false, "Display route references.")
-	XFlag := flag.String("X", "", "Pattern match interface name.")
-
-	// FIXME add these display modifiers
-	_ = *mFlag || *LFlag || *vFlag || *rFlag
+	CFlag := IfConfig_C_Flag.Define(false)
+	IfConfig_L_Flag.Define(false)
+	XFlag := IfConfig_X_Flag.Define("")
+	aFlag := IfConfig_a_Flag.Define(false)
+	dFlag := IfConfig_d_Flag.Define(false)
+	lFlag := IfConfig_l_Flag.Define(false)
+	IfConfig_m_Flag.Define(false)
+	IfConfig_r_Flag.Define(false)
+	uFlag := IfConfig_u_Flag.Define(false)
+	IfConfig_v_Flag.Define(false)
 
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
