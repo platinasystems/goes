@@ -14,6 +14,11 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xflag"
 )
 
+const (
+	Echo_e_Flag xflag.KeyUsage[bool] = "e Interpret escapes."
+	Echo_n_Flag xflag.KeyUsage[bool] = "n Print without trailing newline."
+)
+
 func Echo(ctx context.Context, args []string) error {
 	xflag.TemplateUsage(`
 usage: {{.Name}} [flags] [message]
@@ -21,8 +26,8 @@ Print message to stdout.
 
 {{flags .}}`)
 
-	esc := flag.Bool("e", false, "Interpret escapes.")
-	nonl := flag.Bool("n", false, "Without trailing newline.")
+	esc := Echo_e_Flag.Define(false)
+	nonl := Echo_n_Flag.Define(false)
 
 	err := flag.CommandLine.Parse(args)
 	if err != nil {

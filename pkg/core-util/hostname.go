@@ -14,6 +14,13 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xflag"
 )
 
+const (
+	Hostname_d_Flag xflag.KeyUsage[bool] = "d Only print domain name."
+	Hostname_f_Flag xflag.KeyUsage[bool] = "f " +
+		"Print fully qualified domain name (FQDN)."
+	Hostname_s_Flag xflag.KeyUsage[bool] = "s Print name w/o domain."
+)
+
 func Hostname(ctx context.Context, args []string) error {
 	xflag.TemplateUsage(`
 usage: {{.Name}} [flags] [name]
@@ -21,10 +28,9 @@ Set or print system host name.
 
 {{flags .}}`)
 
-	dFlag := flag.Bool("d", false, "only print domain")
-	fFlag := flag.Bool("f", true,
-		"print fully qualified domain name (FQDN)")
-	sFlag := flag.Bool("s", false, "print name w/o domain")
+	dFlag := Hostname_d_Flag.Define(false)
+	fFlag := Hostname_f_Flag.Define(true)
+	sFlag := Hostname_s_Flag.Define(false)
 
 	err := flag.CommandLine.Parse(args)
 	if err != nil {

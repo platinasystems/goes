@@ -15,6 +15,21 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xflag"
 )
 
+const (
+	Id_A_Flag xflag.KeyUsage[bool] = "A Print user process audit."
+	Id_G_Flag xflag.KeyUsage[bool] = "G Print group IDs."
+	Id_M_Flag xflag.KeyUsage[bool] = "M Print process MAC label."
+	Id_P_Flag xflag.KeyUsage[bool] = "P Print password file entry."
+	Id_c_Flag xflag.KeyUsage[bool] = "c Print login class."
+	Id_g_Flag xflag.KeyUsage[bool] = "g Print effective group ID."
+	Id_p_Flag xflag.KeyUsage[bool] = "p Print human readable output."
+	Id_u_Flag xflag.KeyUsage[bool] = "u Print effective user ID."
+	Id_n_Flag xflag.KeyUsage[bool] = "n " +
+		"Print user or group name instead of number."
+	Id_r_Flag xflag.KeyUsage[bool] = "r " +
+		"Print real instead of effective group or user ID."
+)
+
 func Id(ctx context.Context, args []string) error {
 	var u *user.User
 	var gname string
@@ -27,18 +42,16 @@ Print “user” (or current user's) identity.
 
 {{flags .}}`)
 
-	Aflag := flag.Bool("A", false, "Print user process audit.")
-	Gflag := flag.Bool("G", false, "Print group IDs.")
-	Mflag := flag.Bool("M", false, "Print process MAC label.")
-	Pflag := flag.Bool("P", false, "Print password file entry.")
-	cflag := flag.Bool("c", false, "Print login class.")
-	gflag := flag.Bool("g", false, "Print effective group ID.")
-	pflag := flag.Bool("p", false, "Print human readable output.")
-	uflag := flag.Bool("u", false, "Print effective user ID.")
-	nflag := flag.Bool("n", false,
-		"Print user or group name instead of number.")
-	rflag := flag.Bool("r", false,
-		"Print real instead of effective group or user ID.")
+	Aflag := Id_A_Flag.Define(false)
+	Gflag := Id_G_Flag.Define(false)
+	Mflag := Id_M_Flag.Define(false)
+	Pflag := Id_P_Flag.Define(false)
+	cflag := Id_c_Flag.Define(false)
+	gflag := Id_g_Flag.Define(false)
+	pflag := Id_p_Flag.Define(false)
+	uflag := Id_u_Flag.Define(false)
+	nflag := Id_n_Flag.Define(false)
+	rflag := Id_r_Flag.Define(false)
 
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
