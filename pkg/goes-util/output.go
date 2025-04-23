@@ -17,6 +17,17 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xprogram"
 )
 
+const (
+	Output_a_Flag xflag.KeyUsage[bool] = "a " +
+		"Append <file> instead of truncate."
+	Output_e_Flag xflag.KeyUsage[bool] = "e " +
+		"Write or tee Stderr to <file> instead of Stdout."
+	Output_m_Flag xflag.KeyUsage[uint] = "m " +
+		"Output file mode (default 0666)."
+	Output_t_Flag xflag.KeyUsage[bool] = "t " +
+		"Tee to <file> and stdout."
+)
+
 func Output(ctx context.Context, complete bool, args []string) error {
 	xflag.TemplateUsage(`
 usage: {{.Name}} [flags] <file> <feature> [args]
@@ -24,11 +35,10 @@ Execute feature with output written to file.
 
 {{flags .}}`)
 
-	aFlag := flag.Bool("a", false, "Append <file> instead of truncate.")
-	eFlag := flag.Bool("e", false,
-		"Write or tee Stderr to <file> instead of Stdout.")
-	mFlag := flag.Uint("m", 0, "Output file mode (default 0666).")
-	tFlag := flag.Bool("t", false, "Tee to <file> and stdout.")
+	aFlag := Output_a_Flag.Define(false)
+	eFlag := Output_e_Flag.Define(false)
+	mFlag := Output_m_Flag.Define(0)
+	tFlag := Output_t_Flag.Define(false)
 
 	err := flag.CommandLine.Parse(args)
 	if err != nil {

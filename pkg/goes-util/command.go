@@ -17,6 +17,12 @@ import (
 	"golang.org/x/term"
 )
 
+const (
+	Command_p_Flag xflag.KeyUsage[bool] = "p Restricted path search."
+	Command_v_Flag xflag.KeyUsage[bool] = "v Report path found."
+	Command_V_Flag xflag.KeyUsage[bool] = "V More verbose report."
+)
+
 func Command(ctx context.Context, complete bool, args []string) error {
 	xflag.TemplateUsage(`
 usage: {{.Name}} [flags] <external> [args]
@@ -24,9 +30,9 @@ Execute “external” PATH command.
 
 {{flags .}}`)
 
-	pFlag := flag.Bool("p", false, "Restricted path search.")
-	vFlag := flag.Bool("v", false, "Report path found.")
-	vvFlag := flag.Bool("V", false, "More verbose report.")
+	pFlag := Command_p_Flag.Define(false)
+	vFlag := Command_v_Flag.Define(false)
+	vvFlag := Command_V_Flag.Define(false)
 
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
