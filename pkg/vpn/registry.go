@@ -96,7 +96,7 @@ func Registry(ctx context.Context, args []string) error {
 
 	xlog.SetPrefixes("registry/")
 
-	xflag.UsageTemplate(flag.CommandLine, `
+	xflag.TemplateUsage(`
 usage: {{.Name}} [flags]
 A RESTful WWW server.
 

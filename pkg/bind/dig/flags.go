@@ -1,4 +1,4 @@
-// Copyright © 2024 Platina Systems, Inc. All rights reserved.
+// Copyright © 2024-2025 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -13,7 +13,7 @@ import (
 
 func newFlagSet() *flag.FlagSet {
 	fs := flag.NewFlagSet("dig", flag.ContinueOnError)
-	xflag.UsageTemplate(fs, "[-flags] [name [TYPE] [CLASS] [+options]]")
+	xflag.TemplateUsageIn(fs, "[-flags] [name [TYPE] [CLASS] [+options]]")
 	return fs
 }
 

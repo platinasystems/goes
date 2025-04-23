@@ -1,4 +1,4 @@
-// Copyright © 2022-2024 Platina Systems, Inc. All rights reserved.
+// Copyright © 2022-2025 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -27,7 +27,7 @@ type Request struct {
 
 func (req Request) Func(ctx context.Context, args []string) error {
 	flags := flag.NewFlagSet("ioc", flag.ContinueOnError)
-	xflag.UsageTemplate(flags, `
+	xflag.TemplateUsageIn(flags, `
 usage: {{.Name}} [flags] <host> <command> [<args>]
 Run command on <host>.
 

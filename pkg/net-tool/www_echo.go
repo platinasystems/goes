@@ -1,4 +1,4 @@
-// Copyright © 2023-2024 Platina Systems, Inc. All rights reserved.
+// Copyright © 2023-2025 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -21,11 +21,11 @@ import (
 const WWWEchoPort = ":8080"
 
 func WWWEcho(ctx context.Context, args []string) error {
-	xflag.UsageTemplate(flag.CommandLine, `
+	xflag.TemplateUsage(`
 usage: {{.Name}} [<address>:<port>]
 WWW echo server that responds with path of http request.
 
-Default: “`+WWWEchoPort+`”
+Default: “` + WWWEchoPort + `”
 `)
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
@@ -64,7 +64,7 @@ Default: “`+WWWEchoPort+`”
 func WWWPing(ctx context.Context, args []string) error {
 	const nl = "\n"
 
-	xflag.UsageTemplate(flag.CommandLine, `
+	xflag.TemplateUsage(`
 usage: {{.Name}} [host]
 Ping WWW echo server.
 
@@ -73,7 +73,7 @@ Host:
   - <ip4>:<port>
   - <name>:<port>
 
-Default: “127.0.0.1`+WWWEchoPort+`”
+Default: “127.0.0.1` + WWWEchoPort + `”
 `)
 	err := flag.CommandLine.Parse(args)
 	if err != nil {

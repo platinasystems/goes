@@ -95,7 +95,7 @@ func CreateCertificate(ctx context.Context, args []string) error {
 	const year = 365 * 24 * time.Hour
 	const longest = 10 * year
 
-	xflag.UsageTemplate(flag.CommandLine, `
+	xflag.TemplateUsage(`
 usage: {{.Name}} [flags]
 Create PEM encoded x509 certificate file.
 
@@ -223,7 +223,7 @@ Create PEM encoded x509 certificate file.
 
 // Print parsed certificate(s).
 func ShowCertificate(ctx context.Context, args []string) error {
-	xflag.UsageTemplate(flag.CommandLine, `
+	xflag.TemplateUsage(`
 usage: {{.Name}} [flags]
 Print parsed certificate.
 

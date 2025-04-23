@@ -58,7 +58,7 @@ const (
 func RestAdmin(ctx context.Context, args []string) error {
 	var rest rest
 
-	xflag.UsageTemplate(flag.CommandLine, `
+	xflag.TemplateUsage(`
 usage: {{.Name}} [flags] <subscriber>
 RESTful registry administration.
 
@@ -95,7 +95,7 @@ RESTful registry administration.
 func RestCertify(ctx context.Context, args []string) error {
 	var rest rest
 
-	xflag.UsageTemplate(flag.CommandLine, `
+	xflag.TemplateUsage(`
 usage: {{.Name}} [flags] https://<host>[:port]
 Import registry certificate.
 
@@ -170,7 +170,7 @@ Import registry certificate.
 func RestPing(ctx context.Context, args []string) error {
 	var rest rest
 
-	xflag.UsageTemplate(flag.CommandLine, `
+	xflag.TemplateUsage(`
 usage: {{.Name}} [flags]
 RESTful ping registry.
 
@@ -202,7 +202,7 @@ RESTful ping registry.
 func RestReload(ctx context.Context, args []string) error {
 	var rest rest
 
-	xflag.UsageTemplate(flag.CommandLine, `
+	xflag.TemplateUsage(`
 usage: {{.Name}} [flags] [args]
 RESTful reload registry configuration.
 
@@ -234,7 +234,7 @@ RESTful reload registry configuration.
 func RestShow(ctx context.Context, args []string) error {
 	var rest rest
 
-	xflag.UsageTemplate(flag.CommandLine, `
+	xflag.TemplateUsage(`
 usage: {{.Name}} [flags] [args]
 RESTful query and print registry object.
 
@@ -270,7 +270,7 @@ RESTful query and print registry object.
 func RestSubscribe(ctx context.Context, args []string) error {
 	var rest rest
 
-	xflag.UsageTemplate(flag.CommandLine, `
+	xflag.TemplateUsage(`
 usage: {{.Name}} [flags]
 RESTful subscribe to VPN.
 

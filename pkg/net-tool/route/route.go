@@ -78,7 +78,7 @@ const (
 )
 
 func (rt Route) op(ctx context.Context, args []string) error {
-	xflag.UsageTemplate(flag.CommandLine, Usage[rt])
+	xflag.TemplateUsage(Usage[rt])
 
 	DebugFlag.Define(false)
 	if HaveFibs {
@@ -139,7 +139,7 @@ func (rt Route) op(ctx context.Context, args []string) error {
 func (rt Route) String() string { return string(rt) }
 
 func flush(ctx context.Context, args []string) error {
-	xflag.UsageTemplate(flag.CommandLine, Usage[Flush])
+	xflag.TemplateUsage(Usage[Flush])
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
 		return err
@@ -154,7 +154,7 @@ func flush(ctx context.Context, args []string) error {
 }
 
 func monitor(ctx context.Context, args []string) error {
-	xflag.UsageTemplate(flag.CommandLine, Usage[Monitor])
+	xflag.TemplateUsage(Usage[Monitor])
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
 		return err

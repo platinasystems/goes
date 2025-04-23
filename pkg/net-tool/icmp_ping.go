@@ -16,7 +16,7 @@ import (
 )
 
 func ICMPPing(ctx context.Context, args []string) error {
-	xflag.UsageTemplate(flag.CommandLine, `
+	xflag.TemplateUsage(`
 usage: {{.Name}} [flags] [host]
 Send ICMP ECHO_REQUEST packets to network “host”, default 127.0.0.1.
 {{flags .}}`)

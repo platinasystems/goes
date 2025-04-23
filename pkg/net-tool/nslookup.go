@@ -1,4 +1,4 @@
-// Copyright © 2023-2024 Platina Systems, Inc. All rights reserved.
+// Copyright © 2023-2025 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -18,7 +18,7 @@ import (
 func Nslookup(ctx context.Context, args []string) error {
 	var sep string
 
-	xflag.UsageTemplate(flag.CommandLine, `
+	xflag.TemplateUsage(`
 usage: {{.Name}} [-|<name>|<address> [<server>]]
 `)
 	err := flag.CommandLine.Parse(args)

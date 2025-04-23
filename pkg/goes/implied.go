@@ -1,4 +1,4 @@
-// Copyright © 2023-2024 Platina Systems, Inc. All rights reserved.
+// Copyright © 2023-2025 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -57,7 +57,7 @@ func ImpliedPrintOrScanObject(
 		}
 		return nil
 	} else if args[0] == "-h" {
-		xflag.UsageTemplate(flag.CommandLine, `
+		xflag.TemplateUsage(`
 usage: {{.Name}}
 Print or scan object.
 `)
@@ -87,7 +87,7 @@ func ImpliedPrintResults(
 	args []string,
 ) error {
 	if len(args) > 0 && args[0] == "-h" {
-		xflag.UsageTemplate(flag.CommandLine, `
+		xflag.TemplateUsage(`
 usage: {{.Name}}
 Print results.
 `)
@@ -123,7 +123,7 @@ func ImpliedSelect(
 			PrintKeyLines(MatchingKeys(m))
 			return nil
 		case Help:
-			xflag.UsageTemplate(flag.CommandLine, `
+			xflag.TemplateUsage(`
 usage: {{.Name}} <feature> [args]
 Select feature.
 `)

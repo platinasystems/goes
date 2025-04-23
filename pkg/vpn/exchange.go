@@ -51,7 +51,7 @@ func Exchange(ctx context.Context, args []string) error {
 
 	xlog.SetPrefixes("exchange/")
 
-	xflag.UsageTemplate(flag.CommandLine, `
+	xflag.TemplateUsage(`
 usage: {{.Name}} [flags] [vpn]
 Exchange ciphered packets between guests.
 

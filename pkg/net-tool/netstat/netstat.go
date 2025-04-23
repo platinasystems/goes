@@ -41,7 +41,7 @@ type options struct {
 func Feature(ctx context.Context, args []string) error {
 	var opts options
 
-	xflag.UsageTemplate(flag.CommandLine, `
+	xflag.TemplateUsage(`
 usage: {{.Name}} [flags]
 Prints network status.
 

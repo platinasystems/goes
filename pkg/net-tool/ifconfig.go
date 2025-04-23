@@ -1,4 +1,4 @@
-// Copyright © 2023-2024 Platina Systems, Inc. All rights reserved.
+// Copyright © 2023-2025 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -70,7 +70,7 @@ var inets = []string{"inet", "inet6"}
 func Ifconfig(ctx context.Context, complete bool, args []string) error {
 	var pat *regexp.Regexp
 
-	xflag.UsageTemplate(flag.CommandLine, ifconfigUsage)
+	xflag.TemplateUsage(ifconfigUsage)
 
 	mFlag := flag.Bool("m", false, "Display all supported media.")
 	LFlag := flag.Bool("L", false,

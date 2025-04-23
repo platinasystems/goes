@@ -20,9 +20,9 @@ import (
 )
 
 func AlarmDaemons(ctx context.Context, args []string) error {
-	xflag.UsageTemplate(flag.CommandLine, `
+	xflag.TemplateUsage(`
 usage: {{.Name}}
-Send alarm to `+daemonCriterion+".\n")
+Send alarm to ` + daemonCriterion + ".\n")
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
 		return err
@@ -48,7 +48,7 @@ func DoDaemons(ctx context.Context, f func(*os.Process) error) error {
 }
 
 func ShowDaemons(ctx context.Context, args []string) error {
-	xflag.UsageTemplate(flag.CommandLine, `
+	xflag.TemplateUsage(`
 usage: {{.Name}}
 List PIDs with this same executable and /dev/null stdin.
 `)
@@ -65,7 +65,7 @@ List PIDs with this same executable and /dev/null stdin.
 // the system logger; otherwise, [goes.Reselect] [goes.Features] within the
 // current process context.
 func StartDaemon(ctx context.Context, complete bool, args []string) error {
-	xflag.UsageTemplate(flag.CommandLine, `
+	xflag.TemplateUsage(`
 usage: {{.Name}} <feature> [args]
 If not a /ko-app, execute feature as a detached process with output piped to
 the system logger; otherwise, perform within the current process context.
@@ -101,9 +101,9 @@ the system logger; otherwise, perform within the current process context.
 }
 
 func StopDaemons(ctx context.Context, args []string) error {
-	xflag.UsageTemplate(flag.CommandLine, `
+	xflag.TemplateUsage(`
 usage: {{.Name}}
-Terminate `+daemonCriterion+".\n")
+Terminate ` + daemonCriterion + ".\n")
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
 		return err

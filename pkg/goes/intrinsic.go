@@ -1,4 +1,4 @@
-// Copyright © 2023-2024 Platina Systems, Inc. All rights reserved.
+// Copyright © 2023-2025 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -18,7 +18,7 @@ usage: {{.Name}} <feature> [args]
 Print last arg prefix matches.
 `
 	if len(args) > 0 && args[0] == "-h" {
-		xflag.UsageTemplate(flag.CommandLine, tmpl)
+		xflag.TemplateUsage(tmpl)
 		flag.CommandLine.Usage()
 		return nil
 	}
@@ -31,7 +31,7 @@ usage: {{.Name}} <feature> [args]
 Print feature usage.
 `
 	if len(args) > 0 && args[0] == "-h" {
-		xflag.UsageTemplate(flag.CommandLine, tmpl)
+		xflag.TemplateUsage(tmpl)
 		flag.CommandLine.Usage()
 		return nil
 	}

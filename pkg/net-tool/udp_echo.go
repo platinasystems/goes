@@ -1,4 +1,4 @@
-// Copyright © 2023-2024 Platina Systems, Inc. All rights reserved.
+// Copyright © 2023-2025 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -30,7 +30,7 @@ const (
 func UDPEcho(ctx context.Context, args []string) error {
 	var udpa *net.UDPAddr
 
-	xflag.UsageTemplate(flag.CommandLine, `
+	xflag.TemplateUsage(`
 usage: {{.Name}} [<address>:<port>]
 UDP Echo server. (default listen “address:port”: “:7”)
 `)
@@ -64,7 +64,7 @@ UDP Echo server. (default listen “address:port”: “:7”)
 }
 
 func UDPPing(ctx context.Context, args []string) error {
-	xflag.UsageTemplate(flag.CommandLine, `
+	xflag.TemplateUsage(`
 usage: {{.Name}} [host]
 Ping host with sequenced packets.
 

@@ -20,7 +20,7 @@ import (
 )
 
 func NDP(ctx context.Context, args []string) error {
-	xflag.UsageTemplate(flag.CommandLine, `
+	xflag.TemplateUsage(`
 usage: {{.Name}} [flags] [args]
 Control/diagnose IPv6 neighbor discovery protocol
 {{flags .}}`)

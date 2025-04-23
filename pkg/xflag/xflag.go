@@ -37,6 +37,7 @@ func GetFrom[T any](flags *flag.FlagSet, name string) (v T) {
 //	const VerboseFlag KeyUsage[bool] = "v Verbose output."
 type KeyUsage[T any] string
 
+// [KeyUsage.DefineIn] [flag.CommandLine]
 func (ku KeyUsage[T]) Define(val T, aliases ...string) *T {
 	return ku.DefineIn(flag.CommandLine, val, aliases...)
 }
@@ -56,6 +57,7 @@ func (ku KeyUsage[T]) DefineIn(flags *flag.FlagSet, val T, aliases ...string) *T
 	return define(flags, key, val, usage, aliases...).(*T)
 }
 
+// [KeyUsage.ValueIn] [flag.CommandLine]
 func (ku KeyUsage[T]) Value() T {
 	return ku.ValueIn(flag.CommandLine)
 }
@@ -94,20 +96,15 @@ func SprintDefaults(flags *flag.FlagSet) string {
 	return sb.String()
 }
 
-// These results are passed to the usage template execution.
-var UsageData = func(flags *flag.FlagSet) any {
-	return flags
-}
-
-// The usage template will include these functions.
-var UsageFuncs = template.FuncMap{
-	"flags": SprintDefaults,
+// [TemplateUsageIn] [flag.CommandLine]
+func TemplateUsage(tmpl string) {
+	TemplateUsageIn(flag.CommandLine, tmpl)
 }
 
 // Assign [flag.FlagSet.Usage] to a closure that creates a new [text/template]
 // with [UsageFuncs]; parses “tmpl”; then [text/template.Template.Execute]'s
-// to [flag.FlagSet.Output] with [UsageData] results.
-func UsageTemplate(flags *flag.FlagSet, tmpl string) {
+// to [flag.FlagSet.Output] with [UsageData].
+func TemplateUsageIn(flags *flag.FlagSet, tmpl string) {
 	flags.Usage = func() {
 		w := flags.Output()
 		tmpl = strings.TrimLeft(tmpl, " \t\n")
@@ -120,6 +117,16 @@ func UsageTemplate(flags *flag.FlagSet, tmpl string) {
 			fmt.Fprint(w, name, ":usage:", err, "\n")
 		}
 	}
+}
+
+// These results are passed to the usage template execution.
+var UsageData = func(flags *flag.FlagSet) any {
+	return flags
+}
+
+// The usage template will include these functions.
+var UsageFuncs = template.FuncMap{
+	"flags": SprintDefaults,
 }
 
 func define(flags *flag.FlagSet, name string, val any, usage string,

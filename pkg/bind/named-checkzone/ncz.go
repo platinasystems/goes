@@ -1,4 +1,4 @@
-// Copyright © 2024 Platina Systems, Inc. All rights reserved.
+// Copyright © 2024-2025 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -26,7 +26,7 @@ var (
 )
 
 func NamedCheckZone(ctx context.Context, args []string) error {
-	xflag.UsageTemplate(flag.CommandLine, `
+	xflag.TemplateUsage(`
 usage: {{.Name}} [-flags] {zone} {file | -}
 Mimic BIND9's config verification tool.
 
