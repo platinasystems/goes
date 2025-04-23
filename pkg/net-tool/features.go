@@ -4,16 +4,13 @@
 
 package net_tool
 
-import (
-	"github.com/platinasystems/goes/v2/pkg/net-tool/netstat"
-	"github.com/platinasystems/goes/v2/pkg/net-tool/route"
-)
+import "github.com/platinasystems/goes/v2/pkg/net-tool/route"
 
-// Features map by name these emulated Unix net-tools.
+// Features mapped by name that emulate Unix net-tools.
 var Features = map[string]any{
 	"ifconfig": Ifconfig,
 	"ndp":      NDP,
-	"netstat":  netstat.Feature,
+	"netstat":  Netstat,
 	"nslookup": Nslookup,
 	"ping":     ICMPPing,
 	"route":    route.Features,

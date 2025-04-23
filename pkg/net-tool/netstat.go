@@ -2,7 +2,7 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-package netstat
+package net_tool
 
 import (
 	"context"
@@ -49,7 +49,7 @@ const (
 		"Wait interval."
 )
 
-func Feature(ctx context.Context, args []string) error {
+func Netstat(ctx context.Context, args []string) error {
 	xflag.TemplateUsage(`
 usage: {{.Name}} [flags]
 Prints network status.
