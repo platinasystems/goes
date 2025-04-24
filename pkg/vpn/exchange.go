@@ -8,7 +8,6 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/pem"
-	"flag"
 	"fmt"
 	"net"
 	"net/netip"
@@ -47,7 +46,6 @@ func Exchange(ctx context.Context, args []string) error {
 	const defport = 8003
 	var wg sync.WaitGroup
 	var ex exchange
-	var pub netip.AddrPort
 
 	xlog.SetPrefixes("exchange/")
 
@@ -57,10 +55,9 @@ Exchange ciphered packets between guests.
 
 {{flags .}}`)
 
-	flag.TextVar(&pub, NamePublicFlag,
-		netip.AddrPortFrom(netip.IPv4Unspecified(), 0),
-		`NAT'd listen {addr}:{port}. (0.0.0.0:0 ignored)`)
-	trace := flag.Bool(NameTraceFlag, false, "Log packet forwarding.")
+	pub := PublicFlag.Define(netip.AddrPortFrom(netip.IPv4Unspecified(), 0))
+	trace := TraceFlag.Define(false)
+
 	err := ex.defineAndParseFlags(ctx, defport, args)
 	if err != nil {
 		return err
@@ -103,8 +100,8 @@ Exchange ciphered packets between guests.
 		return xerrors.Label(err, "LocalAddr")
 	}
 	sap := lap
-	if !pub.Addr().IsUnspecified() {
-		sap = pub
+	if !(*pub).Addr().IsUnspecified() {
+		sap = *pub
 	}
 	if err = ex.register(ctx, sap); err != nil {
 		return err

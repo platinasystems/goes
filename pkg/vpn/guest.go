@@ -7,7 +7,6 @@ package vpn
 import (
 	"context"
 	"encoding/pem"
-	"flag"
 	"fmt"
 	"io"
 	"net"
@@ -44,8 +43,9 @@ Forward ciphered packets between exchange and tunnel interface.
 
 {{flags .}}`)
 
-	trace := flag.Bool(NameTraceFlag, false, "Log packet forwarding.")
-	tflag := flag.Uint(NameTunnelFlag, 0, "Tunnel unit number.")
+	trace := TraceFlag.Define(false)
+	tflag := TunnelFlag.Define(0)
+
 	err := g.defineAndParseFlags(ctx, defport, args)
 	if err != nil {
 		return err

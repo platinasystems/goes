@@ -148,7 +148,7 @@ Import registry certificate.
 		return err
 	}
 
-	rfn := pathRegFile()
+	rfn := ConfigDirFile(RegFlag)
 	fmt.Fprintf(w, `Enter "yes" to write above to %s: `, rfn)
 	s, err := r.ReadString('\n')
 	if err != nil && strings.TrimSpace(s) != "yes" {
@@ -302,7 +302,7 @@ RESTful subscribe to VPN.
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		err = errors.New(resp.Status)
-	} else if pathRegFile() == "-" {
+	} else if ConfigDirFile(RegFlag) == "-" {
 		_, err = io.Copy(os.Stdout, resp.Body)
 	}
 	return err
@@ -388,7 +388,7 @@ func (rest *rest) defineAndParseFlags(args []string) error {
 		return err
 	}
 
-	fn := pathCertFile()
+	fn := ConfigDirFile(CertFlag)
 	cs, err := certificates(fn)
 	if err != nil {
 		return err
@@ -398,7 +398,7 @@ func (rest *rest) defineAndParseFlags(args []string) error {
 		rest.crt = cs[0]
 	}
 
-	if rest.sig, err = NewSignatures(pathSigFile()); err != nil {
+	if rest.sig, err = NewSignatures(ConfigDirFile(SigFlag)); err != nil {
 		return err
 	}
 
@@ -419,7 +419,7 @@ func (rest *rest) defineAndParseFlags(args []string) error {
 	}
 
 	if cl := flag.CommandLine.Name(); !strings.HasSuffix(cl, "certify") {
-		if cs, err = certificates(pathRegFile()); err != nil {
+		if cs, err = certificates(ConfigDirFile(RegFlag)); err != nil {
 			return err
 		}
 		rest.reg = cs[0]
@@ -427,7 +427,7 @@ func (rest *rest) defineAndParseFlags(args []string) error {
 			return err
 		}
 		cfg.RootCAs.AddCert(rest.reg)
-		if vpn := ValueOfStringFlag(NameVpnFlag); len(vpn) > 0 {
+		if vpn := VpnFlag.Value(); len(vpn) > 0 {
 			rest.url = rest.url.JoinPath(vpn)
 		}
 	}

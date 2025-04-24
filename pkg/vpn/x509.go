@@ -125,7 +125,7 @@ Create PEM encoded x509 certificate file.
 		return err
 	}
 
-	sig, err := NewSignatures(pathSigFile())
+	sig, err := NewSignatures(ConfigDirFile(SigFlag))
 	if err != nil {
 		return err
 	}
@@ -204,7 +204,7 @@ Create PEM encoded x509 certificate file.
 		Headers: map[string]string{},
 		Bytes:   der,
 	}
-	cfn := pathCertFile()
+	cfn := ConfigDirFile(CertFlag)
 	if cfn == "-" {
 		return pem.Encode(os.Stdout, blk)
 	}
@@ -234,7 +234,7 @@ Print parsed certificate.
 		return err
 	}
 
-	cs, err := certificates(pathCertFile())
+	cs, err := certificates(ConfigDirFile(CertFlag))
 	if err != nil {
 		return err
 	} else if len(cs) == 0 {

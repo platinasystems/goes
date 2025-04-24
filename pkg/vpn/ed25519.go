@@ -33,7 +33,7 @@ Create PEM encoded ed25519 signature key file.
 		return err
 	}
 
-	sfn := pathSigFile()
+	sfn := ConfigDirFile(SigFlag)
 
 	_, priv, err := ed25519.GenerateKey(nil)
 	if err != nil {

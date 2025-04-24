@@ -36,7 +36,7 @@ Print algorithm.
 		return err
 	}
 
-	sig, err := NewSignatures(pathSigFile())
+	sig, err := NewSignatures(ConfigDirFile(SigFlag))
 	if err == nil {
 		err = sig.Show(os.Stdout)
 	}
