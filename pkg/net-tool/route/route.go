@@ -34,47 +34,36 @@ const (
 )
 
 const (
-	DebugFlag  xflag.KeyUsage[bool]   = "d Debug mode."
-	ExpireFlag xflag.KeyUsage[int]    = "expire Seconds from now."
-	FibFlag    xflag.KeyUsage[string] = "fib " +
-		"A comma separated list of FIB IDs other than default."
-	FlagsFlag xflag.KeyUsage[string] = "flags " +
-		"A comma separated list." + gwFlags
-	GenmaskFlag  xflag.KeyUsage[string] = "genmask Generate netmask."
-	HopCountFlag xflag.KeyUsage[uint]   = "hopcount FIXME"
-	HostFlag     xflag.KeyUsage[bool]   = "host Host <destination>."
-	IfaFlag      xflag.KeyUsage[string] = "ifa " +
-		"A MAC address of a point-to-point peer?"
-	IfaceFlag xflag.KeyUsage[bool] = "iface " +
-		"Inticates <gateway> is a point-to-point interface name."
-	IfpFlag xflag.KeyUsage[string] = "ifp " +
-		"A point-to-point peer interface and MAC."
-	InetFlag    xflag.KeyUsage[bool]   = `inet Address hint or filter.`
-	Inet6Flag   xflag.KeyUsage[bool]   = `inet6 Address hint or filter.`
-	JailFlag    xflag.KeyUsage[string] = `j Run inside jail.`
-	MetricFlag  xflag.KeyUsage[uint]   = "metric FIXME"
-	MetricsFlag xflag.KeyUsage[string] = "metrics " +
-		"A comma separated NAME=VALUE." + gwMetrics
-	MTUFlag       xflag.KeyUsage[uint] = "mtu FIXME"
-	NetFlag       xflag.KeyUsage[bool] = "net Network <destination>."
-	NumericFlag   xflag.KeyUsage[bool] = "n Numeric address output."
-	PrefixlenFlag xflag.KeyUsage[int]  = "prefixlen " +
-		"If >= 0, use instead of 1st arg/<suffix> or 3rd arg."
-	ProtocolFlag xflag.KeyUsage[string] = "protocol " +
-		"{boot, kernel, redirect, static}"
-	QuietFlag  xflag.KeyUsage[bool]   = "q Suppress most output."
-	RTTFlag    xflag.KeyUsage[uint]   = "rtt FIXME"
-	RTTVarFlag xflag.KeyUsage[uint]   = "rttvar FIXME"
-	ScopeFlag  xflag.KeyUsage[string] = "scope " +
-		"{global, nowhere, host, link, site}"
-	SSThreshFlag xflag.KeyUsage[uint]   = "ssthresh FIXME"
-	TableFlag    xflag.KeyUsage[string] = "table " +
-		"{compat, default, main, local}"
-	TestFlag xflag.KeyUsage[bool]   = "t Test mode."
-	ToFlag   xflag.KeyUsage[string] = "to " +
-		"{unicast, broadcast, blackhole, etc.}"
-	TOSFlag     xflag.KeyUsage[uint] = "tos Set type-of-service."
-	VerboseFlag xflag.KeyUsage[bool] = "v Verbose output."
+	DebugFlag     xflag.Xbool   = "d Debug mode."
+	ExpireFlag    xflag.Xint    = "expire Seconds from now."
+	FibFlag       xflag.Xstring = "fib A comma separated list of FIB IDs other than default."
+	FlagsFlag     xflag.Xstring = "flags A comma separated list." + gwFlags
+	GenmaskFlag   xflag.Xstring = "genmask Generate netmask."
+	HopCountFlag  xflag.Xuint   = "hopcount FIXME"
+	HostFlag      xflag.Xbool   = "host Host <destination>."
+	IfaFlag       xflag.Xstring = "ifa A MAC address of a point-to-point peer?"
+	IfaceFlag     xflag.Xbool   = "iface Inticates <gateway> is a point-to-point interface name."
+	IfpFlag       xflag.Xstring = "ifp A point-to-point peer interface and MAC."
+	InetFlag      xflag.Xbool   = `inet Address hint or filter.`
+	Inet6Flag     xflag.Xbool   = `inet6 Address hint or filter.`
+	JailFlag      xflag.Xstring = `j Run inside jail.`
+	MetricFlag    xflag.Xuint   = "metric FIXME"
+	MetricsFlag   xflag.Xstring = "metrics A comma separated NAME=VALUE." + gwMetrics
+	MTUFlag       xflag.Xuint   = "mtu FIXME"
+	NetFlag       xflag.Xbool   = "net Network <destination>."
+	NumericFlag   xflag.Xbool   = "n Numeric address output."
+	PrefixlenFlag xflag.Xint    = "prefixlen If >= 0, use instead of 1st arg/<suffix> or 3rd arg."
+	ProtocolFlag  xflag.Xstring = "protocol {boot, kernel, redirect, static}"
+	QuietFlag     xflag.Xbool   = "q Suppress most output."
+	RTTFlag       xflag.Xuint   = "rtt FIXME"
+	RTTVarFlag    xflag.Xuint   = "rttvar FIXME"
+	ScopeFlag     xflag.Xstring = "scope {global, nowhere, host, link, site}"
+	SSThreshFlag  xflag.Xuint   = "ssthresh FIXME"
+	TableFlag     xflag.Xstring = "table {compat, default, main, local}"
+	TestFlag      xflag.Xbool   = "t Test mode."
+	ToFlag        xflag.Xstring = "to {unicast, broadcast, blackhole, etc.}"
+	TOSFlag       xflag.Xuint   = "tos Set type-of-service."
+	VerboseFlag   xflag.Xbool   = "v Verbose output."
 )
 
 func (rt Route) op(ctx context.Context, args []string) error {

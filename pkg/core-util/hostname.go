@@ -15,10 +15,9 @@ import (
 )
 
 const (
-	Hostname_d_Flag xflag.KeyUsage[bool] = "d Only print domain name."
-	Hostname_f_Flag xflag.KeyUsage[bool] = "f " +
-		"Print fully qualified domain name (FQDN)."
-	Hostname_s_Flag xflag.KeyUsage[bool] = "s Print name w/o domain."
+	Hostname_d_Flag xflag.Xbool = "d Only print domain name."
+	Hostname_f_Flag xflag.Xbool = "f Print fully qualified domain name."
+	Hostname_s_Flag xflag.Xbool = "s Print name w/o domain."
 )
 
 func Hostname(ctx context.Context, args []string) error {

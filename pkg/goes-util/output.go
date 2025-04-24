@@ -18,14 +18,10 @@ import (
 )
 
 const (
-	Output_a_Flag xflag.KeyUsage[bool] = "a " +
-		"Append <file> instead of truncate."
-	Output_e_Flag xflag.KeyUsage[bool] = "e " +
-		"Write or tee Stderr to <file> instead of Stdout."
-	Output_m_Flag xflag.KeyUsage[uint] = "m " +
-		"Output file mode (default 0666)."
-	Output_t_Flag xflag.KeyUsage[bool] = "t " +
-		"Tee to <file> and stdout."
+	Output_a_Flag xflag.Xbool = "a Append <file> instead of truncate."
+	Output_e_Flag xflag.Xbool = "e Write or tee Stderr to <file> instead of Stdout."
+	Output_m_Flag xflag.Xuint = "m Output file mode (default 0666)."
+	Output_t_Flag xflag.Xbool = "t Tee to <file> and stdout."
 )
 
 func Output(ctx context.Context, complete bool, args []string) error {

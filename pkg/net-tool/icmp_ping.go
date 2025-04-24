@@ -16,18 +16,12 @@ import (
 )
 
 const (
-	ICMPPing_c_Flag xflag.KeyUsage[uint] = "c " +
-		"Count."
-	ICMPPing_i_Flag xflag.KeyUsage[time.Duration] = "i " +
-		"Interval."
-	ICMPPing_m_Flag xflag.KeyUsage[uint] = "m " +
-		"Request Time To Live."
-	ICMPPing_q_Flag xflag.KeyUsage[bool] = "q " +
-		"Quiet."
-	ICMPPing_t_Flag xflag.KeyUsage[time.Duration] = "t " +
-		"Timeout regardless of how many received packets."
-	ICMPPing_v_Flag xflag.KeyUsage[bool] = "v " +
-		"Verbose."
+	ICMPPing_c_Flag xflag.Xuint     = "c Count."
+	ICMPPing_i_Flag xflag.Xduration = "i Interval."
+	ICMPPing_m_Flag xflag.Xuint     = "m Request Time To Live."
+	ICMPPing_q_Flag xflag.Xbool     = "q Quiet."
+	ICMPPing_t_Flag xflag.Xduration = "t Timeout regardless of how many received packets."
+	ICMPPing_v_Flag xflag.Xbool     = "v Verbose."
 )
 
 func ICMPPing(ctx context.Context, args []string) error {

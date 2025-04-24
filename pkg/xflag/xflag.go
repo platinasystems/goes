@@ -19,6 +19,16 @@ import (
 var ErrIsUndefinable = errors.New("is undefinable")
 var ErrIsNotTextUnmarshaler = errors.New("is not TextUnmarshaler")
 
+// These results are passed to the usage template execution.
+var UsageData = func(flags *flag.FlagSet) any {
+	return flags
+}
+
+// Each usage template includes these functions.
+var UsageFuncs = template.FuncMap{
+	"flags": SprintDefaults,
+}
+
 func Get[T any](name string) T {
 	return GetFrom[T](flag.CommandLine, name)
 }
@@ -30,47 +40,6 @@ func GetFrom[T any](flags *flag.FlagSet, name string) (v T) {
 		}
 	}
 	return
-}
-
-// A [unicode.Space] separated flag key and usage, e.g.
-//
-//	const VerboseFlag KeyUsage[bool] = "v Verbose output."
-type KeyUsage[T any] string
-
-// [KeyUsage.DefineIn] [flag.CommandLine]
-func (ku KeyUsage[T]) Define(val T, aliases ...string) *T {
-	return ku.DefineIn(flag.CommandLine, val, aliases...)
-}
-
-func (ku KeyUsage[T]) DefineIn(flags *flag.FlagSet, val T, aliases ...string) *T {
-	var key, usage string
-	for i, r := range string(ku) {
-		if len(key) == 0 {
-			if unicode.IsSpace(r) {
-				key = string(ku)[:i]
-			}
-		} else if !unicode.IsSpace(r) {
-			usage = string(ku)[i:]
-			break
-		}
-	}
-	return define(flags, key, val, usage, aliases...).(*T)
-}
-
-// [KeyUsage.ValueIn] [flag.CommandLine]
-func (ku KeyUsage[T]) Value() T {
-	return ku.ValueIn(flag.CommandLine)
-}
-
-func (ku KeyUsage[T]) ValueIn(flags *flag.FlagSet) T {
-	var key string
-	for i, r := range string(ku) {
-		if unicode.IsSpace(r) {
-			key = string(ku)[:i]
-			break
-		}
-	}
-	return GetFrom[T](flags, key)
 }
 
 func LastName(flags *flag.FlagSet) string {
@@ -119,14 +88,78 @@ func TemplateUsageIn(flags *flag.FlagSet, tmpl string) {
 	}
 }
 
-// These results are passed to the usage template execution.
-var UsageData = func(flags *flag.FlagSet) any {
-	return flags
+// A flag Description is a generic type wrapping string consisting of a
+// [unicode.Space] separated name and usage, e.g.
+//
+//	const Verbose Description[bool] = "verbose Log everything."
+//
+// Or with the alias:
+//
+//	const Verbose Xbool = "verbose Log everything."
+//
+// Define flag with initial value and any aliases before [flag.Parse].
+//
+//	Verbose.Define(false, "v")
+//
+// Then assess flag after [flag.Parse].
+//
+//	if Verbose.Value() { ... }
+type Description[T any] string
+type Xbool = Description[bool]
+type Xduration = Description[time.Duration]
+type Xfloat64 = Description[float64]
+type Xint = Description[int]
+type Xint64 = Description[int64]
+type Xstring = Description[string]
+type Xuint = Description[uint]
+type Xuint64 = Description[uint64]
+
+// [Description.DefineIn] [flag.CommandLine]
+func (d Description[T]) Define(val T, aliases ...string) *T {
+	return d.DefineIn(flag.CommandLine, val, aliases...)
 }
 
-// The usage template will include these functions.
-var UsageFuncs = template.FuncMap{
-	"flags": SprintDefaults,
+// Definable values:
+//
+//	bool | float64 | int | int64 | string | uint | uint64 |
+//		time.Duration | encoding.TextMarshaler
+func (d Description[T]) DefineIn(
+	flags *flag.FlagSet, val T, aliases ...string,
+) *T {
+	var name, usage string
+	s := d.String()
+	for i, r := range s {
+		if len(name) == 0 {
+			if unicode.IsSpace(r) {
+				name = s[:i]
+			}
+		} else if !unicode.IsSpace(r) {
+			usage = s[i:]
+			break
+		}
+	}
+	return define(flags, name, val, usage, aliases...).(*T)
+}
+
+func (d Description[T]) String() string {
+	return string(d)
+}
+
+// [Description.ValueIn] [flag.CommandLine]
+func (d Description[T]) Value() T {
+	return d.ValueIn(flag.CommandLine)
+}
+
+func (d Description[T]) ValueIn(flags *flag.FlagSet) T {
+	var name string
+	s := d.String()
+	for i, r := range s {
+		if unicode.IsSpace(r) {
+			name = s[:i]
+			break
+		}
+	}
+	return GetFrom[T](flags, name)
 }
 
 func define(flags *flag.FlagSet, name string, val any, usage string,

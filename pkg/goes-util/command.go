@@ -18,9 +18,9 @@ import (
 )
 
 const (
-	Command_p_Flag xflag.KeyUsage[bool] = "p Restricted path search."
-	Command_v_Flag xflag.KeyUsage[bool] = "v Report path found."
-	Command_V_Flag xflag.KeyUsage[bool] = "V More verbose report."
+	Command_p_Flag xflag.Xbool = "p Restricted path search."
+	Command_v_Flag xflag.Xbool = "v Report path found."
+	Command_V_Flag xflag.Xbool = "V More verbose report."
 )
 
 func Command(ctx context.Context, complete bool, args []string) error {

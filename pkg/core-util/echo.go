@@ -15,8 +15,8 @@ import (
 )
 
 const (
-	Echo_e_Flag xflag.KeyUsage[bool] = "e Interpret escapes."
-	Echo_n_Flag xflag.KeyUsage[bool] = "n Print without trailing newline."
+	Echo_e_Flag xflag.Xbool = "e Interpret escapes."
+	Echo_n_Flag xflag.Xbool = "n Print without trailing newline."
 )
 
 func Echo(ctx context.Context, args []string) error {

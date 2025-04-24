@@ -16,18 +16,16 @@ import (
 )
 
 const (
-	Id_A_Flag xflag.KeyUsage[bool] = "A Print user process audit."
-	Id_G_Flag xflag.KeyUsage[bool] = "G Print group IDs."
-	Id_M_Flag xflag.KeyUsage[bool] = "M Print process MAC label."
-	Id_P_Flag xflag.KeyUsage[bool] = "P Print password file entry."
-	Id_c_Flag xflag.KeyUsage[bool] = "c Print login class."
-	Id_g_Flag xflag.KeyUsage[bool] = "g Print effective group ID."
-	Id_p_Flag xflag.KeyUsage[bool] = "p Print human readable output."
-	Id_u_Flag xflag.KeyUsage[bool] = "u Print effective user ID."
-	Id_n_Flag xflag.KeyUsage[bool] = "n " +
-		"Print user or group name instead of number."
-	Id_r_Flag xflag.KeyUsage[bool] = "r " +
-		"Print real instead of effective group or user ID."
+	Id_A_Flag xflag.Xbool = "A Print user process audit."
+	Id_G_Flag xflag.Xbool = "G Print group IDs."
+	Id_M_Flag xflag.Xbool = "M Print process MAC label."
+	Id_P_Flag xflag.Xbool = "P Print password file entry."
+	Id_c_Flag xflag.Xbool = "c Print login class."
+	Id_g_Flag xflag.Xbool = "g Print effective group ID."
+	Id_p_Flag xflag.Xbool = "p Print human readable output."
+	Id_u_Flag xflag.Xbool = "u Print effective user ID."
+	Id_n_Flag xflag.Xbool = "n Print user or group name instead of number."
+	Id_r_Flag xflag.Xbool = "r Print real user ID."
 )
 
 func Id(ctx context.Context, args []string) error {

@@ -9,7 +9,6 @@ import (
 	"flag"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/platinasystems/goes/v2/pkg/netif"
 	"github.com/platinasystems/goes/v2/pkg/netrt"
@@ -19,34 +18,20 @@ import (
 )
 
 const (
-	Netstat_F_Flag xflag.KeyUsage[int] = "F " +
-		"FIB number, -1 for current."
-	Netstat_I_Flag xflag.KeyUsage[string] = "I " +
-		"Interface name."
-	Netstat_f_Flag xflag.KeyUsage[string] = "f " +
-		"Address Family: inet, inet6, link."
-	Netstat_i_Flag xflag.KeyUsage[bool] = "i " +
-		"Show interface info."
-	Netstat_inet_Flag xflag.KeyUsage[bool] = "inet " +
-		"Address filter."
-	Netstat_inet6_Flag xflag.KeyUsage[bool] = "inet6 " +
-		"Address filter."
-	Netstat_m_Flag xflag.KeyUsage[bool] = "m " +
-		"Show memory stats."
-	Netstat_mm_Flag xflag.KeyUsage[bool] = "mm " +
-		"Show detailed memory stats."
-	Netstat_n_Flag xflag.KeyUsage[bool] = "n " +
-		"Show numeric address instead of lookup."
-	Netstat_p_Flag xflag.KeyUsage[int] = "p " +
-		"Protocol number."
-	Netstat_r_Flag xflag.KeyUsage[bool] = "r " +
-		"Show routing table."
-	Netstat_s_Flag xflag.KeyUsage[bool] = "s " +
-		"Show per-protocol stats."
-	Netstat_ss_Flag xflag.KeyUsage[bool] = "ss " +
-		"Show per-protocol, non-zero stats."
-	Netstat_w_Flag xflag.KeyUsage[time.Duration] = "w " +
-		"Wait interval."
+	Netstat_F_Flag     xflag.Xint      = "F FIB number, -1 for current."
+	Netstat_I_Flag     xflag.Xstring   = "I Interface name."
+	Netstat_f_Flag     xflag.Xstring   = "f Address Family: inet, inet6, link."
+	Netstat_i_Flag     xflag.Xbool     = "i Show interface info."
+	Netstat_inet_Flag  xflag.Xbool     = "inet Address filter."
+	Netstat_inet6_Flag xflag.Xbool     = "inet6 Address filter."
+	Netstat_m_Flag     xflag.Xbool     = "m Show memory stats."
+	Netstat_mm_Flag    xflag.Xbool     = "mm Show detailed memory stats."
+	Netstat_n_Flag     xflag.Xbool     = "n Show numeric address instead of lookup."
+	Netstat_p_Flag     xflag.Xint      = "p Protocol number."
+	Netstat_r_Flag     xflag.Xbool     = "r Show routing table."
+	Netstat_s_Flag     xflag.Xbool     = "s Show per-protocol stats."
+	Netstat_ss_Flag    xflag.Xbool     = "ss Show per-protocol, non-zero stats."
+	Netstat_w_Flag     xflag.Xduration = "w Wait interval."
 )
 
 func Netstat(ctx context.Context, args []string) error {

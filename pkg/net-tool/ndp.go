@@ -20,42 +20,24 @@ import (
 )
 
 const (
-	NDP_A_Flag xflag.KeyUsage[uint] = "A " +
-		"Repeat show interval (seconds)."
-	NDP_H_Flag xflag.KeyUsage[bool] = "H " +
-		"Harmonize routing and neighbor tables."
-	NDP_I_Flag xflag.KeyUsage[string] = "I " +
-		"Set, “show” or “delete” default interface."
-	NDP_P_Flag xflag.KeyUsage[bool] = "P " +
-		"Flush all the entries in the prefix list."
-	NDP_R_Flag xflag.KeyUsage[bool] = "R " +
-		"Flush all the entries in the default router list."
-	NDP_a_Flag xflag.KeyUsage[bool] = "a " +
-		"Show current entries."
-	NDP_c_Flag xflag.KeyUsage[bool] = "c " +
-		"Erase all entries."
-	NDP_d_Flag xflag.KeyUsage[string] = "d " +
-		"Delete specified entry."
-	NDP_f_Flag xflag.KeyUsage[string] = "f " +
-		"Table configuration file."
-	NDP_i_Flag xflag.KeyUsage[string] = "i " +
-		"View information for the specified interface."
-	NDP_l_Flag xflag.KeyUsage[bool] = "l " +
-		"Show link-layer reachability information."
-	NDP_n_Flag xflag.KeyUsage[bool] = "n " +
-		"Don't resolve numeric addresses to hostnames."
-	NDP_p_Flag xflag.KeyUsage[bool] = "p " +
-		"Show prefix list."
-	NDP_r_Flag xflag.KeyUsage[bool] = "r " +
-		"Show default router list."
-	NDP_s_Flag xflag.KeyUsage[bool] = "s " +
-		"Register an NDP entry for a node."
-	NDP_t_Flag xflag.KeyUsage[bool] = "t " +
-		"Show timestamp for each entry."
-	NDP_x_Flag xflag.KeyUsage[bool] = "x " +
-		"Show extended link-layer reachability information."
-	NDP_w_Flag xflag.KeyUsage[bool] = "w " +
-		"Show node's cryptographically generated address."
+	NDP_A_Flag xflag.Xuint   = "A Repeat show interval (seconds)."
+	NDP_H_Flag xflag.Xbool   = "H Harmonize routing and neighbor tables."
+	NDP_I_Flag xflag.Xstring = "I Set, “show” or “delete” default interface."
+	NDP_P_Flag xflag.Xbool   = "P Flush all the entries in the prefix list."
+	NDP_R_Flag xflag.Xbool   = "R Flush all the entries in the default router list."
+	NDP_a_Flag xflag.Xbool   = "a Show current entries."
+	NDP_c_Flag xflag.Xbool   = "c Erase all entries."
+	NDP_d_Flag xflag.Xstring = "d Delete specified entry."
+	NDP_f_Flag xflag.Xstring = "f Table configuration file."
+	NDP_i_Flag xflag.Xstring = "i View information for the specified interface."
+	NDP_l_Flag xflag.Xbool   = "l Show link-layer reachability information."
+	NDP_n_Flag xflag.Xbool   = "n Don't resolve numeric addresses to hostnames."
+	NDP_p_Flag xflag.Xbool   = "p Show prefix list."
+	NDP_r_Flag xflag.Xbool   = "r Show default router list."
+	NDP_s_Flag xflag.Xbool   = "s Register an NDP entry for a node."
+	NDP_t_Flag xflag.Xbool   = "t Show timestamp for each entry."
+	NDP_x_Flag xflag.Xbool   = "x Show extended link-layer reachability information."
+	NDP_w_Flag xflag.Xbool   = "w Show node's cryptographically generated address."
 )
 
 func NDP(ctx context.Context, args []string) error {

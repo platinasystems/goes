@@ -66,26 +66,16 @@ Parameters:
 ` + netif.AddressParameters + netif.ConfigParameters + netif.CreateParameters
 
 const (
-	IfConfig_C_Flag xflag.KeyUsage[bool] = "C " +
-		"List cloneable devices."
-	IfConfig_L_Flag xflag.KeyUsage[bool] = "L " +
-		"Display IPv6 address lifetime as offset."
-	IfConfig_X_Flag xflag.KeyUsage[string] = "X " +
-		"Pattern match interface name."
-	IfConfig_a_Flag xflag.KeyUsage[bool] = "a " +
-		"Display all interfaces (implied unless -d, -u, -X)."
-	IfConfig_d_Flag xflag.KeyUsage[bool] = "d " +
-		"Only display down interfaces."
-	IfConfig_l_Flag xflag.KeyUsage[bool] = "l " +
-		"List available interfaces."
-	IfConfig_m_Flag xflag.KeyUsage[bool] = "m " +
-		"Display all supported media."
-	IfConfig_r_Flag xflag.KeyUsage[bool] = "r " +
-		"Display route references."
-	IfConfig_u_Flag xflag.KeyUsage[bool] = "u " +
-		"Only display up interfaces."
-	IfConfig_v_Flag xflag.KeyUsage[bool] = "v " +
-		"Verbose display."
+	IfConfig_C_Flag xflag.Xbool   = "C List cloneable devices."
+	IfConfig_L_Flag xflag.Xbool   = "L Display IPv6 address lifetime as offset."
+	IfConfig_X_Flag xflag.Xstring = "X Pattern match interface name."
+	IfConfig_a_Flag xflag.Xbool   = "a Display all interfaces (implied unless -d, -u, -X)."
+	IfConfig_d_Flag xflag.Xbool   = "d Only display down interfaces."
+	IfConfig_l_Flag xflag.Xbool   = "l List available interfaces."
+	IfConfig_m_Flag xflag.Xbool   = "m Display all supported media."
+	IfConfig_r_Flag xflag.Xbool   = "r Display route references."
+	IfConfig_u_Flag xflag.Xbool   = "u Only display up interfaces."
+	IfConfig_v_Flag xflag.Xbool   = "v Verbose display."
 )
 
 var inets = []string{"inet", "inet6"}
