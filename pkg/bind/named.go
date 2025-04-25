@@ -2,7 +2,7 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-package named
+package bind
 
 import (
 	"context"
@@ -13,7 +13,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"net/http"
 	"os"
@@ -29,15 +28,35 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xprogram"
 )
 
-var errata, verbose xlog.WritePrinter
-var conf named_conf.Conf
-var opt = map[string]string{
-	"cert":      "/etc/named.crt",
-	"key":       "/etc/named.key",
-	"endpoints": "/dns/query",
-}
+const NamedDefaultConf = "/etc/named.conf"
 
-type xlistener interface {
+const (
+	Named_4_Flag xflag.Xbool   = `4 Only service IPv4 host addresses.`
+	Named_6_Flag xflag.Xbool   = `6 Only service IPv6 host addresses.`
+	Named_C_Flag xflag.Xbool   = `C Print configuration and exit.`
+	Named_T_Flag xflag.Xstring = `T
+Commas separated “<key>[=<value>]” options.  e.g.
+    -T notcp,key=/etc/named.key,cert=/etc/named.crt`
+	Named_V_Flag xflag.Xbool   = `V Print version and exit.`
+	Named_Z_Flag xflag.Xstring = `Z
+Comma separated zone files instead of or in addition to configuation.`
+	Named_c_Flag xflag.Xstring = `c
+Absolute path name of configuration file.`
+	Named_p_Flag xflag.Xstring = `p
+Comma separated ports on which the server will listen for queries.
+If value is of the form “<portnum> or “dns=<portnum>”, the server will
+listen for DNS queries on the numbered port. If value is of the form
+“tls=<portnum>”, the server will listen for TLS queries on portnum;
+the default is 853.  If value is of the form “https=<portnum>”,
+the server will listen for HTTPS queries on portnum; the default is 443.
+If value is of the form “http=<portnum>”, the server will listen for
+HTTP queries on portnum; the default is 80.`
+	Named_q_Flag xflag.Xbool   = `q Quiet logging.`
+	Named_v_Flag xflag.Xbool   = `v Verbose logging.`
+	Named_z_Flag xflag.Xstring = `z Default zone.`
+)
+
+type namedListener interface {
 	net.Listener
 	SetDeadline(time.Time) error
 }
@@ -48,13 +67,33 @@ usage: {{.Name}} [[-flags]
 Mimic BIND9's Internet domain name daemon.
 
 {{flags .}}`)
-	addCommandLineFlags()
+
+	Named_4_Flag.Define(false)
+	Named_6_Flag.Define(false)
+	Named_C_Flag.Define(false)
+	Named_T_Flag.Define("")
+	Named_V_Flag.Define(false)
+	Named_Z_Flag.Define("")
+	Named_c_Flag.Define(NamedDefaultConf)
+	Named_p_Flag.Define("53")
+	Named_q_Flag.Define(false)
+	Named_v_Flag.Define(false)
+	Named_z_Flag.Define(".")
+
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
 		return err
 	}
 
-	if flags.V {
+	var conf named_conf.Conf
+
+	opt := map[string]string{
+		"cert":      "/etc/named.crt",
+		"key":       "/etc/named.key",
+		"endpoints": "/dns/query",
+	}
+
+	if Named_V_Flag.Value() {
 		version := "(unavailable)"
 		if mm := xprogram.MainModule(); mm != nil {
 			version = mm.Version
@@ -63,29 +102,29 @@ Mimic BIND9's Internet domain name daemon.
 		return nil
 	}
 
-	mutable := log.New(os.Stdout, "", log.Lshortfile)
-	if flags.v {
+	if Named_v_Flag.Value() {
 		verbose = xlog.Unmute(mutable)
 		verbose.Println("start named")
 		defer verbose.Println("stopped named")
-	} else if flags.q {
+	} else if Named_q_Flag.Value() {
 		errata = xlog.Mute(mutable)
 	}
 
-	if len(flags.c) > 0 {
-		conf, err = named_conf.NewConf(flags.c)
+	if len(Named_c_Flag.Value()) > 0 {
+		conf, err = named_conf.NewConf(Named_c_Flag.Value())
 		if err != nil {
-			if !os.IsNotExist(err) || flags.c != defaultNamedConf {
+			if !os.IsNotExist(err) ||
+				Named_c_Flag.Value() != NamedDefaultConf {
 				return err
 			}
 		}
 	}
-	if flags.C {
+	if Named_C_Flag.Value() {
 		fmt.Print(conf)
 		return nil
 	}
 
-	for _, s := range strings.Split(flags.T, ",") {
+	for _, s := range strings.Split(Named_T_Flag.Value(), ",") {
 		eq := strings.Index(s, "=")
 		if eq < 0 {
 			opt[s] = "true"
@@ -95,7 +134,7 @@ Mimic BIND9's Internet domain name daemon.
 	}
 
 	for _, s := range strings.Split(opt["endpoints"], ",") {
-		http.HandleFunc(s, httpHandler)
+		http.HandleFunc(s, namedHttpHandler)
 	}
 
 	ctx, cancel := context.WithCancel(ctx)
@@ -108,9 +147,9 @@ Mimic BIND9's Internet domain name daemon.
 	wg.Add(1)
 	go xdnsdb.Routine(ctx, wg, verbose)
 
-	if len(flags.Z) > 0 {
-		for _, fn := range strings.Split(flags.Z, ",") {
-			err = xdnsdb.Include(ctx, flags.z, fn)
+	if len(Named_Z_Flag.Value()) > 0 {
+		for _, fn := range strings.Split(Named_Z_Flag.Value(), ",") {
+			err = xdnsdb.Include(ctx, Named_z_Flag.Value(), fn)
 			if err != nil {
 				return err
 			}
@@ -120,31 +159,32 @@ Mimic BIND9's Internet domain name daemon.
 	host := ":"
 	tcpNW := "tcp"
 	udpNW := "udp"
-	if flags.ip4only {
+	if Named_4_Flag.Value() {
 		host = "0.0.0.0:"
 		tcpNW = "tcp4"
 		udpNW = "udp4"
-	} else if flags.ip6only {
+	} else if Named_6_Flag.Value() {
 		host = "[::]:"
 		tcpNW = "tcp6"
 		udpNW = "udp6"
 	}
 
-	for _, s := range strings.Split(flags.p, ",") {
+	for _, s := range strings.Split(Named_p_Flag.Value(), ",") {
 		if strings.HasPrefix(s, "http=") {
 			laddr := host + strings.TrimPrefix(s, "http=")
 			srv := &http.Server{Addr: laddr}
 			wg.Add(1)
-			go httpShutdown(ctx, wg, srv)
+			go namedHttpShutdown(ctx, wg, srv)
 			wg.Add(1)
-			go httpListenAndServe(wg, srv)
+			go namedHttpListenAndServe(wg, srv)
 		} else if strings.HasPrefix(s, "https=") {
 			laddr := host + strings.TrimPrefix(s, "https=")
 			srv := &http.Server{Addr: laddr}
 			wg.Add(1)
-			go httpShutdown(ctx, wg, srv)
+			go namedHttpShutdown(ctx, wg, srv)
 			wg.Add(1)
-			go httpListenAndServe(wg, srv, opt["cert"], opt["key"])
+			go namedHttpListenAndServe(wg, srv,
+				opt["cert"], opt["key"])
 		} else if strings.HasPrefix(s, "tls=") {
 			laddr := ":" + strings.TrimPrefix(s, "tls=")
 			ca, err := tls.LoadX509KeyPair(opt["cert"], opt["key"])
@@ -161,12 +201,12 @@ Mimic BIND9's Internet domain name daemon.
 				return err
 			}
 			defer ln.Close()
-			xln, ok := ln.(xlistener)
+			xln, ok := ln.(namedListener)
 			if !ok {
 				return errors.New("can't set deadline")
 			}
 			wg.Add(1)
-			go tcpAccept(ctx, wg, xln)
+			go namedTcpAccept(ctx, wg, xln)
 		} else {
 			laddr := ":" + strings.TrimPrefix(s, "dns=")
 			if opt["notcp"] != "true" {
@@ -175,12 +215,12 @@ Mimic BIND9's Internet domain name daemon.
 					return err
 				}
 				defer ln.Close()
-				xln, ok := ln.(xlistener)
+				xln, ok := ln.(namedListener)
 				if !ok {
 					return errors.New("can't set deadline")
 				}
 				wg.Add(1)
-				go tcpAccept(ctx, wg, xln)
+				go namedTcpAccept(ctx, wg, xln)
 			}
 			udpConn, err := net.ListenPacket(udpNW, laddr)
 			if err != nil {
@@ -189,9 +229,9 @@ Mimic BIND9's Internet domain name daemon.
 			defer udpConn.Close()
 			mch := make(chan *xdnsmessage.Message, 4)
 			wg.Add(1)
-			go udpReceive(ctx, wg, udpConn, mch)
+			go namedUdpReceive(ctx, wg, udpConn, mch)
 			wg.Add(1)
-			go udpService(ctx, wg, udpConn, mch)
+			go namedUdpService(ctx, wg, udpConn, mch)
 		}
 	}
 
@@ -199,7 +239,7 @@ Mimic BIND9's Internet domain name daemon.
 	return err
 }
 
-func answer(req *xdnsmessage.Message) *xdnsmessage.Message {
+func namedAnswer(req *xdnsmessage.Message) *xdnsmessage.Message {
 	now := time.Now()
 	ans := xdnsmessage.NewMessage()
 	ans.Addr = req.Addr
@@ -247,7 +287,7 @@ func answer(req *xdnsmessage.Message) *xdnsmessage.Message {
 }
 
 // https://datatracker.ietf.org/doc/html/rfc8484
-func httpHandler(rsp http.ResponseWriter, req *http.Request) {
+func namedHttpHandler(rsp http.ResponseWriter, req *http.Request) {
 	defer req.Body.Close()
 	var reqb []byte
 	var err error
@@ -271,7 +311,7 @@ func httpHandler(rsp http.ResponseWriter, req *http.Request) {
 		rsp.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	rspm := answer(reqm)
+	rspm := namedAnswer(reqm)
 	defer rspm.Free()
 	rsp.Header().Set("Content-Type", "application/dns-message")
 	// FIXME Message needs a WriteTo
@@ -284,7 +324,9 @@ func httpHandler(rsp http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func httpListenAndServe(wg *sync.WaitGroup, srv *http.Server, fns ...string) {
+func namedHttpListenAndServe(
+	wg *sync.WaitGroup, srv *http.Server, fns ...string,
+) {
 	var err error
 	defer wg.Done()
 	defer verbose.Println("stopped http", srv.Addr, "service:", err)
@@ -296,10 +338,8 @@ func httpListenAndServe(wg *sync.WaitGroup, srv *http.Server, fns ...string) {
 	}
 }
 
-func httpShutdown(
-	ctx context.Context,
-	wg *sync.WaitGroup,
-	srv *http.Server,
+func namedHttpShutdown(
+	ctx context.Context, wg *sync.WaitGroup, srv *http.Server,
 ) {
 	const timeout = 3 * time.Second
 	defer wg.Done()
@@ -311,10 +351,10 @@ func httpShutdown(
 	srv.Shutdown(cctx)
 }
 
-func tcpAccept(
+func namedTcpAccept(
 	ctx context.Context,
 	wg *sync.WaitGroup,
-	xln xlistener,
+	xln namedListener,
 ) {
 	var err error
 	la := xln.Addr()
@@ -337,11 +377,11 @@ func tcpAccept(
 			break
 		}
 		wg.Add(1)
-		go tcpService(ctx, wg, conn)
+		go namedTcpService(ctx, wg, conn)
 	}
 }
 
-func tcpService(
+func namedTcpService(
 	ctx context.Context,
 	wg *sync.WaitGroup,
 	conn net.Conn,
@@ -392,7 +432,7 @@ func tcpService(
 			errata.Print(err)
 			break
 		}
-		ans := answer(req)
+		ans := namedAnswer(req)
 		b, err := ans.AppendTo(data[2:2])
 		if err != nil {
 			errata.Print(err)
@@ -408,7 +448,7 @@ func tcpService(
 	}
 }
 
-func udpReceive(
+func namedUdpReceive(
 	ctx context.Context,
 	wg *sync.WaitGroup,
 	conn net.PacketConn,
@@ -448,7 +488,7 @@ func udpReceive(
 	}
 }
 
-func udpService(
+func namedUdpService(
 	ctx context.Context,
 	wg *sync.WaitGroup,
 	conn net.PacketConn,
@@ -463,7 +503,7 @@ func udpService(
 		case <-ctx.Done():
 			return
 		case req := <-ch:
-			ans := answer(req)
+			ans := namedAnswer(req)
 			if b, err := ans.AppendTo(data[:0]); err != nil {
 				errata.Print(err)
 			} else if _, err = conn.
