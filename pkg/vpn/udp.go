@@ -6,19 +6,11 @@ package vpn
 
 import (
 	"context"
-	"errors"
 	"net"
-	"os"
 	"sync"
-	"time"
 
 	"github.com/platinasystems/goes/v2/pkg/box"
 	"github.com/platinasystems/goes/v2/pkg/xlog"
-)
-
-const (
-	minPktRxDeadline = 10 * time.Millisecond
-	maxPktRxDeadline = 250 * time.Millisecond
 )
 
 func pktRxRoutine(
@@ -32,28 +24,14 @@ func pktRxRoutine(
 	la := udp.LocalAddr()
 	xlog.Info.Printf("start %v rx routine", la)
 	defer xlog.Info.Printf("stopped %v rx routine", la)
-	udp.SetReadDeadline(time.Time{})
-	for dur := minPktRxDeadline; ctx.Err() == nil; {
-		err := udp.SetReadDeadline(time.Now().Add(dur))
-		if err != nil {
+	for ctx.Err() == nil {
+		if bx, err := box.NewRx(ctx, udp); err != nil {
 			xlog.Errata.Print(err)
 			break
-		} else if bx, err := box.NewRx(udp); err == nil {
+		} else if bx != nil {
 			xlog.Trace.Printf("rx %d bytes from %v",
 				bx.Len(), bx.AddrPort)
-			ch <- bx
-		} else if operr, ok := err.(*net.OpError); ok {
-			if !operr.Timeout() {
-				xlog.Errata.Print(err)
-				break
-			}
-		} else if !errors.Is(err, os.ErrDeadlineExceeded) {
-			xlog.Errata.Print(err)
-			break
-		} else if dur < maxPktRxDeadline {
-			if dur *= 2; dur > maxPktRxDeadline {
-				dur = maxPktRxDeadline
-			}
+			bx.Queue(ctx, ch)
 		}
 	}
 }
@@ -79,8 +57,8 @@ func pktTxRoutine(
 			}
 			if tap := bx.AddrPort; !tap.IsValid() {
 				xlog.Errata.Println("no DAP")
-			} else if n, err := bx.Tx(udp); err != nil {
-				xlog.Info.Printf("tx from %v to %v: %v",
+			} else if n, err := bx.Tx(ctx, udp); err != nil {
+				xlog.Errata.Printf("tx from %v to %v: %v",
 					la, tap, err)
 			} else {
 				xlog.Trace.Printf("tx %d bytes from %v to %v",

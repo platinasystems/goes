@@ -72,8 +72,8 @@ Exchange ciphered packets between guests.
 	ex.pem.addressed = make(map[netip.Addr]*pem.Block)
 	ex.pem.identified = make(map[box.Id]*pem.Block)
 
-	ex.pktRxCh = make(chan *box.Box, 4)
-	ex.pktTxCh = make(chan *box.Box, 4)
+	ex.pktRxCh = make(chan *box.Box, 16)
+	ex.pktTxCh = make(chan *box.Box, 16)
 
 	ex.whoisResponseCh = make(chan exchangeWhoisResponse)
 
