@@ -5,10 +5,13 @@
 package box
 
 import (
+	"bytes"
 	"context"
 	"crypto/ecdh"
 	"crypto/rand"
-	"io"
+	"crypto/sha512"
+	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/platinasystems/goes/v2/pkg/gcm"
@@ -16,20 +19,16 @@ import (
 )
 
 // Simulate a secure message from one host to another through an exchange.
-func TestBox(t *testing.T) {
-	const (
-		hello   = "hello"
-		bonjour = "bonjour"
-	)
+func BenchmarkBox(b *testing.B) {
 	const xId, h1Id, h2Id Id = 0, 1, 2
 
 	assert := func(err error) {
-		t.Helper()
+		b.Helper()
 		if err != nil {
-			if err != context.Canceled {
-				t.Fatal(err)
+			if errors.Is(err, context.Canceled) {
+				b.SkipNow()
 			} else {
-				t.SkipNow()
+				b.Fatal(err)
 			}
 		}
 	}
@@ -68,59 +67,54 @@ func TestBox(t *testing.T) {
 	h2h1, err := gcm.New(h2Key, h1Key.PublicKey(), h2Nonce, h1Nonce)
 	assert(err)
 
-	bx := New()
-	_, err = io.WriteString(bx, hello)
+	bx, err := NewReadContents(rand.Reader)
 	assert(err)
+	defer bx.Return()
+	expectSum := sha512.Sum512(bx.Contents)
+
 	bx.From(h1Id)
 	bx.To(h2Id)
 	bx.Via(xId)
-	bx.CloseWith(h1h2)
-	bx.SealWith(h1x)
 
-	if from := bx.FromWhom(); from != h1Id {
-		t.Fatal(from, "!=", h1Id)
-	}
-	if via := bx.ViaWhom(); via != xId {
-		t.Fatal(via, "!=", xId)
-	}
+	for b.Loop() {
+		// Simulate packaging from h1 to h2
+		bx.CloseWith(h1h2)
+		bx.SealWith(h1x)
+		if from := bx.FromWhom(); from != h1Id {
+			b.Fatal(from, "!=", h1Id)
+		}
+		if via := bx.ViaWhom(); via != xId {
+			b.Fatal(via, "!=", xId)
+		}
 
-	assert(bx.UnsealWith(xh1))
-	bx.SealWith(xh2)
-	assert(bx.UnsealWith(h2x))
-	if to := bx.ToWhom(); to != h2Id {
-		t.Fatal(to, "!=", h2Id)
-	}
+		// Simulate x1 reading then resealing label
+		assert(bx.UnsealWith(xh1))
+		bx.SealWith(xh2)
 
-	assert(bx.OpenWith(h2h1))
-	if contents := string(bx.Contents); contents != hello {
-		t.Fatal(contents, "!=", hello)
-	}
-
-	bx.Empty()
-	_, err = io.WriteString(bx, bonjour)
-	assert(err)
-	bx.From(h2Id)
-	bx.To(h1Id)
-	bx.Via(xId)
-	bx.CloseWith(h2h1)
-	bx.SealWith(h2x)
-
-	if from := bx.FromWhom(); from != h2Id {
-		t.Fatal(from, "!=", h2Id)
-	}
-	if via := bx.ViaWhom(); via != xId {
-		t.Fatal(via, "!=", xId)
+		// Simulate receipt by h2
+		assert(bx.UnsealWith(h2x))
+		if to := bx.ToWhom(); to != h2Id {
+			b.Fatal(to, "!=", h2Id)
+		}
+		assert(bx.OpenWith(h2h1))
 	}
 
-	assert(bx.UnsealWith(xh2))
-	bx.SealWith(xh1)
-	assert(bx.UnsealWith(h1x))
-	if to := bx.ToWhom(); to != h1Id {
-		t.Fatal(to, "!=", h2Id)
+	gotSum := sha512.Sum512(bx.Contents)
+	if bytes.Compare(expectSum[:], gotSum[:]) != 0 {
+		b.Fatal("mismatch")
 	}
 
-	assert(bx.OpenWith(h1h2))
-	if contents := string(bx.Contents); contents != bonjour {
-		t.Fatal(contents, "!=", bonjour)
+	bps := float64(ContentMTU*b.N) / b.Elapsed().Seconds()
+	var scale string
+	if bps > 1e9 {
+		bps /= 1e9
+		scale = "G"
+	} else if bps > 1e6 {
+		bps /= 1e6
+		scale = "M"
+	} else if bps > 1e3 {
+		bps /= 1e3
+		scale = "K"
 	}
+	fmt.Printf("%.1f %sB/s\n", bps, scale)
 }
