@@ -93,6 +93,7 @@ func New() (box *Box) {
 	return
 }
 
+// Copy Reader to new, unlabeled box.
 func NewReadContents(r io.Reader) (*Box, error) {
 	box := New()
 	n, err := r.Read(box.data[Content:])
@@ -105,11 +106,33 @@ func NewReadContents(r io.Reader) (*Box, error) {
 	return box, err
 }
 
-// Receive labelled box.
-func NewRx(ctx context.Context, udp *net.UDPConn) (*Box, error) {
+// Copy File to new, unlabeled box.
+func NewReadFileContents(ctx context.Context, f *os.File) (*Box, error) {
+	var dldur DeadlineDuration
 	box := New()
-	for dur := nextRxDur(0); ctx.Err() == nil; dur = nextRxDur(dur) {
-		err := udp.SetReadDeadline(time.Now().Add(dur))
+	for ctx.Err() == nil {
+		f.SetReadDeadline(dldur.Next())
+		n, err := f.Read(box.data[Content:])
+		if err == nil {
+			box.Contents = box.data[Content : Content+n]
+			break
+		}
+		if hasExceededDeadline(err) {
+			runtime.Gosched()
+		} else {
+			box.Return()
+			return nil, err
+		}
+	}
+	return box, nil
+}
+
+// Receive Packet to new, labeled box.
+func NewRx(ctx context.Context, udp *net.UDPConn) (*Box, error) {
+	var dldur DeadlineDuration
+	box := New()
+	for ctx.Err() == nil {
+		err := udp.SetReadDeadline(dldur.Next())
 		if err != nil {
 			box.Return()
 			return nil, err
@@ -294,19 +317,22 @@ func (box *Box) WriteTo(w io.Writer) (int64, error) {
 func (box *Box) Via(via Id)  { via.Encode(box.data[Via:]) }
 func (box *Box) ViaWhom() Id { return DecodeId(box.data[Via:]) }
 
-func nextRxDur(dur time.Duration) time.Duration {
-	const min = 10 * time.Millisecond
-	if dur < min {
-		return min
+type DeadlineDuration time.Duration
+
+func (dl *DeadlineDuration) Next() time.Time {
+	const min = DeadlineDuration(time.Millisecond)
+	if *dl < min {
+		*dl = min
+	} else {
+		max := DeadlineDuration(250 * time.Millisecond)
+		if runtime.NumCPU() <= 1 {
+			max = DeadlineDuration(50 * time.Millisecond)
+		}
+		if *dl *= 2; *dl > max {
+			*dl = max
+		}
 	}
-	max := 250 * time.Millisecond
-	if runtime.NumCPU() <= 1 {
-		max = 50 * time.Millisecond
-	}
-	if dur *= 2; dur > max {
-		dur = max
-	}
-	return dur
+	return time.Now().Add(time.Duration(*dl))
 }
 
 func hasExceededDeadline(err error) bool {

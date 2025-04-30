@@ -8,9 +8,9 @@ import (
 	"context"
 	"encoding/pem"
 	"fmt"
-	"io"
 	"net"
 	"net/netip"
+	"os"
 	"sync"
 
 	"github.com/platinasystems/goes/v2/pkg/box"
@@ -28,6 +28,7 @@ const MTU = box.ContentMTU - netph.TunPISize
 
 type guest struct {
 	client
+	tun *os.File
 }
 
 // Guest is a UDP server that forwards ciphered packets between an exchange
@@ -109,17 +110,17 @@ Forward ciphered packets between exchange and tunnel interface.
 		group   = -1
 	)
 
-	tun, err := nettun.New(*tflag, istap, persist, owner, group, ha)
+	g.tun, err = nettun.New(*tflag, istap, persist, owner, group, ha)
 	if err != nil {
 		return err
 	}
-	defer tun.Close()
+	defer g.tun.Close()
 
-	nif, err := netif.Named(ctx, tun.Name())
+	nif, err := netif.Named(ctx, g.tun.Name())
 	if err != nil {
 		return xerrors.Mark(err)
 	} else if nif == nil {
-		return xerrors.NotFound(tun.Name())
+		return xerrors.NotFound(g.tun.Name())
 	}
 
 	err = nif.Config(cctx, "up", "mtu", fmt.Sprint(MTU))
@@ -170,10 +171,10 @@ Forward ciphered packets between exchange and tunnel interface.
 		}
 	}
 
-	pktRxCh := make(chan *box.Box, 4)
-	pktTxCh := make(chan *box.Box, 4)
-	tunReadCh := make(chan *box.Box, 4)
-	tunWriteCh := make(chan *box.Box, 4)
+	pktRxCh := make(chan *box.Box, 16)
+	pktTxCh := make(chan *box.Box, 16)
+	tunReadCh := make(chan *box.Box, 16)
+	tunWriteCh := make(chan *box.Box, 16)
 
 	wg.Add(1)
 	go xlog.AlarmHandler(cctx, &wg)
@@ -183,9 +184,9 @@ Forward ciphered packets between exchange and tunnel interface.
 	go pktTxRoutine(cctx, &wg, udp, pktTxCh)
 	defer close(pktTxCh)
 	wg.Add(1)
-	go tunReadRoutine(cctx, &wg, tun.Name(), tun, tunReadCh)
+	go g.tunReadRoutine(cctx, &wg, tunReadCh)
 	wg.Add(1)
-	go tunWriteRoutine(cctx, &wg, tun.Name(), tun, tunWriteCh)
+	go g.tunWriteRoutine(cctx, &wg, tunWriteCh)
 	defer close(tunWriteCh)
 
 	xlog.Info.Printf("start (%s, %v)", nif.Name, g.hostPrefix)
@@ -335,7 +336,7 @@ guestLoop:
 }
 
 func (g *guest) multicast(ch chan<- *box.Box, bx *box.Box, addr netip.Addr) {
-	setVpnProto(bx, addr.Is6())
+	g.setVpnProto(bx, addr.Is6())
 	iguest := g.id.Index()
 	via := g.via[iguest]
 	ivia := via.Index()
@@ -351,7 +352,7 @@ func (g *guest) multicast(ch chan<- *box.Box, bx *box.Box, addr netip.Addr) {
 }
 
 func (g *guest) unicast(ch chan<- *box.Box, bx *box.Box, addr netip.Addr) {
-	setVpnProto(bx, addr.Is6())
+	g.setVpnProto(bx, addr.Is6())
 	bx.From(g.id)
 	to, ok := g.addressed[addr]
 	if !ok {
@@ -398,7 +399,7 @@ func (g *guest) unicast(ch chan<- *box.Box, bx *box.Box, addr netip.Addr) {
 	bx.NonBlockingPut(ch)
 }
 
-func setVpnProto(bx *box.Box, is6 bool) {
+func (*guest) setVpnProto(bx *box.Box, is6 bool) {
 	ethp := uint16(VPN_P_IP)
 	if is6 {
 		ethp = VPN_P_IP6
@@ -493,36 +494,36 @@ func (g *guest) whois(ch chan<- *box.Box, bx *box.Box) {
 	bx.NonBlockingPut(ch)
 }
 
-func tunReadRoutine(
+func (g *guest) tunReadRoutine(
 	ctx context.Context,
 	wg *sync.WaitGroup,
-	name string,
-	r io.Reader,
 	ch chan<- *box.Box,
 ) {
 	defer wg.Done()
+	name := g.tun.Name()
 	defer xlog.Info.Println("stopped", name, "read routine")
 	defer close(ch)
 	xlog.Info.Println("start", name, "read routine")
 	for ctx.Err() == nil {
-		bx, err := box.NewReadContents(r)
+		bx, err := box.NewReadFileContents(ctx, g.tun)
 		if err != nil {
 			xlog.Errata.Print(name, ": ", err)
 			break
+		} else if bx != nil {
+			tunpi := netpdu.TunPI(bx.Contents)
+			xlog.Info.Println("read", name, tunpi)
+			bx.Queue(ctx, ch)
 		}
-		xlog.Info.Println("read", name, netpdu.TunPI(bx.Contents))
-		ch <- bx
 	}
 }
 
-func tunWriteRoutine(
+func (g *guest) tunWriteRoutine(
 	ctx context.Context,
 	wg *sync.WaitGroup,
-	name string,
-	w io.Writer,
 	ch <-chan *box.Box,
 ) {
 	defer wg.Done()
+	name := g.tun.Name()
 	defer xlog.Info.Println("stopped", name, "write routine")
 	xlog.Info.Println("start", name, "write routine")
 	for {
@@ -535,9 +536,9 @@ func tunWriteRoutine(
 				xlog.Info.Println(name, "write ch closed")
 				return
 			}
-			xlog.Info.Println("write", name,
-				netpdu.TunPI(bx.Contents))
-			_, err := bx.WriteTo(w)
+			tunpi := netpdu.TunPI(bx.Contents)
+			xlog.Info.Println("write", name, tunpi)
+			_, err := bx.WriteTo(g.tun)
 			bx.Return()
 			if err != nil {
 				xlog.Errata.Print(name, ": ", err)
