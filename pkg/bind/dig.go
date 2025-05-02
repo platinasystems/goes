@@ -127,10 +127,11 @@ func digLookup(
 		name,
 		ra,
 		svr string
-		c   xdnsmessage.Class
-		t   xdnsmessage.Type
 		rsp xdnsmessage.Message
 		err error
+
+		cflag, c xdnsmessage.Class
+		tflag, t xdnsmessage.Type
 	)
 
 	pkt := xdnspkt.Pool.Alloc(0)
@@ -148,15 +149,19 @@ func digLookup(
 	if err != nil {
 		return err
 	}
-	Dig_c_Flag.DefineIn(fs, xdnsmessage.Class0)
+
+	Dig_c_Flag.DefineIn(fs, &cflag, xdnsmessage.Class0)
 	Dig_i_Flag.DefineIn(fs, "")
 	Dig_q_Flag.DefineIn(fs, "")
-	Dig_t_Flag.DefineIn(fs, xdnsmessage.Type0)
+	Dig_t_Flag.DefineIn(fs, &tflag, xdnsmessage.Type0)
 	Dig_x_Flag.DefineIn(fs, "")
+
 	if err = fs.Parse(args); err != nil {
 		return err
 	}
+
 	args = fs.Args()
+
 	if fs == flag.CommandLine {
 		if Dig_O_Flag.ValueIn(fs) {
 			fmt.Print(digOptionsTxt)
@@ -227,8 +232,8 @@ func digLookup(
 			name = args[0]
 			args = args[1:]
 		}
-		if Dig_t_Flag.ValueIn(fs) != xdnsmessage.Type0 {
-			t = Dig_t_Flag.ValueIn(fs)
+		if tflag != xdnsmessage.Type0 {
+			t = tflag
 		} else if len(args) == 0 {
 			t = xdnsmessage.TypeA
 		} else if t, err = xdnsmessage.TypeNamed(args[0]); err != nil {
@@ -236,8 +241,8 @@ func digLookup(
 		} else {
 			args = args[1:]
 		}
-		if Dig_c_Flag.ValueIn(fs) != xdnsmessage.Class0 {
-			c = Dig_c_Flag.ValueIn(fs)
+		if cflag != xdnsmessage.Class0 {
+			c = cflag
 		} else if len(args) == 0 {
 			c = xdnsmessage.ClassINET
 		} else if c, err = xdnsmessage.ClassNamed(args[0]); err != nil {

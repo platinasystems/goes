@@ -46,12 +46,12 @@ func (cl *client) defineAndParseFlags(
 	defport uint16,
 	args []string,
 ) error {
-	ListenFlag.Define(netip.AddrPortFrom(netip.IPv4Unspecified(), defport))
+	ListenFlag.Define(&cl.lap,
+		netip.AddrPortFrom(netip.IPv4Unspecified(), defport))
 	err := cl.rest.defineAndParseFlags(args)
 	if err != nil {
 		return err
 	}
-	cl.lap = ListenFlag.Value()
 	a := cl.lap.Addr()
 	cl.udpv = "udp"
 	if a.Is4() {

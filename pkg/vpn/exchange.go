@@ -55,7 +55,9 @@ Exchange ciphered packets between guests.
 
 {{flags .}}`)
 
-	pub := PublicFlag.Define(netip.AddrPortFrom(netip.IPv4Unspecified(), 0))
+	var pap netip.AddrPort
+	PublicFlag.Define(&pap, netip.AddrPortFrom(netip.IPv4Unspecified(), 0))
+
 	trace := TraceFlag.Define(false)
 
 	err := ex.defineAndParseFlags(ctx, defport, args)
@@ -100,8 +102,11 @@ Exchange ciphered packets between guests.
 		return xerrors.Label(err, "LocalAddr")
 	}
 	sap := lap
-	if !(*pub).Addr().IsUnspecified() {
-		sap = *pub
+	if !pap.Addr().IsUnspecified() {
+		sap = pap
+	}
+	if sap.Addr().IsLoopback() {
+		return xerrors.Invalid("address", sap)
 	}
 	if err = ex.register(ctx, sap); err != nil {
 		return err

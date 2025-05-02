@@ -9,7 +9,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"reflect"
 	"strings"
 	"text/template"
 	"time"
@@ -88,6 +87,11 @@ func TemplateUsageIn(flags *flag.FlagSet, tmpl string) {
 	}
 }
 
+type Definable interface {
+	bool | float64 | int | int64 | string | uint | uint64 |
+		time.Duration
+}
+
 // A flag Description is a generic type wrapping string consisting of a
 // [unicode.Space] separated name and usage, e.g.
 //
@@ -99,12 +103,12 @@ func TemplateUsageIn(flags *flag.FlagSet, tmpl string) {
 //
 // Define flag with initial value and any aliases before [flag.Parse].
 //
-//	Verbose.Define(false, "v")
+//	Verbose.Define(false)
 //
 // Then assess flag after [flag.Parse].
 //
 //	if Verbose.Value() { ... }
-type Description[T any] string
+type Description[T Definable] string
 type Xbool = Description[bool]
 type Xduration = Description[time.Duration]
 type Xfloat64 = Description[float64]
@@ -119,10 +123,6 @@ func (d Description[T]) Define(val T, aliases ...string) *T {
 	return d.DefineIn(flag.CommandLine, val, aliases...)
 }
 
-// Definable values:
-//
-//	bool | float64 | int | int64 | string | uint | uint64 |
-//		time.Duration | encoding.TextMarshaler
 func (d Description[T]) DefineIn(
 	flags *flag.FlagSet, val T, aliases ...string,
 ) *T {
@@ -238,30 +238,56 @@ func define(flags *flag.FlagSet, name string, val any, usage string,
 			}
 		}
 		return p
-	case encoding.TextMarshaler:
-		tum, ok := t.(encoding.TextUnmarshaler)
-		if !ok {
-			rval := reflect.ValueOf(t)
-			if rval.Kind() == reflect.Ptr {
-				rval = reflect.Indirect(rval)
-			}
-			p := reflect.New(rval.Type()).Interface()
-			tum, ok = p.(encoding.TextUnmarshaler)
-			if !ok {
-				panic(fmt.Errorf("%T %w", t,
-					ErrIsNotTextUnmarshaler))
-			}
-		}
-		flags.TextVar(tum, name, t, usage)
-		if len(aliases) > 0 {
-			aka := fmt.Sprint("aka -", name)
-			for _, alias := range aliases {
-				flags.TextVar(tum, alias, t, aka)
-			}
-		}
-		return tum
 	default:
 		panic(fmt.Errorf("%T %w", t, ErrIsUndefinable))
 	}
 	return nil
+}
+
+// A flag TextVarDescription is an
+// ([encoding.TextUnmarler], [encoding.TextMarler])
+// type wrapping string consisting of a
+// [unicode.Space] separated name and usage, e.g.
+//
+//	type AddrPortFlag = TextVarDescription[*netip.AddrPort, netip.AddrPort]
+//	const Listen AddrPortFlag = "listen Service {addr}:{port}."
+//
+// Define flag with initial value and any aliases before [flag.Parse].
+//
+//	var lap netip.AddrPort
+//	Listen.Define(&lap, netip.AddrPortFrom(netip.IPv4Unspecified(), 8080))
+type TextVarDescription[P encoding.TextUnmarshaler,
+	V encoding.TextMarshaler] string
+
+// [TextVarDescription.DefineIn] [flag.CommandLine]
+func (d TextVarDescription[P, V]) Define(p P, v V, aliases ...string) {
+	d.DefineIn(flag.CommandLine, p, v, aliases...)
+}
+
+func (d TextVarDescription[P, V]) DefineIn(
+	flags *flag.FlagSet, p P, v V, aliases ...string,
+) {
+	var name, usage string
+	s := d.String()
+	for i, r := range s {
+		if len(name) == 0 {
+			if unicode.IsSpace(r) {
+				name = s[:i]
+			}
+		} else if !unicode.IsSpace(r) {
+			usage = s[i:]
+			break
+		}
+	}
+	flags.TextVar(p, name, v, usage)
+	if len(aliases) > 0 {
+		aka := fmt.Sprint("aka -", name)
+		for _, alias := range aliases {
+			flags.TextVar(p, alias, v, aka)
+		}
+	}
+}
+
+func (d TextVarDescription[P, V]) String() string {
+	return string(d)
 }

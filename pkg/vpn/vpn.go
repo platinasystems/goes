@@ -25,11 +25,12 @@ const (
 	DefaultSigFile    = "sig.pk8"
 )
 
-type AddrPortFlag = xflag.Description[netip.AddrPort]
+type AddrPortFlag = xflag.TextVarDescription[*netip.AddrPort, netip.AddrPort]
 
 const (
-	CertFlag      xflag.Xstring   = "cert Certificate file name w/in config-dir."
-	ConfigFlag    xflag.Xstring   = "config Configuration file name w/in config-dir."
+	CertFlag   xflag.Xstring = "cert Certificate file name w/in config-dir."
+	ConfigFlag xflag.Xstring = `config
+		Configuration file name w/in config-dir.`
 	ConfigDirFlag xflag.Xstring   = "config-dir Configuration directory."
 	CountryFlag   xflag.Xstring   = "country"
 	EmailFlag     xflag.Xstring   = "email Comma separated addresses."
@@ -39,26 +40,29 @@ const (
 Service {addr}:{port}.
 If “addr” is 0.0.0.0 or [::], listen on all ipv4 or ipv6
 interface addresses.  If “port” is 0, allocate from system.`
-	LocalityFlag     xflag.Xstring = "locality aka. city."
-	NameFlag         xflag.Xstring = "name VPN identfier."
-	OrganizationFlag xflag.Xstring = "organization aka. company"
-
-	OrganizationalUnitFlag xflag.Xstring = "organizational-unit aka. department."
-
-	PostalCodeFlag   xflag.Xstring = "postal-code aka. zip."
-	ProvinceFlag     xflag.Xstring = "province aka. state."
-	PublicFlag       AddrPortFlag  = "public NAT'd listen {addr}:{port}. (0.0.0.0:0 ignored)"
-	QuietFlag        xflag.Xbool   = "q Quiet logging."
-	RegFlag          xflag.Xstring = "reg Registry certificate file name w/in config-dir."
+	LocalityFlag           xflag.Xstring = "locality aka. city."
+	NameFlag               xflag.Xstring = "name VPN identfier."
+	OrganizationFlag       xflag.Xstring = "organization aka. company"
+	OrganizationalUnitFlag xflag.Xstring = `organizational-unit
+		aka. department.`
+	PostalCodeFlag xflag.Xstring = "postal-code aka. zip."
+	ProvinceFlag   xflag.Xstring = "province aka. state."
+	PublicFlag     AddrPortFlag  = `public
+		NAT'd listen {addr}:{port}. (0.0.0.0:0 ignored)`
+	QuietFlag xflag.Xbool   = "q Quiet logging."
+	RegFlag   xflag.Xstring = `reg
+		Registry certificate file name w/in config-dir.`
 	SerialNumberFlag xflag.Xint64  = "serial-number"
-	SigFlag          xflag.Xstring = "sig Signature file name w/in config-dir."
-	StateDirFlag     xflag.Xstring = "state-dir State directory to save approved client certificates."
-	StreetFlag       xflag.Xstring = "street address"
-	TraceFlag        xflag.Xbool   = "trace Log packet forwarding."
-	TunnelFlag       xflag.Xuint   = "t Tunnel unit number."
-	URIFlag          xflag.Xstring = "uri Comma separated URLs."
-	VerboseFlag      xflag.Xbool   = "v Verbose logging."
-	VpnFlag          xflag.Xstring = "vpn Named VPN. (default unnamed)"
+	SigFlag          xflag.Xstring = `sig
+		Signature file name w/in config-dir.`
+	StateDirFlag xflag.Xstring = `state-dir
+		State directory to save approved client certificates.`
+	StreetFlag  xflag.Xstring = "street address"
+	TraceFlag   xflag.Xbool   = "trace Log packet forwarding."
+	TunnelFlag  xflag.Xuint   = "t Tunnel unit number."
+	URIFlag     xflag.Xstring = "uri Comma separated URLs."
+	VerboseFlag xflag.Xbool   = "v Verbose logging."
+	VpnFlag     xflag.Xstring = "vpn Named VPN. (default unnamed)"
 )
 
 func ConfigDirFile(sflag xflag.Xstring) string {

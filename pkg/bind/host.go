@@ -45,19 +45,45 @@ const (
 )
 
 func Host(ctx context.Context, args []string) error {
+	var (
+		name  string
+		cflag xdnsmessage.Class
+		tflag xdnsmessage.Type
+	)
+
 	xflag.TemplateUsage(`
 usage: {{.Name}} [-flags] {name} [server]
 Mimic BIND9's DNS lookup utility.
 
 {{flags .}}`)
 
-	defineHostFlags()
+	Host_4_Flag.Define(false)
+	Host_6_Flag.Define(false)
+	Host_A_Flag.Define(false)
+	Host_C_Flag.Define(false)
+	Host_N_Flag.Define(0)
+	Host_R_Flag.Define(3)
+	Host_T_Flag.Define(false)
+	Host_U_Flag.Define(true)
+	Host_V_Flag.Define(false)
+	Host_W_Flag.Define(30 * time.Second)
+	Host_a_Flag.Define(false)
+	Host_c_Flag.Define(&cflag, xdnsmessage.ClassINET)
+	Host_i_Flag.Define(false)
+	Host_l_Flag.Define(false)
+	Host_m_Flag.Define(false)
+	Host_p_Flag.Define(53)
+	Host_r_Flag.Define(false)
+	Host_s_Flag.Define(false)
+	Host_t_Flag.Define(&tflag, xdnsmessage.TypeA)
+	Host_v_Flag.Define(false, "d")
+	Host_w_Flag.Define(false)
+
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
 		return err
 	}
 
-	var name string
 	svr := "localhost:domain"
 
 	explanations := map[xdnsmessage.Type]string{
@@ -119,10 +145,10 @@ Mimic BIND9's DNS lookup utility.
 		}
 	}
 
-	types := []xdnsmessage.Type{Host_t_Flag.Value()}
+	types := []xdnsmessage.Type{tflag}
 	if Host_a_Flag.Value() || Host_A_Flag.Value() {
 		types[0] = xdnsmessage.TypeANY
-	} else if Host_t_Flag.Value() == xdnsmessage.TypeA {
+	} else if tflag == xdnsmessage.TypeA {
 		types = append(types, xdnsmessage.TypeAAAA, xdnsmessage.TypeMX)
 	}
 	var hf xdnsmessage.HF
@@ -136,7 +162,7 @@ Mimic BIND9's DNS lookup utility.
 			OpCode: xdnsmessage.OpCodeQuery,
 			Questions: []xdnsmessage.WireQuestion{{
 				Name:  xdnsmessage.MakeUniqueString(name),
-				Class: Host_c_Flag.Value(),
+				Class: cflag,
 				Type:  t,
 			}},
 		}
@@ -162,28 +188,4 @@ Mimic BIND9's DNS lookup utility.
 		}
 	}
 	return nil
-}
-
-func defineHostFlags() {
-	Host_4_Flag.Define(false)
-	Host_6_Flag.Define(false)
-	Host_A_Flag.Define(false)
-	Host_C_Flag.Define(false)
-	Host_N_Flag.Define(0)
-	Host_R_Flag.Define(3)
-	Host_T_Flag.Define(false)
-	Host_U_Flag.Define(true)
-	Host_V_Flag.Define(false)
-	Host_W_Flag.Define(30 * time.Second)
-	Host_a_Flag.Define(false)
-	Host_c_Flag.Define(xdnsmessage.ClassINET)
-	Host_i_Flag.Define(false)
-	Host_l_Flag.Define(false)
-	Host_m_Flag.Define(false)
-	Host_p_Flag.Define(53)
-	Host_r_Flag.Define(false)
-	Host_s_Flag.Define(false)
-	Host_t_Flag.Define(xdnsmessage.TypeA)
-	Host_v_Flag.Define(false, "d")
-	Host_w_Flag.Define(false)
 }

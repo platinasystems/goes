@@ -4,14 +4,6 @@
 
 package bind
 
-import (
-	"github.com/platinasystems/goes/v2/pkg/xflag"
-	"github.com/platinasystems/goes/v2/pkg/xnet/xdns/xdnsmessage"
-)
-
-type BindClassFlag = xflag.Description[xdnsmessage.Class]
-type BindTypeFlag = xflag.Description[xdnsmessage.Type]
-
 // Features map by name these emulated BIND9 tools.
 var Features = map[string]any{
 	"dig":   Dig,

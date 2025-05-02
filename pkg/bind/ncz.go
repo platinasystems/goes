@@ -89,6 +89,8 @@ This is similar to the directory clause in named.conf.`
 )
 
 func NCZ(ctx context.Context, args []string) error {
+	var cflag xdnsmessage.Class
+
 	xflag.TemplateUsage(`
 usage: {{.Name}} [-flags] {zone} {file | -}
 Mimic BIND9's config verification tool.
@@ -103,7 +105,7 @@ Mimic BIND9's config verification tool.
 	NCZ_S_Flag.Define("warn")
 	NCZ_T_Flag.Define("")
 	NCZ_W_Flag.Define("warn")
-	NCZ_c_Flag.Define(xdnsmessage.ClassINET)
+	NCZ_c_Flag.Define(&cflag, xdnsmessage.ClassINET)
 	NCZ_d_Flag.Define(false)
 	NCZ_f_Flag.Define("text")
 	NCZ_i_Flag.Define("full")
