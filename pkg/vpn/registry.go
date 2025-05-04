@@ -40,7 +40,6 @@ type registry struct {
 	url  *url.URL
 	http *http.Server
 	vpn  map[string]*regVpn
-	wg   sync.WaitGroup
 }
 
 type regVpn struct {
@@ -90,7 +89,6 @@ var ConfigByName map[string]*struct {
 // Registry is a web server providing a REST interface to persistent
 // files and ephemeral tables.
 func Registry(ctx context.Context, args []string) error {
-	var wg sync.WaitGroup
 	var reg registry
 
 	xlog.SetPrefixes("registry/")
@@ -159,10 +157,8 @@ A RESTful WWW server.
 	defer cancel()
 	defer xlog.Info.Println("stopping", svc, "...")
 
-	wg.Add(1)
-	go xlog.AlarmHandler(cctx, &wg)
-	wg.Add(1)
-	go reg.shutdown(cctx, &wg)
+	wg.Go(func() { go xlog.AlarmHandler(cctx) })
+	wg.Go(func() { reg.shutdown(cctx) })
 
 	err = reg.http.ListenAndServeTLS(cfn, sfn)
 	if errors.Is(err, http.ErrServerClosed) {
@@ -378,8 +374,7 @@ func (reg *registry) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func (reg *registry) shutdown(ctx context.Context, wg *sync.WaitGroup) {
-	defer wg.Done()
+func (reg *registry) shutdown(ctx context.Context) {
 	<-ctx.Done()
 	cctx, cancel := context.
 		WithTimeout(context.Background(), 3*time.Second)

@@ -10,8 +10,8 @@ import (
 	"log"
 	"os"
 	"os/signal"
-	"sync"
 
+	"github.com/platinasystems/goes/v2/pkg/xcontext"
 	"github.com/platinasystems/goes/v2/pkg/xsignal"
 )
 
@@ -98,38 +98,27 @@ func Unmute(printer Printer) WritePrinter {
 }
 
 // Toggle [Info] [Mute] on recept of [xsignal.Alarm].
-func AlarmHandler(ctx context.Context, wg *sync.WaitGroup) {
-	const startStopMsg = "alarm handler"
-	defer wg.Done()
-
-	Info.Println("start", startStopMsg)
-	defer Info.Println("stopped", startStopMsg)
-
+func AlarmHandler(ctx context.Context) {
 	ch := make(chan os.Signal, 2)
 	signal.Notify(ch, xsignal.Alarm)
-	for {
-		select {
-		case <-ctx.Done():
-			signal.Stop(ch)
-			return
-		case sig, ok := <-ch:
-			if !ok {
-				Errata.Println("Alarm channel closed")
-				return
-			}
-			if sig != xsignal.Alarm {
-				Errata.Println("unexpected", sig)
-				continue
-			}
-			if m, ok := Info.(Muted); ok {
-				Info = Unmute(m)
-				Info.Println("enable info")
-			} else if um, ok := Info.(Unmuted); ok {
-				Info.Println("disable info")
-				Info = Mute(um.Mutable)
-			}
+	xcontext.Range(ctx, ch, func(sig os.Signal) bool {
+		if sig != xsignal.Alarm {
+			Errata.Println("unexpected", sig)
+			return false
 		}
-	}
+		if m, ok := Info.(Muted); ok {
+			Info = Unmute(m)
+			Info.Println("enable info")
+		} else if um, ok := Info.(Unmuted); ok {
+			Info.Println("disable info")
+			Info = Mute(um.Mutable)
+		}
+		if um, ok := Trace.(Unmuted); ok {
+			Trace.Println("disable trace")
+			Trace = Mute(um.Mutable)
+		}
+		return true
+	})
 }
 
 func MuteErrata()  { Errata = Mute(Errata) }

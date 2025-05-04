@@ -16,7 +16,10 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xflag"
 	"github.com/platinasystems/goes/v2/pkg/xlog"
 	"github.com/platinasystems/goes/v2/pkg/xprogram"
+	"github.com/platinasystems/goes/v2/pkg/xsync"
 )
+
+var wg xsync.WaitGroup
 
 const (
 	DefaultCertFile   = "cert.pem"

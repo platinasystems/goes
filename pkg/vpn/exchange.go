@@ -11,9 +11,9 @@ import (
 	"fmt"
 	"net"
 	"net/netip"
-	"sync"
 
 	"github.com/platinasystems/goes/v2/pkg/box"
+	"github.com/platinasystems/goes/v2/pkg/xcontext"
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xflag"
 	"github.com/platinasystems/goes/v2/pkg/xlog"
@@ -25,9 +25,8 @@ import (
 type exchange struct {
 	client
 	lladdr netip.Addr
-	pktRxCh,
-	pktTxCh chan *box.Box
-	pem struct {
+	txch   chan *box.Box
+	pem    struct {
 		addressed  map[netip.Addr]*pem.Block
 		identified map[box.Id]*pem.Block
 	}
@@ -44,7 +43,6 @@ var exAll6nodes, exAll6routers netip.Addr
 // Exchange is a UDP server that forwards ciphered packets between guest's.
 func Exchange(ctx context.Context, args []string) error {
 	const defport = 8003
-	var wg sync.WaitGroup
 	var ex exchange
 
 	xlog.SetPrefixes("exchange/")
@@ -74,11 +72,6 @@ Exchange ciphered packets between guests.
 	ex.pem.addressed = make(map[netip.Addr]*pem.Block)
 	ex.pem.identified = make(map[box.Id]*pem.Block)
 
-	ex.pktRxCh = make(chan *box.Box, 16)
-	ex.pktTxCh = make(chan *box.Box, 16)
-
-	ex.whoisResponseCh = make(chan exchangeWhoisResponse)
-
 	if ex.lladdr, err = randLinkLocalAddr(); err != nil {
 		return err
 	} else {
@@ -87,17 +80,19 @@ Exchange ciphered packets between guests.
 
 	cctx, cancel := context.WithCancel(ctx)
 
-	udp, err := net.ListenUDP(ex.udpv, &net.UDPAddr{
+	conn, err := net.ListenUDP(ex.udpv, &net.UDPAddr{
 		IP:   ex.lap.Addr().AsSlice(),
 		Port: int(ex.lap.Port()),
 	})
 	if err != nil {
 		return xerrors.Label(err, "ListenUDP")
 	}
+	wg.Go(func() {
+		defer conn.Close()
+		<-cctx.Done()
+	})
 
-	defer udp.Close()
-
-	lap, err := netip.ParseAddrPort(udp.LocalAddr().String())
+	lap, err := netip.ParseAddrPort(conn.LocalAddr().String())
 	if err != nil {
 		return xerrors.Label(err, "LocalAddr")
 	}
@@ -108,26 +103,30 @@ Exchange ciphered packets between guests.
 	if sap.Addr().IsLoopback() {
 		return xerrors.Invalid("address", sap)
 	}
+
 	if err = ex.register(ctx, sap); err != nil {
 		return err
 	}
 
 	iex, vex := ex.id.Index(), ex.id.Version()
 
+	rxch := make(chan *box.Box, 16)
+	ex.txch = make(chan *box.Box, 16)
+
+	ex.whoisResponseCh = make(chan exchangeWhoisResponse)
+
 	svc := fmt.Sprintf("%v@%v", ex.id, sap)
 	xlog.Info.Println("start", svc)
+
 	defer xlog.Info.Println("stopped", svc)
 	defer wg.Wait()
 	defer cancel()
+	defer close(ex.txch)
 	defer xlog.Info.Println("stopping", svc, "...")
 
-	wg.Add(1)
-	go xlog.AlarmHandler(cctx, &wg)
-	wg.Add(1)
-	go pktRxRoutine(cctx, &wg, udp, ex.pktRxCh)
-	wg.Add(1)
-	go pktTxRoutine(cctx, &wg, udp, ex.pktTxCh)
-	defer close(ex.pktTxCh)
+	wg.Go(func() { xlog.AlarmHandler(cctx) })
+	wg.Go(func() { pktRx(cctx, conn, rxch) })
+	wg.Go(func() { pktTx(cctx, conn, ex.txch) })
 
 pktRxLoop:
 	for {
@@ -135,7 +134,7 @@ pktRxLoop:
 		case <-cctx.Done():
 			xlog.Info.Println("done", cctx.Err())
 			break pktRxLoop
-		case bx, ok := <-ex.pktRxCh:
+		case bx, ok := <-rxch:
 			if !ok {
 				xlog.Info.Println("pkt rx ch closed")
 				break pktRxLoop
@@ -158,8 +157,9 @@ pktRxLoop:
 			}
 			if vfrom != ex.ver[ifrom] {
 				xlog.Info.Println("update", ifrom)
-				wg.Add(1)
-				go ex.whoisRoutine(cctx, &wg, RestKeyId, from)
+				wg.Go(func() {
+					ex.whois(cctx, RestKeyId, from)
+				})
 				bx.Return()
 				continue pktRxLoop
 			}
@@ -167,8 +167,9 @@ pktRxLoop:
 			cfrom, ok := ex.gcm[ifrom]
 			if !ok {
 				xlog.Info.Println("whois", ifrom)
-				wg.Add(1)
-				go ex.whoisRoutine(cctx, &wg, RestKeyId, from)
+				wg.Go(func() {
+					ex.whois(cctx, RestKeyId, from)
+				})
 				bx.Return()
 				continue pktRxLoop
 			}
@@ -189,7 +190,7 @@ pktRxLoop:
 						xlog.Errata.Print("open",
 							bx, err)
 					} else {
-						ex.rx(cctx, &wg, Box{bx})
+						ex.rx(cctx, Box{bx})
 					}
 				}
 				bx.Return()
@@ -205,9 +206,11 @@ pktRxLoop:
 				bx.Return()
 			} else {
 				bx.AddrPort = ato
-				xlog.Info.Println("fwd", bx)
+				xlog.Trace.Println("fwd", bx)
 				bx.SealWith(cto)
-				bx.NonBlockingPut(ex.pktTxCh)
+				if !xcontext.Queue(ctx, ex.txch, bx) {
+					bx.Return()
+				}
 			}
 		case rsp, ok := <-ex.whoisResponseCh:
 			if !ok {
@@ -217,19 +220,15 @@ pktRxLoop:
 			if rsp.err != nil {
 				xlog.Errata.Print(rsp.err)
 			} else if err = ex.whoisResponse(rsp.blk); err != nil {
-				xlog.Info.Println(err)
+				xlog.Errata.Println(err)
 			}
 		}
 	}
 	return nil
 }
 
-func (ex *exchange) rx(
-	ctx context.Context,
-	wg *sync.WaitGroup,
-	bx Box,
-) {
-	xlog.Info.Println("rx", bx)
+func (ex *exchange) rx(ctx context.Context, bx Box) {
+	xlog.Trace.Println("rx", bx)
 	from := bx.FromWhom()
 	h, d, err := bx.PDU().Parse()
 	if err != nil {
@@ -243,46 +242,46 @@ func (ex *exchange) rx(
 			xlog.Errata.Println("rx whois underrun")
 		} else if blk := ex.pem.addressed[addr]; blk == nil {
 			xlog.Info.Println("rx whois:", addr)
-			wg.Add(1)
-			go ex.whoisRoutine(ctx, wg, RestKeyAddress, addr)
+			wg.Go(func() { ex.whois(ctx, RestKeyAddress, addr) })
 		} else {
-			ex.txPubKey("whois addressed rsponse", from, blk)
+			ex.txPubKey(ctx, "whois addressed rsponse", from, blk)
 		}
 	case VPN_P_WHOIS_IDENTIFIED:
 		if id, err := WhoisId(d); err != nil {
 			xlog.Errata.Print("rx whois:", err)
 		} else if blk := ex.pem.identified[id]; blk == nil {
 			xlog.Info.Println("rx whois:", id)
-			wg.Add(1)
-			go ex.whoisRoutine(ctx, wg, RestKeyId, id)
+			wg.Go(func() { ex.whois(ctx, RestKeyId, id) })
 		} else {
-			ex.txPubKey("whois identified response", from, blk)
+			ex.txPubKey(ctx, "whois identified response", from, blk)
 		}
 	case VPN_P_WHOIS_SERVICE:
 		xlog.Info.Println("FIXME rx whois:", WhoisService(d))
 	case VPN_P_IP:
 		xlog.Info.Println("rx dropped", bx)
 	case VPN_P_IP6:
-		ex.rxIP6(bx, from, netpdu.IP6(d))
+		ex.rxIP6(ctx, bx, from, netpdu.IP6(d))
 	default:
 		xlog.Info.Println("rx unknown proto:", h.Proto)
 	}
 }
 
-func (ex *exchange) rxIP6(bx Box, from box.Id, ip6pdu netpdu.IP6) {
+func (ex *exchange) rxIP6(
+	ctx context.Context, bx Box, from box.Id, ip6pdu netpdu.IP6,
+) {
 	ip6h, ip6d, err := ip6pdu.Parse()
 	if err != nil {
-		xlog.Info.Print(err)
+		xlog.Errata.Print(err)
 		return
 	}
 	sum := ip6pdu.Checksum(ip6h.NextHeader, ip6d)
 	if sum != 0 {
-		xlog.Info.Print("bad sum")
+		xlog.Errata.Print("bad sum")
 		return
 	}
 	da := netip.AddrFrom16(ip6h.DA)
 	if da.IsMulticast() {
-		ex.replicate("multicast", bx.Box, from)
+		ex.replicate(ctx, "multicast", bx.Box, from)
 		return
 	}
 	if !ex.tome(da) {
@@ -294,18 +293,19 @@ func (ex *exchange) rxIP6(bx Box, from box.Id, ip6pdu netpdu.IP6) {
 		icmp6pdu := netpdu.ICMP6(ip6d)
 		if icmp6pdu.Type() == netph.ICMP6TypeEchoRequest {
 			echo6req := netpdu.ICMP6EchoRequest(icmp6pdu)
-			ex.txICMP6EchoReply(from, &ip6h, echo6req)
+			ex.txICMP6EchoReply(ctx, from, &ip6h, echo6req)
 		} else {
 			xlog.Info.Println("!echo", icmp6pdu)
 		}
 	case netph.IPPROTO_UDP:
-		ex.rxUDP6(from, &ip6h, netpdu.UDP(ip6d))
+		ex.rxUDP6(ctx, from, &ip6h, netpdu.UDP(ip6d))
 	default:
 		xlog.Info.Println("!(icmp|udp)", ip6pdu)
 	}
 }
 
 func (ex *exchange) rxUDP6(
+	ctx context.Context,
 	from box.Id,
 	req6 *netph.IP6,
 	pdu netpdu.UDP,
@@ -317,7 +317,7 @@ func (ex *exchange) rxUDP6(
 	}
 	switch h.DP {
 	case netph.UDPEcho:
-		ex.txUDP6EchoReply(from, req6, &h, d)
+		ex.txUDP6EchoReply(ctx, from, req6, &h, d)
 	case netph.UDPDomain:
 		xlog.Info.Println("FIXME reply", pdu)
 	default:
@@ -329,7 +329,9 @@ func (ex *exchange) tome(a netip.Addr) bool {
 	return a.Compare(ex.lladdr) == 0 || a.Compare(ex.addr) == 0
 }
 
-func (ex *exchange) replicate(lbl string, bx *box.Box, from box.Id) {
+func (ex *exchange) replicate(
+	ctx context.Context, lbl string, bx *box.Box, from box.Id,
+) {
 	iex, ifrom := ex.id.Index(), from.Index()
 	for id := range ex.pem.identified {
 		if i := id.Index(); i != ifrom && i != iex {
@@ -339,15 +341,19 @@ func (ex *exchange) replicate(lbl string, bx *box.Box, from box.Id) {
 			clone.Via(ex.id)
 			clone.From(from)
 			clone.AddrPort = ex.service[i]
-			xlog.Info.Println(lbl, Box{clone})
+			xlog.Trace.Println(lbl, Box{clone})
 			clone.CloseWith(gcm)
 			clone.SealWith(gcm)
-			clone.NonBlockingPut(ex.pktTxCh)
+			if !xcontext.Queue(ctx, ex.txch, clone) {
+				clone.Return()
+				return
+			}
 		}
 	}
 }
 
 func (ex *exchange) txICMP6EchoReply(
+	ctx context.Context,
 	to box.Id,
 	req6 *netph.IP6,
 	req netpdu.ICMP6EchoRequest,
@@ -411,10 +417,14 @@ func (ex *exchange) txICMP6EchoReply(
 	xlog.Info.Println("reply", Box{bx})
 	bx.CloseWith(c)
 	bx.SealWith(c)
-	bx.NonBlockingPut(ex.pktTxCh)
+	if !xcontext.Queue(ctx, ex.txch, bx) {
+		bx.Return()
+	}
 }
 
-func (ex *exchange) txPubKey(lbl string, to box.Id, blk *pem.Block) {
+func (ex *exchange) txPubKey(
+	ctx context.Context, lbl string, to box.Id, blk *pem.Block,
+) {
 	var err error
 	ito := to.Index()
 	c, ok := ex.gcm[ito]
@@ -437,10 +447,13 @@ func (ex *exchange) txPubKey(lbl string, to box.Id, blk *pem.Block) {
 	xlog.Info.Println(lbl, Box{bx})
 	bx.CloseWith(c)
 	bx.SealWith(c)
-	bx.NonBlockingPut(ex.pktTxCh)
+	if !xcontext.Queue(ctx, ex.txch, bx) {
+		bx.Return()
+	}
 }
 
 func (ex *exchange) txUDP6EchoReply(
+	ctx context.Context,
 	to box.Id,
 	req6 *netph.IP6,
 	requdp *netph.UDP,
@@ -498,14 +511,14 @@ func (ex *exchange) txUDP6EchoReply(
 	xlog.Info.Println("tx", Box{bx})
 	bx.CloseWith(c)
 	bx.SealWith(c)
-	bx.NonBlockingPut(ex.pktTxCh)
+	if !xcontext.Queue(ctx, ex.txch, bx) {
+		bx.Return()
+	}
 }
 
-func (ex *exchange) whoisRoutine(
-	ctx context.Context, wg *sync.WaitGroup, key string, value any,
-) {
+func (ex *exchange) whois(ctx context.Context, key string, value any) {
 	defer wg.Done()
-	blk, err := ex.whois(ctx, key, value)
+	blk, err := ex.client.whois(ctx, key, value)
 	if err != nil {
 		err = fmt.Errorf("%w (whois %s %v)", err, key, value)
 	}

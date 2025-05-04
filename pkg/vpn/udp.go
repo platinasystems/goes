@@ -7,64 +7,51 @@ package vpn
 import (
 	"context"
 	"net"
-	"sync"
 
 	"github.com/platinasystems/goes/v2/pkg/box"
+	"github.com/platinasystems/goes/v2/pkg/xcontext"
 	"github.com/platinasystems/goes/v2/pkg/xlog"
 )
 
-func pktRxRoutine(
-	ctx context.Context,
-	wg *sync.WaitGroup,
-	udp *net.UDPConn,
-	ch chan<- *box.Box,
-) {
-	defer wg.Done()
-	defer close(ch)
-	la := udp.LocalAddr()
+func pktRx(ctx context.Context, conn *net.UDPConn, ch chan<- *box.Box) {
+	la := conn.LocalAddr()
 	xlog.Info.Printf("start %v rx routine", la)
 	defer xlog.Info.Printf("stopped %v rx routine", la)
-	for ctx.Err() == nil {
-		if bx, err := box.NewRx(ctx, udp); err != nil {
+	defer close(ch)
+	bx := box.New()
+	for !xcontext.IsDone(ctx) {
+		if err := bx.Rx(conn); err == nil {
+			xlog.Trace.Printf("rx[%d] %v <- %v",
+				bx.Len(), la, bx.AddrPort)
+			if xcontext.Queue(ctx, ch, bx) {
+				bx = box.New()
+			} else {
+				break
+			}
+		} else {
 			xlog.Errata.Print(err)
 			break
-		} else if bx != nil {
-			xlog.Trace.Printf("rx %d bytes from %v",
-				bx.Len(), bx.AddrPort)
-			bx.Queue(ctx, ch)
 		}
 	}
+	bx.Return()
 }
 
-func pktTxRoutine(
-	ctx context.Context,
-	wg *sync.WaitGroup,
-	udp *net.UDPConn,
-	ch <-chan *box.Box,
-) {
-	defer wg.Done()
-	la := udp.LocalAddr()
+func pktTx(ctx context.Context, conn *net.UDPConn, ch <-chan *box.Box) {
+	la := conn.LocalAddr()
 	xlog.Info.Printf("start %v tx routine", la)
 	defer xlog.Info.Printf("stopped %v tx routine", la)
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case bx, ok := <-ch:
-			if !ok {
-				xlog.Info.Println("pkt tx ch closed")
-				return
-			}
-			if tap := bx.AddrPort; !tap.IsValid() {
-				xlog.Errata.Println("no DAP")
-			} else if n, err := bx.Tx(ctx, udp); err != nil {
-				xlog.Errata.Printf("tx from %v to %v: %v",
-					la, tap, err)
-			} else {
-				xlog.Trace.Printf("tx %d bytes from %v to %v",
-					n, la, tap)
-			}
-			bx.Return()
+	xcontext.Range(ctx, ch, func(bx *box.Box) (ok bool) {
+		if !bx.AddrPort.IsValid() {
+			xlog.Errata.Println("no DAP")
+		} else if n, err := bx.Tx(conn); err != nil {
+			xlog.Errata.Printf("tx %v <- %v: %v",
+				bx.AddrPort, la, err)
+		} else {
+			xlog.Trace.Printf("tx[%d] %v <- %v",
+				n, bx.AddrPort, la)
+			ok = true
 		}
-	}
+		bx.Return()
+		return
+	})
 }

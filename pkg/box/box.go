@@ -7,16 +7,12 @@
 package box
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"io"
 	"net"
 	"net/netip"
-	"os"
-	"runtime"
 	"sync/atomic"
-	"time"
 	_ "unsafe"
 
 	"github.com/platinasystems/goes/v2/pkg/gcm"
@@ -93,70 +89,6 @@ func New() (box *Box) {
 	return
 }
 
-// Copy Reader to new, unlabeled box.
-func NewReadContents(r io.Reader) (*Box, error) {
-	box := New()
-	n, err := r.Read(box.data[Content:])
-	if err != nil {
-		box.Return()
-		box = nil
-	} else {
-		box.Contents = box.data[Content : Content+n]
-	}
-	return box, err
-}
-
-// Copy File to new, unlabeled box.
-func NewReadFileContents(ctx context.Context, f *os.File) (*Box, error) {
-	var dldur DeadlineDuration
-	box := New()
-	for ctx.Err() == nil {
-		f.SetReadDeadline(dldur.Next())
-		n, err := f.Read(box.data[Content:])
-		if err == nil {
-			box.Contents = box.data[Content : Content+n]
-			break
-		}
-		if hasExceededDeadline(err) {
-			runtime.Gosched()
-		} else {
-			box.Return()
-			return nil, err
-		}
-	}
-	return box, nil
-}
-
-// Receive Packet to new, labeled box.
-func NewRx(ctx context.Context, udp *net.UDPConn) (*Box, error) {
-	var dldur DeadlineDuration
-	box := New()
-	for ctx.Err() == nil {
-		err := udp.SetReadDeadline(dldur.Next())
-		if err != nil {
-			box.Return()
-			return nil, err
-		}
-		n, ap, err := udp.ReadFromUDPAddrPort(box.data[:])
-		if err != nil {
-			if hasExceededDeadline(err) {
-				runtime.Gosched()
-				continue
-			}
-			box.Return()
-			return nil, err
-		}
-		if n < Content {
-			box.Return()
-			return nil, ErrUnderrun
-		}
-		box.AddrPort = ap
-		box.Contents = box.data[Content:n]
-		break
-	}
-	return box, nil
-}
-
 func (box *Box) Clone() *Box {
 	clone := New()
 	n := Content + len(box.Contents)
@@ -202,15 +134,6 @@ func (box *Box) Len() int {
 	return Content + len(box.Contents)
 }
 
-// Non-blocking put to channel. If channel is full, return to inventory.
-func (box *Box) NonBlockingPut(ch chan<- *Box) {
-	select {
-	case ch <- box:
-	default:
-		box.Return()
-	}
-}
-
 // Open box contents with label's ZipCode (aka. incremental nonce value.)
 func (box *Box) OpenWith(v Opener) error {
 	var err error
@@ -232,25 +155,28 @@ func (box *Box) RandZipCode() {
 	EncodeZip(box.data[ZipCode:], runtime_randn(SizeofZipCode))
 }
 
-// Keep trying to add box to channel until successful or context is done.
-func (box *Box) Queue(ctx context.Context, ch chan<- *Box) {
-	for {
-		select {
-		case <-ctx.Done():
-			box.Return()
-			return
-		case ch <- box:
-			return
-		default:
-			runtime.Gosched()
-		}
+func (box *Box) ReadContents(r io.Reader) error {
+	n, err := r.Read(box.data[Content:])
+	if err == nil {
+		box.Contents = box.data[Content : Content+n]
 	}
+	return err
 }
 
 func (box *Box) Return() {
 	for box.next = inventory.Load(); !inventory.
 		CompareAndSwap(box.next, box); box.next = inventory.Load() {
 	}
+}
+
+// Receive closed box with sealed label.
+func (box *Box) Rx(conn *net.UDPConn) error {
+	n, ap, err := conn.ReadFromUDPAddrPort(box.data[:])
+	if err == nil {
+		box.AddrPort = ap
+		box.Contents = box.data[Content:n]
+	}
+	return err
 }
 
 // Seal box label with the shared key and nonce.
@@ -262,27 +188,9 @@ func (box *Box) To(to Id)   { to.Encode(box.data[To:]) }
 func (box *Box) ToWhom() Id { return DecodeId(box.data[To:]) }
 
 // Send closed box with sealed label.
-func (box Box) Tx(ctx context.Context, udp *net.UDPConn) (int, error) {
-	const dur = 50 * time.Millisecond
-	n := Content + len(box.Contents)
-	for ctx.Err() == nil {
-		err := udp.SetReadDeadline(time.Now().Add(dur))
-		if err != nil {
-			return 0, err
-		}
-		_, err = udp.WriteToUDPAddrPort(box.data[:n], box.AddrPort)
-		if err == nil {
-			break
-		} else if operr, ok := err.(*net.OpError); ok {
-			if !operr.Timeout() {
-				return 0, operr
-			}
-		} else if !errors.Is(err, os.ErrDeadlineExceeded) {
-			return 0, err
-		}
-		runtime.Gosched()
-	}
-	return n, nil
+func (box Box) Tx(conn *net.UDPConn) (int, error) {
+	data := box.data[:Content+len(box.Contents)]
+	return conn.WriteToUDPAddrPort(data, box.AddrPort)
 }
 
 // Unseal box label with the shared cipher key and nonce.
@@ -307,37 +215,5 @@ func (box *Box) Write(data []byte) (int, error) {
 	return n, nil
 }
 
-// Write Contents w/o label.
-func (box *Box) WriteTo(w io.Writer) (int64, error) {
-	n, err := w.Write(box.Contents)
-	box.Contents = box.data[Content:Content]
-	return int64(n), err
-}
-
 func (box *Box) Via(via Id)  { via.Encode(box.data[Via:]) }
 func (box *Box) ViaWhom() Id { return DecodeId(box.data[Via:]) }
-
-type DeadlineDuration time.Duration
-
-func (dl *DeadlineDuration) Next() time.Time {
-	const min = DeadlineDuration(time.Millisecond)
-	if *dl < min {
-		*dl = min
-	} else {
-		max := DeadlineDuration(250 * time.Millisecond)
-		if runtime.NumCPU() <= 1 {
-			max = DeadlineDuration(50 * time.Millisecond)
-		}
-		if *dl *= 2; *dl > max {
-			*dl = max
-		}
-	}
-	return time.Now().Add(time.Duration(*dl))
-}
-
-func hasExceededDeadline(err error) bool {
-	if operr, isOpErr := err.(*net.OpError); isOpErr {
-		return operr.Timeout()
-	}
-	return errors.Is(err, os.ErrDeadlineExceeded)
-}
