@@ -9,6 +9,7 @@ import (
 	"flag"
 	"fmt"
 	"strings"
+	"time"
 	"unicode"
 
 	"github.com/platinasystems/goes/v2/pkg/netif"
@@ -33,58 +34,10 @@ const (
 	Test    Route = "Test"
 )
 
-const (
-	DebugFlag     xflag.Xbool   = "d Debug mode."
-	ExpireFlag    xflag.Xint    = "expire Seconds from now."
-	FibFlag       xflag.Xstring = "fib A comma separated list of FIB IDs other than default."
-	FlagsFlag     xflag.Xstring = "flags A comma separated list." + gwFlags
-	GenmaskFlag   xflag.Xstring = "genmask Generate netmask."
-	HopCountFlag  xflag.Xuint   = "hopcount FIXME"
-	HostFlag      xflag.Xbool   = "host Host <destination>."
-	IfaFlag       xflag.Xstring = "ifa A MAC address of a point-to-point peer?"
-	IfaceFlag     xflag.Xbool   = "iface Inticates <gateway> is a point-to-point interface name."
-	IfpFlag       xflag.Xstring = "ifp A point-to-point peer interface and MAC."
-	InetFlag      xflag.Xbool   = `inet Address hint or filter.`
-	Inet6Flag     xflag.Xbool   = `inet6 Address hint or filter.`
-	JailFlag      xflag.Xstring = `j Run inside jail.`
-	MetricFlag    xflag.Xuint   = "metric FIXME"
-	MetricsFlag   xflag.Xstring = "metrics A comma separated NAME=VALUE." + gwMetrics
-	MTUFlag       xflag.Xuint   = "mtu FIXME"
-	NetFlag       xflag.Xbool   = "net Network <destination>."
-	NumericFlag   xflag.Xbool   = "n Numeric address output."
-	PrefixlenFlag xflag.Xint    = "prefixlen If >= 0, use instead of 1st arg/<suffix> or 3rd arg."
-	ProtocolFlag  xflag.Xstring = "protocol {boot, kernel, redirect, static}"
-	QuietFlag     xflag.Xbool   = "q Suppress most output."
-	RTTFlag       xflag.Xuint   = "rtt FIXME"
-	RTTVarFlag    xflag.Xuint   = "rttvar FIXME"
-	ScopeFlag     xflag.Xstring = "scope {global, nowhere, host, link, site}"
-	SSThreshFlag  xflag.Xuint   = "ssthresh FIXME"
-	TableFlag     xflag.Xstring = "table {compat, default, main, local}"
-	TestFlag      xflag.Xbool   = "t Test mode."
-	ToFlag        xflag.Xstring = "to {unicast, broadcast, blackhole, etc.}"
-	TOSFlag       xflag.Xuint   = "tos Set type-of-service."
-	VerboseFlag   xflag.Xbool   = "v Verbose output."
-)
-
 func (rt Route) op(ctx context.Context, args []string) error {
 	xflag.TemplateUsage(Usage[rt])
 
-	DebugFlag.Define(false)
-	if HaveFibs {
-		FibFlag.Define("")
-	}
-	HostFlag.Define(false)
-	InetFlag.Define(false, "4")
-	Inet6Flag.Define(false, "6")
-	if xexec.CanJail {
-		JailFlag.Define("")
-	}
-	NetFlag.Define(false)
-	NumericFlag.Define(false)
-	PrefixlenFlag.Define(-1)
-	QuietFlag.Define(false)
-	TestFlag.Define(false)
-	VerboseFlag.Define(false)
+	defineRouteOpFlags()
 	rt.defineGWFlags()
 
 	err := flag.CommandLine.Parse(args)
@@ -92,15 +45,16 @@ func (rt Route) op(ctx context.Context, args []string) error {
 		return err
 	}
 
-	if s := JailFlag.Value(); len(s) > 0 {
-		if err = xexec.Jail(ctx, s); err != nil {
+	if len(routeJail) > 0 {
+		if err = xexec.Jail(ctx, routeJail); err != nil {
 			return err
 		}
 	}
 
 	fibs := []int{-1}
-	if s := FibFlag.Value(); len(s) > 0 {
-		if fibs, err = sscanFibs(strings.Split(s, ",")); err != nil {
+	if len(routeFib) > 0 {
+		fibs, err = sscanFibs(strings.Split(routeFib, ","))
+		if err != nil {
 			return err
 		}
 	}
@@ -123,6 +77,63 @@ func (rt Route) op(ctx context.Context, args []string) error {
 		}
 	}
 	return err
+}
+
+var (
+	// Route Flags.
+	routeDebug     = false
+	routeExpire    = time.Duration(0)
+	routeFib       = ""
+	routeFlags     = ""
+	routeGenMask   = false
+	routeHopCount  = uint(0)
+	routeHost      = false
+	routeIfa       = ""
+	routeIface     = false
+	routeIfp       = ""
+	routeInet      = false
+	routeInet6     = false
+	routeJail      = ""
+	routeMetric    = uint(0)
+	routeMetrics   = ""
+	routeMTU       = uint(0)
+	routeNet       = false
+	routeNumeric   = false
+	routePrefixlen = -1
+	routeProtocol  = "boot"
+	routeQuiet     = false
+	routeRTT       = uint(0)
+	routeRTTVar    = uint(0)
+	routeScope     = "global"
+	routeSSThresh  = uint(0)
+	routeTable     = "main"
+	routeTestMode  = false
+	routeTo        = "unicast"
+	routeTOS       = uint(0)
+	routeVerbose   = false
+)
+
+func defineRouteOpFlags() {
+	xflag.Define(&routeDebug, "d", "Debug mode.")
+	if HaveFibs {
+		xflag.Define(&routeFib, "fib",
+			"A comma separated list of FIB IDs other than default.")
+	}
+	xflag.Define(&routeHost, "host", "Host <destination>.")
+	xflag.Define(&routeInet, "inet", "Address hint or filter.")
+	xflag.Define(&routeInet, "4", "aka -inet")
+	xflag.Define(&routeInet6, "inet6", "Address hint or filter.")
+	xflag.Define(&routeInet6, "6", "aka -inet6")
+	if xexec.CanJail {
+		xflag.Define(&routeJail, "j", "Run inside jail.")
+	}
+	xflag.Define(&routeNet, "net", "Network <destination>.")
+	xflag.Define(&routeNumeric, "n", "Numeric address output.")
+	xflag.Define(&routePrefixlen, "prefixlen",
+		"If >= 0, use instead of 1st arg/<suffix> or 3rd arg.")
+	xflag.Define(&routeQuiet, "q", "Suppress most output.")
+	xflag.Define(&routeTestMode, "t", "Test mode.")
+	xflag.Define(&routeVerbose, "v", "Verbose output.")
 }
 
 func (rt Route) String() string { return string(rt) }

@@ -15,27 +15,13 @@ import (
 	probing "github.com/prometheus-community/pro-bing"
 )
 
-const (
-	ICMPPing_c_Flag xflag.Xuint     = "c Count."
-	ICMPPing_i_Flag xflag.Xduration = "i Interval."
-	ICMPPing_m_Flag xflag.Xuint     = "m Request Time To Live."
-	ICMPPing_q_Flag xflag.Xbool     = "q Quiet."
-	ICMPPing_t_Flag xflag.Xduration = "t Timeout regardless of how many received packets."
-	ICMPPing_v_Flag xflag.Xbool     = "v Verbose."
-)
-
 func ICMPPing(ctx context.Context, args []string) error {
 	xflag.TemplateUsage(`
 usage: {{.Name}} [flags] [host]
 Send ICMP ECHO_REQUEST packets to network “host”, default 127.0.0.1.
 {{flags .}}`)
 
-	cFlag := ICMPPing_c_Flag.Define(0)
-	iFlag := ICMPPing_i_Flag.Define(time.Second)
-	mFlag := ICMPPing_m_Flag.Define(0)
-	qFlag := ICMPPing_q_Flag.Define(false)
-	tFlag := ICMPPing_t_Flag.Define(3 * time.Second)
-	vFlag := ICMPPing_v_Flag.Define(false)
+	defineICMPPingFlags()
 
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
@@ -56,14 +42,14 @@ Send ICMP ECHO_REQUEST packets to network “host”, default 127.0.0.1.
 		return err
 	}
 
-	pinger.Count = int(*cFlag)
-	pinger.Interval = *iFlag
+	pinger.Count = icmpping_c
+	pinger.Interval = icmpping_i
 
-	if *tFlag != 0 {
-		pinger.Timeout = *tFlag
+	if icmpping_t != 0 {
+		pinger.Timeout = icmpping_t
 	}
-	if *mFlag != 0 {
-		pinger.TTL = int(*mFlag)
+	if icmpping_m != 0 {
+		pinger.TTL = icmpping_m
 	}
 	if !isNumericHost {
 		if err = pinger.Resolve(); err != nil {
@@ -85,7 +71,7 @@ Send ICMP ECHO_REQUEST packets to network “host”, default 127.0.0.1.
 		fmt.Printf("PING %s (%v); %d data bytes\n",
 			pinger.Addr(), pinger.IPAddr(), pinger.Size)
 	}
-	if *vFlag {
+	if icmpping_v {
 		pinger.OnSend = func(pkt *probing.Packet) {
 			fmt.Printf("%d bytes to %v; icmp_seq=%d\n",
 				pkt.Nbytes,
@@ -93,7 +79,7 @@ Send ICMP ECHO_REQUEST packets to network “host”, default 127.0.0.1.
 				pkt.Seq)
 		}
 	}
-	if !*qFlag {
+	if !icmpping_q {
 		pinger.OnRecv = func(pkt *probing.Packet) {
 			fmt.Printf("%d bytes from %v; "+
 				"icmp_seq=%d ttl=%d time=%v\n",
@@ -120,4 +106,24 @@ Send ICMP ECHO_REQUEST packets to network “host”, default 127.0.0.1.
 		}
 	}
 	return pinger.RunWithContext(ctx)
+}
+
+var (
+	// ICMPPing Flags.
+	icmpping_c = 0
+	icmpping_i = time.Second
+	icmpping_m = 0
+	icmpping_q = false
+	icmpping_t = 3 * time.Second
+	icmpping_v = false
+)
+
+func defineICMPPingFlags() {
+	xflag.Define(&icmpping_c, "c", "Count.")
+	xflag.Define(&icmpping_i, "i", "Interval.")
+	xflag.Define(&icmpping_m, "m", "Request Time To Live.")
+	xflag.Define(&icmpping_q, "q", "Quiet.")
+	xflag.Define(&icmpping_t, "t",
+		"Timeout regardless of how many received packets.")
+	xflag.Define(&icmpping_v, "v", "Verbose.")
 }

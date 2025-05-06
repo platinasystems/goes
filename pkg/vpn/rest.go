@@ -91,7 +91,7 @@ RESTful registry administration.
 	return err
 }
 
-// Rest.certify adds the peer certificate to [RegFlag].
+// Rest.certify adds the peer certificate to [Reg].
 func RestCertify(ctx context.Context, args []string) error {
 	var rest rest
 
@@ -148,7 +148,7 @@ Import registry certificate.
 		return err
 	}
 
-	rfn := ConfigDirFile(RegFlag)
+	rfn := cfgfile(vpnRegistry)
 	fmt.Fprintf(w, `Enter "yes" to write above to %s: `, rfn)
 	s, err := r.ReadString('\n')
 	if err != nil && strings.TrimSpace(s) != "yes" {
@@ -302,7 +302,7 @@ RESTful subscribe to VPN.
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		err = errors.New(resp.Status)
-	} else if ConfigDirFile(RegFlag) == "-" {
+	} else if cfgfile(vpnRegistry) == "-" {
 		_, err = io.Copy(os.Stdout, resp.Body)
 	}
 	return err
@@ -388,7 +388,7 @@ func (rest *rest) defineAndParseFlags(args []string) error {
 		return err
 	}
 
-	fn := ConfigDirFile(CertFlag)
+	fn := cfgfile(vpnCert)
 	cs, err := certificates(fn)
 	if err != nil {
 		return err
@@ -398,7 +398,8 @@ func (rest *rest) defineAndParseFlags(args []string) error {
 		rest.crt = cs[0]
 	}
 
-	if rest.sig, err = NewSignatures(ConfigDirFile(SigFlag)); err != nil {
+	rest.sig, err = NewSignatures(cfgfile(vpnSig))
+	if err != nil {
 		return err
 	}
 
@@ -419,7 +420,8 @@ func (rest *rest) defineAndParseFlags(args []string) error {
 	}
 
 	if cl := flag.CommandLine.Name(); !strings.HasSuffix(cl, "certify") {
-		if cs, err = certificates(ConfigDirFile(RegFlag)); err != nil {
+		cs, err = certificates(cfgfile(vpnRegistry))
+		if err != nil {
 			return err
 		}
 		rest.reg = cs[0]
@@ -427,8 +429,8 @@ func (rest *rest) defineAndParseFlags(args []string) error {
 			return err
 		}
 		cfg.RootCAs.AddCert(rest.reg)
-		if vpn := VpnFlag.Value(); len(vpn) > 0 {
-			rest.url = rest.url.JoinPath(vpn)
+		if len(vpnVPN) > 0 {
+			rest.url = rest.url.JoinPath(vpnVPN)
 		}
 	}
 

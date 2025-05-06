@@ -17,22 +17,20 @@ import (
 	"golang.org/x/term"
 )
 
-const (
-	Command_p_Flag xflag.Xbool = "p Restricted path search."
-	Command_v_Flag xflag.Xbool = "v Report path found."
-	Command_V_Flag xflag.Xbool = "V More verbose report."
-)
+const ()
 
 func Command(ctx context.Context, complete bool, args []string) error {
+	var p, v, vv bool
+
 	xflag.TemplateUsage(`
 usage: {{.Name}} [flags] <external> [args]
 Execute “external” PATH command.
 
 {{flags .}}`)
 
-	pFlag := Command_p_Flag.Define(false)
-	vFlag := Command_v_Flag.Define(false)
-	vvFlag := Command_V_Flag.Define(false)
+	xflag.Define(&p, "p", "Restricted path search.")
+	xflag.Define(&v, "v", "Report path found.")
+	xflag.Define(&vv, "V", "More verbose report.")
 
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
@@ -53,18 +51,18 @@ Execute “external” PATH command.
 	}
 
 	lookpath := exec.LookPath
-	if *pFlag {
+	if p {
 		lookpath = xexec.RestrictedLookPath
 	}
 	full, err := lookpath(args[0])
 	if err != nil {
 		return err
 	}
-	if *vFlag {
+	if v {
 		fmt.Println(full)
 		return nil
 	}
-	if *vvFlag {
+	if vv {
 		fmt.Println(args[0], "is", full)
 		return nil
 	}

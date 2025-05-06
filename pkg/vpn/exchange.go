@@ -42,7 +42,6 @@ var exAll6nodes, exAll6routers netip.Addr
 
 // Exchange is a UDP server that forwards ciphered packets between guest's.
 func Exchange(ctx context.Context, args []string) error {
-	const defport = 8003
 	var ex exchange
 
 	xlog.SetPrefixes("exchange/")
@@ -53,16 +52,15 @@ Exchange ciphered packets between guests.
 
 {{flags .}}`)
 
-	var pap netip.AddrPort
-	PublicFlag.Define(&pap, netip.AddrPortFrom(netip.IPv4Unspecified(), 0))
+	vpnListen = netip.AddrPortFrom(netip.IPv4Unspecified(), 8003)
+	xflag.DefineText(&vpnPublic, "public",
+		"NAT'd listen {addr}:{port}. (0.0.0.0:0 ignored)")
 
-	trace := TraceFlag.Define(false)
-
-	err := ex.defineAndParseFlags(ctx, defport, args)
+	err := ex.defineAndParseFlags(ctx, args)
 	if err != nil {
 		return err
 	}
-	if *trace {
+	if vpnTrace {
 		xlog.UnmuteTrace()
 	}
 
@@ -81,8 +79,8 @@ Exchange ciphered packets between guests.
 	cctx, cancel := context.WithCancel(ctx)
 
 	conn, err := net.ListenUDP(ex.udpv, &net.UDPAddr{
-		IP:   ex.lap.Addr().AsSlice(),
-		Port: int(ex.lap.Port()),
+		IP:   vpnListen.Addr().AsSlice(),
+		Port: int(vpnListen.Port()),
 	})
 	if err != nil {
 		return xerrors.Label(err, "ListenUDP")
@@ -97,8 +95,8 @@ Exchange ciphered packets between guests.
 		return xerrors.Label(err, "LocalAddr")
 	}
 	sap := lap
-	if !pap.Addr().IsUnspecified() {
-		sap = pap
+	if !vpnPublic.Addr().IsUnspecified() {
+		sap = vpnPublic
 	}
 	if sap.Addr().IsLoopback() {
 		return xerrors.Invalid("address", sap)

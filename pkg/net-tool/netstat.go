@@ -17,23 +17,6 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xnet"
 )
 
-const (
-	Netstat_F_Flag     xflag.Xint      = "F FIB number, -1 for current."
-	Netstat_I_Flag     xflag.Xstring   = "I Interface name."
-	Netstat_f_Flag     xflag.Xstring   = "f Address Family: inet, inet6, link."
-	Netstat_i_Flag     xflag.Xbool     = "i Show interface info."
-	Netstat_inet_Flag  xflag.Xbool     = "inet Address filter."
-	Netstat_inet6_Flag xflag.Xbool     = "inet6 Address filter."
-	Netstat_m_Flag     xflag.Xbool     = "m Show memory stats."
-	Netstat_mm_Flag    xflag.Xbool     = "mm Show detailed memory stats."
-	Netstat_n_Flag     xflag.Xbool     = "n Show numeric address instead of lookup."
-	Netstat_p_Flag     xflag.Xint      = "p Protocol number."
-	Netstat_r_Flag     xflag.Xbool     = "r Show routing table."
-	Netstat_s_Flag     xflag.Xbool     = "s Show per-protocol stats."
-	Netstat_ss_Flag    xflag.Xbool     = "ss Show per-protocol, non-zero stats."
-	Netstat_w_Flag     xflag.Xduration = "w Wait interval."
-)
-
 func Netstat(ctx context.Context, args []string) error {
 	xflag.TemplateUsage(`
 usage: {{.Name}} [flags]
@@ -53,20 +36,7 @@ Flags:
 
 {{flags .}}`)
 
-	Netstat_F_Flag.Define(-1)
-	Netstat_I_Flag.Define("")
-	Netstat_f_Flag.Define("")
-	iFlag := Netstat_i_Flag.Define(false)
-	Netstat_inet_Flag.Define(false, "4")
-	Netstat_inet6_Flag.Define(false, "6")
-	Netstat_m_Flag.Define(false)
-	Netstat_mm_Flag.Define(false)
-	Netstat_n_Flag.Define(false)
-	Netstat_p_Flag.Define(0)
-	rFlag := Netstat_r_Flag.Define(false)
-	Netstat_s_Flag.Define(false)
-	Netstat_ss_Flag.Define(false)
-	Netstat_w_Flag.Define(0)
+	defineNetstatFlags()
 
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
@@ -76,14 +46,49 @@ Flags:
 	args = flag.Args()
 
 	switch {
-	case *iFlag:
+	case netstat_i:
 		return netstati(ctx)
-	case *rFlag:
+	case netstat_r:
 		return netstatr(ctx)
 	default:
 		return xerrors.FIXME("show active sockets")
 	}
 	return nil
+}
+
+var (
+	// Netstat Flags.
+	netstat_F     = -1
+	netstat_I     = ""
+	netstat_f     = ""
+	netstat_i     = false
+	netstat_inet  = false
+	netstat_inet6 = false
+	netstat_m     = false
+	netstat_mm    = false
+	netstat_n     = false
+	netstat_p     = 0
+	netstat_r     = false
+	netstat_s     = false
+	netstat_ss    = false
+	netstat_w     = 0
+)
+
+func defineNetstatFlags() {
+	xflag.Define(&netstat_F, "F", "FIB number, -1 for current.")
+	xflag.Define(&netstat_I, "I", "Interface name.")
+	xflag.Define(&netstat_f, "f", "Address Family: inet, inet6, link.")
+	xflag.Define(&netstat_i, "i", "Show interface info.")
+	xflag.Define(&netstat_inet, "inet", "Address filter.")
+	xflag.Define(&netstat_inet6, "inet6", "Address filter.")
+	xflag.Define(&netstat_m, "m", "Show memory stats.")
+	xflag.Define(&netstat_mm, "mm", "Show detailed memory stats.")
+	xflag.Define(&netstat_n, "n", "Show numeric address instead of lookup.")
+	xflag.Define(&netstat_p, "p", "Protocol number.")
+	xflag.Define(&netstat_r, "r", "Show routing table.")
+	xflag.Define(&netstat_s, "s", "Show per-protocol stats.")
+	xflag.Define(&netstat_ss, "ss", "Show per-protocol, non-zero stats.")
+	xflag.Define(&netstat_w, "w", "Wait interval.")
 }
 
 func netstati(ctx context.Context) error {
@@ -113,7 +118,7 @@ func netstati(ctx context.Context) error {
 		fmt.Printf(" %11d", nif.Collisions)
 		fmt.Println()
 	}
-	if s := Netstat_I_Flag.Value(); len(s) > 0 {
+	if s := netstat_I; len(s) > 0 {
 		nif, err := netif.Named(ctx, s)
 		if err != nil {
 			return err
@@ -137,9 +142,9 @@ func netstati(ctx context.Context) error {
 
 func netstatr(ctx context.Context) error {
 	family := xnet.AF_UNSPEC
-	if Netstat_inet_Flag.Value() {
+	if netstat_inet {
 		family = xnet.AF_INET
-	} else if Netstat_inet6_Flag.Value() {
+	} else if netstat_inet6 {
 		family = xnet.AF_INET6
 	}
 	rter, err := netrt.Routes(ctx, family)

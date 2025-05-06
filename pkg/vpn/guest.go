@@ -36,7 +36,6 @@ type guest struct {
 // Guest is a UDP server that forwards ciphered packets between an exchange
 // and a network tunnel interface.
 func Guest(ctx context.Context, args []string) error {
-	const defport = 0
 	var g guest
 
 	xflag.TemplateUsage(`
@@ -45,22 +44,21 @@ Forward ciphered packets between exchange and tunnel interface.
 
 {{flags .}}`)
 
-	trace := TraceFlag.Define(false)
-	tflag := TunnelFlag.Define(0)
+	xflag.Define(&vpnTunnel, "t", "Tunnel unit number.")
 
-	err := g.defineAndParseFlags(ctx, defport, args)
+	err := g.defineAndParseFlags(ctx, args)
 	if err != nil {
 		return err
 	}
-	if *trace {
+	if vpnTrace {
 		xlog.UnmuteTrace()
 	}
 
 	cctx, cancel := context.WithCancel(ctx)
 
 	conn, err := net.ListenUDP(g.udpv, &net.UDPAddr{
-		IP:   g.lap.Addr().AsSlice(),
-		Port: int(g.lap.Port()),
+		IP:   vpnListen.Addr().AsSlice(),
+		Port: int(vpnListen.Port()),
 	})
 	if err != nil {
 		return xerrors.Label(err, "ListenUDP")
@@ -121,7 +119,7 @@ Forward ciphered packets between exchange and tunnel interface.
 		group   = -1
 	)
 
-	g.tun, err = nettun.New(*tflag, istap, persist, owner, group, ha)
+	g.tun, err = nettun.New(vpnTunnel, istap, persist, owner, group, ha)
 	if err != nil {
 		return err
 	}

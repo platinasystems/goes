@@ -9,7 +9,7 @@ import (
 	"net/netip"
 	"os"
 	"path/filepath"
-	"sync"
+	"time"
 
 	"github.com/platinasystems/goes/v2/pkg/fhs"
 	"github.com/platinasystems/goes/v2/pkg/xdg"
@@ -19,61 +19,50 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xsync"
 )
 
-var wg xsync.WaitGroup
+const year = 365 * 24 * time.Hour
 
-const (
-	DefaultCertFile   = "cert.pem"
-	DefaultConfigFile = "config.yaml"
-	DefaultRegFile    = "registry.pem"
-	DefaultSigFile    = "sig.pk8"
+var (
+	wg           xsync.WaitGroup
+	vpnCert      = "cert.pem"
+	vpnConfig    = "config.yaml"
+	vpnConfigDir = "/etc/goes"
+	vpnCountry   = ""
+	vpnDuration  = 10 * year
+	vpnEmail     = ""
+	vpnDNS       = ""
+	vpnLocality  = ""
+	vpnListen    = netip.AddrPortFrom(netip.IPv4Unspecified(), 0)
+	vpnName      = ""
+
+	vpnOrganization       = ""
+	vpnOrganizationalUnit = ""
+
+	vpnPostalCode = ""
+	vpnProvince   = ""
+	vpnPublic     = netip.AddrPortFrom(netip.IPv4Unspecified(), 0)
+	vpnQuiet      = false
+	vpnRegistry   = "registry.pem"
+
+	vpnSerialNumber int64 = 1
+
+	vpnSig      = "sig.pk8"
+	vpnStateDir = "/var/run/goes"
+	vpnStreet   = ""
+	vpnTrace    = false
+
+	vpnTunnel uint = 0
+
+	vpnURI     = ""
+	vpnVerbose = false
+	vpnVPN     = ""
 )
 
-type AddrPortFlag = xflag.TextVarDescription[*netip.AddrPort, netip.AddrPort]
-
-const (
-	CertFlag   xflag.Xstring = "cert Certificate file name w/in config-dir."
-	ConfigFlag xflag.Xstring = `config
-		Configuration file name w/in config-dir.`
-	ConfigDirFlag xflag.Xstring   = "config-dir Configuration directory."
-	CountryFlag   xflag.Xstring   = "country"
-	EmailFlag     xflag.Xstring   = "email Comma separated addresses."
-	DNSFlag       xflag.Xstring   = "dns Comma separated domain names."
-	DurationFlag  xflag.Xduration = "duration e.g. 360s, 60m, or 1h."
-	ListenFlag    AddrPortFlag    = `listen
-Service {addr}:{port}.
-If “addr” is 0.0.0.0 or [::], listen on all ipv4 or ipv6
-interface addresses.  If “port” is 0, allocate from system.`
-	LocalityFlag           xflag.Xstring = "locality aka. city."
-	NameFlag               xflag.Xstring = "name VPN identfier."
-	OrganizationFlag       xflag.Xstring = "organization aka. company"
-	OrganizationalUnitFlag xflag.Xstring = `organizational-unit
-		aka. department.`
-	PostalCodeFlag xflag.Xstring = "postal-code aka. zip."
-	ProvinceFlag   xflag.Xstring = "province aka. state."
-	PublicFlag     AddrPortFlag  = `public
-		NAT'd listen {addr}:{port}. (0.0.0.0:0 ignored)`
-	QuietFlag xflag.Xbool   = "q Quiet logging."
-	RegFlag   xflag.Xstring = `reg
-		Registry certificate file name w/in config-dir.`
-	SerialNumberFlag xflag.Xint64  = "serial-number"
-	SigFlag          xflag.Xstring = `sig
-		Signature file name w/in config-dir.`
-	StateDirFlag xflag.Xstring = `state-dir
-		State directory to save approved client certificates.`
-	StreetFlag  xflag.Xstring = "street address"
-	TraceFlag   xflag.Xbool   = "trace Log packet forwarding."
-	TunnelFlag  xflag.Xuint   = "t Tunnel unit number."
-	URIFlag     xflag.Xstring = "uri Comma separated URLs."
-	VerboseFlag xflag.Xbool   = "v Verbose logging."
-	VpnFlag     xflag.Xstring = "vpn Named VPN. (default unnamed)"
-)
-
-func ConfigDirFile(sflag xflag.Xstring) string {
-	return filepath.Join(ConfigDirFlag.Value(), sflag.Value())
+func cfgfile(s string) string {
+	return filepath.Join(vpnConfigDir, s)
 }
 
 // [xdg.ConfigHome] or [fhs.Config] + GOES/vpn
-var DefaultConfigDir = sync.OnceValue(func() string {
+func defaultConfigDir() string {
 	mn := xprogram.MainName()
 	sys := filepath.Join(fhs.Config(), mn, "vpn")
 	if s := xdg.ConfigHome(); len(s) > 0 {
@@ -87,10 +76,10 @@ var DefaultConfigDir = sync.OnceValue(func() string {
 		}
 	}
 	return sys
-})
+}
 
 // [xdg.StateHome] or [fhs.State] + GOES/vpn
-var DefaultStateDir = sync.OnceValue(func() string {
+func defaultStateDir() string {
 	mn := xprogram.MainName()
 	sys := filepath.Join(fhs.State(), mn, "vpn")
 	if s := xdg.StateHome(); len(s) > 0 {
@@ -104,7 +93,7 @@ var DefaultStateDir = sync.OnceValue(func() string {
 		}
 	}
 	return sys
-})
+}
 
 var Features = map[string]any{
 	"new": map[string]any{
@@ -145,22 +134,23 @@ const (
 )
 
 func defineAndParseFlags(args []string) error {
-	qFlag := QuietFlag.Define(false)
-	vFlag := VerboseFlag.Define(false)
-
-	CertFlag.Define(DefaultCertFile)
-	ConfigDirFlag.Define(DefaultConfigDir())
-	RegFlag.Define(DefaultRegFile)
-	SigFlag.Define(DefaultSigFile)
-	VpnFlag.Define("")
+	vpnConfigDir = defaultConfigDir()
+	xflag.Define(&vpnQuiet, "q", "Quiet logging.")
+	xflag.Define(&vpnVerbose, "v", "Verbose logging.")
+	xflag.Define(&vpnCert, "cert", "Certificate file name w/in config-dir.")
+	xflag.Define(&vpnConfigDir, "config-dir", "Configuration directory.")
+	xflag.Define(&vpnRegistry, "registry",
+		"Registry certificate file name w/in config-dir.")
+	xflag.Define(&vpnSig, "sig", "Signature file name w/in config-dir.")
+	xflag.Define(&vpnVPN, "vpn", "Named VPN. (default unnamed)")
 
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
 		return err
 	}
-	if *qFlag {
+	if vpnQuiet {
 		xlog.MuteErrata()
-	} else if *vFlag {
+	} else if vpnVerbose {
 		xlog.UnmuteInfo()
 	}
 	return nil

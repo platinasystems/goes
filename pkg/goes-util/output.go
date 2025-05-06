@@ -17,24 +17,21 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xprogram"
 )
 
-const (
-	Output_a_Flag xflag.Xbool = "a Append <file> instead of truncate."
-	Output_e_Flag xflag.Xbool = "e Write or tee Stderr to <file> instead of Stdout."
-	Output_m_Flag xflag.Xuint = "m Output file mode (default 0666)."
-	Output_t_Flag xflag.Xbool = "t Tee to <file> and stdout."
-)
-
 func Output(ctx context.Context, complete bool, args []string) error {
+	var a, e, t bool
+	var m uint
+
 	xflag.TemplateUsage(`
 usage: {{.Name}} [flags] <file> <feature> [args]
 Execute feature with output written to file.
 
 {{flags .}}`)
 
-	aFlag := Output_a_Flag.Define(false)
-	eFlag := Output_e_Flag.Define(false)
-	mFlag := Output_m_Flag.Define(0)
-	tFlag := Output_t_Flag.Define(false)
+	xflag.Define(&a, "a", "Append <file> instead of truncate.")
+	xflag.Define(&e, "e",
+		"Write or tee Stderr to <file> instead of Stdout.")
+	xflag.Define(&m, "m", "Output file mode (default 0666).")
+	xflag.Define(&t, "t", "Tee to <file> and stdout.")
 
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
@@ -52,15 +49,15 @@ Execute feature with output written to file.
 	}
 
 	oflags := os.O_RDWR | os.O_CREATE
-	if *aFlag {
+	if a {
 		oflags |= os.O_APPEND
 	} else {
 		oflags |= os.O_TRUNC
 	}
 
 	mode := os.FileMode(0666)
-	if *mFlag != 0 {
-		mode = os.FileMode(*mFlag)
+	if m != 0 {
+		mode = os.FileMode(m)
 	}
 
 	f, err := os.OpenFile(args[0], oflags, mode)
@@ -73,10 +70,10 @@ Execute feature with output written to file.
 	cmd.Args[0] = xprogram.MainName()
 	cmd.Stdin = os.Stdin
 
-	if *tFlag {
+	if t {
 		var r io.ReadCloser
 		var w io.Writer
-		if *eFlag {
+		if e {
 			cmd.Stdout = os.Stdout
 			r, err = cmd.StderrPipe()
 			if err != nil {
@@ -93,7 +90,7 @@ Execute feature with output written to file.
 		}
 		defer r.Close()
 		go io.Copy(io.MultiWriter(w, f), r)
-	} else if *eFlag {
+	} else if e {
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = f
 	} else {

@@ -17,6 +17,7 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/gcm"
 	"github.com/platinasystems/goes/v2/pkg/nonce"
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
+	"github.com/platinasystems/goes/v2/pkg/xflag"
 	"github.com/platinasystems/goes/v2/pkg/xlog"
 )
 
@@ -25,7 +26,6 @@ type client struct {
 	name,
 	udpv string
 	rest
-	lap    netip.AddrPort
 	priv   *ecdh.PrivateKey
 	pub    *ecdh.PublicKey
 	pubder []byte
@@ -43,16 +43,18 @@ type client struct {
 
 func (cl *client) defineAndParseFlags(
 	ctx context.Context,
-	defport uint16,
 	args []string,
 ) error {
-	ListenFlag.Define(&cl.lap,
-		netip.AddrPortFrom(netip.IPv4Unspecified(), defport))
+	xflag.Define(&vpnTrace, "trace", "Log packet forwarding.")
+	xflag.DefineText(&vpnListen, "listen", `
+Service {addr}:{port}.
+If “addr” is 0.0.0.0 or [::], listen on all ipv4 or ipv6
+interface addresses.  If “port” is 0, allocate from system.`[1:])
 	err := cl.rest.defineAndParseFlags(args)
 	if err != nil {
 		return err
 	}
-	a := cl.lap.Addr()
+	a := vpnListen.Addr()
 	cl.udpv = "udp"
 	if a.Is4() {
 		cl.udpv = "udp4"

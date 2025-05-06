@@ -12,7 +12,6 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"errors"
-	"flag"
 	"fmt"
 	"io"
 	"math"
@@ -92,7 +91,6 @@ var CertificatesTemplate = sync.OnceValues(func() (*template.Template, error) {
 
 // CreateCertificate a PEM encoded x509 certificate file.
 func CreateCertificate(ctx context.Context, args []string) error {
-	const year = 365 * 24 * time.Hour
 	const longest = 10 * year
 
 	xflag.TemplateUsage(`
@@ -106,26 +104,29 @@ Create PEM encoded x509 certificate file.
 		return err
 	}
 
-	name := flag.String("name", hostname, "VPN identfier.")
-	sn := flag.Int64("serial-number", 1, "")
-	dur := flag.Duration("duration", 10*year, "e.g. 360s, 60m, or 1h.")
-	dns := flag.String("dns", hostname, "Comma separated domain names.")
-	email := flag.String("email", "", "Comma separated addresses.")
-	organization := flag.String("organization", "", "aka. company")
-	organizationalUnit := flag.String("organizational-unit", "",
+	vpnName = hostname
+	vpnDNS = hostname
+
+	xflag.Define(&vpnName, "name", "VPN identfier.")
+	xflag.Define(&vpnCountry, "country", "")
+	xflag.Define(&vpnDNS, "dns", "Comma separated domain names.")
+	xflag.Define(&vpnDuration, "duration", "e.g. 360s, 60m, or 1h.")
+	xflag.Define(&vpnEmail, "email", "Comma separated addresses.")
+	xflag.Define(&vpnLocality, "locality", "aka. city.")
+	xflag.Define(&vpnOrganization, "organization", "aka. company")
+	xflag.Define(&vpnOrganizationalUnit, "organizational-unit",
 		"aka. department.")
-	street := flag.String("street", "", "")
-	locality := flag.String("locality", "", "aka. city.")
-	province := flag.String("province", "", "aka. state.")
-	country := flag.String("country", "", "")
-	postalCode := flag.String("postal-code", "", "aka. zip.")
-	uris := flag.String("uri", "", "Comma separated URLs.")
+	xflag.Define(&vpnPostalCode, "postal-code", "aka. zip.")
+	xflag.Define(&vpnProvince, "province", "aka. state.")
+	xflag.Define(&vpnSerialNumber, "serial-number", "Random if zero.")
+	xflag.Define(&vpnStreet, "street", "")
+	xflag.Define(&vpnURI, "uri", "Comma separated URLs.")
 
 	if err = defineAndParseFlags(args); err != nil {
 		return err
 	}
 
-	sig, err := NewSignatures(ConfigDirFile(SigFlag))
+	sig, err := NewSignatures(cfgfile(vpnSig))
 	if err != nil {
 		return err
 	}
@@ -135,40 +136,41 @@ Create PEM encoded x509 certificate file.
 		return xerrors.Incomplete(sig.String())
 	}
 
-	if *dur > longest {
-		return xerrors.Invalid(dur.String())
+	if vpnDuration > longest {
+		return xerrors.Invalid(vpnDuration.String())
 	}
 
 	now := time.Now()
-	expire := now.Add(*dur)
+	expire := now.Add(vpnDuration)
 	t := x509.Certificate{
 		IsCA:               true,
-		SerialNumber:       big.NewInt(*sn),
+		SerialNumber:       big.NewInt(vpnSerialNumber),
 		SignatureAlgorithm: x509.PureEd25519,
 		NotBefore:          now,
 		NotAfter:           expire,
 		KeyUsage: x509.KeyUsageDigitalSignature |
 			x509.KeyUsageCertSign,
 		Subject: pkix.Name{
-			CommonName:         *name,
-			SerialNumber:       fmt.Sprint(*sn),
-			Organization:       strings.Fields(*organization),
-			OrganizationalUnit: strings.Fields(*organizationalUnit),
-			StreetAddress:      strings.Fields(*street),
-			Locality:           strings.Fields(*locality),
-			Province:           strings.Fields(*province),
-			Country:            strings.Fields(*country),
-			PostalCode:         strings.Fields(*postalCode),
+			CommonName:   vpnName,
+			SerialNumber: fmt.Sprint(vpnSerialNumber),
+			Organization: strings.Fields(vpnOrganization),
+			OrganizationalUnit: strings.
+				Fields(vpnOrganizationalUnit),
+			StreetAddress: strings.Fields(vpnStreet),
+			Locality:      strings.Fields(vpnLocality),
+			Province:      strings.Fields(vpnProvince),
+			Country:       strings.Fields(vpnCountry),
+			PostalCode:    strings.Fields(vpnPostalCode),
 		},
-		DNSNames: strings.Split(*dns, ","),
+		DNSNames: strings.Split(vpnDNS, ","),
 	}
 
-	if len(*email) > 0 {
-		t.EmailAddresses = strings.Split(*email, ",")
+	if len(vpnEmail) > 0 {
+		t.EmailAddresses = strings.Split(vpnEmail, ",")
 	}
 
-	if len(*uris) > 0 {
-		for _, s := range strings.Split(*uris, ",") {
+	if len(vpnURI) > 0 {
+		for _, s := range strings.Split(vpnURI, ",") {
 			u, err := url.Parse(s)
 			if err != nil {
 				return err
@@ -204,7 +206,7 @@ Create PEM encoded x509 certificate file.
 		Headers: map[string]string{},
 		Bytes:   der,
 	}
-	cfn := ConfigDirFile(CertFlag)
+	cfn := cfgfile(vpnCert)
 	if cfn == "-" {
 		return pem.Encode(os.Stdout, blk)
 	}
@@ -234,7 +236,7 @@ Print parsed certificate.
 		return err
 	}
 
-	cs, err := certificates(ConfigDirFile(CertFlag))
+	cs, err := certificates(cfgfile(vpnCert))
 	if err != nil {
 		return err
 	} else if len(cs) == 0 {

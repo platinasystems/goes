@@ -12,16 +12,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"time"
 
 	"github.com/platinasystems/goes/v2/pkg/xflag"
 )
 
 // NewEd25519 creates a PEM encoded ed25519 signature key file.
 func NewEd25519(ctx context.Context, args []string) error {
-	const year = 365 * 24 * time.Hour
-	const longest = 10 * year
-
 	xflag.TemplateUsage(`
 usage: {{.Name}} [flags]
 Create PEM encoded ed25519 signature key file.
@@ -33,7 +29,7 @@ Create PEM encoded ed25519 signature key file.
 		return err
 	}
 
-	sfn := ConfigDirFile(SigFlag)
+	sfn := cfgfile(vpnSig)
 
 	_, priv, err := ed25519.GenerateKey(nil)
 	if err != nil {

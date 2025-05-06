@@ -29,14 +29,14 @@ func (rt Route) dst(ctx context.Context) (dst netip.Prefix, gw any, err error) {
 		return
 	}
 	dstarg := flag.Arg(0)
-	if HostFlag.Value() {
+	if routeHost {
 		forceHost = true
-	} else if NetFlag.Value() {
+	} else if routeNet {
 		forceNet = true
 	}
 
 	if dstarg == "default" {
-		if Inet6Flag.Value() {
+		if routeInet6 {
 			dst = netip.PrefixFrom(netip.IPv4Unspecified(), 0)
 		} else {
 			dst = netip.PrefixFrom(netip.IPv6Unspecified(), 0)
@@ -46,7 +46,7 @@ func (rt Route) dst(ctx context.Context) (dst netip.Prefix, gw any, err error) {
 		}
 		return
 	}
-	bits := PrefixlenFlag.Value()
+	bits := routePrefixlen
 	if slash := strings.Index(dstarg, "/"); slash > 0 {
 		if slash == len(dstarg)-1 {
 			err = xerrors.Invalid("destination", dstarg)
@@ -86,14 +86,14 @@ func (rt Route) dst(ctx context.Context) (dst netip.Prefix, gw any, err error) {
 		return
 	} else {
 		ipa := ipas[0]
-		if Inet6Flag.Value() {
+		if routeInet6 {
 			for _, t := range ipas {
 				if len(t.IP) == net.IPv6len {
 					ipa = t
 					break
 				}
 			}
-		} else if InetFlag.Value() {
+		} else if routeInet {
 			for _, t := range ipas {
 				if len(t.IP) == net.IPv4len {
 					ipa = t

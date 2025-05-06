@@ -14,7 +14,7 @@ import (
 )
 
 func lookupGW(ctx context.Context, arg string) (any, error) {
-	if IfaceFlag.Value() {
+	if routeIface {
 		return netif.Named(ctx, arg)
 	}
 	if isNumericAddr(arg) {

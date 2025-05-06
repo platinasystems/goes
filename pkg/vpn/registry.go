@@ -99,19 +99,23 @@ A RESTful WWW server.
 
 {{flags .}}`)
 
-	ConfigFlag.Define(DefaultConfigFile)
-	StateDirFlag.Define(DefaultStateDir())
+	xflag.Define(&vpnConfig, "config",
+		"Configuration file name w/in config-dir.")
+
+	vpnStateDir = defaultStateDir()
+	xflag.Define(&vpnStateDir, "state-dir",
+		"State directory to save approved client certificates.")
 
 	err := defineAndParseFlags(args)
 	if err != nil {
 		return err
 	}
 
-	if _, err = os.Stat(ConfigDirFile(ConfigFlag)); err != nil {
+	if _, err = os.Stat(cfgfile(vpnConfig)); err != nil {
 		return err
 	}
 
-	cfn := ConfigDirFile(CertFlag)
+	cfn := cfgfile(vpnCert)
 	if cs, err := certificates(cfn); err != nil {
 		return err
 	} else if len(cs) == 0 {
@@ -120,7 +124,7 @@ A RESTful WWW server.
 		reg.crt = cs[0]
 	}
 
-	sfn := ConfigDirFile(SigFlag)
+	sfn := cfgfile(vpnSig)
 	if reg.sig, err = NewSignatures(sfn); err != nil {
 		return err
 	}
@@ -384,7 +388,7 @@ func (reg *registry) shutdown(ctx context.Context) {
 }
 
 func (reg *registry) reload() error {
-	data, err := os.ReadFile(ConfigDirFile(ConfigFlag))
+	data, err := os.ReadFile(cfgfile(vpnConfig))
 	if err != nil {
 		return err
 	}
@@ -435,10 +439,10 @@ func (reg *registry) reload() error {
 
 		var sources []string
 		if name == "vpn" {
-			sources = append(sources, ConfigDirFlag.Value())
+			sources = append(sources, vpnConfigDir)
 		} else {
-			sources = append(sources, ConfigDirFile(CertFlag),
-				ConfigDirFile(RegFlag))
+			sources = append(sources, cfgfile(vpnCert),
+				cfgfile(vpnRegistry))
 		}
 		sources = append(sources, vpn.StateDir())
 		for _, src := range sources {
@@ -857,7 +861,7 @@ func (vpn *regVpn) subscribe(req *http.Request) error {
 }
 
 func (vpn *regVpn) StateDir() string {
-	dir := StateDirFlag.Value()
+	dir := vpnStateDir
 	if len(vpn.name) > 0 && vpn.name != "vpn" {
 		dir = filepath.Join(dir, vpn.name)
 	}

@@ -36,7 +36,7 @@ Print algorithm.
 		return err
 	}
 
-	sig, err := NewSignatures(ConfigDirFile(SigFlag))
+	sig, err := NewSignatures(cfgfile(vpnSig))
 	if err == nil {
 		err = sig.Show(os.Stdout)
 	}
