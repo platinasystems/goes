@@ -12,7 +12,6 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"sync"
 
 	"github.com/creack/pty"
 	"github.com/platinasystems/goes/v2/pkg/goes"
@@ -21,6 +20,7 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xexec"
 	"github.com/platinasystems/goes/v2/pkg/xflag"
 	"github.com/platinasystems/goes/v2/pkg/xprogram"
+	"github.com/platinasystems/goes/v2/pkg/xsync"
 	"golang.org/x/sys/unix"
 )
 
@@ -45,7 +45,7 @@ Execute feature in an allocated TTY.
 		return xerrors.Incomplete("feature")
 	}
 
-	var wg sync.WaitGroup
+	var wg xsync.WaitGroup
 	defer wg.Wait()
 
 	ws := pty.Winsize{
@@ -63,19 +63,15 @@ Execute feature in an allocated TTY.
 		return fmt.Errorf("resize: %w", err)
 	}
 
-	wg.Add(1)
-	go func() {
+	wg.Go(func() {
 		io.Copy(ptmx, os.Stdin)
 		ptmx.Close()
 		io.ReadAll(os.Stdin)
-		wg.Done()
-	}()
+	})
 
-	wg.Add(1)
-	go func() {
+	wg.Go(func() {
 		io.Copy(os.Stdout, xcontext.WithNBR(ctx, ptmx))
-		wg.Done()
-	}()
+	})
 
 	cmd := exec.CommandContext(ctx, xprogram.Path(), args...)
 	cmd.Args[0] = xprogram.MainName()
