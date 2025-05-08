@@ -14,11 +14,11 @@ import (
 	"net"
 	"net/netip"
 	"os"
-	"sync"
 	"time"
 
 	"github.com/platinasystems/goes/v2/pkg/xflag"
 	"github.com/platinasystems/goes/v2/pkg/xnet"
+	"github.com/platinasystems/goes/v2/pkg/xsync"
 )
 
 const (
@@ -54,9 +54,9 @@ UDP Echo server. (default listen “address:port”: “:7”)
 	defer fmt.Println("stopped", udpa, "service")
 	defer c.Close()
 
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go udpEchoReply(ctx, &wg, c)
+	var wg xsync.WaitGroup
+	wg.Go(func() { udpEchoReply(ctx, c) })
+
 	<-ctx.Done()
 	wg.Wait()
 
@@ -166,12 +166,7 @@ Default: 127.0.0.1:7
 	return ctx.Err()
 }
 
-func udpEchoReply(
-	ctx context.Context,
-	wg *sync.WaitGroup,
-	c *net.UDPConn,
-) {
-	defer wg.Done()
+func udpEchoReply(ctx context.Context, c *net.UDPConn) {
 	pg := make([]byte, 4<<10)
 	for {
 		n, from, err := c.ReadFromUDP(pg)

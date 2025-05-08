@@ -12,10 +12,10 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"sync"
 	"time"
 
 	"github.com/platinasystems/goes/v2/pkg/xflag"
+	"github.com/platinasystems/goes/v2/pkg/xsync"
 )
 
 const WWWEchoPort = ":8080"
@@ -45,9 +45,9 @@ Default: “` + WWWEchoPort + `”
 
 	srv := &http.Server{Addr: a}
 	cctx, cancel := context.WithCancel(ctx)
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go wwwEchoShutdown(cctx, &wg, srv)
+
+	var wg xsync.WaitGroup
+	wg.Go(func() { wwwEchoShutdown(cctx, srv) })
 
 	fmt.Println("start", a, "service")
 	defer fmt.Println("stopped", a, "service")
@@ -95,13 +95,8 @@ Default: “127.0.0.1` + WWWEchoPort + `”
 	return err
 }
 
-func wwwEchoShutdown(
-	ctx context.Context,
-	wg *sync.WaitGroup,
-	srv *http.Server,
-) {
+func wwwEchoShutdown(ctx context.Context, srv *http.Server) {
 	const timeout = 10 * time.Second
-	defer wg.Done()
 	<-ctx.Done()
 	fmt.Println("done")
 	cctx, cancel := context.WithTimeout(context.Background(), timeout)
