@@ -518,7 +518,6 @@ func (ex *exchange) txUDP6EchoReply(
 }
 
 func (ex *exchange) whois(ctx context.Context, key string, value any) {
-	defer wg.Done()
 	blk, err := ex.client.whois(ctx, key, value)
 	if err != nil {
 		err = fmt.Errorf("%w (whois %s %v)", err, key, value)
