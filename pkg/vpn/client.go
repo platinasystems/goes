@@ -41,27 +41,23 @@ type client struct {
 	via       map[int]box.Id
 }
 
-func (cl *client) defineAndParseFlags(
-	ctx context.Context,
-	args []string,
-) error {
-	xflag.Define(&vpnTrace, "trace", "Log packet forwarding.")
-	xflag.DefineText(&vpnListen, "listen", `
+func defineClientFlags(listen netip.AddrPort) {
+	vpnListen = listen
+	xflag.Define(&vpnListen, "listen", `
 Service {addr}:{port}.
 If “addr” is 0.0.0.0 or [::], listen on all ipv4 or ipv6
 interface addresses.  If “port” is 0, allocate from system.`[1:])
-	err := cl.rest.defineAndParseFlags(args)
-	if err != nil {
-		return err
-	}
-	a := vpnListen.Addr()
+	xflag.Define(&vpnTrace, "trace", "Log packet forwarding.")
+}
+
+func (cl *client) setup() error {
 	cl.udpv = "udp"
-	if a.Is4() {
+	if a := vpnListen.Addr(); a.Is4() {
 		cl.udpv = "udp4"
 	} else if a.Is6() {
 		cl.udpv = "udp6"
 	}
-	return nil
+	return cl.rest.setup()
 }
 
 func (cl *client) register(

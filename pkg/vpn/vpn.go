@@ -5,7 +5,6 @@
 package vpn
 
 import (
-	"flag"
 	"net/netip"
 	"os"
 	"path/filepath"
@@ -14,7 +13,6 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/fhs"
 	"github.com/platinasystems/goes/v2/pkg/xdg"
 	"github.com/platinasystems/goes/v2/pkg/xflag"
-	"github.com/platinasystems/goes/v2/pkg/xlog"
 	"github.com/platinasystems/goes/v2/pkg/xprogram"
 	"github.com/platinasystems/goes/v2/pkg/xsync"
 )
@@ -22,78 +20,39 @@ import (
 const year = 365 * 24 * time.Hour
 
 var (
-	wg           xsync.WaitGroup
-	vpnCert      = "cert.pem"
-	vpnConfig    = "config.yaml"
-	vpnConfigDir = "/etc/goes"
-	vpnCountry   = ""
-	vpnDuration  = 10 * year
-	vpnEmail     = ""
-	vpnDNS       = ""
-	vpnLocality  = ""
-	vpnListen    = netip.AddrPortFrom(netip.IPv4Unspecified(), 0)
-	vpnName      = ""
+	wg xsync.WaitGroup
 
-	vpnOrganization       = ""
-	vpnOrganizationalUnit = ""
+	vpnCert         = "cert.pem"
+	vpnConfig       = "config.yaml"
+	vpnConfigDir    = "/etc/goes"
+	vpnDuration     = 10 * year
+	vpnRegistry     = "registry.pem"
+	vpnSerialNumber = int64(1)
+	vpnSig          = "sig.pk8"
+	vpnStateDir     = "/var/run/goes"
 
-	vpnPostalCode = ""
-	vpnProvince   = ""
-	vpnPublic     = netip.AddrPortFrom(netip.IPv4Unspecified(), 0)
-	vpnQuiet      = false
-	vpnRegistry   = "registry.pem"
+	vpnQuiet,
+	vpnTrace,
+	vpnVerbose bool
 
-	vpnSerialNumber int64 = 1
+	vpnListen,
+	vpnPublic netip.AddrPort
 
-	vpnSig      = "sig.pk8"
-	vpnStateDir = "/var/run/goes"
-	vpnStreet   = ""
-	vpnTrace    = false
+	vpnCountry,
+	vpnEmail,
+	vpnDNS,
+	vpnLocality,
+	vpnName,
+	vpnOrganization,
+	vpnOrganizationalUnit,
+	vpnPostalCode,
+	vpnProvince,
+	vpnStreet,
+	vpnURI,
+	vpnVPN string
 
-	vpnTunnel uint = 0
-
-	vpnURI     = ""
-	vpnVerbose = false
-	vpnVPN     = ""
+	vpnTunnel uint
 )
-
-func cfgfile(s string) string {
-	return filepath.Join(vpnConfigDir, s)
-}
-
-// [xdg.ConfigHome] or [fhs.Config] + GOES/vpn
-func defaultConfigDir() string {
-	mn := xprogram.MainName()
-	sys := filepath.Join(fhs.Config(), mn, "vpn")
-	if s := xdg.ConfigHome(); len(s) > 0 {
-		s = filepath.Join(s, mn, "vpn")
-		if fi, err := os.Stat(s); err == nil && fi.IsDir() {
-			return s
-		} else if fi, err = os.Stat(sys); err == nil && fi.IsDir() {
-			return sys
-		} else if os.Geteuid() != 0 {
-			return s
-		}
-	}
-	return sys
-}
-
-// [xdg.StateHome] or [fhs.State] + GOES/vpn
-func defaultStateDir() string {
-	mn := xprogram.MainName()
-	sys := filepath.Join(fhs.State(), mn, "vpn")
-	if s := xdg.StateHome(); len(s) > 0 {
-		s = filepath.Join(s, mn, "vpn")
-		if fi, err := os.Stat(s); err == nil && fi.IsDir() {
-			return s
-		} else if fi, err = os.Stat(sys); err == nil && fi.IsDir() {
-			return sys
-		} else if os.Geteuid() != 0 {
-			return s
-		}
-	}
-	return sys
-}
 
 var Features = map[string]any{
 	"new": map[string]any{
@@ -133,7 +92,7 @@ const (
 	oCreate = os.O_WRONLY | os.O_CREATE | os.O_TRUNC
 )
 
-func defineAndParseFlags(args []string) error {
+func defineCommonFlags() {
 	vpnConfigDir = defaultConfigDir()
 	xflag.Define(&vpnQuiet, "q", "Quiet logging.")
 	xflag.Define(&vpnVerbose, "v", "Verbose logging.")
@@ -143,15 +102,38 @@ func defineAndParseFlags(args []string) error {
 		"Registry certificate file name w/in config-dir.")
 	xflag.Define(&vpnSig, "sig", "Signature file name w/in config-dir.")
 	xflag.Define(&vpnVPN, "vpn", "Named VPN. (default unnamed)")
+}
 
-	err := flag.CommandLine.Parse(args)
-	if err != nil {
-		return err
+// [xdg.ConfigHome] or [fhs.Config] + GOES/vpn
+func defaultConfigDir() string {
+	mn := xprogram.MainName()
+	sys := filepath.Join(fhs.Config(), mn, "vpn")
+	if s := xdg.ConfigHome(); len(s) > 0 {
+		s = filepath.Join(s, mn, "vpn")
+		if fi, err := os.Stat(s); err == nil && fi.IsDir() {
+			return s
+		} else if fi, err = os.Stat(sys); err == nil && fi.IsDir() {
+			return sys
+		} else if os.Geteuid() != 0 {
+			return s
+		}
 	}
-	if vpnQuiet {
-		xlog.MuteErrata()
-	} else if vpnVerbose {
-		xlog.UnmuteInfo()
+	return sys
+}
+
+// [xdg.StateHome] or [fhs.State] + GOES/vpn
+func defaultStateDir() string {
+	mn := xprogram.MainName()
+	sys := filepath.Join(fhs.State(), mn, "vpn")
+	if s := xdg.StateHome(); len(s) > 0 {
+		s = filepath.Join(s, mn, "vpn")
+		if fi, err := os.Stat(s); err == nil && fi.IsDir() {
+			return s
+		} else if fi, err = os.Stat(sys); err == nil && fi.IsDir() {
+			return sys
+		} else if os.Geteuid() != 0 {
+			return s
+		}
 	}
-	return nil
+	return sys
 }

@@ -9,11 +9,13 @@ import (
 	"crypto/ed25519"
 	"crypto/x509"
 	"encoding/pem"
+	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
 
 	"github.com/platinasystems/goes/v2/pkg/xflag"
+	"github.com/platinasystems/goes/v2/pkg/xlog"
 )
 
 // NewEd25519 creates a PEM encoded ed25519 signature key file.
@@ -24,12 +26,18 @@ Create PEM encoded ed25519 signature key file.
 
 {{flags .}}`)
 
-	err := defineAndParseFlags(args)
+	defineCommonFlags()
+	err := flag.CommandLine.Parse(args)
 	if err != nil {
 		return err
 	}
+	if vpnQuiet {
+		xlog.MuteErrata()
+	} else if vpnVerbose {
+		xlog.UnmuteInfo()
+	}
 
-	sfn := cfgfile(vpnSig)
+	sfn := filepath.Join(vpnConfigDir, vpnSig)
 
 	_, priv, err := ed25519.GenerateKey(nil)
 	if err != nil {

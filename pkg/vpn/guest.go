@@ -7,6 +7,7 @@ package vpn
 import (
 	"context"
 	"encoding/pem"
+	"flag"
 	"fmt"
 	"net"
 	"net/netip"
@@ -44,14 +45,24 @@ Forward ciphered packets between exchange and tunnel interface.
 
 {{flags .}}`)
 
+	defineCommonFlags()
+	defineClientFlags(netip.AddrPortFrom(netip.IPv4Unspecified(), 0))
 	xflag.Define(&vpnTunnel, "t", "Tunnel unit number.")
 
-	err := g.defineAndParseFlags(ctx, args)
+	err := flag.CommandLine.Parse(args)
 	if err != nil {
 		return err
 	}
-	if vpnTrace {
-		xlog.UnmuteTrace()
+	if vpnQuiet {
+		xlog.MuteErrata()
+	} else if vpnVerbose {
+		xlog.UnmuteInfo()
+		if vpnTrace {
+			xlog.UnmuteTrace()
+		}
+	}
+	if err = g.setup(); err != nil {
+		return nil
 	}
 
 	cctx, cancel := context.WithCancel(ctx)

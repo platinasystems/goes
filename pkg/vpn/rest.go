@@ -20,6 +20,7 @@ import (
 	"net/netip"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -64,12 +65,21 @@ RESTful registry administration.
 
 {{flags .}}`)
 
-	err := rest.defineAndParseFlags(args)
+	defineCommonFlags()
+	err := flag.CommandLine.Parse(args)
 	if err != nil {
 		return err
 	}
 	if args = flag.Args(); len(args) == 0 {
 		return xerrors.Incomplete("subscriber")
+	}
+	if vpnQuiet {
+		xlog.MuteErrata()
+	} else if vpnVerbose {
+		xlog.UnmuteInfo()
+	}
+	if err = rest.setup(); err != nil {
+		return err
 	}
 
 	clone := *rest.url
@@ -101,14 +111,23 @@ Import registry certificate.
 
 {{flags .}}`)
 
-	err := rest.defineAndParseFlags(args)
+	defineCommonFlags()
+	err := flag.CommandLine.Parse(args)
 	if err != nil {
 		return err
 	}
-	args = flag.Args()
-	if len(args) == 0 {
+	if args = flag.Args(); len(args) == 0 {
 		return xerrors.Incomplete("registry")
 	}
+	if vpnQuiet {
+		xlog.MuteErrata()
+	} else if vpnVerbose {
+		xlog.UnmuteInfo()
+	}
+	if err = rest.setup(); err != nil {
+		return err
+	}
+
 	rest.url, err = url.Parse(args[0])
 	if err != nil {
 		return err
@@ -148,7 +167,7 @@ Import registry certificate.
 		return err
 	}
 
-	rfn := cfgfile(vpnRegistry)
+	rfn := filepath.Join(vpnConfigDir, vpnRegistry)
 	fmt.Fprintf(w, `Enter "yes" to write above to %s: `, rfn)
 	s, err := r.ReadString('\n')
 	if err != nil && strings.TrimSpace(s) != "yes" {
@@ -176,8 +195,17 @@ RESTful ping registry.
 
 {{flags .}}`)
 
-	err := rest.defineAndParseFlags(args)
+	defineCommonFlags()
+	err := flag.CommandLine.Parse(args)
 	if err != nil {
+		return err
+	}
+	if vpnQuiet {
+		xlog.MuteErrata()
+	} else if vpnVerbose {
+		xlog.UnmuteInfo()
+	}
+	if err = rest.setup(); err != nil {
 		return err
 	}
 
@@ -208,8 +236,17 @@ RESTful reload registry configuration.
 
 {{flags .}}`)
 
-	err := rest.defineAndParseFlags(args)
+	defineCommonFlags()
+	err := flag.CommandLine.Parse(args)
 	if err != nil {
+		return err
+	}
+	if vpnQuiet {
+		xlog.MuteErrata()
+	} else if vpnVerbose {
+		xlog.UnmuteInfo()
+	}
+	if err = rest.setup(); err != nil {
 		return err
 	}
 
@@ -240,8 +277,17 @@ RESTful query and print registry object.
 
 {{flags .}}`)
 
-	err := rest.defineAndParseFlags(args)
+	defineCommonFlags()
+	err := flag.CommandLine.Parse(args)
 	if err != nil {
+		return err
+	}
+	if vpnQuiet {
+		xlog.MuteErrata()
+	} else if vpnVerbose {
+		xlog.UnmuteInfo()
+	}
+	if err = rest.setup(); err != nil {
 		return err
 	}
 
@@ -276,8 +322,18 @@ RESTful subscribe to VPN.
 
 {{flags .}}`)
 
-	err := rest.defineAndParseFlags(args)
+	defineCommonFlags()
+	err := flag.CommandLine.Parse(args)
 	if err != nil {
+		return err
+	}
+	if vpnQuiet {
+		xlog.MuteErrata()
+	} else if vpnVerbose {
+		xlog.UnmuteInfo()
+	}
+
+	if err = rest.setup(); err != nil {
 		return err
 	}
 
@@ -302,7 +358,7 @@ RESTful subscribe to VPN.
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		err = errors.New(resp.Status)
-	} else if cfgfile(vpnRegistry) == "-" {
+	} else if vpnRegistry == "-" {
 		_, err = io.Copy(os.Stdout, resp.Body)
 	}
 	return err
@@ -382,13 +438,14 @@ func (rest *rest) do(req *http.Request) (*http.Response, error) {
 	return resp, err
 }
 
-func (rest *rest) defineAndParseFlags(args []string) error {
-	err := defineAndParseFlags(args)
-	if err != nil {
-		return err
+func (rest *rest) setup() error {
+	if vpnQuiet {
+		xlog.MuteErrata()
+	} else if vpnVerbose {
+		xlog.UnmuteInfo()
 	}
 
-	fn := cfgfile(vpnCert)
+	fn := filepath.Join(vpnConfigDir, vpnCert)
 	cs, err := certificates(fn)
 	if err != nil {
 		return err
@@ -398,7 +455,7 @@ func (rest *rest) defineAndParseFlags(args []string) error {
 		rest.crt = cs[0]
 	}
 
-	rest.sig, err = NewSignatures(cfgfile(vpnSig))
+	rest.sig, err = NewSignatures(filepath.Join(vpnConfigDir, vpnSig))
 	if err != nil {
 		return err
 	}
@@ -420,7 +477,8 @@ func (rest *rest) defineAndParseFlags(args []string) error {
 	}
 
 	if cl := flag.CommandLine.Name(); !strings.HasSuffix(cl, "certify") {
-		cs, err = certificates(cfgfile(vpnRegistry))
+		rfn := filepath.Join(vpnConfigDir, vpnRegistry)
+		cs, err = certificates(rfn)
 		if err != nil {
 			return err
 		}

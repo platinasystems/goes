@@ -10,6 +10,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
+	"flag"
 	"fmt"
 	"io"
 	"net"
@@ -99,6 +100,7 @@ A RESTful WWW server.
 
 {{flags .}}`)
 
+	defineCommonFlags()
 	xflag.Define(&vpnConfig, "config",
 		"Configuration file name w/in config-dir.")
 
@@ -106,16 +108,22 @@ A RESTful WWW server.
 	xflag.Define(&vpnStateDir, "state-dir",
 		"State directory to save approved client certificates.")
 
-	err := defineAndParseFlags(args)
+	err := flag.CommandLine.Parse(args)
 	if err != nil {
 		return err
 	}
+	if vpnQuiet {
+		xlog.MuteErrata()
+	} else if vpnVerbose {
+		xlog.UnmuteInfo()
+	}
 
-	if _, err = os.Stat(cfgfile(vpnConfig)); err != nil {
+	cfg := filepath.Join(vpnConfigDir, vpnConfig)
+	if _, err = os.Stat(cfg); err != nil {
 		return err
 	}
 
-	cfn := cfgfile(vpnCert)
+	cfn := filepath.Join(vpnConfigDir, vpnCert)
 	if cs, err := certificates(cfn); err != nil {
 		return err
 	} else if len(cs) == 0 {
@@ -124,7 +132,7 @@ A RESTful WWW server.
 		reg.crt = cs[0]
 	}
 
-	sfn := cfgfile(vpnSig)
+	sfn := filepath.Join(vpnConfigDir, vpnSig)
 	if reg.sig, err = NewSignatures(sfn); err != nil {
 		return err
 	}
@@ -388,7 +396,7 @@ func (reg *registry) shutdown(ctx context.Context) {
 }
 
 func (reg *registry) reload() error {
-	data, err := os.ReadFile(cfgfile(vpnConfig))
+	data, err := os.ReadFile(filepath.Join(vpnConfigDir, vpnConfig))
 	if err != nil {
 		return err
 	}
@@ -441,8 +449,9 @@ func (reg *registry) reload() error {
 		if name == "vpn" {
 			sources = append(sources, vpnConfigDir)
 		} else {
-			sources = append(sources, cfgfile(vpnCert),
-				cfgfile(vpnRegistry))
+			sources = append(sources,
+				filepath.Join(vpnConfigDir, vpnCert),
+				filepath.Join(vpnConfigDir, vpnRegistry))
 		}
 		sources = append(sources, vpn.StateDir())
 		for _, src := range sources {

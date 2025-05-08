@@ -12,6 +12,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"errors"
+	"flag"
 	"fmt"
 	"io"
 	"math"
@@ -26,6 +27,7 @@ import (
 
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xflag"
+	"github.com/platinasystems/goes/v2/pkg/xlog"
 )
 
 const BlockTypeCertificate = "CERTIFICATE"
@@ -122,11 +124,17 @@ Create PEM encoded x509 certificate file.
 	xflag.Define(&vpnStreet, "street", "")
 	xflag.Define(&vpnURI, "uri", "Comma separated URLs.")
 
-	if err = defineAndParseFlags(args); err != nil {
+	defineCommonFlags()
+	if err = flag.CommandLine.Parse(args); err != nil {
 		return err
 	}
+	if vpnQuiet {
+		xlog.MuteErrata()
+	} else if vpnVerbose {
+		xlog.UnmuteInfo()
+	}
 
-	sig, err := NewSignatures(cfgfile(vpnSig))
+	sig, err := NewSignatures(filepath.Join(vpnConfigDir, vpnSig))
 	if err != nil {
 		return err
 	}
@@ -206,7 +214,7 @@ Create PEM encoded x509 certificate file.
 		Headers: map[string]string{},
 		Bytes:   der,
 	}
-	cfn := cfgfile(vpnCert)
+	cfn := filepath.Join(vpnConfigDir, vpnCert)
 	if cfn == "-" {
 		return pem.Encode(os.Stdout, blk)
 	}
@@ -231,12 +239,18 @@ Print parsed certificate.
 
 {{flags .}}`)
 
-	err := defineAndParseFlags(args)
+	defineCommonFlags()
+	err := flag.CommandLine.Parse(args)
 	if err != nil {
 		return err
 	}
+	if vpnQuiet {
+		xlog.MuteErrata()
+	} else if vpnVerbose {
+		xlog.UnmuteInfo()
+	}
 
-	cs, err := certificates(cfgfile(vpnCert))
+	cs, err := certificates(filepath.Join(vpnConfigDir, vpnCert))
 	if err != nil {
 		return err
 	} else if len(cs) == 0 {

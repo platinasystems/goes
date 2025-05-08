@@ -117,7 +117,7 @@ issues a warning if an SPF-formatted TXT record is not also present:
 fail, warn, ignore.`[1:])
 	xflag.Define(&ncz_W, "W", `
 Check non-terminal wildcards: warn or ignore`[1:])
-	xflag.DefineText(&ncz_c, "c", `Zone class if unspecified`)
+	xflag.Define(&ncz_c, "c", `Zone class if unspecified`)
 	xflag.Define(&ncz_d, "d", `Enables debugging.`)
 	xflag.Define(&ncz_f, "f", `Zone file format: text, or raw.`)
 	xflag.Define(&ncz_i, "i", `

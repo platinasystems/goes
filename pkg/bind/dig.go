@@ -102,7 +102,7 @@ func defineDigPerLookupFlags(fs *flag.FlagSet) (perlu struct {
 	i, q, x string
 }) {
 	perlu.c = xdnsmessage.Class0
-	xflag.DefineTextIn(fs, &perlu.c, "c", `
+	xflag.DefineIn(fs, &perlu.c, "c", `
 Set the query class. { ANY, CH, CS, HS, IN }`[1:])
 
 	perlu.i = ""
@@ -116,7 +116,7 @@ queries (RFC2874) are not attempted.`[1:])
 Query the flagged name instead of positional argument.`[1:])
 
 	perlu.t = xdnsmessage.Type0
-	xflag.DefineTextIn(fs, &perlu.t, "t", `
+	xflag.DefineIn(fs, &perlu.t, "t", `
 The resource record type to query. It can be any valid query
 type which is supported in BIND 9. The default query type is
 "A", unless the -x option is supplied to indicate a reverse

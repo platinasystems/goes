@@ -8,6 +8,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/pem"
+	"flag"
 	"fmt"
 	"net"
 	"net/netip"
@@ -52,16 +53,27 @@ Exchange ciphered packets between guests.
 
 {{flags .}}`)
 
-	vpnListen = netip.AddrPortFrom(netip.IPv4Unspecified(), 8003)
-	xflag.DefineText(&vpnPublic, "public",
+	defineCommonFlags()
+	defineClientFlags(netip.AddrPortFrom(netip.IPv4Unspecified(), 8003))
+	vpnPublic = netip.AddrPortFrom(netip.IPv4Unspecified(), 0)
+	xflag.Define(&vpnPublic, "public",
 		"NAT'd listen {addr}:{port}. (0.0.0.0:0 ignored)")
 
-	err := ex.defineAndParseFlags(ctx, args)
+	err := flag.CommandLine.Parse(args)
 	if err != nil {
 		return err
 	}
-	if vpnTrace {
-		xlog.UnmuteTrace()
+	if vpnQuiet {
+		xlog.MuteErrata()
+	} else if vpnVerbose {
+		xlog.UnmuteInfo()
+		if vpnTrace {
+			xlog.UnmuteTrace()
+		}
+	}
+
+	if err = ex.setup(); err != nil {
+		return nil
 	}
 
 	exAll6nodes = netip.IPv6LinkLocalAllNodes()

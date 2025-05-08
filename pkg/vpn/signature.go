@@ -9,13 +9,16 @@ import (
 	"crypto"
 	"crypto/x509"
 	"encoding/pem"
+	"flag"
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xflag"
+	"github.com/platinasystems/goes/v2/pkg/xlog"
 )
 
 type Privater interface {
@@ -31,12 +34,18 @@ Print algorithm.
 
 {{flags .}}`)
 
-	err := defineAndParseFlags(args)
+	defineCommonFlags()
+	err := flag.CommandLine.Parse(args)
 	if err != nil {
 		return err
 	}
+	if vpnQuiet {
+		xlog.MuteErrata()
+	} else if vpnVerbose {
+		xlog.UnmuteInfo()
+	}
 
-	sig, err := NewSignatures(cfgfile(vpnSig))
+	sig, err := NewSignatures(filepath.Join(vpnConfigDir, vpnSig))
 	if err == nil {
 		err = sig.Show(os.Stdout)
 	}
