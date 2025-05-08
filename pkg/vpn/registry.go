@@ -112,11 +112,6 @@ A RESTful WWW server.
 	if err != nil {
 		return err
 	}
-	if vpnQuiet {
-		xlog.MuteErrata()
-	} else if vpnVerbose {
-		xlog.UnmuteInfo()
-	}
 
 	cfg := filepath.Join(vpnConfigDir, vpnConfig)
 	if _, err = os.Stat(cfg); err != nil {

@@ -47,7 +47,10 @@ func defineClientFlags(listen netip.AddrPort) {
 Service {addr}:{port}.
 If “addr” is 0.0.0.0 or [::], listen on all ipv4 or ipv6
 interface addresses.  If “port” is 0, allocate from system.`[1:])
-	xflag.Define(&vpnTrace, "trace", "Log packet forwarding.")
+	xflag.Enable("trace", "Log packet forwarding.", func() error {
+		xlog.UnmuteTrace()
+		return nil
+	})
 }
 
 func (cl *client) setup() error {

@@ -18,7 +18,6 @@ import (
 
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xflag"
-	"github.com/platinasystems/goes/v2/pkg/xlog"
 )
 
 type Privater interface {
@@ -38,11 +37,6 @@ Print algorithm.
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
 		return err
-	}
-	if vpnQuiet {
-		xlog.MuteErrata()
-	} else if vpnVerbose {
-		xlog.UnmuteInfo()
 	}
 
 	sig, err := NewSignatures(filepath.Join(vpnConfigDir, vpnSig))

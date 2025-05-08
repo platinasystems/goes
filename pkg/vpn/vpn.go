@@ -13,45 +13,9 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/fhs"
 	"github.com/platinasystems/goes/v2/pkg/xdg"
 	"github.com/platinasystems/goes/v2/pkg/xflag"
+	"github.com/platinasystems/goes/v2/pkg/xlog"
 	"github.com/platinasystems/goes/v2/pkg/xprogram"
 	"github.com/platinasystems/goes/v2/pkg/xsync"
-)
-
-const year = 365 * 24 * time.Hour
-
-var (
-	wg xsync.WaitGroup
-
-	vpnCert         = "cert.pem"
-	vpnConfig       = "config.yaml"
-	vpnConfigDir    = "/etc/goes"
-	vpnDuration     = 10 * year
-	vpnRegistry     = "registry.pem"
-	vpnSerialNumber = int64(1)
-	vpnSig          = "sig.pk8"
-	vpnStateDir     = "/var/run/goes"
-
-	vpnQuiet,
-	vpnTrace,
-	vpnVerbose bool
-
-	vpnListen,
-	vpnPublic netip.AddrPort
-
-	vpnCountry,
-	vpnEmail,
-	vpnDNS,
-	vpnLocality,
-	vpnName,
-	vpnOrganization,
-	vpnOrganizationalUnit,
-	vpnPostalCode,
-	vpnProvince,
-	vpnStreet,
-	vpnURI,
-	vpnVPN string
-
-	vpnTunnel uint
 )
 
 var Features = map[string]any{
@@ -90,18 +54,57 @@ var Features = map[string]any{
 const (
 	oAppend = os.O_WRONLY | os.O_CREATE | os.O_APPEND
 	oCreate = os.O_WRONLY | os.O_CREATE | os.O_TRUNC
+
+	year = 365 * 24 * time.Hour
+)
+
+var (
+	wg xsync.WaitGroup
+
+	vpnCert         = "cert.pem"
+	vpnConfig       = "config.yaml"
+	vpnConfigDir    = "/etc/goes"
+	vpnDuration     = 10 * year
+	vpnRegistry     = "registry.pem"
+	vpnSerialNumber = int64(1)
+	vpnSig          = "sig.pk8"
+	vpnStateDir     = "/var/run/goes"
+
+	vpnListen,
+	vpnPublic netip.AddrPort
+
+	vpnCountry,
+	vpnEmail,
+	vpnDNS,
+	vpnLocality,
+	vpnName,
+	vpnOrganization,
+	vpnOrganizationalUnit,
+	vpnPostalCode,
+	vpnProvince,
+	vpnStreet,
+	vpnURI,
+	vpnVPN string
+
+	vpnTunnel uint
 )
 
 func defineCommonFlags() {
 	vpnConfigDir = defaultConfigDir()
-	xflag.Define(&vpnQuiet, "q", "Quiet logging.")
-	xflag.Define(&vpnVerbose, "v", "Verbose logging.")
 	xflag.Define(&vpnCert, "cert", "Certificate file name w/in config-dir.")
 	xflag.Define(&vpnConfigDir, "config-dir", "Configuration directory.")
 	xflag.Define(&vpnRegistry, "registry",
 		"Registry certificate file name w/in config-dir.")
 	xflag.Define(&vpnSig, "sig", "Signature file name w/in config-dir.")
 	xflag.Define(&vpnVPN, "vpn", "Named VPN. (default unnamed)")
+	xflag.Enable("q", "Quiet logging.", func() error {
+		xlog.MuteErrata()
+		return nil
+	})
+	xflag.Enable("v", "Verbose logging.", func() error {
+		xlog.UnmuteInfo()
+		return nil
+	})
 }
 
 // [xdg.ConfigHome] or [fhs.Config] + GOES/vpn

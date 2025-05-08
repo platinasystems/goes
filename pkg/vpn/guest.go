@@ -53,14 +53,6 @@ Forward ciphered packets between exchange and tunnel interface.
 	if err != nil {
 		return err
 	}
-	if vpnQuiet {
-		xlog.MuteErrata()
-	} else if vpnVerbose {
-		xlog.UnmuteInfo()
-		if vpnTrace {
-			xlog.UnmuteTrace()
-		}
-	}
 	if err = g.setup(); err != nil {
 		return nil
 	}

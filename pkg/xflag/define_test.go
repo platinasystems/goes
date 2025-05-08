@@ -69,7 +69,7 @@ func TestDefine(t *testing.T) {
 			ha:  net.HardwareAddr{0, 0x11, 0x22, 0x33, 0x44, 0x55},
 		}
 	)
-	fs := flag.NewFlagSet("define-help", flag.ContinueOnError)
+	fs := flag.NewFlagSet("define", flag.ContinueOnError)
 	DefineIn(fs, &bf, "f", "")
 	DefineIn(fs, &bt, "t", "")
 	DefineIn(fs, &i, "i", "")

@@ -63,15 +63,6 @@ Exchange ciphered packets between guests.
 	if err != nil {
 		return err
 	}
-	if vpnQuiet {
-		xlog.MuteErrata()
-	} else if vpnVerbose {
-		xlog.UnmuteInfo()
-		if vpnTrace {
-			xlog.UnmuteTrace()
-		}
-	}
-
 	if err = ex.setup(); err != nil {
 		return nil
 	}

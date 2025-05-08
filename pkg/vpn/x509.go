@@ -27,7 +27,6 @@ import (
 
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xflag"
-	"github.com/platinasystems/goes/v2/pkg/xlog"
 )
 
 const BlockTypeCertificate = "CERTIFICATE"
@@ -127,11 +126,6 @@ Create PEM encoded x509 certificate file.
 	defineCommonFlags()
 	if err = flag.CommandLine.Parse(args); err != nil {
 		return err
-	}
-	if vpnQuiet {
-		xlog.MuteErrata()
-	} else if vpnVerbose {
-		xlog.UnmuteInfo()
 	}
 
 	sig, err := NewSignatures(filepath.Join(vpnConfigDir, vpnSig))
@@ -243,11 +237,6 @@ Print parsed certificate.
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
 		return err
-	}
-	if vpnQuiet {
-		xlog.MuteErrata()
-	} else if vpnVerbose {
-		xlog.UnmuteInfo()
 	}
 
 	cs, err := certificates(filepath.Join(vpnConfigDir, vpnCert))

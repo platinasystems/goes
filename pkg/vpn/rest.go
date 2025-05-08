@@ -73,11 +73,6 @@ RESTful registry administration.
 	if args = flag.Args(); len(args) == 0 {
 		return xerrors.Incomplete("subscriber")
 	}
-	if vpnQuiet {
-		xlog.MuteErrata()
-	} else if vpnVerbose {
-		xlog.UnmuteInfo()
-	}
 	if err = rest.setup(); err != nil {
 		return err
 	}
@@ -118,11 +113,6 @@ Import registry certificate.
 	}
 	if args = flag.Args(); len(args) == 0 {
 		return xerrors.Incomplete("registry")
-	}
-	if vpnQuiet {
-		xlog.MuteErrata()
-	} else if vpnVerbose {
-		xlog.UnmuteInfo()
 	}
 	if err = rest.setup(); err != nil {
 		return err
@@ -200,11 +190,6 @@ RESTful ping registry.
 	if err != nil {
 		return err
 	}
-	if vpnQuiet {
-		xlog.MuteErrata()
-	} else if vpnVerbose {
-		xlog.UnmuteInfo()
-	}
 	if err = rest.setup(); err != nil {
 		return err
 	}
@@ -241,11 +226,6 @@ RESTful reload registry configuration.
 	if err != nil {
 		return err
 	}
-	if vpnQuiet {
-		xlog.MuteErrata()
-	} else if vpnVerbose {
-		xlog.UnmuteInfo()
-	}
 	if err = rest.setup(); err != nil {
 		return err
 	}
@@ -281,11 +261,6 @@ RESTful query and print registry object.
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
 		return err
-	}
-	if vpnQuiet {
-		xlog.MuteErrata()
-	} else if vpnVerbose {
-		xlog.UnmuteInfo()
 	}
 	if err = rest.setup(); err != nil {
 		return err
@@ -327,12 +302,6 @@ RESTful subscribe to VPN.
 	if err != nil {
 		return err
 	}
-	if vpnQuiet {
-		xlog.MuteErrata()
-	} else if vpnVerbose {
-		xlog.UnmuteInfo()
-	}
-
 	if err = rest.setup(); err != nil {
 		return err
 	}
@@ -439,12 +408,6 @@ func (rest *rest) do(req *http.Request) (*http.Response, error) {
 }
 
 func (rest *rest) setup() error {
-	if vpnQuiet {
-		xlog.MuteErrata()
-	} else if vpnVerbose {
-		xlog.UnmuteInfo()
-	}
-
 	fn := filepath.Join(vpnConfigDir, vpnCert)
 	cs, err := certificates(fn)
 	if err != nil {
