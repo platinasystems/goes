@@ -17,7 +17,6 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
@@ -265,12 +264,11 @@ func Include(ctx context.Context, origin, fn string) error {
 	return nil
 }
 
-func Routine(ctx context.Context, wg *sync.WaitGroup, verbose interface {
+func Server(ctx context.Context, verbose interface {
 	Print(...any)
 }) {
 	verbose.Print("start")
 	defer verbose.Print("stopped")
-	defer wg.Done()
 	for {
 		select {
 		case <-ctx.Done():

@@ -9,7 +9,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"sync"
 
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xflag"
@@ -17,9 +16,12 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xnet/xdns/xdnsdb"
 	"github.com/platinasystems/goes/v2/pkg/xnet/xdns/xdnsmessage"
 	"github.com/platinasystems/goes/v2/pkg/xprogram"
+	"github.com/platinasystems/goes/v2/pkg/xsync"
 )
 
 func NCZ(ctx context.Context, args []string) error {
+	var wg xsync.WaitGroup
+
 	xflag.TemplateUsage(`
 usage: {{.Name}} [-flags] {zone} {file | -}
 Mimic BIND9's config verification tool.
@@ -34,7 +36,6 @@ Mimic BIND9's config verification tool.
 	}
 	args = flag.Args()
 
-	wg := new(sync.WaitGroup)
 	ctx, cancel := context.WithCancel(ctx)
 	defer func() {
 		cancel()
@@ -61,8 +62,7 @@ Mimic BIND9's config verification tool.
 
 	zone, fn := args[0], args[1]
 
-	wg.Add(1)
-	go xdnsdb.Routine(ctx, wg, verbose)
+	wg.Go(func() { xdnsdb.Server(ctx, verbose) })
 
 	if err = xdnsdb.Include(ctx, zone, fn); err != nil {
 		return err

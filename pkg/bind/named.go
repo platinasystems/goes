@@ -17,7 +17,6 @@ import (
 	"net/http"
 	"os"
 	"strings"
-	"sync"
 	"time"
 
 	named_conf "github.com/platinasystems/goes/v2/pkg/bind/named-conf"
@@ -26,6 +25,7 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xnet/xdns/xdnsdb"
 	"github.com/platinasystems/goes/v2/pkg/xnet/xdns/xdnsmessage"
 	"github.com/platinasystems/goes/v2/pkg/xprogram"
+	"github.com/platinasystems/goes/v2/pkg/xsync"
 )
 
 const NamedDefaultConf = "/etc/named.conf"
@@ -34,6 +34,8 @@ type namedListener interface {
 	net.Listener
 	SetDeadline(time.Time) error
 }
+
+var namedWG xsync.WaitGroup
 
 func Named(ctx context.Context, args []string) error {
 	xflag.TemplateUsage(`
@@ -102,19 +104,15 @@ Mimic BIND9's Internet domain name daemon.
 	}
 
 	ctx, cancel := context.WithCancel(ctx)
-	wg := new(sync.WaitGroup)
-	defer func() {
-		cancel()
-		wg.Wait()
-	}()
 
-	wg.Add(1)
-	go xdnsdb.Routine(ctx, wg, verbose)
+	namedWG.Go(func() { xdnsdb.Server(ctx, verbose) })
 
 	if len(named_Z) > 0 {
 		for _, fn := range strings.Split(named_Z, ",") {
 			err = xdnsdb.Include(ctx, named_z, fn)
 			if err != nil {
+				cancel()
+				namedWG.Wait()
 				return err
 			}
 		}
@@ -137,18 +135,16 @@ Mimic BIND9's Internet domain name daemon.
 		if strings.HasPrefix(s, "http=") {
 			laddr := host + strings.TrimPrefix(s, "http=")
 			srv := &http.Server{Addr: laddr}
-			wg.Add(1)
-			go namedHttpShutdown(ctx, wg, srv)
-			wg.Add(1)
-			go namedHttpListenAndServe(wg, srv)
+			namedWG.Go(func() { namedHttpShutdown(ctx, srv) })
+			namedWG.Go(func() { namedHttpListenAndServe(srv) })
 		} else if strings.HasPrefix(s, "https=") {
 			laddr := host + strings.TrimPrefix(s, "https=")
 			srv := &http.Server{Addr: laddr}
-			wg.Add(1)
-			go namedHttpShutdown(ctx, wg, srv)
-			wg.Add(1)
-			go namedHttpListenAndServe(wg, srv,
-				opt["cert"], opt["key"])
+			namedWG.Go(func() { namedHttpShutdown(ctx, srv) })
+			namedWG.Go(func() {
+				namedHttpListenAndServe(srv,
+					opt["cert"], opt["key"])
+			})
 		} else if strings.HasPrefix(s, "tls=") {
 			laddr := ":" + strings.TrimPrefix(s, "tls=")
 			ca, err := tls.LoadX509KeyPair(opt["cert"], opt["key"])
@@ -169,8 +165,7 @@ Mimic BIND9's Internet domain name daemon.
 			if !ok {
 				return errors.New("can't set deadline")
 			}
-			wg.Add(1)
-			go namedTcpAccept(ctx, wg, xln)
+			namedWG.Go(func() { namedTcpAccept(ctx, xln) })
 		} else {
 			laddr := ":" + strings.TrimPrefix(s, "dns=")
 			if opt["notcp"] != "true" {
@@ -183,8 +178,7 @@ Mimic BIND9's Internet domain name daemon.
 				if !ok {
 					return errors.New("can't set deadline")
 				}
-				wg.Add(1)
-				go namedTcpAccept(ctx, wg, xln)
+				namedWG.Go(func() { namedTcpAccept(ctx, xln) })
 			}
 			udpConn, err := net.ListenPacket(udpNW, laddr)
 			if err != nil {
@@ -192,14 +186,16 @@ Mimic BIND9's Internet domain name daemon.
 			}
 			defer udpConn.Close()
 			mch := make(chan *xdnsmessage.Message, 4)
-			wg.Add(1)
-			go namedUdpReceive(ctx, wg, udpConn, mch)
-			wg.Add(1)
-			go namedUdpService(ctx, wg, udpConn, mch)
+			namedWG.Go(func() {
+				namedUdpReceive(ctx, udpConn, mch)
+			})
+			namedWG.Go(func() {
+				namedUdpService(ctx, udpConn, mch)
+			})
 		}
 	}
 
-	wg.Wait()
+	namedWG.Wait()
 	return err
 }
 
@@ -328,11 +324,8 @@ func namedHttpHandler(rsp http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func namedHttpListenAndServe(
-	wg *sync.WaitGroup, srv *http.Server, fns ...string,
-) {
+func namedHttpListenAndServe(srv *http.Server, fns ...string) {
 	var err error
-	defer wg.Done()
 	defer verbose.Println("stopped http", srv.Addr, "service:", err)
 	verbose.Println("start http", srv.Addr, "service")
 	if len(fns) == 2 {
@@ -342,11 +335,8 @@ func namedHttpListenAndServe(
 	}
 }
 
-func namedHttpShutdown(
-	ctx context.Context, wg *sync.WaitGroup, srv *http.Server,
-) {
+func namedHttpShutdown(ctx context.Context, srv *http.Server) {
 	const timeout = 3 * time.Second
-	defer wg.Done()
 	defer verbose.Print("http", srv.Addr, "done")
 	<-ctx.Done()
 	cctx, cancel := context.WithTimeout(context.Background(), timeout)
@@ -355,15 +345,10 @@ func namedHttpShutdown(
 	srv.Shutdown(cctx)
 }
 
-func namedTcpAccept(
-	ctx context.Context,
-	wg *sync.WaitGroup,
-	xln namedListener,
-) {
+func namedTcpAccept(ctx context.Context, xln namedListener) {
 	var err error
 	la := xln.Addr()
 	defer verbose.Println("stopped tcp", la, "accept:", err)
-	defer wg.Done()
 	verbose.Println("start tcp", la, "accept")
 	for {
 		if err = ctx.Err(); err != nil {
@@ -380,19 +365,13 @@ func namedTcpAccept(
 			}
 			break
 		}
-		wg.Add(1)
-		go namedTcpService(ctx, wg, conn)
+		namedWG.Go(func() { namedTcpService(ctx, conn) })
 	}
 }
 
-func namedTcpService(
-	ctx context.Context,
-	wg *sync.WaitGroup,
-	conn net.Conn,
-) {
+func namedTcpService(ctx context.Context, conn net.Conn) {
 	ra := conn.RemoteAddr()
 	defer verbose.Println("stopped tcp", ra, "service")
-	defer wg.Done()
 	defer conn.Close()
 	data := make([]byte, 4<<10, 4<<10)
 	req := xdnsmessage.NewMessage()
@@ -454,12 +433,10 @@ func namedTcpService(
 
 func namedUdpReceive(
 	ctx context.Context,
-	wg *sync.WaitGroup,
 	conn net.PacketConn,
 	ch chan<- *xdnsmessage.Message,
 ) {
 	defer verbose.Println("stopped udp receiver")
-	defer wg.Done()
 	defer close(ch)
 	data := make([]byte, 4<<10, 4<<10)
 	verbose.Println("start udp receiver")
@@ -494,12 +471,10 @@ func namedUdpReceive(
 
 func namedUdpService(
 	ctx context.Context,
-	wg *sync.WaitGroup,
 	conn net.PacketConn,
 	ch <-chan *xdnsmessage.Message,
 ) {
 	defer verbose.Println("stopped udp message service")
-	defer wg.Done()
 	verbose.Println("start udp message service")
 	data := make([]byte, 4<<10, 4<<10)
 	for {
