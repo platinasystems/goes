@@ -10,24 +10,26 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strconv"
 
 	"github.com/platinasystems/goes/v2/pkg/goes"
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xexec"
 	"github.com/platinasystems/goes/v2/pkg/xflag"
+	"github.com/platinasystems/goes/v2/pkg/xos"
 	"github.com/platinasystems/goes/v2/pkg/xprogram"
 	"github.com/platinasystems/goes/v2/pkg/xsignal"
 )
 
 func AlarmDaemons(ctx context.Context, args []string) error {
 	xflag.TemplateUsage(`
-usage: {{.Name}}
-Send alarm to ` + daemonCriterion + ".\n")
+usage: {{.Name}} [pid]...
+Send alarm to identified or ` + daemonCriterion + ".\n")
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
 		return err
 	}
-	return DoDaemons(ctx, func(proc *os.Process) error {
+	return DoPIDsOrDaemons(ctx, args, func(proc *os.Process) error {
 		return proc.Signal(xsignal.Alarm)
 	})
 }
@@ -37,26 +39,59 @@ func DoDaemons(ctx context.Context, f func(*os.Process) error) error {
 	if err != nil {
 		return err
 	}
-	for _, proc := range procs {
-		if t := f(proc); t != nil && err == nil {
-			err = fmt.Errorf("%d: %w", proc.Pid, t)
+	return DoProcs(ctx, procs, f)
+}
+
+func DoPIDs(
+	ctx context.Context, args []string, f func(*os.Process) error,
+) error {
+	var procs []*os.Process
+	for _, s := range args {
+		if pid, err := strconv.ParseInt(s, 10, 0); err != nil {
+			return err
+		} else if proc, err := os.FindProcess(int(pid)); err != nil {
+			return err
 		} else {
-			fmt.Println(proc.Pid)
+			procs = append(procs, proc)
 		}
 	}
-	return err
+	return DoProcs(ctx, procs, f)
+}
+
+func DoPIDsOrDaemons(
+	ctx context.Context, args []string, f func(*os.Process) error,
+) error {
+	if len(args) > 0 {
+		return DoPIDs(ctx, args, f)
+	}
+	return DoDaemons(ctx, f)
+}
+
+func DoProcs(
+	ctx context.Context, procs []*os.Process, f func(*os.Process) error,
+) (err error) {
+	for _, proc := range procs {
+		cl, clerr := xos.CmdLine(ctx, proc)
+		if t := f(proc); t != nil && err == nil {
+			err = fmt.Errorf("%d: %w", proc.Pid, t)
+		} else if clerr == nil {
+			fmt.Print(proc.Pid, "\t", cl, "\n")
+		} else {
+			fmt.Print(proc.Pid, "\t", clerr, "\n")
+		}
+	}
+	return
 }
 
 func ShowDaemons(ctx context.Context, args []string) error {
 	xflag.TemplateUsage(`
-usage: {{.Name}}
-List PIDs with this same executable and /dev/null stdin.
-`)
+usage: {{.Name}} [pid]...
+Print identified or ` + daemonCriterion + ".\n")
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
 		return err
 	}
-	return DoDaemons(ctx, func(proc *os.Process) error {
+	return DoPIDsOrDaemons(ctx, args, func(proc *os.Process) error {
 		return nil
 	})
 }
@@ -108,13 +143,13 @@ the system logger; otherwise, perform within the current process context.
 
 func StopDaemons(ctx context.Context, args []string) error {
 	xflag.TemplateUsage(`
-usage: {{.Name}}
-Terminate ` + daemonCriterion + ".\n")
+usage: {{.Name}} [pid]...
+Terminate identified or ` + daemonCriterion + ".\n")
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
 		return err
 	}
-	return DoDaemons(ctx, func(proc *os.Process) error {
+	return DoPIDsOrDaemons(ctx, args, func(proc *os.Process) error {
 		return proc.Signal(xsignal.Terminate)
 	})
 }
