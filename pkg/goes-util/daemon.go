@@ -80,6 +80,12 @@ the system logger; otherwise, perform within the current process context.
 		return xerrors.Incomplete("feature")
 	}
 
+	for _, s := range args {
+		if s == "-h" || s == "-help" || s == "--help" {
+			return goes.Reselect(ctx, args)
+		}
+	}
+
 	if xprogram.IsKoApp() {
 		return goes.Reselect(ctx, args)
 	}
