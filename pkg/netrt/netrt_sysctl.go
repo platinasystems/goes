@@ -10,6 +10,7 @@ import (
 	"context"
 
 	"github.com/platinasystems/goes/v2/pkg/xnet"
+	"github.com/platinasystems/goes/v2/pkg/xos/sysctl"
 	"golang.org/x/sys/unix"
 )
 
@@ -19,14 +20,14 @@ type sysctlRsp struct {
 
 func Neighbors(ctx context.Context, family int) (NextNdCloser, error) {
 	mib := []int32{
-		unix.CTL_NET,
+		sysctl.CTL_NET,
 		xnet.AF_ROUTE,
 		0,
 		int32(family),
 		unix.NET_RT_FLAGS,
 		unix.RTF_LLINFO,
 	}
-	data, err := xnet.SysctlGet(mib...)
+	data, err := sysctl.Get(mib...)
 	if err != nil {
 		return nil, err
 	}
@@ -35,14 +36,14 @@ func Neighbors(ctx context.Context, family int) (NextNdCloser, error) {
 
 func Routes(ctx context.Context, family int) (NextRtCloser, error) {
 	mib := []int32{
-		unix.CTL_NET,
+		sysctl.CTL_NET,
 		xnet.AF_ROUTE,
 		0,
 		int32(family),
 		unix.NET_RT_DUMP,
 		0,
 	}
-	data, err := xnet.SysctlGet(mib...)
+	data, err := sysctl.Get(mib...)
 	if err != nil {
 		return nil, err
 	}
@@ -55,7 +56,7 @@ func (rsp *sysctlRsp) Close() error {
 }
 
 func (rsp *sysctlRsp) NextNd(ctx context.Context) (Nd, error) {
-	for len(rsp.data) > xnet.SysctlMsgMin {
+	for len(rsp.data) > sysctl.Min {
 		rtm, body, data := Extract[RtMsghdr2](rsp.data)
 		if rtm == nil {
 			break
@@ -77,7 +78,7 @@ func (rsp *sysctlRsp) NextNd(ctx context.Context) (Nd, error) {
 
 func (rsp *sysctlRsp) NextRt(ctx context.Context) (Rt, error) {
 	const gh = unix.RTF_GATEWAY | unix.RTF_HOST
-	for len(rsp.data) > xnet.SysctlMsgMin {
+	for len(rsp.data) > sysctl.Min {
 		rtm, body, data := Extract[RtMsghdr2](rsp.data)
 		if rtm == nil {
 			break

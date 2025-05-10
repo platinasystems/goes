@@ -18,6 +18,7 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/integer"
 	"github.com/platinasystems/goes/v2/pkg/netif"
 	"github.com/platinasystems/goes/v2/pkg/xnet"
+	"github.com/platinasystems/goes/v2/pkg/xos/sysctl"
 	"golang.org/x/sys/unix"
 )
 
@@ -43,7 +44,7 @@ func Extract[T RtMsghdr | RtMsghdr2 | RtMetrics](data []byte) (
 	if n, i := len(data), Sizeof(t); n >= i {
 		t = (*T)(unsafe.Pointer(&data[0]))
 		body = data[i:]
-		i = xnet.SysctlAlign(xnet.SysctlMsgLen(data))
+		i = sysctl.Align(sysctl.Len(data))
 		if n < i {
 			i = n
 		}

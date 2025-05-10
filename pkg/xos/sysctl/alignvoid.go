@@ -1,4 +1,4 @@
-// Copyright © 2023-2024 Platina Systems, Inc. All rights reserved.
+// Copyright © 2023-2025 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -10,4 +10,4 @@ import "unsafe"
 
 var void uintptr
 
-const SysctlAlignTo = unsafe.Sizeof(void)
+const AlignTo = unsafe.Sizeof(void)

@@ -11,6 +11,7 @@ import (
 	"net/netip"
 	"unsafe"
 
+	"github.com/platinasystems/goes/v2/pkg/xos/sysctl"
 	"golang.org/x/sys/unix"
 )
 
@@ -138,7 +139,7 @@ func (dl *SADataLink) NAS(body []byte) (
 
 func SAExpand[T SAIn | SAIn6 | SADataLink](data []byte) (t *T, x []byte) {
 	i := len(data)
-	size := SysctlAlign(Sizeof(t))
+	size := sysctl.Align(Sizeof(t))
 	if i+size > cap(data) {
 		x = make([]byte, i+size, PageAlign(i+size))
 		copy(x, data)
@@ -187,7 +188,7 @@ func SAAppendDataLink[A ~[]byte, S ~[]byte](
 	if slen > 0 {
 		msg = append(msg, sbytes...)
 	}
-	size := SysctlAlign(len(msg))
+	size := sysctl.Align(len(msg))
 	if size > cap(msg) {
 		x := make([]byte, size)
 		copy(x, msg)
@@ -211,7 +212,7 @@ func SAExtract[T SAIn | SAIn6 | SADataLink](data []byte) (
 	if n, i := len(data), Sizeof(t); n >= i {
 		t = SAPointer[T](data)
 		body = data[i:]
-		i = SysctlAlign(int(data[0]))
+		i = sysctl.Align(int(data[0]))
 		if n <= i {
 			i = n
 		}

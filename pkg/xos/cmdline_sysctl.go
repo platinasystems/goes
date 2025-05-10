@@ -13,11 +13,11 @@ import (
 	"bytes"
 	"os"
 
-	"github.com/platinasystems/goes/v2/pkg/xos"
+	"github.com/platinasystems/goes/v2/pkg/xos/sysctl"
 )
 
 func CmdLine(proc *os.Process) (string, error) {
-	buf, err := xos.SysctlGet(
+	buf, err := sysctl.Get(
 		xos.CTL_KERN,
 		xos.KERN_PROCARGS2,
 		int32(proc.Pid),

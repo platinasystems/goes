@@ -15,6 +15,7 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/integer"
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xnet"
+	"github.com/platinasystems/goes/v2/pkg/xos/sysctl"
 	"golang.org/x/sys/unix"
 )
 
@@ -22,11 +23,16 @@ type IfMsgHdr = unix.IfMsghdr
 type IfData = unix.IfData
 type IfaMsgHdr = unix.IfaMsghdr
 
+func isMsg(data []byte, t uint8) bool {
+	return sysctl.Version(data) == unix.RTM_VERSION &&
+		sysctl.Type(data) == t
+}
+
 func Extract[T Msgs](data []byte) (p *T, body, rem []byte) {
-	l := xnet.SysctlMsgLen(data)
+	l := sysctl.Len(data)
 	p = Pointer[T](data)
 	body = data[Sizeof(p):]
-	rem = data[xnet.SysctlAlign(l):]
+	rem = data[sysctl.Align(l):]
 	return
 }
 
@@ -39,8 +45,8 @@ func Sizeof[T Msgs](p *T) int {
 }
 
 func List(ctx context.Context) (nifs NetIfs, err error) {
-	rib, err := xnet.SysctlGet(
-		unix.CTL_NET,
+	rib, err := sysctl.Get(
+		sysctl.CTL_NET,
 		xnet.AF_ROUTE,
 		0,
 		xnet.AF_UNSPEC,
@@ -51,12 +57,12 @@ func List(ctx context.Context) (nifs NetIfs, err error) {
 		return
 	}
 	nifByIndex := make(map[int]*NetIf)
-	for data := rib; len(data) > xnet.SysctlMsgMin; {
-		msglen := xnet.SysctlMsgLen(data)
+	for data := rib; len(data) > sysctl.Min; {
+		msglen := sysctl.Len(data)
 		if len(data) < msglen {
 			break
 		}
-		if !xnet.SysctlMsgOK(data, unix.RTM_IFINFO) {
+		if !isMsg(data, unix.RTM_IFINFO) {
 			data = data[msglen:]
 			continue
 		}
@@ -74,11 +80,11 @@ func List(ctx context.Context) (nifs NetIfs, err error) {
 		nif.ifinfo(im, body)
 	}
 	for data := rib; len(data) > 0; {
-		msglen := xnet.SysctlMsgLen(data)
+		msglen := sysctl.Len(data)
 		if len(data) < msglen {
 			break
 		}
-		if !xnet.SysctlMsgOK(data, unix.RTM_NEWADDR) {
+		if !isMsg(data, unix.RTM_NEWADDR) {
 			data = data[msglen:]
 			continue
 		}
@@ -99,8 +105,8 @@ func (nif *NetIf) Refresh(ctx context.Context) error {
 }
 
 func (nif *NetIf) refreshWithIndex(ctx context.Context) error {
-	rib, err := xnet.SysctlGet(
-		unix.CTL_NET,
+	rib, err := sysctl.Get(
+		sysctl.CTL_NET,
 		xnet.AF_ROUTE,
 		int32(nif.Index),
 		xnet.AF_UNSPEC,
@@ -110,12 +116,12 @@ func (nif *NetIf) refreshWithIndex(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	for data := rib; len(data) > xnet.SysctlMsgMin; {
-		msglen := xnet.SysctlMsgLen(data)
+	for data := rib; len(data) > sysctl.Min; {
+		msglen := sysctl.Len(data)
 		if len(data) < msglen {
 			break
 		}
-		if !xnet.SysctlMsgOK(data, unix.RTM_IFINFO) {
+		if !isMsg(data, unix.RTM_IFINFO) {
 			data = data[msglen:]
 			continue
 		}
@@ -126,11 +132,11 @@ func (nif *NetIf) refreshWithIndex(ctx context.Context) error {
 		}
 	}
 	for data := rib; len(data) > 0; {
-		msglen := xnet.SysctlMsgLen(data)
+		msglen := sysctl.Len(data)
 		if len(data) < msglen {
 			break
 		}
-		if !xnet.SysctlMsgOK(data, unix.RTM_NEWADDR) {
+		if !isMsg(data, unix.RTM_NEWADDR) {
 			data = data[msglen:]
 			continue
 		}
@@ -145,8 +151,8 @@ func (nif *NetIf) refreshWithIndex(ctx context.Context) error {
 
 func (nif *NetIf) refreshWithName(ctx context.Context) error {
 	var found bool
-	rib, err := xnet.SysctlGet(
-		unix.CTL_NET,
+	rib, err := sysctl.Get(
+		sysctl.CTL_NET,
 		xnet.AF_ROUTE,
 		0,
 		xnet.AF_UNSPEC,
@@ -156,12 +162,12 @@ func (nif *NetIf) refreshWithName(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	for data := rib; len(data) > xnet.SysctlMsgMin; {
-		msglen := xnet.SysctlMsgLen(data)
+	for data := rib; len(data) > sysctl.Min; {
+		msglen := sysctl.Len(data)
 		if len(data) < msglen {
 			break
 		}
-		if !xnet.SysctlMsgOK(data, unix.RTM_IFINFO) {
+		if !isMsg(data, unix.RTM_IFINFO) {
 			data = data[msglen:]
 			continue
 		}
@@ -180,11 +186,11 @@ func (nif *NetIf) refreshWithName(ctx context.Context) error {
 		return xerrors.NotFound(nif.Name)
 	}
 	for data := rib; len(data) > 0; {
-		msglen := xnet.SysctlMsgLen(data)
+		msglen := sysctl.Len(data)
 		if len(data) < msglen {
 			break
 		}
-		if !xnet.SysctlMsgOK(data, unix.RTM_NEWADDR) {
+		if !isMsg(data, unix.RTM_NEWADDR) {
 			data = data[msglen:]
 			continue
 		}
@@ -271,7 +277,7 @@ func (nif *NetIf) ifaddr(ifa *IfaMsgHdr, body []byte) {
 				nif.Extra["brd"] = a
 			}
 		}
-		body = body[xnet.SysctlAlign(sal):]
+		body = body[sysctl.Align(sal):]
 	}
 	if addr.IsValid() && bits > 0 {
 		prefix := netip.PrefixFrom(addr, bits)
