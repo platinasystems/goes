@@ -87,6 +87,7 @@ Forward ciphered packets between exchange and tunnel interface.
 	pktTxCh := make(chan *box.Box, 16)
 	tunReadCh := make(chan *box.Box, 16)
 	tunWriteCh := make(chan *box.Box, 16)
+	blkCh := make(chan any)
 
 	svc := fmt.Sprintf("%v via %v@%v", iguest, via, lap)
 	xlog.Info.Println("start", svc)
@@ -98,13 +99,14 @@ Forward ciphered packets between exchange and tunnel interface.
 	defer close(tunWriteCh)
 	defer xlog.Info.Println("stopping", svc, "...")
 
-	viaBlk, err := g.client.rest.whois(cctx, RestKeyId, via)
-	if err != nil {
-		return err
-	} else if err = g.peer(viaBlk); err != nil {
+	rsp := g.whois(cctx, RestKeyId, via)
+	if err, iserr := rsp.(error); iserr {
 		return err
 	}
-
+	viaBlk := rsp.(*pem.Block)
+	if err = g.peer(viaBlk); err != nil {
+		return err
+	}
 	dst, err := addressHeader(viaBlk)
 	if err != nil {
 		return xerrors.Label(err, "address")
@@ -154,6 +156,7 @@ Forward ciphered packets between exchange and tunnel interface.
 	}
 	// FIXME probably still need dst w/ ipv4
 	_ = dst
+
 	err = nif.Add(cctx, addr, netip.Addr{}, g.hostPrefix.Bits())
 	if err != nil {
 		return err
@@ -205,6 +208,16 @@ guestLoop:
 		case <-cctx.Done():
 			xlog.Info.Println("done")
 			break guestLoop
+		case rsp, ok := <-blkCh:
+			if !ok {
+				return ctx.Err()
+			}
+			if err, iserr := rsp.(error); iserr {
+				return err
+			}
+			if err = g.peer(rsp.(*pem.Block)); err != nil {
+				return err
+			}
 		case bx, ok := <-tunReadCh:
 			if !ok {
 				xlog.Info.Println("tun read ch closed")
@@ -239,15 +252,17 @@ guestLoop:
 			from := bx.FromWhom()
 			ifrom, vfrom := from.Index(), from.Version()
 			if v, ok := g.ver[ifrom]; !ok || v != vfrom {
-				g.whoisId(cctx, pktTxCh, from)
+				g.askExchangeWhoisId(cctx, pktTxCh, from)
 				bx.Return()
 				continue guestLoop
 			}
 			via := bx.ViaWhom()
 			ivia, vvia := via.Index(), via.Version()
 			if v, ok := g.ver[ivia]; !ok || v != vvia {
-				xlog.Errata.Println("FIXME ask registry",
-					"whois id", via)
+				xlog.Info.Println("update", ivia)
+				wg.Go(func() {
+					blkCh <- g.whois(cctx, RestKeyId, ivia)
+				})
 				bx.Return()
 				continue guestLoop
 			}
@@ -369,7 +384,7 @@ func (g *guest) unicast(
 	bx.From(g.id)
 	to, ok := g.addressed[addr]
 	if !ok {
-		g.whoisAddressed(ctx, ch, addr)
+		g.askExchangeWhoisAddressed(ctx, ch, addr)
 		bx.Return()
 		return
 	}
@@ -386,8 +401,7 @@ func (g *guest) unicast(
 		if _, ok := g.service[ito]; ok {
 			via = to
 		} else {
-			xlog.Errata.Printf("%v@%v: %s", to, addr,
-				"no guest exchange")
+			xlog.Errata.Printf("%v@%v: %s", to, addr, "no via")
 			bx.Return()
 			return
 		}
@@ -396,7 +410,7 @@ func (g *guest) unicast(
 	ivia := via.Index()
 	cvia, ok := g.gcm[ivia]
 	if !ok {
-		g.whoisId(ctx, ch, via)
+		g.askExchangeWhoisId(ctx, ch, via)
 		bx.Return()
 		return
 	}
@@ -444,7 +458,7 @@ func (*guest) toWhom(pdu netpdu.TunPI) (addr netip.Addr, err error) {
 	return
 }
 
-func (g *guest) whoisAddressed(
+func (g *guest) askExchangeWhoisAddressed(
 	ctx context.Context, ch chan<- *box.Box, addr netip.Addr,
 ) {
 	var err error
@@ -461,11 +475,11 @@ func (g *guest) whoisAddressed(
 		bx.Return()
 	} else {
 		xlog.Info.Println("whois", addr)
-		g.whois(ctx, ch, bx)
+		g.askExchangeWhois(ctx, ch, bx)
 	}
 }
 
-func (g *guest) whoisId(
+func (g *guest) askExchangeWhoisId(
 	ctx context.Context, ch chan<- *box.Box, id box.Id,
 ) {
 	var err error
@@ -480,11 +494,11 @@ func (g *guest) whoisId(
 		bx.Return()
 	} else {
 		xlog.Info.Println("whois", id)
-		g.whois(ctx, ch, bx)
+		g.askExchangeWhois(ctx, ch, bx)
 	}
 }
 
-func (g *guest) whois(
+func (g *guest) askExchangeWhois(
 	ctx context.Context, ch chan<- *box.Box, bx *box.Box,
 ) {
 	via, ok := g.via[g.id.Index()]

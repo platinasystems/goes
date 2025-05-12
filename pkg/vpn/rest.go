@@ -522,9 +522,9 @@ func (rest *rest) tryCheckin(
 	return
 }
 
-func (rest *rest) whois(ctx context.Context, key string, value any) (
-	*pem.Block, error,
-) {
+// Returns [*pem.Block] or error response to RESTful query of [RestKeyAddress]
+// or [RestKeyId] with respective [netip.Addr] or [box.ID] value.
+func (rest *rest) whois(ctx context.Context, key string, value any) any {
 	clone := *rest.url
 	q := clone.Query()
 	q.Set(RestKeyOp, RestOpWhois)
@@ -533,22 +533,22 @@ func (rest *rest) whois(ctx context.Context, key string, value any) (
 	req, err := xerrors.MarkResult(http.
 		NewRequestWithContext(ctx, http.MethodGet, clone.String(), nil))
 	if err != nil {
-		return nil, err
+		return err
 	}
 	resp, err := rest.do(req)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer resp.Body.Close()
 	data, err := xerrors.MarkResult(io.ReadAll(resp.Body))
 	if err != nil {
-		return nil, err
+		return err
 	}
 	blk, _ := pem.Decode(data)
 	if blk == nil {
-		return blk, xerrors.Invalid("encoding")
+		return xerrors.Invalid("encoding")
 	}
-	return blk, nil
+	return blk
 }
 
 // eXtract registry url from its certificate.

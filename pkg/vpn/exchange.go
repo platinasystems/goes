@@ -27,16 +27,11 @@ type exchange struct {
 	client
 	lladdr netip.Addr
 	txch   chan *box.Box
+	blkch  chan any // *pem.Block || error
 	pem    struct {
 		addressed  map[netip.Addr]*pem.Block
 		identified map[box.Id]*pem.Block
 	}
-	whoisResponseCh chan exchangeWhoisResponse
-}
-
-type exchangeWhoisResponse struct {
-	blk *pem.Block
-	err error
 }
 
 var exAll6nodes, exAll6routers netip.Addr
@@ -113,8 +108,7 @@ Exchange ciphered packets between guests.
 
 	rxch := make(chan *box.Box, 16)
 	ex.txch = make(chan *box.Box, 16)
-
-	ex.whoisResponseCh = make(chan exchangeWhoisResponse)
+	ex.blkch = make(chan any)
 
 	svc := fmt.Sprintf("%v@%v", ex.id, sap)
 	xlog.Info.Println("start", svc)
@@ -159,7 +153,8 @@ pktRxLoop:
 			if vfrom != ex.ver[ifrom] {
 				xlog.Info.Println("update", ifrom)
 				wg.Go(func() {
-					ex.whois(cctx, RestKeyId, from)
+					ex.blkch <- ex.
+						whois(cctx, RestKeyId, from)
 				})
 				bx.Return()
 				continue pktRxLoop
@@ -169,7 +164,8 @@ pktRxLoop:
 			if !ok {
 				xlog.Info.Println("whois", ifrom)
 				wg.Go(func() {
-					ex.whois(cctx, RestKeyId, from)
+					ex.blkch <- ex.
+						whois(cctx, RestKeyId, from)
 				})
 				bx.Return()
 				continue pktRxLoop
@@ -213,15 +209,18 @@ pktRxLoop:
 					bx.Return()
 				}
 			}
-		case rsp, ok := <-ex.whoisResponseCh:
+		case rsp, ok := <-ex.blkch:
 			if !ok {
 				xlog.Errata.Println("closed whois response ch")
 				break pktRxLoop
 			}
-			if rsp.err != nil {
-				xlog.Errata.Print(rsp.err)
-			} else if err = ex.whoisResponse(rsp.blk); err != nil {
-				xlog.Errata.Println(err)
+			if err, iserr := rsp.(error); iserr {
+				xlog.Errata.Print(err)
+			} else {
+				blk := rsp.(*pem.Block)
+				if err := ex.update(blk); err != nil {
+					xlog.Errata.Println(err)
+				}
 			}
 		}
 	}
@@ -243,7 +242,9 @@ func (ex *exchange) rx(ctx context.Context, bx Box) {
 			xlog.Errata.Println("rx whois underrun")
 		} else if blk := ex.pem.addressed[addr]; blk == nil {
 			xlog.Info.Println("rx whois:", addr)
-			wg.Go(func() { ex.whois(ctx, RestKeyAddress, addr) })
+			wg.Go(func() {
+				ex.blkch <- ex.whois(ctx, RestKeyAddress, addr)
+			})
 		} else {
 			ex.txPubKey(ctx, "whois addressed rsponse", from, blk)
 		}
@@ -252,7 +253,9 @@ func (ex *exchange) rx(ctx context.Context, bx Box) {
 			xlog.Errata.Print("rx whois:", err)
 		} else if blk := ex.pem.identified[id]; blk == nil {
 			xlog.Info.Println("rx whois:", id)
-			wg.Go(func() { ex.whois(ctx, RestKeyId, id) })
+			wg.Go(func() {
+				ex.blkch <- ex.whois(ctx, RestKeyId, id)
+			})
 		} else {
 			ex.txPubKey(ctx, "whois identified response", from, blk)
 		}
@@ -517,15 +520,7 @@ func (ex *exchange) txUDP6EchoReply(
 	}
 }
 
-func (ex *exchange) whois(ctx context.Context, key string, value any) {
-	blk, err := ex.client.whois(ctx, key, value)
-	if err != nil {
-		err = fmt.Errorf("%w (whois %s %v)", err, key, value)
-	}
-	ex.whoisResponseCh <- exchangeWhoisResponse{blk, err}
-}
-
-func (ex *exchange) whoisResponse(blk *pem.Block) error {
+func (ex *exchange) update(blk *pem.Block) error {
 	addr, err := addressHeader(blk)
 	if err != nil {
 		return xerrors.Label(err, "HeaderAddress")
