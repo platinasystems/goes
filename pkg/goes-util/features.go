@@ -37,6 +37,7 @@ var Features = map[string]any{
 				}
 				return bi, err
 			},
+			"setting": xprogram.BuildSettings,
 		},
 		"daemons": ShowDaemons,
 		"main": map[string]any{
