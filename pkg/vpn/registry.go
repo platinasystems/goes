@@ -100,13 +100,14 @@ A RESTful WWW server.
 
 {{flags .}}`)
 
-	defineCommonFlags()
-	xflag.Define(&vpnConfig, "config",
-		"Configuration file name w/in config-dir.")
+	defineCert()
+	defineConfig()
+	defineConfigDir()
+	defineSig()
+	defineStateDir()
 
-	vpnStateDir = defaultStateDir()
-	xflag.Define(&vpnStateDir, "state-dir",
-		"State directory to save approved client certificates.")
+	enableQuiet()
+	enableVerbose()
 
 	err := flag.CommandLine.Parse(args)
 	if err != nil {

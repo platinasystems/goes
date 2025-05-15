@@ -65,7 +65,12 @@ RESTful registry administration.
 
 {{flags .}}`)
 
-	defineCommonFlags()
+	defineCert()
+	defineConfigDir()
+	defineRegistry()
+	defineSig()
+	defineVPN()
+
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
 		return err
@@ -106,7 +111,12 @@ Import registry certificate.
 
 {{flags .}}`)
 
-	defineCommonFlags()
+	defineCert()
+	defineConfigDir()
+	defineRegistry()
+	defineSig()
+	defineVPN()
+
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
 		return err
@@ -185,7 +195,12 @@ RESTful ping registry.
 
 {{flags .}}`)
 
-	defineCommonFlags()
+	defineCert()
+	defineConfigDir()
+	defineRegistry()
+	defineSig()
+	defineVPN()
+
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
 		return err
@@ -221,7 +236,12 @@ RESTful reload registry configuration.
 
 {{flags .}}`)
 
-	defineCommonFlags()
+	defineCert()
+	defineConfigDir()
+	defineRegistry()
+	defineSig()
+	defineVPN()
+
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
 		return err
@@ -257,7 +277,12 @@ RESTful query and print registry object.
 
 {{flags .}}`)
 
-	defineCommonFlags()
+	defineCert()
+	defineConfigDir()
+	defineRegistry()
+	defineSig()
+	defineVPN()
+
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
 		return err
@@ -297,7 +322,12 @@ RESTful subscribe to VPN.
 
 {{flags .}}`)
 
-	defineCommonFlags()
+	defineCert()
+	defineConfigDir()
+	defineRegistry()
+	defineSig()
+	defineVPN()
+
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
 		return err

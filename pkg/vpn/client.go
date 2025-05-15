@@ -17,7 +17,6 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/gcm"
 	"github.com/platinasystems/goes/v2/pkg/nonce"
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
-	"github.com/platinasystems/goes/v2/pkg/xflag"
 	"github.com/platinasystems/goes/v2/pkg/xlog"
 )
 
@@ -39,18 +38,6 @@ type client struct {
 	service   map[int]netip.AddrPort
 	ver       map[int]uint8
 	via       map[int]box.Id
-}
-
-func defineClientFlags(listen netip.AddrPort) {
-	vpnListen = listen
-	xflag.Define(&vpnListen, "listen", `
-Service {addr}:{port}.
-If “addr” is 0.0.0.0 or [::], listen on all ipv4 or ipv6
-interface addresses.  If “port” is 0, allocate from system.`[1:])
-	xflag.Enable("trace", "Log packet forwarding.", func() error {
-		xlog.UnmuteTrace()
-		return nil
-	})
 }
 
 func (cl *client) setup() error {

@@ -92,39 +92,38 @@ var CertificatesTemplate = sync.OnceValues(func() (*template.Template, error) {
 
 // CreateCertificate a PEM encoded x509 certificate file.
 func CreateCertificate(ctx context.Context, args []string) error {
-	const longest = 10 * year
-
 	xflag.TemplateUsage(`
 usage: {{.Name}} [flags]
 Create PEM encoded x509 certificate file.
 
 {{flags .}}`)
 
-	hostname, err := os.Hostname()
-	if err != nil {
+	if hostname, err := os.Hostname(); err != nil {
 		return err
+	} else {
+		vpnName = hostname
+		vpnDNS = hostname
 	}
 
-	vpnName = hostname
-	vpnDNS = hostname
+	defineCert()
+	defineConfigDir()
+	defineCountry()
+	defineDNS()
+	defineDuration()
+	defineEmail()
+	defineLocality()
+	defineName()
+	defineOrganization()
+	defineOrganizationalUnit()
+	definePostalCode()
+	defineProvince()
+	defineSerialNumber()
+	defineSig()
+	defineStreet()
+	defineURI()
 
-	xflag.Define(&vpnName, "name", "VPN identfier.")
-	xflag.Define(&vpnCountry, "country", "")
-	xflag.Define(&vpnDNS, "dns", "Comma separated domain names.")
-	xflag.Define(&vpnDuration, "duration", "e.g. 360s, 60m, or 1h.")
-	xflag.Define(&vpnEmail, "email", "Comma separated addresses.")
-	xflag.Define(&vpnLocality, "locality", "aka. city.")
-	xflag.Define(&vpnOrganization, "organization", "aka. company")
-	xflag.Define(&vpnOrganizationalUnit, "organizational-unit",
-		"aka. department.")
-	xflag.Define(&vpnPostalCode, "postal-code", "aka. zip.")
-	xflag.Define(&vpnProvince, "province", "aka. state.")
-	xflag.Define(&vpnSerialNumber, "serial-number", "Random if zero.")
-	xflag.Define(&vpnStreet, "street", "")
-	xflag.Define(&vpnURI, "uri", "Comma separated URLs.")
-
-	defineCommonFlags()
-	if err = flag.CommandLine.Parse(args); err != nil {
+	err := flag.CommandLine.Parse(args)
+	if err != nil {
 		return err
 	}
 
@@ -233,7 +232,10 @@ Print parsed certificate.
 
 {{flags .}}`)
 
-	defineCommonFlags()
+	defineConfigDir()
+	defineCert()
+	defineSig()
+
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
 		return err

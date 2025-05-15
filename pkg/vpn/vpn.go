@@ -55,7 +55,8 @@ const (
 	oAppend = os.O_WRONLY | os.O_CREATE | os.O_APPEND
 	oCreate = os.O_WRONLY | os.O_CREATE | os.O_TRUNC
 
-	year = 365 * 24 * time.Hour
+	year    = 365 * 24 * time.Hour
+	longest = 10 * year
 )
 
 var (
@@ -64,7 +65,7 @@ var (
 	vpnCert         = "cert.pem"
 	vpnConfig       = "config.yaml"
 	vpnConfigDir    = "/etc/goes"
-	vpnDuration     = 10 * year
+	vpnDuration     = year
 	vpnRegistry     = "registry.pem"
 	vpnSerialNumber = int64(1)
 	vpnSig          = "sig.pk8"
@@ -89,54 +90,160 @@ var (
 	vpnTunnel uint
 )
 
-func defineCommonFlags() {
-	vpnConfigDir = defaultConfigDir()
-	xflag.Define(&vpnCert, "cert", "Certificate file name w/in config-dir.")
+func defineCert() {
+	xflag.Define(&vpnCert, "cert",
+		"Certificate file name w/in config-dir.")
+}
+
+func defineConfig() {
+	xflag.Define(&vpnConfig, "config",
+		"Configuration file name w/in config-dir.")
+}
+
+// Default [xdg.ConfigHome] or [fhs.Config] + GOES/vpn
+func defineConfigDir() {
+	mn := xprogram.MainName()
+	vpnConfigDir = filepath.Join(fhs.Config(), mn, "vpn")
+	fhsVpnInfo, err := os.Stat(vpnConfigDir)
+	if err != nil {
+		fhsVpnInfo = nil
+	}
+	if home := xdg.ConfigHome(); len(home) > 0 {
+		homeVpn := filepath.Join(home, mn, "vpn")
+		homeVpnInfo, err := os.Stat(homeVpn)
+		if (err == nil && homeVpnInfo.IsDir()) ||
+			fhsVpnInfo == nil ||
+			!fhsVpnInfo.IsDir() ||
+			os.Geteuid() != 0 {
+			vpnConfigDir = homeVpn
+		}
+	}
 	xflag.Define(&vpnConfigDir, "config-dir", "Configuration directory.")
+}
+
+func defineCountry() {
+	xflag.Define(&vpnCountry, "country", "")
+}
+
+func defineDNS() {
+	xflag.Define(&vpnDNS, "dns", "Comma separated domain names.")
+}
+
+func defineDuration() {
+	xflag.Define(&vpnDuration, "duration", "e.g. 360s, 60m, or 1h.")
+}
+
+func defineEmail() {
+	xflag.Define(&vpnEmail, "email", "Comma separated addresses.")
+}
+
+func defineListen(port uint16) {
+	vpnListen = netip.AddrPortFrom(netip.IPv4Unspecified(), port)
+	xflag.Define(&vpnListen, "listen", `
+Service {addr}:{port}.
+If “addr” is 0.0.0.0 or [::], listen on all ipv4 or ipv6
+interface addresses.  If “port” is 0, allocate from system.`[1:])
+}
+
+func defineLocality() {
+	xflag.Define(&vpnLocality, "locality", "aka. city.")
+}
+
+func defineName() {
+	xflag.Define(&vpnName, "name", "VPN identfier.")
+}
+
+func definePublic() {
+	vpnPublic = netip.AddrPortFrom(netip.IPv4Unspecified(), 0)
+	xflag.Define(&vpnPublic, "public",
+		"NAT'd listen {addr}:{port}. (0.0.0.0:0 ignored)")
+}
+
+func defineOrganization() {
+	xflag.Define(&vpnOrganization, "organization", "aka. company")
+}
+
+func defineOrganizationalUnit() {
+	xflag.Define(&vpnOrganizationalUnit, "organizational-unit",
+		"aka. department.")
+}
+
+func definePostalCode() {
+	xflag.Define(&vpnPostalCode, "postal-code", "aka. zip.")
+}
+
+func defineProvince() {
+	xflag.Define(&vpnProvince, "province", "aka. state.")
+}
+
+func defineRegistry() {
 	xflag.Define(&vpnRegistry, "registry",
 		"Registry certificate file name w/in config-dir.")
+}
+
+func defineSerialNumber() {
+	xflag.Define(&vpnSerialNumber, "serial-number", "Random if zero.")
+}
+
+func defineSig() {
 	xflag.Define(&vpnSig, "sig", "Signature file name w/in config-dir.")
-	xflag.Define(&vpnVPN, "vpn", "Named VPN. (default unnamed)")
+}
+
+func defineStreet() {
+	xflag.Define(&vpnStreet, "street", "")
+}
+
+func defineTunnel() {
+	xflag.Define(&vpnTunnel, "t", "Tunnel unit number.")
+}
+
+func defineURI() {
+	xflag.Define(&vpnURI, "uri", "Comma separated URLs.")
+}
+
+func enableQuiet() {
 	xflag.Enable("q", "Quiet logging.", func() error {
 		xlog.MuteErrata()
 		return nil
 	})
+}
+
+func enableTrace() {
+	xflag.Enable("trace", "Log packet forwarding.", func() error {
+		xlog.UnmuteTrace()
+		return nil
+	})
+}
+
+func enableVerbose() {
 	xflag.Enable("v", "Verbose logging.", func() error {
 		xlog.UnmuteInfo()
 		return nil
 	})
 }
 
-// [xdg.ConfigHome] or [fhs.Config] + GOES/vpn
-func defaultConfigDir() string {
-	mn := xprogram.MainName()
-	sys := filepath.Join(fhs.Config(), mn, "vpn")
-	if s := xdg.ConfigHome(); len(s) > 0 {
-		s = filepath.Join(s, mn, "vpn")
-		if fi, err := os.Stat(s); err == nil && fi.IsDir() {
-			return s
-		} else if fi, err = os.Stat(sys); err == nil && fi.IsDir() {
-			return sys
-		} else if os.Geteuid() != 0 {
-			return s
-		}
-	}
-	return sys
+func defineVPN() {
+	xflag.Define(&vpnVPN, "vpn", "Named VPN. (default unnamed)")
 }
 
-// [xdg.StateHome] or [fhs.State] + GOES/vpn
-func defaultStateDir() string {
+// Default [xdg.StateHome] or [fhs.State] + GOES/vpn
+func defineStateDir() {
 	mn := xprogram.MainName()
-	sys := filepath.Join(fhs.State(), mn, "vpn")
-	if s := xdg.StateHome(); len(s) > 0 {
-		s = filepath.Join(s, mn, "vpn")
-		if fi, err := os.Stat(s); err == nil && fi.IsDir() {
-			return s
-		} else if fi, err = os.Stat(sys); err == nil && fi.IsDir() {
-			return sys
-		} else if os.Geteuid() != 0 {
-			return s
+	vpnStateDir = filepath.Join(fhs.State(), mn, "vpn")
+	fhsVpnInfo, err := os.Stat(vpnStateDir)
+	if err != nil {
+		fhsVpnInfo = nil
+	}
+	if home := xdg.StateHome(); len(home) > 0 {
+		homeVpn := filepath.Join(home, mn, "vpn")
+		homeVpnInfo, err := os.Stat(homeVpn)
+		if (err == nil && homeVpnInfo.IsDir()) ||
+			fhsVpnInfo == nil ||
+			!fhsVpnInfo.IsDir() ||
+			os.Geteuid() != 0 {
+			vpnStateDir = homeVpn
 		}
 	}
-	return sys
+	xflag.Define(&vpnStateDir, "state-dir",
+		"State directory to save approved client certificates.")
 }

@@ -33,7 +33,9 @@ Print algorithm.
 
 {{flags .}}`)
 
-	defineCommonFlags()
+	defineConfigDir()
+	defineSig()
+
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
 		return err

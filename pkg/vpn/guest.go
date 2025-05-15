@@ -45,9 +45,17 @@ Forward ciphered packets between exchange and tunnel interface.
 
 {{flags .}}`)
 
-	defineCommonFlags()
-	defineClientFlags(netip.AddrPortFrom(netip.IPv4Unspecified(), 0))
-	xflag.Define(&vpnTunnel, "t", "Tunnel unit number.")
+	defineCert()
+	defineConfigDir()
+	defineListen(0)
+	defineRegistry()
+	defineSig()
+	defineTunnel()
+	defineVPN()
+
+	enableQuiet()
+	enableTrace()
+	enableVerbose()
 
 	err := flag.CommandLine.Parse(args)
 	if err != nil {

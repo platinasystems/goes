@@ -48,11 +48,17 @@ Exchange ciphered packets between guests.
 
 {{flags .}}`)
 
-	defineCommonFlags()
-	defineClientFlags(netip.AddrPortFrom(netip.IPv4Unspecified(), 8003))
-	vpnPublic = netip.AddrPortFrom(netip.IPv4Unspecified(), 0)
-	xflag.Define(&vpnPublic, "public",
-		"NAT'd listen {addr}:{port}. (0.0.0.0:0 ignored)")
+	defineCert()
+	defineConfigDir()
+	defineListen(8003)
+	definePublic()
+	defineRegistry()
+	defineSig()
+	enableTrace()
+	defineVPN()
+
+	enableQuiet()
+	enableVerbose()
 
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
