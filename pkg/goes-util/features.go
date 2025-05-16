@@ -6,7 +6,6 @@ package goes_util
 
 import (
 	"errors"
-	"golang/buildid"
 
 	"github.com/platinasystems/goes/v2/pkg/xprogram"
 )
@@ -26,38 +25,15 @@ var Features = map[string]any{
 	"pty":     Pty,
 	"show": map[string]any{
 		"build": map[string]any{
-			"id": func() (any, error) {
-				return buildid.ReadFile(xprogram.Path())
-			},
-			"info": func() (any, error) {
-				var err error
-				bi := xprogram.BuildInfo()
-				if bi == nil {
-					err = ErrUnavailable
-				}
-				return bi, err
-			},
+			"id":      xprogram.BuildId,
+			"info":    xprogram.BuildInfoString,
 			"setting": xprogram.BuildSettings,
 		},
 		"daemons": ShowDaemons,
 		"main": map[string]any{
-			"name": func() (any, error) {
-				return xprogram.MainName(), nil
-			},
-			"reference": func() (any, error) {
-				m := xprogram.MainModule()
-				if m == nil {
-					return "", ErrUnavailable
-				}
-				return m.Path + "@" + m.Version, nil
-			},
-			"version": func() (any, error) {
-				m := xprogram.MainModule()
-				if m == nil {
-					return "", ErrUnavailable
-				}
-				return m.Version, nil
-			},
+			"name":      xprogram.MainName,
+			"reference": xprogram.MainReference,
+			"version":   xprogram.MainVersion,
 		},
 	},
 	"standby": Standby,

@@ -48,6 +48,8 @@ func ImpliedPrintOrScanObject(
 			if data = xutf8.AlineBytes(data); len(data) > 0 {
 				os.Stdout.Write(data)
 			}
+		} else if f, ok := v.(func() string); ok {
+			os.Stdout.WriteString(xutf8.AlineString(f()))
 		} else if b, ok := v.([]byte); ok {
 			if b = xutf8.AlineBytes(b); len(b) > 0 {
 				os.Stdout.Write(b)

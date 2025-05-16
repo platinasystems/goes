@@ -5,6 +5,7 @@
 package xprogram
 
 import (
+	"golang/buildid"
 	"os"
 	"path"
 	"path/filepath"
@@ -68,12 +69,24 @@ func Path() string {
 	return s
 }
 
+func BuildId() string {
+	s, _ := buildid.ReadFile(Path())
+	return s
+}
+
 func BuildInfo() *debug.BuildInfo {
 	bi, ok := debug.ReadBuildInfo()
 	if !ok {
 		bi = nil
 	}
 	return bi
+}
+
+func BuildInfoString() string {
+	if bi := BuildInfo(); bi != nil {
+		return bi.String()
+	}
+	return ""
 }
 
 func IsOpt() bool {
@@ -107,3 +120,17 @@ var MainName = sync.OnceValue(func() string {
 	}
 	return name
 })
+
+func MainReference() string {
+	if mm := MainModule(); mm != nil {
+		return mm.Path + "@" + mm.Version
+	}
+	return ""
+}
+
+func MainVersion() string {
+	if mm := MainModule(); mm != nil {
+		return mm.Version
+	}
+	return ""
+}
