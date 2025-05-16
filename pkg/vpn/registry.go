@@ -30,6 +30,7 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xflag"
 	"github.com/platinasystems/goes/v2/pkg/xlog"
 	"github.com/platinasystems/goes/v2/pkg/xmaps"
+	"github.com/platinasystems/goes/v2/pkg/xprogram"
 	"gopkg.in/yaml.v3"
 )
 
@@ -332,6 +333,10 @@ func (reg *registry) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 				err = vpn.showSubscriber(w, qv)
 			case "tenant":
 				err = vpn.showTenant(w, qv)
+			case "vcs.modified":
+				fmt.Fprintln(w, xprogram.VcsModified)
+			case "vcs.revision":
+				fmt.Fprintln(w, xprogram.VcsRevision)
 			default:
 				w.WriteHeader(http.StatusBadRequest)
 			}
