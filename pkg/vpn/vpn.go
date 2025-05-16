@@ -104,18 +104,20 @@ func defineConfig() {
 func defineConfigDir() {
 	mn := xprogram.MainName()
 	vpnConfigDir = filepath.Join(fhs.Config(), mn, "vpn")
-	fhsVpnInfo, err := os.Stat(vpnConfigDir)
-	if err != nil {
-		fhsVpnInfo = nil
-	}
-	if home := xdg.ConfigHome(); len(home) > 0 {
-		homeVpn := filepath.Join(home, mn, "vpn")
-		homeVpnInfo, err := os.Stat(homeVpn)
-		if (err == nil && homeVpnInfo.IsDir()) ||
-			fhsVpnInfo == nil ||
-			!fhsVpnInfo.IsDir() ||
-			os.Geteuid() != 0 {
-			vpnConfigDir = homeVpn
+	if !xprogram.IsKoApp() && os.Geteuid() != 0 {
+		fhsVpnInfo, err := os.Stat(vpnConfigDir)
+		if err != nil {
+			fhsVpnInfo = nil
+		}
+		if home := xdg.ConfigHome(); len(home) > 0 {
+			homeVpn := filepath.Join(home, mn, "vpn")
+			if homeVpnInfo, err := os.Stat(homeVpn); err == nil {
+				if homeVpnInfo.IsDir() {
+					vpnConfigDir = homeVpn
+				}
+			} else if fhsVpnInfo == nil || !fhsVpnInfo.IsDir() {
+				vpnConfigDir = homeVpn
+			}
 		}
 	}
 	xflag.Define(&vpnConfigDir, "config-dir", "Configuration directory.")
@@ -230,18 +232,20 @@ func defineVPN() {
 func defineStateDir() {
 	mn := xprogram.MainName()
 	vpnStateDir = filepath.Join(fhs.State(), mn, "vpn")
-	fhsVpnInfo, err := os.Stat(vpnStateDir)
-	if err != nil {
-		fhsVpnInfo = nil
-	}
-	if home := xdg.StateHome(); len(home) > 0 {
-		homeVpn := filepath.Join(home, mn, "vpn")
-		homeVpnInfo, err := os.Stat(homeVpn)
-		if (err == nil && homeVpnInfo.IsDir()) ||
-			fhsVpnInfo == nil ||
-			!fhsVpnInfo.IsDir() ||
-			os.Geteuid() != 0 {
-			vpnStateDir = homeVpn
+	if !xprogram.IsKoApp() && os.Geteuid() != 0 {
+		fhsVpnInfo, err := os.Stat(vpnStateDir)
+		if err != nil {
+			fhsVpnInfo = nil
+		}
+		if home := xdg.StateHome(); len(home) > 0 {
+			homeVpn := filepath.Join(home, mn, "vpn")
+			if homeVpnInfo, err := os.Stat(homeVpn); err == nil {
+				if homeVpnInfo.IsDir() {
+					vpnStateDir = homeVpn
+				}
+			} else if fhsVpnInfo == nil || !fhsVpnInfo.IsDir() {
+				vpnStateDir = homeVpn
+			}
 		}
 	}
 	xflag.Define(&vpnStateDir, "state-dir",
