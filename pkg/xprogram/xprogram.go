@@ -10,49 +10,84 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"runtime/debug"
 	"strings"
 	"sync"
 )
 
-type BuildSettingKey string
+type BuildSetting string
 
 const (
-	BuileMode   BuildSettingKey = "-buildmode"
-	Compiler    BuildSettingKey = "-compiler"
-	CgoEnabled  BuildSettingKey = "CGO_ENABLED"
-	CgoCPPFlags BuildSettingKey = "CGO_CPPFLAGS"
-	CgoCXXFlags BuildSettingKey = "CGO_CXXFLAGS"
-	CgoLDFlags  BuildSettingKey = "CGO_LDFLAGS"
-	GoARCH      BuildSettingKey = "GOARCH"
-	GoOS        BuildSettingKey = "GOOS"
-	Vcs         BuildSettingKey = "vcs"
-	VcsModified BuildSettingKey = "vcs.modified"
-	VcsRevision BuildSettingKey = "vcs.revision"
-	VcsTime     BuildSettingKey = "vcs.time"
+	BuildMode   = BuildSetting("buildmode")
+	Compiler    = BuildSetting("compiler")
+	CgoEnabled  = BuildSetting("enabled")
+	CgoCPPFlags = BuildSetting("cpp")
+	CgoCXXFlags = BuildSetting("cxx")
+	CgoLDFlags  = BuildSetting("ld")
+	GoARCH      = BuildSetting("arch")
+	GoMicroARCH = BuildSetting(runtime.GOARCH)
+	GoOS        = BuildSetting("os")
+	VcsModified = BuildSetting("modified")
+	VcsRevision = BuildSetting("revision")
+	VcsTime     = BuildSetting("time")
+	VcsType     = BuildSetting("type")
 )
 
 var BuildSettings = map[string]any{
-	string(BuileMode):   BuileMode,
-	string(Compiler):    Compiler,
-	string(CgoEnabled):  CgoEnabled,
-	string(CgoCPPFlags): CgoCPPFlags,
-	string(CgoCXXFlags): CgoCXXFlags,
-	string(CgoLDFlags):  CgoLDFlags,
-	string(GoARCH):      GoARCH,
-	string(GoOS):        GoOS,
-	string(Vcs):         Vcs,
-	string(VcsModified): VcsModified,
-	string(VcsRevision): VcsRevision,
-	string(VcsTime):     VcsTime,
+	string(BuildMode): BuildMode,
+	string(Compiler):  Compiler,
+	"cgo": map[string]any{
+		string(CgoEnabled): CgoEnabled,
+		"flags": map[string]any{
+			string(CgoCPPFlags): CgoCPPFlags,
+			string(CgoCXXFlags): CgoCXXFlags,
+			string(CgoLDFlags):  CgoLDFlags,
+		},
+	},
+	"go": map[string]any{
+		string(GoARCH):      GoARCH,
+		string(GoMicroARCH): GoMicroARCH,
+		string(GoOS):        GoOS,
+	},
+	"vcs": map[string]any{
+		string(VcsModified): VcsModified,
+		string(VcsRevision): VcsRevision,
+		string(VcsTime):     VcsTime,
+		string(VcsType):     VcsType,
+	},
 }
 
-func (bsk BuildSettingKey) String() string {
-	if bi := BuildInfo(); bi != nil {
-		for _, bs := range bi.Settings {
-			if bs.Key == string(bsk) {
-				return bs.Value
-			}
+var BuildSettingKey = map[BuildSetting]string{
+	BuildMode:   "-" + string(BuildMode),
+	Compiler:    "-" + string(Compiler),
+	CgoEnabled:  "CGO_ENABLED",
+	CgoCPPFlags: "CGO_CPPFLAGS",
+	CgoCXXFlags: "CGO_CXXFLAGS",
+	CgoLDFlags:  "CGO_LDFLAGS",
+	GoARCH:      "GOARCH",
+	GoOS:        "GOOS",
+	VcsModified: "vcs." + string(VcsModified),
+	VcsRevision: "vcs." + string(VcsRevision),
+	VcsTime:     "vcs." + string(VcsTime),
+	VcsType:     "vcs",
+}
+
+func (bs BuildSetting) String() string {
+	bi := BuildInfo()
+	if bi == nil {
+		return ""
+	}
+	key, ok := BuildSettingKey[bs]
+	if !ok {
+		if bs != GoMicroARCH {
+			panic(string(bs))
+		}
+		key = "GO" + strings.ToUpper(string(bs))
+	}
+	for _, bs := range bi.Settings {
+		if bs.Key == key {
+			return bs.Value
 		}
 	}
 	return ""
