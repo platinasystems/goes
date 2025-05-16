@@ -68,6 +68,7 @@ var (
 	vpnCert         = "cert.pem"
 	vpnConfig       = "config.yaml"
 	vpnConfigDir    = "/etc/goes"
+	vpnDataDir      = "/usr/share/goes"
 	vpnDuration     = year
 	vpnRegistry     = "registry.pem"
 	vpnSerialNumber = int64(1)
@@ -128,6 +129,35 @@ func defineConfigDir() {
 
 func defineCountry() {
 	xflag.Define(&vpnCountry, "country", "")
+}
+
+// Default $KO_DATA_PATH; or [xdg.DataHome] or [fhs.Data] + GOES/vpn
+func defineDataDir() {
+	if s, ok := os.LookupEnv("KO_DATA_PATH"); ok {
+		vpnDataDir = s
+	} else {
+		mn := xprogram.MainName()
+		vpnDataDir = filepath.Join(fhs.Data(), mn, "vpn")
+		if os.Geteuid() != 0 {
+			fhsVpnInfo, err := os.Stat(vpnDataDir)
+			if err != nil {
+				fhsVpnInfo = nil
+			}
+			if home := xdg.DataHome(); len(home) > 0 {
+				homeVpn := filepath.Join(home, mn, "vpn")
+				homeVpnInfo, err := os.Stat(homeVpn)
+				if err == nil {
+					if homeVpnInfo.IsDir() {
+						vpnDataDir = homeVpn
+					}
+				} else if fhsVpnInfo == nil ||
+					!fhsVpnInfo.IsDir() {
+					vpnDataDir = homeVpn
+				}
+			}
+		}
+	}
+	xflag.Define(&vpnDataDir, "data-dir", "Registry service directory.")
 }
 
 func defineDNS() {

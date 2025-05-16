@@ -104,6 +104,7 @@ A RESTful WWW server.
 	defineCert()
 	defineConfig()
 	defineConfigDir()
+	defineDataDir()
 	defineSig()
 	defineStateDir()
 
