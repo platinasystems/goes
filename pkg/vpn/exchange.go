@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"net"
 	"net/netip"
+	"time"
 
 	"github.com/platinasystems/goes/v2/pkg/box"
 	"github.com/platinasystems/goes/v2/pkg/xcontext"
@@ -168,7 +169,6 @@ pktRxLoop:
 			ex.service[ifrom] = ap
 			cfrom, ok := ex.gcm[ifrom]
 			if !ok {
-				xlog.Info.Println("whois", ifrom)
 				wg.Go(func() {
 					ex.blkch <- ex.
 						whois(cctx, RestKeyId, from)
@@ -234,7 +234,7 @@ pktRxLoop:
 }
 
 func (ex *exchange) rx(ctx context.Context, bx Box) {
-	xlog.Trace.Println("rx", bx)
+	xlog.Trace.Println(bx)
 	from := bx.FromWhom()
 	h, d, err := bx.PDU().Parse()
 	if err != nil {
@@ -242,7 +242,12 @@ func (ex *exchange) rx(ctx context.Context, bx Box) {
 	}
 	switch h.Proto {
 	case VPN_P_HELLO:
-		xlog.Info.Println("ignore hello")
+		if ack, err := ex.helloAck(from); err != nil {
+			xlog.Errata.Print(err)
+		} else if !xcontext.Queue(ctx, ex.txch, ack) {
+			ack.Return()
+		}
+		// DON'T forward to other hosts ex.replicate("relay", bx.Box, from)
 	case VPN_P_WHOIS_ADDRESSED:
 		if addr := WhoisAddress(d); !addr.IsValid() {
 			xlog.Errata.Println("rx whois underrun")
@@ -360,6 +365,35 @@ func (ex *exchange) replicate(
 			}
 		}
 	}
+}
+
+func (ex *exchange) helloAck(to box.Id) (*box.Box, error) {
+	var err error
+	ito := to.Index()
+	c, ok := ex.gcm[ito]
+	if !ok {
+		return nil, xerrors.Invalid(ito, "no GCM")
+	}
+	bx := box.New()
+	bx.AddrPort = ex.service[ito]
+	bx.From(ex.id)
+	bx.To(to)
+	bx.Contents, err = xnet.Attach(bx.Contents, netph.TunPI{
+		Proto: VPN_P_HELLO,
+	})
+	if err != nil {
+		bx.Return()
+		return nil, err
+	}
+	bx.Contents, err = xnet.Attach(bx.Contents, time.Now().UnixMicro())
+	if err != nil {
+		bx.Return()
+		return nil, err
+	}
+	xlog.Trace.Print(Box{bx})
+	bx.CloseWith(c)
+	bx.SealWith(c)
+	return bx, nil
 }
 
 func (ex *exchange) txICMP6EchoReply(
@@ -518,7 +552,7 @@ func (ex *exchange) txUDP6EchoReply(
 	udp := netpdu.UDP(bx.Contents[udpi:])
 	udp.SetLen()
 	udp.SetSum(ip6.Checksum(netph.IPPROTO_UDP, udp))
-	xlog.Info.Println("tx", Box{bx})
+	xlog.Trace.Println(Box{bx})
 	bx.CloseWith(c)
 	bx.SealWith(c)
 	if !xcontext.Queue(ctx, ex.txch, bx) {

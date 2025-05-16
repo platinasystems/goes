@@ -13,6 +13,7 @@ import (
 	"net/netip"
 	"os"
 	"runtime"
+	"time"
 
 	"github.com/platinasystems/goes/v2/pkg/box"
 	"github.com/platinasystems/goes/v2/pkg/netif"
@@ -210,12 +211,23 @@ Forward ciphered packets between exchange and tunnel interface.
 	xlog.Info.Printf("start (%s, %v)", nif.Name, g.hostPrefix)
 	defer xlog.Info.Printf("stopped (%s, %v)", nif.Name, g.hostPrefix)
 
+	if err = g.hello(ctx, pktTxCh, via, time.Now()); err != nil {
+		return err
+	}
+
+	kat := time.NewTicker(10 * time.Second)
+	defer kat.Stop()
+
 guestLoop:
 	for {
 		select {
 		case <-cctx.Done():
 			xlog.Info.Println("done")
 			break guestLoop
+		case t := <-kat.C:
+			if err = g.hello(ctx, pktTxCh, via, t); err != nil {
+				xlog.Errata.Println(err)
+			}
 		case rsp, ok := <-blkCh:
 			if !ok {
 				return ctx.Err()
@@ -319,7 +331,8 @@ guestLoop:
 			}
 			switch hvpn.Proto {
 			case VPN_P_HELLO:
-				xlog.Info.Println("ignore hello")
+				// FIXME verify exchange version.
+				xlog.Trace.Println(Box{bx})
 				bx.Return()
 			case VPN_P_PUBLIC_KEY:
 				blk, _ := pem.Decode(dvpn)
@@ -363,6 +376,57 @@ guestLoop:
 		}
 	}
 	return err
+}
+
+func (g *guest) hello(
+	ctx context.Context,
+	ch chan<- *box.Box,
+	to box.Id,
+	now time.Time,
+) error {
+	var err error
+	ito := to.Index()
+	cto, ok := g.gcm[ito]
+	if !ok {
+		return fmt.Errorf("%d: no cipher", ito)
+	}
+	via, ok := g.via[ito]
+	if !ok {
+		via = to
+	}
+	ivia := via.Index()
+	cvia, ok := g.gcm[ivia]
+	if !ok {
+		return fmt.Errorf("%d: no exchange cipher", ivia)
+	}
+	avia, ok := g.service[ivia]
+	if !ok {
+		return fmt.Errorf("%d: no exchange service", ivia)
+	}
+	bx := box.New()
+	bx.Contents, err = xnet.Attach(bx.Contents, netph.TunPI{
+		Proto: VPN_P_HELLO,
+	})
+	if err != nil {
+		bx.Return()
+		return err
+	}
+	bx.Contents, err = xnet.Attach(bx.Contents, now.UnixMicro())
+	if err != nil {
+		bx.Return()
+		return err
+	}
+	bx.AddrPort = avia
+	bx.From(g.id)
+	bx.To(to)
+	bx.Via(via)
+	xlog.Trace.Println(Box{bx})
+	bx.CloseWith(cto)
+	bx.SealWith(cvia)
+	if !xcontext.Queue(ctx, ch, bx) {
+		bx.Return()
+	}
+	return nil
 }
 
 func (g *guest) multicast(
