@@ -13,12 +13,14 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"io/fs"
 	"net"
 	"net/http"
 	"net/netip"
 	"net/url"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"sort"
 	"strings"
@@ -178,7 +180,6 @@ A RESTful WWW server.
 }
 
 func (reg *registry) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	var err error
 	defer req.Body.Close()
 	if !req.TLS.HandshakeComplete {
 		xlog.Info.Println("incomplete handshake")
@@ -192,9 +193,16 @@ func (reg *registry) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 	peer0 := req.TLS.PeerCertificates[0]
 	cn := peer0.Subject.CommonName
+
 	qv := req.URL.Query()
 	op := qv.Get(RestKeyOp)
 	obj := qv.Get(RestKeyObj)
+
+	if len(op) == 0 {
+		reg.getFileOrDir(w, req)
+		return
+	}
+
 	name := strings.TrimLeft(req.URL.Path, "/")
 	if len(name) == 0 {
 		name = "vpn"
@@ -205,14 +213,9 @@ func (reg *registry) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		fmt.Fprint(w, name)
 		return
 	}
-	defer func() {
-		if err != nil {
-			xlog.Info.Print(op, ": ", err, "\n")
-		}
-	}()
 	switch op {
 	case RestOpApprove:
-		if err = vpn.selfOrSubscriber(peer0); err != nil {
+		if err := vpn.selfOrSubscriber(peer0); err != nil {
 			w.WriteHeader(http.StatusForbidden)
 			fmt.Fprint(w, cn)
 		} else if err = vpn.selfOrAdmin(cn); err != nil {
@@ -237,7 +240,7 @@ func (reg *registry) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			w.WriteHeader(http.StatusOK)
 		}
 	case RestOpCheckin:
-		if err = vpn.selfOrSubscriber(peer0); err != nil {
+		if err := vpn.selfOrSubscriber(peer0); err != nil {
 			w.WriteHeader(http.StatusForbidden)
 			fmt.Fprint(w, cn)
 		} else if req.Method != http.MethodPut {
@@ -252,7 +255,7 @@ func (reg *registry) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			}
 		}
 	case RestOpDeny:
-		if err = vpn.selfOrSubscriber(peer0); err != nil {
+		if err := vpn.selfOrSubscriber(peer0); err != nil {
 			w.WriteHeader(http.StatusForbidden)
 			fmt.Fprint(w, cn)
 		} else if err = vpn.selfOrAdmin(cn); err != nil {
@@ -270,7 +273,7 @@ func (reg *registry) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	case RestOpDump:
 		switch obj {
 		case "subscribers":
-			if err = vpn.selfOrSubscriber(peer0); err != nil {
+			if err := vpn.selfOrSubscriber(peer0); err != nil {
 				w.WriteHeader(http.StatusForbidden)
 				fmt.Fprint(w, cn)
 			} else if req.Method != http.MethodGet {
@@ -284,7 +287,7 @@ func (reg *registry) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			w.WriteHeader(http.StatusBadRequest)
 		}
 	case RestOpPing:
-		if err = vpn.selfOrSubscriber(peer0); err != nil {
+		if err := vpn.selfOrSubscriber(peer0); err != nil {
 			w.WriteHeader(http.StatusForbidden)
 			fmt.Fprint(w, cn)
 		} else if req.Method != http.MethodGet {
@@ -310,7 +313,7 @@ func (reg *registry) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			fmt.Fprintln(w, "OK")
 		}
 	case RestOpShow:
-		if err = vpn.selfOrSubscriber(peer0); err != nil {
+		if err := vpn.selfOrSubscriber(peer0); err != nil {
 			w.WriteHeader(http.StatusForbidden)
 			fmt.Fprint(w, cn)
 		} else if req.Method != http.MethodGet {
@@ -357,7 +360,7 @@ func (reg *registry) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			fmt.Fprintln(w, "OK")
 		}
 	case RestOpUnsubscribe:
-		if err = vpn.selfOrSubscriber(peer0); err != nil {
+		if err := vpn.selfOrSubscriber(peer0); err != nil {
 			w.WriteHeader(http.StatusForbidden)
 			fmt.Fprint(w, cn)
 		} else if err = vpn.selfOrAdmin(cn); err != nil {
@@ -373,7 +376,7 @@ func (reg *registry) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			fmt.Fprintln(w, "OK")
 		}
 	case RestOpWhois:
-		if err = vpn.selfOrSubscriber(peer0); err != nil {
+		if err := vpn.selfOrSubscriber(peer0); err != nil {
 			w.WriteHeader(http.StatusForbidden)
 			fmt.Fprint(w, cn)
 		} else if req.Method != http.MethodGet {
@@ -385,6 +388,83 @@ func (reg *registry) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		}
 	default:
 		w.WriteHeader(http.StatusBadRequest)
+	}
+}
+
+// virtual-link, this program may be fetched as MAIN-GOOS-GOARCH
+var vlink = sync.OnceValue(func() string {
+	return fmt.Sprintf("%s-%s-%s", xprogram.MainName(),
+		runtime.GOOS, runtime.GOARCH)
+})
+
+func (reg *registry) getFileOrDir(w http.ResponseWriter, req *http.Request) {
+	name := strings.TrimLeft(req.URL.Path, "/")
+	if len(name) == 0 {
+		names := []string{vlink()}
+		if entries, err := os.ReadDir(vpnDataDir); err == nil {
+			for _, entry := range entries {
+				names = append(names, entry.Name())
+			}
+		}
+		slices.Sort(names)
+		for _, s := range names {
+			fmt.Fprintln(w, s)
+		}
+		return
+	} else if name == vlink() {
+		f, err := os.Open(xprogram.Path())
+		if err != nil {
+			if errors.Is(err, fs.ErrPermission) {
+				w.WriteHeader(http.StatusForbidden)
+			} else {
+				w.WriteHeader(http.StatusInternalServerError)
+			}
+			fmt.Fprint(w, err)
+		} else {
+			io.Copy(w, f)
+			f.Close()
+		}
+		return
+	}
+
+	name = filepath.Join(vpnDataDir, name)
+	if fi, err := os.Stat(name); err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			w.WriteHeader(http.StatusNotFound)
+		} else if errors.Is(err, fs.ErrPermission) {
+			w.WriteHeader(http.StatusForbidden)
+		} else {
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+		fmt.Fprint(w, err)
+	} else if fi.IsDir() {
+		if entries, err := os.ReadDir(name); err != nil {
+			if errors.Is(err, fs.ErrPermission) {
+				w.WriteHeader(http.StatusForbidden)
+			} else {
+				w.WriteHeader(http.StatusInternalServerError)
+			}
+			fmt.Fprint(w, err)
+		} else {
+			var names []string
+			for _, entry := range entries {
+				names = append(names, entry.Name())
+			}
+			slices.Sort(names)
+			for _, s := range names {
+				fmt.Fprintln(w, s)
+			}
+		}
+	} else if f, err := os.Open(name); err != nil {
+		if errors.Is(err, fs.ErrPermission) {
+			w.WriteHeader(http.StatusForbidden)
+		} else {
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+		fmt.Fprint(w, err)
+	} else {
+		_, err = io.Copy(w, f)
+		f.Close()
 	}
 }
 
