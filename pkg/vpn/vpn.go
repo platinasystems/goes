@@ -8,6 +8,7 @@ import (
 	"net/netip"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/platinasystems/goes/v2/pkg/fhs"
@@ -105,24 +106,19 @@ func defineConfig() {
 		"Configuration file name w/in config-dir.")
 }
 
-// Default [xdg.ConfigHome] or [fhs.Config] + GOES/vpn
+// Default [xdg.ConfigHome] or [fhs.Config] +
+// MAIN, if MAIN as "-vpn", or MAIN/vpn
 func defineConfigDir() {
-	mn := xprogram.MainName()
-	vpnConfigDir = filepath.Join(fhs.Config(), mn, "vpn")
-	if !xprogram.IsKoApp() && os.Geteuid() != 0 {
-		fhsVpnInfo, err := os.Stat(vpnConfigDir)
-		if err != nil {
-			fhsVpnInfo = nil
-		}
-		if home := xdg.ConfigHome(); len(home) > 0 {
-			homeVpn := filepath.Join(home, mn, "vpn")
-			if homeVpnInfo, err := os.Stat(homeVpn); err == nil {
-				if homeVpnInfo.IsDir() {
-					vpnConfigDir = homeVpn
-				}
-			} else if fhsVpnInfo == nil || !fhsVpnInfo.IsDir() {
-				vpnConfigDir = homeVpn
-			}
+	subDir := mainSubDir()
+	fhsDir := filepath.Join(fhs.Config(), subDir)
+	if xprogram.IsKoApp() {
+		vpnConfigDir = fhsDir
+	} else {
+		xdgDir := filepath.Join(xdg.ConfigHome(), subDir)
+		if os.Geteuid() == 0 {
+			vpnConfigDir = prefDir(fhsDir, xdgDir)
+		} else {
+			vpnConfigDir = prefDir(xdgDir, fhsDir)
 		}
 	}
 	xflag.Define(&vpnConfigDir, "config-dir", "Configuration directory.")
@@ -132,30 +128,19 @@ func defineCountry() {
 	xflag.Define(&vpnCountry, "country", "")
 }
 
-// Default $KO_DATA_PATH; or [xdg.DataHome] or [fhs.Data] + GOES/vpn
+// Default $KO_DATA_PATH; or [xdg.DataHome] or [fhs.Data] +
+// MAIN, if MAIN as "-vpn", or MAIN/vpn
 func defineDataDir() {
 	if s, ok := os.LookupEnv("KO_DATA_PATH"); ok {
 		vpnDataDir = s
 	} else {
-		mn := xprogram.MainName()
-		vpnDataDir = filepath.Join(fhs.Data(), mn, "vpn")
-		if os.Geteuid() != 0 {
-			fhsVpnInfo, err := os.Stat(vpnDataDir)
-			if err != nil {
-				fhsVpnInfo = nil
-			}
-			if home := xdg.DataHome(); len(home) > 0 {
-				homeVpn := filepath.Join(home, mn, "vpn")
-				homeVpnInfo, err := os.Stat(homeVpn)
-				if err == nil {
-					if homeVpnInfo.IsDir() {
-						vpnDataDir = homeVpn
-					}
-				} else if fhsVpnInfo == nil ||
-					!fhsVpnInfo.IsDir() {
-					vpnDataDir = homeVpn
-				}
-			}
+		subDir := mainSubDir()
+		fhsDir := filepath.Join(fhs.Data(), subDir)
+		xdgDir := filepath.Join(xdg.DataHome(), subDir)
+		if os.Geteuid() == 0 {
+			vpnDataDir = prefDir(fhsDir, xdgDir)
+		} else {
+			vpnDataDir = prefDir(xdgDir, fhsDir)
 		}
 	}
 	xflag.Define(&vpnDataDir, "data-dir", "Registry service directory.")
@@ -244,6 +229,25 @@ func enableQuiet() {
 	})
 }
 
+// Default [xdg.StateHome] or [fhs.State] + GOES/vpn
+// MAIN, if MAIN as "-vpn", or MAIN/vpn
+func defineStateDir() {
+	subDir := mainSubDir()
+	fhsDir := filepath.Join(fhs.State(), subDir)
+	if xprogram.IsKoApp() {
+		vpnStateDir = fhsDir
+	} else {
+		xdgDir := filepath.Join(xdg.StateHome(), subDir)
+		if os.Geteuid() == 0 {
+			vpnStateDir = prefDir(fhsDir, xdgDir)
+		} else {
+			vpnStateDir = prefDir(xdgDir, fhsDir)
+		}
+	}
+	xflag.Define(&vpnStateDir, "state-dir",
+		"State directory to save approved client certificates.")
+}
+
 func enableTrace() {
 	xflag.Enable("trace", "Log packet forwarding.", func() error {
 		xlog.UnmuteTrace()
@@ -262,26 +266,22 @@ func defineVPN() {
 	xflag.Define(&vpnVPN, "vpn", "Named VPN. (default unnamed)")
 }
 
-// Default [xdg.StateHome] or [fhs.State] + GOES/vpn
-func defineStateDir() {
-	mn := xprogram.MainName()
-	vpnStateDir = filepath.Join(fhs.State(), mn, "vpn")
-	if !xprogram.IsKoApp() && os.Geteuid() != 0 {
-		fhsVpnInfo, err := os.Stat(vpnStateDir)
-		if err != nil {
-			fhsVpnInfo = nil
-		}
-		if home := xdg.StateHome(); len(home) > 0 {
-			homeVpn := filepath.Join(home, mn, "vpn")
-			if homeVpnInfo, err := os.Stat(homeVpn); err == nil {
-				if homeVpnInfo.IsDir() {
-					vpnStateDir = homeVpn
-				}
-			} else if fhsVpnInfo == nil || !fhsVpnInfo.IsDir() {
-				vpnStateDir = homeVpn
-			}
+func mainSubDir() string {
+	s := xprogram.MainName()
+	if strings.Index(s, "-vpn") < 0 {
+		s = filepath.Join(s, "vpn")
+	}
+	return s
+}
+
+func prefDir(primary string, alternates ...string) string {
+	if fi, err := os.Stat(primary); err == nil && fi.IsDir() {
+		return primary
+	}
+	for _, alt := range alternates {
+		if fi, err := os.Stat(alt); err == nil && fi.IsDir() {
+			return alt
 		}
 	}
-	xflag.Define(&vpnStateDir, "state-dir",
-		"State directory to save approved client certificates.")
+	return primary
 }
