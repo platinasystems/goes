@@ -63,7 +63,7 @@ Forward ciphered packets between exchange and tunnel interface.
 		return err
 	}
 	if err = g.setup(); err != nil {
-		return nil
+		return err
 	}
 
 	cctx, cancel := context.WithCancel(ctx)

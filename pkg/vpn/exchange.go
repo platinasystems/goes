@@ -66,7 +66,7 @@ Exchange ciphered packets between guests.
 		return err
 	}
 	if err = ex.setup(); err != nil {
-		return nil
+		return err
 	}
 
 	exAll6nodes = netip.IPv6LinkLocalAllNodes()
