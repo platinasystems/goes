@@ -110,9 +110,10 @@ func DataDirs() (dirs []string) {
 	if len(s) > 0 {
 		dirs = strings.Split(s, PathListSeparatorString)
 	} else {
+		dirs = append(dirs, DataHome())
 		switch runtime.GOOS {
 		case "darwin", "ios":
-			dirs = append(dirs, "/Library/Application Support")
+			dirs = append(dirs, "/Library")
 		case "plan9":
 			dirs = append(dirs, "/lib")
 		case "windows":
@@ -144,7 +145,7 @@ func DataHome() string {
 	switch runtime.GOOS {
 	case "darwin", "ios":
 		if s = SudoUserHome(); len(s) > 0 {
-			s = filepath.Join(s, "Library/Application Support")
+			s = filepath.Join(s, "Library")
 		}
 	case "plan9":
 		if s = os.Getenv("home"); len(s) > 0 {
@@ -169,9 +170,7 @@ func RunTimeDir() string {
 	}
 	switch runtime.GOOS {
 	case "darwin", "ios":
-		if s = SudoUserHome(); len(s) > 0 {
-			return filepath.Join(s, "Library/Application Support")
-		}
+		return os.TempDir()
 	case "plan9":
 	case "windows":
 		s = WindowsAppDataLocal()
