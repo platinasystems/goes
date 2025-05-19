@@ -93,11 +93,10 @@ RESTful registry administration.
 		return err
 	}
 	resp, err := rest.do(req)
-	if err != nil {
-		return err
+	if err == nil {
+		defer resp.Body.Close()
+		_, err = io.Copy(os.Stdout, resp.Body)
 	}
-	defer resp.Body.Close()
-	_, err = io.Copy(os.Stdout, resp.Body)
 	return err
 }
 
@@ -186,6 +185,46 @@ Import registry certificate.
 	return pem.Encode(wc, &blk)
 }
 
+func RestGet(ctx context.Context, args []string) error {
+	var rest rest
+
+	xflag.TemplateUsage(`
+usage: {{.Name}} [filename]
+Get or list registry file(s).
+
+{{flags .}}`)
+
+	defineCert()
+	defineConfigDir()
+	defineRegistry()
+	defineSig()
+	defineVPN()
+
+	err := flag.CommandLine.Parse(args)
+	if err != nil {
+		return err
+	}
+	if err = rest.setup(); err != nil {
+		return err
+	}
+
+	clone := *rest.url
+	if flag.CommandLine.NArg() > 0 {
+		clone.Path = flag.CommandLine.Arg(0)
+	}
+	req, err := http.
+		NewRequestWithContext(ctx, http.MethodGet, clone.String(), nil)
+	if err != nil {
+		return xerrors.Mark(err)
+	}
+	resp, err := rest.do(req)
+	if err == nil {
+		defer resp.Body.Close()
+		_, err = io.Copy(os.Stdout, resp.Body)
+	}
+	return err
+}
+
 func RestPing(ctx context.Context, args []string) error {
 	var rest rest
 
@@ -219,11 +258,10 @@ RESTful ping registry.
 		return xerrors.Mark(err)
 	}
 	resp, err := rest.do(req)
-	if err != nil {
-		return err
+	if err == nil {
+		defer resp.Body.Close()
+		_, err = io.Copy(os.Stdout, resp.Body)
 	}
-	defer resp.Body.Close()
-	_, err = io.Copy(os.Stdout, resp.Body)
 	return err
 }
 
@@ -260,11 +298,10 @@ RESTful reload registry configuration.
 		return xerrors.Mark(err)
 	}
 	resp, err := rest.do(req)
-	if err != nil {
-		return err
+	if err == nil {
+		defer resp.Body.Close()
+		_, err = io.Copy(os.Stdout, resp.Body)
 	}
-	defer resp.Body.Close()
-	_, err = io.Copy(os.Stdout, resp.Body)
 	return err
 }
 
@@ -306,10 +343,9 @@ RESTful query and print registry object.
 	}
 	resp, err := rest.do(req)
 	if err != nil {
-		return err
+		defer resp.Body.Close()
+		_, err = io.Copy(os.Stdout, resp.Body)
 	}
-	defer resp.Body.Close()
-	_, err = io.Copy(os.Stdout, resp.Body)
 	return err
 }
 

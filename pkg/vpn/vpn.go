@@ -45,6 +45,7 @@ var Features = map[string]any{
 		"certify":     RestCertify,
 		"deny":        RestAdmin,
 		"exchange":    Exchange,
+		"get":         RestGet,
 		"guest":       Guest,
 		"ping":        RestPing,
 		"reload":      RestReload,

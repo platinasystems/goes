@@ -8,6 +8,7 @@
 *~
 *#*#
 _cgo_.o
+kodata
 /*.patch
 /goes
 /ifconfig
