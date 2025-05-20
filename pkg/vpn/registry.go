@@ -321,25 +321,25 @@ func (reg *registry) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			fmt.Fprint(w, req.Method)
 		} else {
 			switch obj {
-			case "active":
+			case RestShowActive:
 				err = vpn.showActive(w)
-			case "address":
+			case RestShowAddress:
 				err = vpn.showAddress(w, qv)
-			case "admins":
+			case RestShowAdmins:
 				for _, s := range ConfigByName[name].Admins {
 					fmt.Fprintln(w, "-", s)
 				}
-			case "hosts":
+			case RestShowHosts:
 				err = vpn.showHosts(w, qv)
-			case "pending":
+			case RestShowPending:
 				err = vpn.showPending(w)
-			case "subscriber":
+			case RestShowSubscriber:
 				err = vpn.showSubscriber(w, qv)
-			case "tenant":
+			case RestShowTenant:
 				err = vpn.showTenant(w, qv)
-			case "vcs.modified":
+			case RestShowVcsModified:
 				fmt.Fprintln(w, xprogram.VcsModified)
-			case "vcs.revision":
+			case RestShowVcsRevision:
 				fmt.Fprintln(w, xprogram.VcsRevision)
 			default:
 				w.WriteHeader(http.StatusBadRequest)

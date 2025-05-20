@@ -56,6 +56,18 @@ const (
 	RestOpWhois       = "whois"
 )
 
+const (
+	RestShowActive      = "active"
+	RestShowAddress     = "address"
+	RestShowAdmins      = "admins"
+	RestShowHosts       = "hosts"
+	RestShowPending     = "pending"
+	RestShowSubscriber  = "subscriber"
+	RestShowTenant      = "tenant"
+	RestShowVcsModified = "vcs.modified"
+	RestShowVcsRevision = "vcs.revision"
+)
+
 func DefineRestFlags() {
 	defineCert()
 	defineConfigDir()
@@ -234,22 +246,13 @@ RESTful reload registry configuration.
 }
 
 func RestShow(ctx context.Context, args []string) error {
-	obj := xflag.LastName(flag.CommandLine)
-	return RestShowObj(ctx, obj, args)
-}
-
-func RestShowObj(ctx context.Context, obj string, args []string) error {
 	xflag.TemplateUsage(`
 usage: {{.Name}} [flags] [args]
 RESTful query and print registry object.
 
 {{flags .}}`)
+	obj := xflag.LastName(flag.CommandLine)
 	return Rest(ctx, http.MethodGet, RestOpShow, obj, args)
-}
-
-func RestShowVCS(ctx context.Context, args []string) error {
-	obj := "vcs." + xflag.LastName(flag.CommandLine)
-	return RestShowObj(ctx, obj, args)
 }
 
 func RestSubscribe(ctx context.Context, args []string) error {
