@@ -56,6 +56,34 @@ const (
 	RestOpWhois       = "whois"
 )
 
+func DefineRestFlags() {
+	defineCert()
+	defineConfigDir()
+	defineRegistry()
+	defineSig()
+	defineVPN()
+}
+
+// Prints RESTful response to [os.Stdout].
+func Rest(
+	ctx context.Context, method, op, obj string, args []string,
+) error {
+	var rest rest
+
+	DefineRestFlags()
+
+	err := flag.CommandLine.Parse(args)
+	if err != nil {
+		return err
+	}
+	args = flag.CommandLine.Args()
+	if err = rest.config(); err != nil {
+		return err
+	}
+	_, err = rest.op(ctx, os.Stdout, method, op, obj, args)
+	return err
+}
+
 func RestAdmin(ctx context.Context, args []string) error {
 	var rest rest
 
@@ -65,11 +93,7 @@ RESTful registry administration.
 
 {{flags .}}`)
 
-	defineCert()
-	defineConfigDir()
-	defineRegistry()
-	defineSig()
-	defineVPN()
+	DefineRestFlags()
 
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
@@ -78,7 +102,7 @@ RESTful registry administration.
 	if args = flag.Args(); len(args) == 0 {
 		return xerrors.Incomplete("subscriber")
 	}
-	if err = rest.setup(); err != nil {
+	if err = rest.config(); err != nil {
 		return err
 	}
 
@@ -110,11 +134,7 @@ Import registry certificate.
 
 {{flags .}}`)
 
-	defineCert()
-	defineConfigDir()
-	defineRegistry()
-	defineSig()
-	defineVPN()
+	DefineRestFlags()
 
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
@@ -123,7 +143,7 @@ Import registry certificate.
 	if args = flag.Args(); len(args) == 0 {
 		return xerrors.Incomplete("registry")
 	}
-	if err = rest.setup(); err != nil {
+	if err = rest.config(); err != nil {
 		return err
 	}
 
@@ -135,7 +155,7 @@ Import registry certificate.
 
 	clone := *rest.url
 	q := clone.Query()
-	q.Set(RestKeyOp, xflag.LastName(flag.CommandLine))
+	q.Set(RestKeyOp, RestOpCertify)
 	clone.RawQuery = q.Encode()
 
 	req, err := http.
@@ -186,167 +206,50 @@ Import registry certificate.
 }
 
 func RestGet(ctx context.Context, args []string) error {
-	var rest rest
-
 	xflag.TemplateUsage(`
 usage: {{.Name}} [filename]
 Get or list registry file(s).
 
 {{flags .}}`)
-
-	defineCert()
-	defineConfigDir()
-	defineRegistry()
-	defineSig()
-	defineVPN()
-
-	err := flag.CommandLine.Parse(args)
-	if err != nil {
-		return err
-	}
-	if err = rest.setup(); err != nil {
-		return err
-	}
-
-	clone := *rest.url
-	if flag.CommandLine.NArg() > 0 {
-		clone.Path = flag.CommandLine.Arg(0)
-	}
-	req, err := http.
-		NewRequestWithContext(ctx, http.MethodGet, clone.String(), nil)
-	if err != nil {
-		return xerrors.Mark(err)
-	}
-	resp, err := rest.do(req)
-	if err == nil {
-		defer resp.Body.Close()
-		_, err = io.Copy(os.Stdout, resp.Body)
-	}
-	return err
+	return Rest(ctx, http.MethodGet, "", "", args)
 }
 
 func RestPing(ctx context.Context, args []string) error {
-	var rest rest
-
 	xflag.TemplateUsage(`
 usage: {{.Name}} [flags]
 RESTful ping registry.
 
 {{flags .}}`)
-
-	defineCert()
-	defineConfigDir()
-	defineRegistry()
-	defineSig()
-	defineVPN()
-
-	err := flag.CommandLine.Parse(args)
-	if err != nil {
-		return err
-	}
-	if err = rest.setup(); err != nil {
-		return err
-	}
-
-	clone := *rest.url
-	q := clone.Query()
-	q.Set(RestKeyOp, xflag.LastName(flag.CommandLine))
-	clone.RawQuery = q.Encode()
-	req, err := http.
-		NewRequestWithContext(ctx, http.MethodGet, clone.String(), nil)
-	if err != nil {
-		return xerrors.Mark(err)
-	}
-	resp, err := rest.do(req)
-	if err == nil {
-		defer resp.Body.Close()
-		_, err = io.Copy(os.Stdout, resp.Body)
-	}
-	return err
+	return Rest(ctx, http.MethodGet, RestOpPing, "", args)
 }
 
 func RestReload(ctx context.Context, args []string) error {
-	var rest rest
-
 	xflag.TemplateUsage(`
 usage: {{.Name}} [flags] [args]
 RESTful reload registry configuration.
 
 {{flags .}}`)
 
-	defineCert()
-	defineConfigDir()
-	defineRegistry()
-	defineSig()
-	defineVPN()
-
-	err := flag.CommandLine.Parse(args)
-	if err != nil {
-		return err
-	}
-	if err = rest.setup(); err != nil {
-		return err
-	}
-
-	clone := *rest.url
-	q := clone.Query()
-	q.Set(RestKeyOp, RestOpReload)
-	clone.RawQuery = q.Encode()
-	req, err := http.
-		NewRequestWithContext(ctx, http.MethodPut, clone.String(), nil)
-	if err != nil {
-		return xerrors.Mark(err)
-	}
-	resp, err := rest.do(req)
-	if err == nil {
-		defer resp.Body.Close()
-		_, err = io.Copy(os.Stdout, resp.Body)
-	}
-	return err
+	return Rest(ctx, http.MethodPut, RestOpReload, "", args)
 }
 
 func RestShow(ctx context.Context, args []string) error {
-	var rest rest
+	obj := xflag.LastName(flag.CommandLine)
+	return RestShowObj(ctx, obj, args)
+}
 
+func RestShowObj(ctx context.Context, obj string, args []string) error {
 	xflag.TemplateUsage(`
 usage: {{.Name}} [flags] [args]
 RESTful query and print registry object.
 
 {{flags .}}`)
+	return Rest(ctx, http.MethodGet, RestOpShow, obj, args)
+}
 
-	defineCert()
-	defineConfigDir()
-	defineRegistry()
-	defineSig()
-	defineVPN()
-
-	err := flag.CommandLine.Parse(args)
-	if err != nil {
-		return err
-	}
-	if err = rest.setup(); err != nil {
-		return err
-	}
-
-	clone := *rest.url
-	q := clone.Query()
-	q.Set(RestKeyOp, RestOpShow)
-	q.Set(RestKeyObj, xflag.LastName(flag.CommandLine))
-	for i, arg := range flag.Args() {
-		q.Set(fmt.Sprint("arg", i), arg)
-	}
-	clone.RawQuery = q.Encode()
-	req, err := http.
-		NewRequestWithContext(ctx, http.MethodGet, clone.String(), nil)
-	if err != nil {
-		return xerrors.Mark(err)
-	}
-	resp, err := rest.do(req)
-	if err != nil {
-		defer resp.Body.Close()
-		_, err = io.Copy(os.Stdout, resp.Body)
-	}
-	return err
+func RestShowVCS(ctx context.Context, args []string) error {
+	obj := "vcs." + xflag.LastName(flag.CommandLine)
+	return RestShowObj(ctx, obj, args)
 }
 
 func RestSubscribe(ctx context.Context, args []string) error {
@@ -358,23 +261,19 @@ RESTful subscribe to VPN.
 
 {{flags .}}`)
 
-	defineCert()
-	defineConfigDir()
-	defineRegistry()
-	defineSig()
-	defineVPN()
+	DefineRestFlags()
 
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
 		return err
 	}
-	if err = rest.setup(); err != nil {
+	if err = rest.config(); err != nil {
 		return err
 	}
 
 	clone := *rest.url
 	q := clone.Query()
-	q.Set(RestKeyOp, xflag.LastName(flag.CommandLine))
+	q.Set(RestKeyOp, RestOpSubscribe)
 	clone.RawQuery = q.Encode()
 	req, err := http.
 		NewRequestWithContext(ctx, http.MethodPut, clone.String(), nil)
@@ -440,40 +339,7 @@ func (rest *rest) checkin(
 	return
 }
 
-func (rest *rest) do(req *http.Request) (*http.Response, error) {
-	if strings.HasPrefix(req.URL.Host, "127.0.0.1") ||
-		strings.HasPrefix(req.URL.Host, "localhost") {
-		rest.tp.TLSClientConfig.InsecureSkipVerify = true
-	}
-	cl := &http.Client{Transport: rest.tp}
-	resp, err := cl.Do(req)
-	if err != nil {
-		if resp != nil {
-			defer resp.Body.Close()
-			body, berr := io.ReadAll(resp.Body)
-			if berr == nil && len(body) > 0 {
-				err = fmt.Errorf("%w, %s", err, body)
-			}
-			resp = nil
-		}
-	} else if resp == nil {
-		err = xerrors.Invalid("response")
-	} else if resp.StatusCode != http.StatusOK {
-		defer resp.Body.Close()
-		body, berr := io.ReadAll(resp.Body)
-		if berr != nil || len(body) == 0 {
-			err = errors.New(resp.Status)
-		} else {
-			err = fmt.Errorf("%s, %s", resp.Status, body)
-		}
-		if resp.StatusCode != http.StatusTooEarly {
-			resp = nil
-		}
-	}
-	return resp, err
-}
-
-func (rest *rest) setup() error {
+func (rest *rest) config() error {
 	fn := filepath.Join(vpnConfigDir, vpnCert)
 	cs, err := certificates(fn)
 	if err != nil {
@@ -524,6 +390,76 @@ func (rest *rest) setup() error {
 	rest.tp = http.DefaultTransport.(*http.Transport).Clone()
 	rest.tp.TLSClientConfig = cfg
 	return nil
+}
+
+func (rest *rest) do(req *http.Request) (*http.Response, error) {
+	if strings.HasPrefix(req.URL.Host, "127.0.0.1") ||
+		strings.HasPrefix(req.URL.Host, "localhost") {
+		rest.tp.TLSClientConfig.InsecureSkipVerify = true
+	}
+	cl := &http.Client{Transport: rest.tp}
+	resp, err := cl.Do(req)
+	if err != nil {
+		if resp != nil {
+			defer resp.Body.Close()
+			body, berr := io.ReadAll(resp.Body)
+			if berr == nil && len(body) > 0 {
+				err = fmt.Errorf("%w, %s", err, body)
+			}
+			resp = nil
+		}
+	} else if resp == nil {
+		err = xerrors.Invalid("response")
+	} else if resp.StatusCode != http.StatusOK {
+		defer resp.Body.Close()
+		body, berr := io.ReadAll(resp.Body)
+		if berr != nil || len(body) == 0 {
+			err = errors.New(resp.Status)
+		} else {
+			err = fmt.Errorf("%s, %s", resp.Status, body)
+		}
+		if resp.StatusCode != http.StatusTooEarly {
+			resp = nil
+		}
+	}
+	return resp, err
+}
+
+// Returns error or number of bytes copied to “dst” buffer or writer from
+// RESTful response.
+func (rest *rest) op(
+	ctx context.Context, dst any, method, op, obj string, args []string,
+) (int, error) {
+	clone := *rest.url
+	if len(op) > 0 {
+		q := clone.Query()
+		q.Set(RestKeyOp, op)
+		if len(obj) > 0 {
+			q.Set(RestKeyObj, obj)
+		}
+		for i, arg := range args {
+			q.Set(fmt.Sprint("arg", i), arg)
+		}
+		clone.RawQuery = q.Encode()
+	} else if len(args) > 0 {
+		clone.Path = args[0]
+	}
+	req, err := http.NewRequestWithContext(ctx, method, clone.String(), nil)
+	if err != nil {
+		return 0, err
+	}
+	resp, err := rest.do(req)
+	if err != nil {
+		return 0, err
+	}
+	defer resp.Body.Close()
+	if b, ok := dst.([]byte); ok {
+		return resp.Body.Read(b)
+	} else if w, ok := dst.(io.Writer); ok {
+		n, err := io.Copy(w, resp.Body)
+		return int(n), err
+	}
+	return 0, xerrors.Invalid("dst")
 }
 
 func (rest *rest) tryCheckin(

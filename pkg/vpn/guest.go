@@ -46,23 +46,18 @@ Forward ciphered packets between exchange and tunnel interface.
 
 {{flags .}}`)
 
-	defineCert()
-	defineConfigDir()
 	defineListen(0)
-	defineRegistry()
-	defineSig()
 	defineTunnel()
-	defineVPN()
-
 	enableQuiet()
 	enableTrace()
 	enableVerbose()
+	DefineRestFlags()
 
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
 		return err
 	}
-	if err = g.setup(); err != nil {
+	if err = g.config(); err != nil {
 		return err
 	}
 

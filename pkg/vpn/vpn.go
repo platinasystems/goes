@@ -36,9 +36,10 @@ var Features = map[string]any{
 			"signature":   ShowSignature,
 			"subscriber":  RestShow,
 			"tenant":      RestShow,
-
-			"vcs.modified": RestShow,
-			"vcs.revision": RestShow,
+			"vcs": map[string]any{
+				"modified": RestShowVCS,
+				"revision": RestShowVCS,
+			},
 		},
 	},
 	"vpn": map[string]any{

@@ -40,14 +40,14 @@ type client struct {
 	via       map[int]box.Id
 }
 
-func (cl *client) setup() error {
+func (cl *client) config() error {
 	cl.udpv = "udp"
 	if a := vpnListen.Addr(); a.Is4() {
 		cl.udpv = "udp4"
 	} else if a.Is6() {
 		cl.udpv = "udp6"
 	}
-	return cl.rest.setup()
+	return cl.rest.config()
 }
 
 func (cl *client) register(

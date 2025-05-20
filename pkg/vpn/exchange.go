@@ -49,23 +49,18 @@ Exchange ciphered packets between guests.
 
 {{flags .}}`)
 
-	defineCert()
-	defineConfigDir()
 	defineListen(8003)
 	definePublic()
-	defineRegistry()
-	defineSig()
 	enableTrace()
-	defineVPN()
-
 	enableQuiet()
 	enableVerbose()
+	DefineRestFlags()
 
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
 		return err
 	}
-	if err = ex.setup(); err != nil {
+	if err = ex.config(); err != nil {
 		return err
 	}
 
