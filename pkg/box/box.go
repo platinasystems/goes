@@ -7,6 +7,7 @@
 package box
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -16,6 +17,7 @@ import (
 	_ "unsafe"
 
 	"github.com/platinasystems/goes/v2/pkg/gcm"
+	"github.com/platinasystems/goes/v2/pkg/xcontext"
 	"github.com/platinasystems/goes/v2/pkg/xnet"
 	"github.com/platinasystems/goes/v2/pkg/xnet/netph"
 )
@@ -146,6 +148,15 @@ func (box *Box) OpenWith(v Opener) error {
 	zip := box.data[ZipCode:Stamp]
 	box.Contents, err = v.Open(box.Contents[:0], zip, box.Contents, nil)
 	return err
+}
+
+// Return false and free box if context is done before the box is channeled.
+func (box *Box) Queue(ctx context.Context, ch chan<- *Box) bool {
+	t := xcontext.Queue(ctx, ch, box)
+	if !t {
+		box.Return()
+	}
+	return t
 }
 
 //go:linkname runtime_randn runtime.randn

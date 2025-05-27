@@ -24,37 +24,22 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xnet/netph"
 )
 
-type exchange struct {
-	client
-	lladdr netip.Addr
-	txch   chan *box.Box
-	blkch  chan any // *pem.Block || error
-	pem    struct {
-		addressed  map[netip.Addr]*pem.Block
-		identified map[box.Id]*pem.Block
-	}
-}
-
-var exAll6nodes, exAll6routers netip.Addr
-
 // Exchange is a UDP server that forwards ciphered packets between guest's.
 func Exchange(ctx context.Context, args []string) error {
-	var ex exchange
-
-	xlog.SetPrefixes("exchange/")
-
 	xflag.TemplateUsage(`
 usage: {{.Name}} [flags] [vpn]
 Exchange ciphered packets between guests.
 
 {{flags .}}`)
 
+	var ex exchange
+
 	defineListen(8003)
 	definePublic()
 	enableTrace()
 	enableQuiet()
 	enableVerbose()
-	DefineRestFlags()
+	ex.rest.defineFlags()
 
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
@@ -62,18 +47,6 @@ Exchange ciphered packets between guests.
 	}
 	if err = ex.config(); err != nil {
 		return err
-	}
-
-	exAll6nodes = netip.IPv6LinkLocalAllNodes()
-	exAll6routers = netip.IPv6LinkLocalAllRouters()
-
-	ex.pem.addressed = make(map[netip.Addr]*pem.Block)
-	ex.pem.identified = make(map[box.Id]*pem.Block)
-
-	if ex.lladdr, err = randLinkLocalAddr(); err != nil {
-		return err
-	} else {
-		xlog.Info.Println("link-local address:", ex.lladdr)
 	}
 
 	cctx, cancel := context.WithCancel(ctx)
@@ -108,33 +81,44 @@ Exchange ciphered packets between guests.
 
 	iex, vex := ex.id.Index(), ex.id.Version()
 
-	rxch := make(chan *box.Box, 16)
-	ex.txch = make(chan *box.Box, 16)
-	ex.blkch = make(chan any)
-
 	svc := fmt.Sprintf("%v@%v", ex.id, sap)
 	xlog.Info.Println("start", svc)
 
 	defer xlog.Info.Println("stopped", svc)
 	defer wg.Wait()
 	defer cancel()
-	defer close(ex.txch)
 	defer xlog.Info.Println("stopping", svc, "...")
 
 	wg.Go(func() { xlog.AlarmHandler(cctx) })
-	wg.Go(func() { pktRx(cctx, conn, rxch) })
-	wg.Go(func() { pktTx(cctx, conn, ex.txch) })
+	wg.Go(func() { pktRx(cctx, conn, ex.pkt.rx) })
+	wg.Go(func() { pktTx(cctx, conn, ex.pkt.tx) })
+	wg.Go(func() { ex.whoisRoutine(cctx) })
 
-pktRxLoop:
+exchangeLoop:
 	for {
 		select {
 		case <-cctx.Done():
 			xlog.Info.Println("done", cctx.Err())
-			break pktRxLoop
-		case bx, ok := <-rxch:
+			break exchangeLoop
+		case err = <-ex.fault:
+			break exchangeLoop
+		case buf, ok := <-ex.whois.response:
 			if !ok {
-				xlog.Info.Println("pkt rx ch closed")
-				break pktRxLoop
+				xlog.Info.Println("closed whois response")
+				break exchangeLoop
+			}
+			blk, _ := pem.Decode(buf.Bytes())
+			if blk == nil {
+				err = xerrors.Invalid("encoding")
+				break exchangeLoop
+			}
+			if err = ex.update(blk); err != nil {
+				break exchangeLoop
+			}
+		case bx, ok := <-ex.pkt.rx:
+			if !ok {
+				xlog.Info.Println("closed pkt rx")
+				break exchangeLoop
 			}
 			ap := bx.AddrPort
 			from := bx.FromWhom()
@@ -144,37 +128,31 @@ pktRxLoop:
 			if ivia != iex {
 				xlog.Errata.Printf("via %d != %d", ivia, iex)
 				bx.Return()
-				continue pktRxLoop
+				continue exchangeLoop
 			}
 			if vvia != vex {
 				xlog.Errata.Printf("FIXME version via "+
 					"%d != exchange %d", vvia, vex)
 				bx.Return()
-				continue pktRxLoop
+				continue exchangeLoop
 			}
 			if vfrom != ex.ver[ifrom] {
 				xlog.Info.Println("update", ifrom)
-				wg.Go(func() {
-					ex.blkch <- ex.
-						whois(cctx, RestKeyId, from)
-				})
+				ex.queueWhoisRequest(ctx, ifrom)
 				bx.Return()
-				continue pktRxLoop
+				continue exchangeLoop
 			}
 			ex.service[ifrom] = ap
 			cfrom, ok := ex.gcm[ifrom]
 			if !ok {
-				wg.Go(func() {
-					ex.blkch <- ex.
-						whois(cctx, RestKeyId, from)
-				})
+				ex.queueWhoisRequest(ctx, ifrom)
 				bx.Return()
-				continue pktRxLoop
+				continue exchangeLoop
 			}
 			if err := bx.UnsealWith(cfrom); err != nil {
 				xlog.Errata.Println("unseal", bx, err)
 				bx.Return()
-				continue pktRxLoop
+				continue exchangeLoop
 			}
 			to := bx.ToWhom()
 			ito, vto := to.Index(), to.Version()
@@ -206,26 +184,35 @@ pktRxLoop:
 				bx.AddrPort = ato
 				xlog.Trace.Println("fwd", bx)
 				bx.SealWith(cto)
-				if !xcontext.Queue(ctx, ex.txch, bx) {
+				if !xcontext.Queue(ctx, ex.pkt.tx, bx) {
 					bx.Return()
-				}
-			}
-		case rsp, ok := <-ex.blkch:
-			if !ok {
-				xlog.Errata.Println("closed whois response ch")
-				break pktRxLoop
-			}
-			if err, iserr := rsp.(error); iserr {
-				xlog.Errata.Print(err)
-			} else {
-				blk := rsp.(*pem.Block)
-				if err := ex.update(blk); err != nil {
-					xlog.Errata.Println(err)
 				}
 			}
 		}
 	}
 	return nil
+}
+
+type exchange struct {
+	client
+	lladdr netip.Addr
+	pem    struct {
+		addressed  map[netip.Addr]*pem.Block
+		identified map[box.Id]*pem.Block
+	}
+}
+
+func (ex *exchange) config() error {
+	var err error
+	if ex.lladdr, err = randLinkLocalAddr(); err != nil {
+		return err
+	} else {
+		xlog.Info.Println("link-local address:", ex.lladdr)
+	}
+	ex.pem.addressed = make(map[netip.Addr]*pem.Block)
+	ex.pem.identified = make(map[box.Id]*pem.Block)
+	xlog.Info.Print("made channels and maps")
+	return ex.client.config()
 }
 
 func (ex *exchange) rx(ctx context.Context, bx Box) {
@@ -239,18 +226,15 @@ func (ex *exchange) rx(ctx context.Context, bx Box) {
 	case VPN_P_HELLO:
 		if ack, err := ex.helloAck(from); err != nil {
 			xlog.Errata.Print(err)
-		} else if !xcontext.Queue(ctx, ex.txch, ack) {
+		} else if !xcontext.Queue(ctx, ex.pkt.tx, ack) {
 			ack.Return()
 		}
-		// DON'T forward to other hosts ex.replicate("relay", bx.Box, from)
 	case VPN_P_WHOIS_ADDRESSED:
 		if addr := WhoisAddress(d); !addr.IsValid() {
 			xlog.Errata.Println("rx whois underrun")
 		} else if blk := ex.pem.addressed[addr]; blk == nil {
 			xlog.Info.Println("rx whois:", addr)
-			wg.Go(func() {
-				ex.blkch <- ex.whois(ctx, RestKeyAddress, addr)
-			})
+			ex.queueWhoisRequest(ctx, addr)
 		} else {
 			ex.txPubKey(ctx, "whois addressed rsponse", from, blk)
 		}
@@ -259,9 +243,7 @@ func (ex *exchange) rx(ctx context.Context, bx Box) {
 			xlog.Errata.Print("rx whois:", err)
 		} else if blk := ex.pem.identified[id]; blk == nil {
 			xlog.Info.Println("rx whois:", id)
-			wg.Go(func() {
-				ex.blkch <- ex.whois(ctx, RestKeyId, id)
-			})
+			ex.queueWhoisRequest(ctx, id)
 		} else {
 			ex.txPubKey(ctx, "whois identified response", from, blk)
 		}
@@ -354,7 +336,7 @@ func (ex *exchange) replicate(
 			xlog.Trace.Println(lbl, Box{clone})
 			clone.CloseWith(gcm)
 			clone.SealWith(gcm)
-			if !xcontext.Queue(ctx, ex.txch, clone) {
+			if !xcontext.Queue(ctx, ex.pkt.tx, clone) {
 				clone.Return()
 				return
 			}
@@ -456,7 +438,7 @@ func (ex *exchange) txICMP6EchoReply(
 	xlog.Info.Println("reply", Box{bx})
 	bx.CloseWith(c)
 	bx.SealWith(c)
-	if !xcontext.Queue(ctx, ex.txch, bx) {
+	if !xcontext.Queue(ctx, ex.pkt.tx, bx) {
 		bx.Return()
 	}
 }
@@ -486,7 +468,7 @@ func (ex *exchange) txPubKey(
 	xlog.Info.Println(lbl, Box{bx})
 	bx.CloseWith(c)
 	bx.SealWith(c)
-	if !xcontext.Queue(ctx, ex.txch, bx) {
+	if !xcontext.Queue(ctx, ex.pkt.tx, bx) {
 		bx.Return()
 	}
 }
@@ -550,7 +532,7 @@ func (ex *exchange) txUDP6EchoReply(
 	xlog.Trace.Println(Box{bx})
 	bx.CloseWith(c)
 	bx.SealWith(c)
-	if !xcontext.Queue(ctx, ex.txch, bx) {
+	if !xcontext.Queue(ctx, ex.pkt.tx, bx) {
 		bx.Return()
 	}
 }

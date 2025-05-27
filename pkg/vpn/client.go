@@ -5,6 +5,7 @@
 package vpn
 
 import (
+	"bytes"
 	"context"
 	"crypto/ecdh"
 	"crypto/rand"
@@ -22,6 +23,14 @@ import (
 
 // common to guest and exchange
 type client struct {
+	pkt struct {
+		rx, tx chan *box.Box
+	}
+	whois struct {
+		request  chan any // [box.Id] || [netip.Addr]
+		response chan *bytes.Buffer
+	}
+	fault chan error
 	name,
 	udpv string
 	rest
@@ -47,6 +56,11 @@ func (cl *client) config() error {
 	} else if a.Is6() {
 		cl.udpv = "udp6"
 	}
+	cl.pkt.rx = make(chan *box.Box, 16)
+	cl.pkt.tx = make(chan *box.Box, 16)
+	cl.whois.request = make(chan any, 4)
+	cl.whois.response = make(chan *bytes.Buffer, 4)
+	cl.fault = make(chan error)
 	return cl.rest.config()
 }
 
@@ -59,7 +73,7 @@ func (cl *client) register(
 		return err
 	}
 
-	cl.name = cl.crt.Subject.CommonName
+	cl.name = cl.rest.crt.Subject.CommonName
 	cl.addressed = make(map[netip.Addr]box.Id)
 	cl.gcm = make(map[int]*gcm.Cipher)
 	cl.service = make(map[int]netip.AddrPort)
@@ -86,7 +100,7 @@ func (cl *client) register(
 
 	var via box.Id
 	cl.id, via, cl.addr, cl.vpnPrefix, err =
-		cl.checkin(ctx, cl.pubder, cl.nonce[:], optsvc)
+		cl.rest.checkin(ctx, cl.pubder, cl.nonce[:], optsvc)
 	if err != nil {
 		return err
 	}
@@ -151,12 +165,46 @@ func (cl *client) peer(blk *pem.Block) error {
 	return err
 }
 
+func (cl *client) queueWhoisRequest(ctx context.Context, req any) bool {
+	select {
+	case <-ctx.Done():
+		return false
+	case cl.whois.request <- req:
+		return true
+	}
+}
+
 func (cl *client) waitForDNS(ctx context.Context) error {
 	const timeout = 60 * time.Second
-	hostname := cl.url.Hostname()
+	hostname := cl.rest.url.Hostname()
 	ips, err := PatientLookupIP(ctx, "ip", hostname, timeout)
 	if err == nil {
 		xlog.Info.Println(hostname, ips)
 	}
 	return err
+}
+
+func (cl *client) whoisRoutine(ctx context.Context) {
+	xlog.Info.Println("start whois routine")
+
+	defer xlog.Info.Println("stopped whois routine")
+	defer close(cl.whois.response)
+
+	buf := cl.rest.alloc()
+	defer cl.rest.free(buf)
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case v, ok := <-cl.whois.request:
+			if !ok {
+				return
+			}
+			err := cl.rest.whois(ctx, cl.whois.response, v)
+			if err != nil {
+				cl.fault <- err
+			}
+		}
+	}
 }

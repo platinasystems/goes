@@ -44,6 +44,8 @@ type registry struct {
 	url  *url.URL
 	http *http.Server
 	vpn  map[string]*regVpn
+
+	vcsrev string
 }
 
 type regVpn struct {
@@ -163,6 +165,8 @@ A RESTful WWW server.
 		},
 	}
 
+	reg.vcsrev = xprogram.VcsRevision.String()
+
 	xlog.Info.Println("start", svc)
 	defer xlog.Info.Println("stopped", svc)
 	defer wg.Wait()
@@ -180,7 +184,13 @@ A RESTful WWW server.
 }
 
 func (reg *registry) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	w.Header().Add("Trailer", RestTrailerVcsRevision)
+	defer func() {
+		w.Header().Set(RestTrailerVcsRevision, reg.vcsrev)
+	}()
+
 	defer req.Body.Close()
+
 	if !req.TLS.HandshakeComplete {
 		xlog.Info.Println("incomplete handshake")
 		w.WriteHeader(http.StatusUnauthorized)
@@ -195,8 +205,7 @@ func (reg *registry) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	cn := peer0.Subject.CommonName
 
 	qv := req.URL.Query()
-	op := qv.Get(RestKeyOp)
-	obj := qv.Get(RestKeyObj)
+	op := qv.Get(RestOp)
 
 	if len(op) == 0 {
 		reg.getFileOrDir(w, req)
@@ -271,8 +280,8 @@ func (reg *registry) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			fmt.Fprintln(w, "OK")
 		}
 	case RestOpDump:
-		switch obj {
-		case "subscribers":
+		switch qv.Get(RestOpDump) {
+		case RestDumpSubscribers:
 			if err := vpn.selfOrSubscriber(peer0); err != nil {
 				w.WriteHeader(http.StatusForbidden)
 				fmt.Fprint(w, cn)
@@ -320,7 +329,7 @@ func (reg *registry) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			w.WriteHeader(http.StatusMethodNotAllowed)
 			fmt.Fprint(w, req.Method)
 		} else {
-			switch obj {
+			switch qv.Get(RestOpShow) {
 			case RestShowActive:
 				err = vpn.showActive(w)
 			case RestShowAddress:
@@ -566,7 +575,7 @@ func reqsub(req *http.Request) (string, error) {
 	if !qv.Has("subscriber") {
 		return "", xerrors.Incomplete("subscriber")
 	}
-	return qv.Get(RestKeySubscriber), nil
+	return qv.Get(RestSubscriber), nil
 }
 
 func (vpn *regVpn) approve(req *http.Request) error {
@@ -617,10 +626,10 @@ func (vpn *regVpn) checkin(w http.ResponseWriter, req *http.Request) error {
 
 	cn := req.TLS.PeerCertificates[0].Subject.CommonName
 
-	if qv.Has(RestKeyService) {
-		svc, err = netip.ParseAddrPort(qv.Get(RestKeyService))
+	if qv.Has(RestService) {
+		svc, err = netip.ParseAddrPort(qv.Get(RestService))
 		if err != nil {
-			return xerrors.Label(err, RestKeyService)
+			return xerrors.Label(err, RestService)
 		}
 		if svc.Addr().IsUnspecified() {
 			rap, err := netip.ParseAddrPort(req.RemoteAddr)
@@ -981,21 +990,22 @@ func (vpn *regVpn) whois(w http.ResponseWriter, req *http.Request) error {
 	defer vpn.mutex.RUnlock()
 
 	qv := req.URL.Query()
-	if qv.Has("name") {
-		k = qv.Get("name")
+	if qv.Has(RestWhoisName) {
+		k = qv.Get(RestWhoisName)
 		blk, ok = vpn.block.named[k]
-	} else if qv.Has("id") {
-		id, err := xerrors.MarkResult(box.ParseId(qv.Get(RestKeyId)))
+	} else if qv.Has(RestWhoisId) {
+		s := qv.Get(RestWhoisId)
+		id, err := box.ParseId(s)
 		if err != nil {
-			return xerrors.Label(err, RestKeyId)
+			return xerrors.Label(err, RestWhoisId)
 		}
 		k = fmt.Sprint(id)
 		blk, ok = vpn.block.identified[id.Index()]
-	} else if qv.Has("address") {
-		addr, err := xerrors.MarkResult(netip.
-			ParseAddr(qv.Get(RestKeyAddress)))
+	} else if qv.Has(RestWhoisAddress) {
+		s := qv.Get(RestWhoisAddress)
+		addr, err := netip.ParseAddr(s)
 		if err != nil {
-			return xerrors.Label(err, RestKeyAddress)
+			return xerrors.Label(err, RestWhoisAddress)
 		}
 		k = fmt.Sprint(addr)
 		blk, ok = vpn.block.addressed[addr]

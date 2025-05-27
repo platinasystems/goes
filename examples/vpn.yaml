@@ -269,6 +269,7 @@ spec:
     - "-cert"
     - "exchange0.pem"
     - "-v"
+#   - "-trace"
     ports:
     - protocol: UDP
       containerPort: 8003
@@ -309,6 +310,7 @@ spec:
     - "-cert"
     - "hosta.pem"
     - "-v"
+#   - "-trace"
     securityContext:
       allowPrivilegeEscalation: true
       capabilities:
@@ -355,6 +357,7 @@ spec:
     - "-cert"
     - "hostb.pem"
     - "-v"
+#   - "-trace"
     securityContext:
       allowPrivilegeEscalation: true
       capabilities:
@@ -401,6 +404,7 @@ spec:
     - "-cert"
     - "hostc.pem"
     - "-v"
+#   - "-trace"
     securityContext:
       allowPrivilegeEscalation: true
       capabilities:
