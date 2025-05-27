@@ -7,7 +7,6 @@ package xnet
 import "testing"
 
 func TestNetUint64(t *testing.T) {
-	var err error
 	var got uint64
 	samples := []uint64{
 		0x0000000000000000,
@@ -19,28 +18,21 @@ func TestNetUint64(t *testing.T) {
 	b := make([]byte, 0, len(samples)*8)
 	for _, want := range samples {
 		b = b[:0]
-		if b, err = Attach(b, want); err != nil {
-			t.Fatalf("%#x: %v", want, err)
-		}
-		if _, err = Remove(b, &got); err != nil {
-			t.Fatalf("%#x: %v", want, err)
-		}
+		b = Attach64(b, want)
+		Remove64(b, &got)
 		if got != want {
 			t.Fatalf("%#x != %#x", got, want)
 		}
 	}
 	b = b[:0]
 	for _, want := range samples {
-		if b, err = Attach(b, want); err != nil {
-			t.Fatalf("%#x: %v", want, err)
-		}
-	}
-	for i, want := range samples {
-		if b, err = Remove(b, &got); err != nil {
-			t.Fatalf("%d:%#x: %v", i, want, err)
-		}
+		b = Attach64(b, want)
+		b = Detach64(b, &got)
 		if got != want {
-			t.Fatalf("%d:%#x != %#x", i, got, want)
+			t.Fatalf("%#x != %#x", got, want)
+		}
+		if len(b) != 0 {
+			t.Fatal("not empty:", len(b))
 		}
 	}
 }
