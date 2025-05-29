@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/platinasystems/goes/v2/pkg/chunk"
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xflag"
 	"github.com/platinasystems/goes/v2/pkg/xnet/xdns"
@@ -155,8 +156,9 @@ func digLookup(
 		err error
 	)
 
-	pkt := xdnspkt.Pool.Alloc(0)
-	defer xdnspkt.Pool.Free(pkt)
+	pkt := chunk.New(xdnspkt.Cap)
+	*pkt = (*pkt)[:0]
+	defer chunk.Discard(pkt)
 
 	if fs == flag.CommandLine {
 		cmd = strings.Join(args, " ")
@@ -283,15 +285,15 @@ func digLookup(
 			Type:  perlu.t,
 		}},
 	}
-	if pkt, err = req.AppendTo(pkt[:0]); err != nil {
+	if *pkt, err = req.AppendTo((*pkt)[:0]); err != nil {
 		return err
 	}
 	beg := time.Now()
-	if pkt, err = rsvp(pkt); err != nil {
+	if *pkt, err = rsvp(*pkt); err != nil {
 		return err
 	}
 	end := time.Now()
-	if err = rsp.UnmarshalBinary(pkt); err != nil {
+	if err = rsp.UnmarshalBinary(*pkt); err != nil {
 		return err
 	}
 	if rsp.ID != req.ID {
@@ -402,7 +404,7 @@ func digLookup(
 			fmt.Printf(";; SERVER: %s(%s)\n", svr, ra)
 		}
 		fmt.Println(";; WHEN:", ef)
-		fmt.Println(";; MSG SIZE:", len(pkt))
+		fmt.Println(";; MSG SIZE:", len(*pkt))
 	}
 	if len(args) > 0 {
 		return digLookup(ctx, digNewFlagSet(), rsvp, args)

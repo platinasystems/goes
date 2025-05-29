@@ -1,123 +1,94 @@
-// Copyright © 2022-2024 Platina Systems, Inc. All rights reserved.
+// Copyright © 2022-2025 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-// Package chunk provides yet another allocator for long running applications
-// to avoid GC through a select, custom, or capacity matched free pools.
-// Unlike [sync.Pool.Put], [Free]'d data is never abandoned to the GC,
-// it's always prepended to the matching free pool.
+// Package chunk provides byte slice allocation w/ capacity matched pools.
 package chunk
 
 import (
-	"os"
+	"context"
 	"sync"
-	"sync/atomic"
 )
+
+type Chunk = *[]byte
+
+func mk(n uint) *[]byte {
+	chunk := new([]byte)
+	*chunk = make([]byte, n, n)
+	return chunk
+}
 
 var (
-	Cap16  = &Pool{Cap: 16}
-	Cap64  = &Pool{Cap: 64}
-	Cap256 = &Pool{Cap: 256}
-	Cap512 = &Pool{Cap: 512}
-	Cap1K  = &Pool{Cap: 1 << 10}
-	Cap4K  = &Pool{Cap: 4 << 10}
-	Cap8K  = &Pool{Cap: 8 << 10}
-	Cap16K = &Pool{Cap: 16 << 10}
+	pool16  = sync.Pool{New: func() any { return mk(16) }}
+	pool64  = sync.Pool{New: func() any { return mk(64) }}
+	pool256 = sync.Pool{New: func() any { return mk(256) }}
+	pool512 = sync.Pool{New: func() any { return mk(512) }}
+	pool1K  = sync.Pool{New: func() any { return mk(1 << 10) }}
+	pool2K  = sync.Pool{New: func() any { return mk(2 << 10) }}
+	pool4K  = sync.Pool{New: func() any { return mk(4 << 10) }}
+	pool8K  = sync.Pool{New: func() any { return mk(8 << 10) }}
 )
 
-// Pools may be expanded but must remain ordered by Cap.
-var Pools = []*Pool{
-	Cap16,
-	Cap64,
-	Cap256,
-	Cap512,
-	Cap1K,
-	Cap4K,
-	Cap8K,
-	Cap16K,
-}
-
-var Page = sync.OnceValue(func() *Pool {
-	switch n := os.Getpagesize(); n {
-	case 4 << 10:
-		return Cap4K
-	case 8 << 10:
-		return Cap8K
-	case 16 << 10:
-		return Cap16K
-	default:
-		return Cap4K
-	}
-})
-
-func Alloc(n int) []byte {
-	for _, c := range Pools {
-		if n < c.Cap {
-			return c.Alloc(n)
-		}
-	}
-	return make([]byte, n)
-}
-
-func Free(data []byte) {
-	for _, c := range Pools {
-		if cap(data) == c.Cap {
-			c.Free(data)
-			break
-		}
-	}
-}
-
-type Pool struct {
-	Cap  int
-	free struct {
-		data, ref atomic.Pointer[ref]
-	}
-}
-
-type ref struct {
-	next *ref
-	data []byte
-}
-
-func (p *Pool) Alloc(n int) []byte {
-	if n > p.Cap {
-		return make([]byte, n)
-	}
-	r := p.free.data.Load()
-	for r != nil {
-		if !p.free.data.CompareAndSwap(r, r.next) {
-			r = p.free.data.Load()
-			continue
-		}
-		data := r.data[:n]
-		r.data = r.data[:0]
-		r.next = p.free.ref.Load()
-		for !p.free.ref.CompareAndSwap(r.next, r) {
-			r.next = p.free.ref.Load()
-		}
-		return data
-	}
-	return make([]byte, n, p.Cap)
-}
-
-func (p *Pool) Free(data []byte) {
-	if cap(data) != p.Cap {
+func Discard(chunk *[]byte) {
+	if chunk == nil {
 		return
 	}
-	r := p.free.ref.Load()
-	for r != nil {
-		if p.free.ref.CompareAndSwap(r, r.next) {
-			break
-		}
-		r = p.free.ref.Load()
+	switch n := cap(*chunk); n {
+	case 0:
+	case 16:
+		pool16.Put(chunk)
+	case 64:
+		pool64.Put(chunk)
+	case 256:
+		pool256.Put(chunk)
+	case 512:
+		pool512.Put(chunk)
+	case 1 << 10:
+		pool1K.Put(chunk)
+	case 2 << 10:
+		pool2K.Put(chunk)
+	case 4 << 10:
+		pool4K.Put(chunk)
+	case 8 << 10:
+		pool8K.Put(chunk)
+	default:
+		*chunk = (*chunk)[:0]
 	}
-	if r == nil {
-		r = new(ref)
+}
+
+func New(n uint) *[]byte {
+	var chunk *[]byte
+	if n <= 16 {
+		chunk = pool16.Get().(*[]byte)
+	} else if n <= 64 {
+		chunk = pool64.Get().(*[]byte)
+	} else if n <= 256 {
+		chunk = pool256.Get().(*[]byte)
+	} else if n <= 512 {
+		chunk = pool512.Get().(*[]byte)
+	} else if n <= 1<<10 {
+		chunk = pool1K.Get().(*[]byte)
+	} else if n <= 2<<10 {
+		chunk = pool2K.Get().(*[]byte)
+	} else if n <= 4<<10 {
+		chunk = pool4K.Get().(*[]byte)
+	} else if n <= 8<<10 {
+		chunk = pool8K.Get().(*[]byte)
+	} else {
+		chunk = mk(n)
 	}
-	r.data = data[:cap(data)]
-	r.next = p.free.data.Load()
-	for !p.free.data.CompareAndSwap(r.next, r) {
-		r.next = p.free.data.Load()
+	*chunk = (*chunk)[:n]
+	return chunk
+}
+
+// Returns false and discards chunk if it isn't channeled before
+// context is done.
+func Queue(ctx context.Context, ch chan<- *[]byte, chunk *[]byte) bool {
+	select {
+	case <-ctx.Done():
+		Discard(chunk)
+		return false
+	case ch <- chunk:
+		return true
 	}
 }

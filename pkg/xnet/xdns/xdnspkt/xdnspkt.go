@@ -11,15 +11,10 @@ import (
 	"os"
 	"time"
 
-	"github.com/platinasystems/goes/v2/pkg/chunk"
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 )
 
 const Cap = 1232
-
-var Pool = chunk.Pool{
-	Cap: Cap,
-}
 
 var ResetDeadline time.Time
 

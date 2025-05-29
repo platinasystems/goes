@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/platinasystems/goes/v2/pkg/chunk"
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xflag"
 	"github.com/platinasystems/goes/v2/pkg/xlog"
@@ -77,8 +78,9 @@ Mimic BIND9's DNS lookup utility.
 		svr = args[0]
 	}
 
-	pkt := xdnspkt.Pool.Alloc(0)
-	defer xdnspkt.Pool.Free(pkt)
+	pkt := chunk.New(xdnspkt.Cap)
+	*pkt = (*pkt)[:0]
+	defer chunk.Discard(pkt)
 
 	rsvp := func(data []byte) ([]byte, error) {
 		return data, xerrors.Incomplete("requester")
@@ -118,13 +120,13 @@ Mimic BIND9's DNS lookup utility.
 				Type:  t,
 			}},
 		}
-		if pkt, err = req.AppendTo(pkt[:0]); err != nil {
+		if *pkt, err = req.AppendTo((*pkt)[:0]); err != nil {
 			return err
 		}
-		if pkt, err = rsvp(pkt); err != nil {
+		if *pkt, err = rsvp(*pkt); err != nil {
 			return err
 		}
-		if err = rsp.UnmarshalBinary(pkt); err != nil {
+		if err = rsp.UnmarshalBinary(*pkt); err != nil {
 			return err
 		}
 		if rsp.ID != req.ID {
