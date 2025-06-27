@@ -106,7 +106,7 @@ func TestReadCertificates(t *testing.T) {
 		"hostc",
 	}
 	if testing.Verbose() {
-		readCertificateTrace = xlog.Unmute(readCertificateTrace)
+		xlog.UnmuteTrace()
 	}
 	r := bytes.NewBufferString(testCertificates[1:])
 	cs, err := readCertificates(r)

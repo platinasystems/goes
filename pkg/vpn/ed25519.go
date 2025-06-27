@@ -15,7 +15,22 @@ import (
 	"path/filepath"
 
 	"github.com/platinasystems/goes/v2/pkg/xflag"
+	"github.com/platinasystems/goes/v2/pkg/xlog"
 )
+
+type pureEd25519 struct {
+	ed25519.PublicKey
+}
+
+func (v pureEd25519) verify(msg []byte) bool {
+	n := len(msg)
+	if n < ed25519.SignatureSize {
+		xlog.Errata.Println(n, "<", ed25519.SignatureSize)
+		return false
+	}
+	i := len(msg) - ed25519.SignatureSize
+	return ed25519.Verify(v.PublicKey, msg[:i], msg[i:])
+}
 
 // NewEd25519 creates a PEM encoded ed25519 signature key file.
 func NewEd25519(ctx context.Context, args []string) error {

@@ -29,13 +29,19 @@ func Recovery(p *error, suppressed ...error) {
 	} else if err = Suppress(err, suppressed...); err == nil {
 		return
 	}
+	if _, is_mark := err.(MarkError); is_mark {
+		*p = err
+		return
+	}
+	if *p != nil {
+		err = Label(*p, err)
+	}
 	depth := 2
 	if _, is_runtime := err.(runtime.Error); is_runtime {
 		depth = 3
 	}
 	if _, f, l, ok := runtime.Caller(depth); ok {
-		*p = Label(err, FileNameMutation(f), l)
-	} else {
-		*p = err
+		err = Label(err, FileNameMutation(f), l)
 	}
+	*p = err
 }

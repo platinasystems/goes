@@ -5,14 +5,18 @@
 package vpn
 
 import (
+	"errors"
+	"fmt"
 	"net/netip"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/platinasystems/goes/v2/pkg/fhs"
 	"github.com/platinasystems/goes/v2/pkg/xdg"
+	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xflag"
 	"github.com/platinasystems/goes/v2/pkg/xlog"
 	"github.com/platinasystems/goes/v2/pkg/xprogram"
@@ -28,17 +32,22 @@ var Features = map[string]any{
 	},
 	"show": map[string]any{
 		"vpn": map[string]any{
-			RestShowActive:      RestShow,
-			RestShowAddress:     RestShow,
-			RestShowAdmins:      RestShow,
-			"certificate":       ShowCertificate,
-			RestShowHosts:       RestShow,
-			RestShowPending:     RestShow,
-			"signature":         ShowSignature,
-			RestShowSubscriber:  RestShow,
-			RestShowTenant:      RestShow,
-			RestShowVcsModified: RestShow,
-			RestShowVcsRevision: RestShow,
+			RestOpShowActive:     RestShow,
+			RestOpShowAddress:    RestShow,
+			RestOpShowAdmins:     RestShow,
+			"certificate":        ShowCertificate,
+			RestOpShowExchanges:  RestShow,
+			RestOpShowHosts:      RestShow,
+			RestOpShowPending:    RestShow,
+			RestOpShowPrefix:     RestShow,
+			"signature":          ShowSignature,
+			RestOpShowStart:      RestShow,
+			RestOpShowSubscriber: RestShow,
+			RestOpShowTenant:     RestShow,
+			RestOpShowVcs: map[string]any{
+				RestOpShowVcsModified: RestShowVcs,
+				RestOpShowVcsRevision: RestShowVcs,
+			},
 		},
 	},
 	"vpn": map[string]any{
@@ -57,6 +66,9 @@ var Features = map[string]any{
 }
 
 const (
+	defaultRegistryPort = 8003
+	defaultServicePort  = 8003
+
 	oAppend = os.O_WRONLY | os.O_CREATE | os.O_APPEND
 	oCreate = os.O_WRONLY | os.O_CREATE | os.O_TRUNC
 
@@ -65,9 +77,20 @@ const (
 )
 
 var (
-	wg xsync.WaitGroup
+	errEOC = errors.New("end of channel")
 
-	vpnCert         = "cert.pem"
+	errNoService = errors.New("no service addr:port")
+
+	errUnaddressed = errors.New("unaddressed")
+
+	errUnassigned = errors.New("unanassigned")
+
+	errUnestablished = errors.New("unestablished")
+
+	errUnidentified = errors.New("unidentified")
+
+	vpnCert = "cert.pem"
+
 	vpnConfig       = "config.yaml"
 	vpnConfigDir    = "/etc/goes"
 	vpnDataDir      = "/usr/share/goes"
@@ -94,9 +117,40 @@ var (
 	vpnVPN string
 
 	vpnTunnel uint
+
+	wg xsync.WaitGroup
 )
 
+var DomainName = sync.OnceValues(func() (string, error) {
+	s, err := HostFQDN()
+	if err == nil {
+		if i := strings.Index(s, "."); i > 0 {
+			s = s[i+1:]
+		} else {
+			s = ""
+		}
+	}
+	return s, err
+})
+
+var Host = sync.OnceValues(func() (string, error) {
+	s, err := HostFQDN()
+	if err == nil {
+		if i := strings.Index(s, "."); i > 0 {
+			s = s[:i]
+		}
+	}
+	return s, err
+})
+
+var HostFQDN = sync.OnceValues(func() (string, error) {
+	return os.Hostname()
+})
+
 func defineCert() {
+	if s, err := Host(); err == nil {
+		vpnCert = fmt.Sprint(s, ".pem")
+	}
 	xflag.Define(&vpnCert, "cert",
 		"Certificate file name w/in config-dir.")
 }
@@ -147,6 +201,9 @@ func defineDataDir() {
 }
 
 func defineDNS() {
+	if s, err := HostFQDN(); err == nil && len(s) > 0 {
+		vpnDNS = s
+	}
 	xflag.Define(&vpnDNS, "dns", "Comma separated domain names.")
 }
 
@@ -171,6 +228,9 @@ func defineLocality() {
 }
 
 func defineName() {
+	if s, err := Host(); err == nil {
+		vpnName = s
+	}
 	xflag.Define(&vpnName, "name", "VPN identfier.")
 }
 
@@ -264,6 +324,22 @@ func enableVerbose() {
 
 func defineVPN() {
 	xflag.Define(&vpnVPN, "vpn", "Named VPN. (default unnamed)")
+}
+
+func noServiceError(args ...any) error {
+	return xerrors.Label(errNoService, args...)
+}
+
+func unaddressedError(args ...any) error {
+	return xerrors.Label(errUnaddressed, args...)
+}
+
+func unassignedError(args ...any) error {
+	return xerrors.Label(errUnassigned, args...)
+}
+
+func unestablishedError(args ...any) error {
+	return xerrors.Label(errUnestablished, args...)
 }
 
 func mainSubDir() string {

@@ -5,21 +5,26 @@
 package vpn
 
 import (
+	"bytes"
 	"context"
-	"encoding/pem"
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/ecdh"
+	"crypto/rand"
+	"crypto/x509"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"net"
+	"net/http"
 	"net/netip"
 	"os"
 	"runtime"
-	"runtime/debug"
+	"slices"
 	"time"
 
-	"github.com/platinasystems/goes/v2/pkg/box"
 	"github.com/platinasystems/goes/v2/pkg/netif"
 	"github.com/platinasystems/goes/v2/pkg/nettun"
-	"github.com/platinasystems/goes/v2/pkg/xcontext"
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xflag"
 	"github.com/platinasystems/goes/v2/pkg/xlog"
@@ -29,81 +34,113 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xos"
 )
 
-const MTU = box.ContentMTU - netph.TunPISize
+const (
+	CipherOverhead = 28
+
+	IP6MTU  = netph.ETHMTU - netph.IP6Size
+	UDP6MTU = IP6MTU - netph.UDPSize
+	VPNMTU  = UDP6MTU - VPNSize
+	TunMTU  = VPNMTU - CipherOverhead
+
+	IsTap = false
+
+	TunOwner = -1
+	TunGroup = -1
+
+	TunPersist = false
+)
+
+type GuestReceipt struct {
+	Id     Id
+	Prefix netip.Prefix
+}
 
 // Guest is a UDP server that forwards ciphered packets between an exchange
 // and a network tunnel interface.
 func Guest(ctx context.Context, args []string) error {
+	var svc string
+	defer xlog.Info.Println("stopped", svc)
+
 	xflag.TemplateUsage(`
-usage: {{.Name}} [flags] [vpn]
+usage: {{.Name}} [flags] <via[:port]>
 Forward ciphered packets between exchange and tunnel interface.
 
 {{flags .}}`)
 
-	var g guest
-
 	defineListen(0)
 	defineTunnel()
+	defineRestFlags()
 	enableQuiet()
 	enableTrace()
 	enableVerbose()
-	g.rest.defineFlags()
 
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
 		return err
 	}
-	if err = g.config(); err != nil {
+	if flag.CommandLine.NArg() == 0 {
+		return xerrors.Incomplete("via[:port]")
+	}
+	via := flag.CommandLine.Arg(0)
+	g := guest{
+		addressed: make(map[netip.Addr]Id),
+		cb:        make(map[int]cipher.Block),
+		gcm:       make(map[int]cipher.AEAD),
+		lbl:       make(map[int][]byte),
+		tunmsgs:   makeGuestTunMsgs(),
+		ver:       make(map[int]uint8),
+	}
+	if err = g.subscriber.config(); err != nil {
 		return err
 	}
 
-	cctx, cancel := context.WithCancel(ctx)
+	ctx, cancel := context.WithCancel(ctx)
+	defer wg.Wait()
+	defer cancel()
 
-	conn, err := net.ListenUDP(g.udpv, &net.UDPAddr{
-		IP:   vpnListen.Addr().AsSlice(),
-		Port: int(vpnListen.Port()),
-	})
-	if err != nil {
-		return xerrors.Label(err, "ListenUDP")
+	wg.Go(func() { xlog.AlarmHandler(ctx) })
+
+	if err = g.checkin(ctx, via); err != nil {
+		return err
+	}
+	if err = g.waitForExchange(ctx, via); err != nil {
+		return err
+	}
+
+	if err = udpListen(); err != nil {
+		return err
 	}
 	wg.Go(func() {
-		defer conn.Close()
+		if t := udpStream(ctx); err == nil {
+			err = t
+		}
+	})
+	wg.Go(func() {
+		defer xlog.Info.Println("closed", udp.LocalAddr())
+		defer udp.Close()
 		<-ctx.Done()
 	})
 
-	lap, err := netip.ParseAddrPort(conn.LocalAddr().String())
+	err = g.greetings(ctx, time.Now(), g.via.Id, g.via.Service)
 	if err != nil {
-		return xerrors.Label(err, "LocalAddr")
-	}
-	if err = g.register(ctx, netip.AddrPort{}); err != nil {
 		return err
 	}
 
-	iguest := g.id.Index()
-	vguest := g.id.Version()
-	via := g.via[iguest]
+	svc = fmt.Sprintf("%s %v@%v via %s %v@%v",
+		g.subscriber.rest.crt.Subject.CommonName,
+		MyId, udp.LocalAddr(),
+		g.via.Name, g.via.Id, g.via.Service)
 
-	svc := fmt.Sprintf("%v via %v@%v", iguest, via, lap)
 	xlog.Info.Println("start", svc)
-
-	defer xlog.Info.Println("stopped", svc)
-	defer wg.Wait()
-	defer cancel()
 	defer xlog.Info.Println("stopping", svc, "...")
 
 	ha := netif.NewHardwareAddr()
 	if err = ha.Rand(); err != nil {
-		return xerrors.Label(err, "rand")
+		return err
 	}
 
-	const (
-		istap   = false
-		persist = false
-		owner   = -1
-		group   = -1
-	)
-
-	g.tun, err = nettun.New(vpnTunnel, istap, persist, owner, group, ha)
+	g.tun, err = nettun.
+		New(vpnTunnel, IsTap, TunPersist, TunOwner, TunGroup, ha)
 	if err != nil {
 		return err
 	}
@@ -112,492 +149,398 @@ Forward ciphered packets between exchange and tunnel interface.
 		<-ctx.Done()
 	})
 
-	if err := xos.SetNonblockFile(g.tun, true); err != nil {
-		return err
+	if runtime.NumCPU() == 1 {
+		if err = xos.SetNonblockFile(g.tun, true); err != nil {
+			return err
+		}
 	}
 
 	nif, err := netif.Named(ctx, g.tun.Name())
 	if err != nil {
-		return xerrors.Mark(err)
-	} else if nif == nil {
+		return err
+	}
+	if nif == nil {
 		return xerrors.NotFound(g.tun.Name())
 	}
 
-	err = nif.Config(cctx, "up", "mtu", fmt.Sprint(MTU))
-	if err != nil {
-		return xerrors.Label(err, nif.Name, "mtu", MTU)
+	if err = nif.Config(ctx, "up", "mtu", fmt.Sprint(TunMTU)); err != nil {
+		return err
 	}
-	xlog.Info.Println("OK", nif.Name, "up", "mtu", MTU)
+	xlog.Info.Println(nif.Name, "up", "mtu", TunMTU)
 
-	addr := g.hostPrefix.Addr()
+	addr := g.prefix.Addr()
 	if addr.Is6() {
 		addr = addr.WithZone(nif.Name)
 	}
+	bits := 32
+	if addr.Is6() {
+		bits = 128
+	}
 	// FIXME probably still need dst w/ ipv4
-
-	err = nif.Add(cctx, addr, netip.Addr{}, g.hostPrefix.Bits())
-	if err != nil {
+	if err = nif.Add(ctx, addr, netip.Addr{}, bits); err != nil {
 		return err
 	}
+	xlog.Info.Println(nif.Name, addr)
 
-	err = routeAdd(cctx, g.vpnPrefix, nif)
-	if err != nil {
-		return xerrors.Note(err,
-			"route", "add", g.vpnPrefix, "via", nif)
+	g.vpn = g.prefix.Masked()
+	if err = routeAdd(ctx, g.vpn, nif); err != nil {
+		return err
 	}
-	defer routeDelete(cctx, g.vpnPrefix, nif)
+	xlog.Info.Println(nif.Name, g.vpn)
+	defer routeDelete(ctx, g.vpn, nif)
 
-	var llu6 netip.Addr
-	var addrs []net.Addr
-
-	// FIXME nif.Addrs returns empty
-	if addrs, err = nif.Addrs(); err != nil {
-		xlog.Errata.Println(err)
+	addrs, err := nif.Addrs()
+	if err != nil {
+		return err
 	} else if len(addrs) > 0 {
 		xlog.Info.Println(nif.Name, "addrs", addrs)
 	} else if itf, err := net.InterfaceByName(nif.Name); err != nil {
-		xlog.Errata.Println(err)
+		return err
 	} else if addrs, err = itf.Addrs(); err != nil {
-		xlog.Errata.Println(err)
+		return err
 	}
 	for _, addr := range addrs {
 		p, err := netip.ParsePrefix(addr.String())
 		if err == nil {
 			pa := p.Addr()
 			if pa.IsLinkLocalUnicast() {
-				llu6 = pa
+				g.llu6 = pa
 				break
 			}
 		}
 	}
 
-	wg.Go(func() { xlog.AlarmHandler(cctx) })
-	wg.Go(func() { pktRx(cctx, conn, g.pkt.rx) })
-	wg.Go(func() { pktTx(cctx, conn, g.pkt.tx) })
-	wg.Go(func() { g.tunRead(cctx) })
-	wg.Go(func() { g.tunWrite(cctx) })
-	wg.Go(func() { g.whoisRoutine(cctx) })
-
-	xlog.Info.Printf("start (%s, %v)", nif.Name, g.hostPrefix)
-	defer xlog.Info.Printf("stopped (%s, %v)", nif.Name, g.hostPrefix)
-	defer func() {
-		r := recover()
-		if r != nil {
-			xlog.Errata.Print(r)
-			debug.PrintStack()
+	wg.Go(func() {
+		name := g.tun.Name()
+		xlog.Info.Println("start read", name)
+		err := mp.ReadMsgs(ctx, g.tun, g.tunmsgs)
+		if err != nil {
+			xlog.Errata.Println("egress read", name, err)
+		} else {
+			xlog.Info.Println("stopped read", name)
 		}
-	}()
+	})
 
-	if err = g.hello(ctx, via, time.Now()); err != nil {
-		return err
-	}
+	wg.Go(func() { g.whoisService(ctx) })
+	defer close(g.whoisReqCh)
 
-	kat := time.NewTicker(10 * time.Second)
-	defer kat.Stop()
+	tkr := time.NewTicker(10 * time.Second)
+	defer tkr.Stop()
 
-guestLoop:
-	for {
+selection:
+	for err == nil {
 		select {
-		case <-cctx.Done():
-			xlog.Info.Println("done")
-			break guestLoop
+		case <-ctx.Done():
+			err = ctx.Err()
 		case err = <-g.fault:
-			break guestLoop
-		case t := <-kat.C:
-			if err = g.hello(ctx, via, t); err != nil {
-				xlog.Errata.Println(err)
-			}
-		case buf, ok := <-g.whois.response:
+		case t := <-tkr.C:
+			err = g.greetings(ctx, t, g.via.Id, g.via.Service)
+		case gx, ok := <-g.whoisRspCh:
 			if !ok {
-				xlog.Info.Println("closed whois response")
-				break guestLoop
+				break selection
 			}
-			blk, _ := pem.Decode(buf.Bytes())
-			if blk == nil {
-				err = xerrors.Invalid("encoding")
-				break guestLoop
-			}
-			if err = g.peer(blk); err != nil {
-				break guestLoop
-			}
-		case bx, ok := <-g.q.read:
+			g.peer(ctx, gx)
+		case m, ok := <-g.tunmsgs:
 			if !ok {
-				xlog.Info.Println("closed tun read")
-				break guestLoop
+				break selection
 			}
-			if ato, err := g.toWhom(bx.Contents); err != nil {
-				xlog.Errata.Println(err)
-				bx.Return()
-			} else if !ato.IsValid() {
-				xlog.Info.Println("dropped non-ip[6]")
-				bx.Return()
-			} else if ato.Compare(g.addr) == 0 {
-				xlog.Info.Println("loopback", ato)
-				bx.Queue(ctx, g.q.write)
-			} else if llu6.IsValid() && ato.Compare(llu6) == 0 {
-				xlog.Info.Println("link-local loopback", ato)
-				bx.Queue(ctx, g.q.write)
-			} else if ato.IsMulticast() {
-				g.multicast(cctx, bx, ato)
-			} else if ato.IsLinkLocalUnicast() ||
-				g.vpnPrefix.Contains(ato) {
-				g.unicast(cctx, bx, ato)
-			} else {
-				xlog.Info.Println(ato, "out of", g.vpnPrefix)
-				bx.Return()
-			}
-		case bx, ok := <-g.pkt.rx:
+			err = g.tx(ctx, m)
+		case m, ok := <-rmc:
 			if !ok {
-				xlog.Info.Println("closed pkt rx")
-				break guestLoop
+				break selection
 			}
-			from := bx.FromWhom()
-			ifrom, vfrom := from.Index(), from.Version()
-			if v, ok := g.ver[ifrom]; !ok || v != vfrom {
-				g.queueWhoisRequest(ctx, ifrom)
-				bx.Return()
-				continue guestLoop
-			}
-			via := bx.ViaWhom()
-			ivia, vvia := via.Index(), via.Version()
-			if v, ok := g.ver[ivia]; !ok || v != vvia {
-				xlog.Info.Println("update", ivia)
-				g.queueWhoisRequest(ctx, ivia)
-				bx.Return()
-				continue guestLoop
-			}
-			svc, ok := g.service[ivia]
-			if !ok || svc.Compare(bx.AddrPort) != 0 {
-				g.service[ivia] = bx.AddrPort
-			}
-			opener, ok := g.gcm[ivia]
-			if !ok {
-				xlog.Errata.Print("no cipher for exchange %d",
-					ivia)
-				bx.Return()
-				continue guestLoop
-			}
-			if err = bx.UnsealWith(opener); err != nil {
-				xlog.Errata.Println("unseal:", err)
-				bx.Return()
-				continue guestLoop
-			}
-			to := bx.ToWhom()
-			ito, vto := to.Index(), to.Version()
-			if ito == iguest {
-				if vto != vguest {
-					xlog.Errata.Print("wrong version")
-					bx.Return()
-					continue guestLoop
-				}
-				if opener, ok = g.gcm[ifrom]; !ok {
-					xlog.Errata.Printf("no cipher for "+
-						"guest %d", ifrom)
-					bx.Return()
-					continue guestLoop
-				}
-			}
-			if err = bx.OpenWith(opener); err != nil {
-				xlog.Info.Print(err)
-				bx.Return()
-				continue guestLoop
-			}
-			xlog.Trace.Println("rx", Box{bx})
-			hvpn, dvpn, err := Box{bx}.PDU().Parse()
-			if err != nil {
-				xlog.Errata.Println(err)
-				bx.Return()
-				continue guestLoop
-			}
-			switch hvpn.Proto {
-			case VPN_P_HELLO:
-				// FIXME verify exchange version.
-				xlog.Trace.Println(Box{bx})
-				bx.Return()
-			case VPN_P_PUBLIC_KEY:
-				blk, _ := pem.Decode(dvpn)
-				if blk == nil {
-					xlog.Errata.Println("encoding?")
-				} else if err = g.peer(blk); err != nil {
-					xlog.Errata.Println(err)
-				}
-				bx.Return()
-			case VPN_P_IP:
-				xnet.Encode(bx.Contents, netph.TunPI{
-					Proto: netph.TUN_P_IP,
-				})
-				if ip, _, err := netpdu.
-					IP(dvpn).Parse(); err != nil {
-					xlog.Errata.Print(err)
-					bx.Return()
-				} else {
-					sa := netip.AddrFrom4(ip.SA)
-					g.addressed[sa] = from
-					bx.Queue(ctx, g.q.write)
-				}
-			case VPN_P_IP6:
-				xnet.Encode(bx.Contents, netph.TunPI{
-					Proto: netph.TUN_P_IP6,
-				})
-				if ip, _, err := netpdu.
-					IP6(dvpn).Parse(); err != nil {
-					xlog.Errata.Print(err)
-					bx.Return()
-				} else {
-					sa := netip.AddrFrom16(ip.SA)
-					g.addressed[sa] = from
-					bx.Queue(ctx, g.q.write)
-				}
-			default:
-				xlog.Errata.Printf("invalid proto %#x",
-					hvpn.Proto)
-				bx.Return()
-			}
+			err = g.rx(ctx, m)
 		}
 	}
-	return err
+	return xerrors.Suppress(err, context.Canceled, errEOC)
+}
+
+func makeGuestTunMsgs() chan *xnet.Msg {
+	if runtime.NumCPU() > 1 {
+		return make(chan *xnet.Msg, 4)
+	}
+	return make(chan *xnet.Msg)
 }
 
 type guest struct {
-	client
-	q struct {
-		read, write chan *box.Box
-	}
-	tun *os.File
+	subscriber
+	tunmsgs   chan *xnet.Msg
+	addressed map[netip.Addr]Id
+
+	llu6 netip.Addr
+
+	prefix,
+	vpn netip.Prefix
+
+	priv *ecdh.PrivateKey
+	cb   map[int]cipher.Block
+	gcm  map[int]cipher.AEAD
+	lbl  map[int][]byte
+	ver  map[int]uint8
+	tun  *os.File
+
+	// msgs pending whois response
+	pending struct{ rx, tx []*xnet.Msg }
 }
 
-func (g *guest) config() error {
-	g.q.read = make(chan *box.Box, 16)
-	g.q.write = make(chan *box.Box, 16)
-	return g.client.config()
-}
-
-func (g *guest) hello(ctx context.Context, to box.Id, now time.Time) error {
+func (g *guest) checkin(ctx context.Context, via string) error {
 	var err error
-	ito := to.Index()
-	cto, ok := g.gcm[ito]
-	if !ok {
-		xlog.Info.Println("hello, whois", to)
-		g.queueWhoisRequest(ctx, to)
-		return nil
-	}
-	via, ok := g.via[ito]
-	if !ok {
-		via = to
-	}
-	ivia := via.Index()
-	cvia, ok := g.gcm[ivia]
-	if !ok {
-		return fmt.Errorf("%d: no exchange cipher", ivia)
-	}
-	avia, ok := g.service[ivia]
-	if !ok {
-		return fmt.Errorf("%d: no exchange service", ivia)
-	}
-	bx := box.New()
-	bx.Contents, err = xnet.Attach(bx.Contents, netph.TunPI{
-		Proto: VPN_P_HELLO,
-	})
+	var receipt GuestReceipt
+
+	buf := g.subscriber.rest.alloc()
+	defer g.subscriber.rest.free(buf)
+
+	g.priv, err = ecdh.X25519().GenerateKey(rand.Reader)
 	if err != nil {
-		bx.Return()
 		return err
 	}
-	bx.Contents, err = xnet.Attach(bx.Contents, now.UnixMicro())
+	pubder, err := x509.MarshalPKIXPublicKey(g.priv.PublicKey())
 	if err != nil {
-		bx.Return()
 		return err
 	}
-	bx.AddrPort = avia
-	bx.From(g.id)
-	bx.To(to)
-	bx.Via(via)
-	xlog.Trace.Println(Box{bx})
-	bx.CloseWith(cto)
-	bx.SealWith(cvia)
-	if !xcontext.Queue(ctx, g.pkt.tx, bx) {
-		bx.Return()
+	rsp, err := g.subscriber.rest.request(ctx, buf, http.MethodPut,
+		"application/pkixcmp", bytes.NewReader(pubder),
+		RestOp, RestOpCheckin,
+		RestOpCheckin, RestOpCheckinGuest,
+		RestOpCheckinGuestVia, via)
+	if err != nil {
+		return err
 	}
+	if err = g.validateCheckinResponse(rsp); err != nil {
+		return err
+	}
+	if err = json.Unmarshal(buf.Bytes(), &receipt); err != nil {
+		return err
+	}
+	MyId = receipt.Id
+	MyLabel = MakeLabel(MyId, MyId)
+	g.prefix = receipt.Prefix
+	xlog.Info.Println("registration:", MyId, "@", g.prefix)
 	return nil
 }
 
-func (g *guest) multicast(ctx context.Context, bx *box.Box, addr netip.Addr) {
-	g.setVpnProto(bx, addr.Is6())
-	iguest := g.id.Index()
-	via := g.via[iguest]
-	ivia := via.Index()
-	c, ok := g.gcm[ivia]
-	if !ok || c == nil {
-		xlog.Info.Println("whois", ivia)
-		g.queueWhoisRequest(ctx, ivia)
-		bx.Return()
-		return
-	}
-	bx.From(g.id)
-	bx.To(via)
-	bx.Via(via)
-	xlog.Trace.Println("multicast", Box{bx})
-	bx.CloseWith(c)
-	bx.SealWith(c)
-	bx.AddrPort = g.service[ivia]
-	bx.Queue(ctx, g.pkt.tx)
+func (g *guest) isOK(id Id) bool {
+	v, ok := g.ver[id.Index()]
+	return ok && v == id.Version()
 }
 
-func (g *guest) unicast(ctx context.Context, bx *box.Box, addr netip.Addr) {
-	g.setVpnProto(bx, addr.Is6())
-	bx.From(g.id)
-	to, ok := g.addressed[addr]
-	if !ok {
-		xlog.Info.Println("whois", addr)
-		g.queueWhoisRequest(ctx, addr)
-		bx.Return()
-		return
-	}
-	bx.To(to)
-	ito := to.Index()
-	cto, ok := g.gcm[ito]
-	if !ok || cto == nil {
-		xlog.Info.Print("whois", ito)
-		bx.Return()
-		return
-	}
-	via, ok := g.via[ito]
-	if !ok {
-		if _, ok := g.service[ito]; ok {
-			via = to
+func (g *guest) pendingDiscard(reg *Registration) {
+	g.pendingTxMatch(reg.Addr, mp.Put)
+}
+
+func (g *guest) pendingRx(ctx context.Context, reg *Registration) {
+	g.pendingRxMatch(reg.Id, func(m *xnet.Msg) {
+		g.rx(ctx, m)
+	})
+}
+
+func (g *guest) pendingRxMatch(id Id, f func(*xnet.Msg)) {
+	var m *xnet.Msg
+	for i := 0; i < len(g.pending.rx); {
+		m = g.pending.rx[i]
+		_, from := ScanLabel(m.Data)
+		if id.Index() == from.Index() {
+			g.pending.rx = slices.Delete(g.pending.rx, i, i+1)
+			f(m)
 		} else {
-			xlog.Errata.Printf("%v@%v: %s", to, addr, "no via")
-			bx.Return()
-			return
+			i += 1
 		}
 	}
-	bx.Via(via)
-	ivia := via.Index()
-	cvia, ok := g.gcm[ivia]
-	if !ok {
-		g.queueWhoisRequest(ctx, ivia)
-		bx.Return()
-		return
-	}
-	bx.AddrPort, ok = g.service[ivia]
-	if !ok {
-		xlog.Errata.Printf("%d: %s", ivia, "no exchange service")
-		bx.Return()
-		return
-	}
-	xlog.Trace.Println("unicast", Box{bx})
-	bx.CloseWith(cto)
-	bx.SealWith(cvia)
-	bx.Queue(ctx, g.pkt.tx)
 }
 
-func (*guest) setVpnProto(bx *box.Box, is6 bool) {
+func (g *guest) pendingTx(ctx context.Context, reg *Registration) {
+	g.pendingTxMatch(reg.Addr, func(m *xnet.Msg) {
+		g.tx(ctx, m)
+	})
+}
+
+func (g *guest) pendingTxMatch(addr netip.Addr, f func(*xnet.Msg)) {
+	var m *xnet.Msg
+	for i := 0; i < len(g.pending.tx); {
+		m = g.pending.tx[i]
+		if da, err := netpdu.TunPI(m.Data).ToWhom(); err != nil {
+			g.pending.tx = slices.Delete(g.pending.tx, i, i+1)
+		} else if da.Compare(addr) == 0 {
+			g.pending.tx = slices.Delete(g.pending.tx, i, i+1)
+			f(m)
+		} else {
+			i += 1
+		}
+	}
+}
+
+func (g *guest) peer(ctx context.Context, reg *Registration) {
+	var err error
+
+	regi := reg.Id.Index()
+	g.ver[regi] = reg.Id.Version()
+	if g.verifiers[regi], err = reg.verifier(); err != nil {
+		g.pendingDiscard(reg)
+		xlog.Errata.Println(err)
+		return
+	}
+	anyk, err := x509.ParsePKIXPublicKey(reg.PubKey)
+	if err != nil {
+		g.pendingDiscard(reg)
+		xlog.Errata.Println(err)
+		return
+	}
+	ecdhpub, ok := anyk.(*ecdh.PublicKey)
+	if !ok {
+		g.pendingDiscard(reg)
+		xlog.Errata.Printf("%T: unsupported", anyk)
+		return
+	}
+	shared, err := g.priv.ECDH(ecdhpub)
+	if err != nil {
+		g.pendingDiscard(reg)
+		xlog.Errata.Println(err)
+		return
+	}
+	cb, err := aes.NewCipher(shared)
+	if err != nil {
+		g.pendingDiscard(reg)
+		xlog.Errata.Println(err)
+		return
+	}
+	gcm, err := cipher.NewGCMWithRandomNonce(cb)
+	if err != nil {
+		g.pendingDiscard(reg)
+		xlog.Errata.Println(err)
+		return
+	}
+	g.addressed[reg.Addr] = reg.Id
+	g.lbl[regi] = MakeLabel(MyId, reg.Id)
+	g.cb[regi] = cb
+	g.gcm[regi] = gcm
+	xlog.Info.Println("peered w/", reg.Name, reg.Id, reg.Addr)
+	g.pendingTx(ctx, reg)
+	g.pendingRx(ctx, reg)
+}
+
+func (g *guest) rx(ctx context.Context, m *xnet.Msg) error {
+	var err error
+
+	put := true
+	defer func() {
+		if put {
+			mp.Put(m)
+		}
+	}()
+
+	to, from := ScanLabel(m.Data)
+	if to == from {
+		g.verifyHello(m, from)
+		return nil
+	}
+	if to != MyId {
+		xlog.Trace.Print("dropped ", to, "<-", from)
+		return nil
+	}
+	if !g.isOK(from) {
+		put = false
+		g.pending.rx = append(g.pending.rx, m)
+		g.whoisQueue(ctx, from)
+		return nil
+	}
+	ifrom := from.Index()
+	cb, ok := g.cb[ifrom]
+	if !ok {
+		xlog.Trace.Println(from, "cipher-block not found")
+		return nil
+	}
+	cb.Decrypt(m.Data[:aes.BlockSize], m.Data[:aes.BlockSize])
+	gcm, ok := g.gcm[ifrom]
+	if !ok {
+		xlog.Trace.Println(from, "gcm not found")
+		return nil
+	}
+	i := len(m.Data) - SizeofLabel
+	m.Data, err = gcm.Open(m.Data[:0], nil, m.Data[:i], m.Data[i:])
+	if err != nil {
+		xlog.Trace.Println("open:", err)
+		return nil
+	}
+	xlog.Trace.Print("rx ", to, "<-", from, netpdu.Mark, PDU(m.Data))
+	_, err = g.tun.Write(m.Data)
+	return err
+}
+
+func (*guest) setVpnProto(m *xnet.Msg, is6 bool) {
 	ethp := uint16(VPN_P_IP)
 	if is6 {
 		ethp = VPN_P_IP6
 	}
-	xnet.Encode(bx.Contents, netph.TunPI{
+	xnet.Encode(m.Data, netph.TunPI{
 		Proto: ethp,
 	})
 }
 
-func (*guest) toWhom(pdu netpdu.TunPI) (addr netip.Addr, err error) {
-	h, d, err := pdu.Parse()
+func (g *guest) tx(ctx context.Context, m *xnet.Msg) error {
+	put := true
+	defer func() {
+		if put {
+			mp.Put(m)
+		}
+	}()
+	da, err := netpdu.TunPI(m.Data).ToWhom()
 	if err != nil {
-		return
+		xlog.Trace.Println("dropped no tunPI")
+		return nil
 	}
-	switch h.Proto {
-	case netph.TUN_P_IP:
-		var ip netph.IP
-		if ip, _, err = netpdu.IP(d).Parse(); err == nil {
-			addr.UnmarshalBinary(ip.DA[:])
-		}
-	case netph.TUN_P_IP6:
-		var ip6 netph.IP6
-		if ip6, _, err = netpdu.IP6(d).Parse(); err == nil {
-			addr.UnmarshalBinary(ip6.DA[:])
-		}
+	if !da.IsValid() {
+		xlog.Trace.Println("dropped non-ip[6]")
+		return nil
 	}
-	return
-}
-
-func (g *guest) tunRead(ctx context.Context) {
-	name := g.tun.Name()
-	xlog.Info.Println("start", name, "read routine")
-	defer xlog.Info.Println("stopped", name, "read routine")
-
-	bx := box.New()
-	for !xcontext.IsDone(ctx) {
-		if err := bx.ReadContents(g.tun); err == nil {
-			pi := netpdu.TunPI(bx.Contents)
-			xlog.Trace.Println("read", name, pi)
-			if xcontext.Queue(ctx, g.q.read, bx) {
-				bx = box.New()
-			} else {
-				break
-			}
-		} else if !xos.IsBlocked(err) {
-			xlog.Errata.Print(name, err)
-			break
-		} else {
-			runtime.Gosched()
-		}
+	if da.IsMulticast() {
+		xlog.Trace.Println("dropped multicast", da)
+		return nil
 	}
-	bx.Return()
-}
-
-func (g *guest) tunWrite(ctx context.Context) {
-	name := g.tun.Name()
-	xlog.Info.Println("start", name, "write routine")
-	defer xlog.Info.Println("stopped", name, "write routine")
-
-	xcontext.Range(ctx, g.q.write, func(bx *box.Box) (ok bool) {
-		for {
-			if _, err := g.tun.Write(bx.Contents); err == nil {
-				xlog.Trace.Println("wrote", name,
-					netpdu.TunPI(bx.Contents))
-				ok = true
-				break
-			} else if !xos.IsBlocked(err) {
-				xlog.Errata.Print(name, err)
-				break
-			}
-			runtime.Gosched()
-			if xcontext.IsDone(ctx) {
-				break
-			}
-		}
-		bx.Return()
-		return
-	})
-}
-
-func (g *guest) queueWhoisRequest(ctx context.Context, req any) bool {
-	select {
-	case <-ctx.Done():
-		return false
-	case g.whois.request <- req:
-		return true
+	if da.Compare(g.prefix.Addr()) == 0 {
+		xlog.Trace.Println("loopback", da)
+		g.tun.Write(m.Data)
+		return nil
 	}
-}
-
-func (g *guest) whoisRoutine(ctx context.Context) {
-	xlog.Info.Println("start guest whois routine")
-
-	defer xlog.Info.Println("stopped guest whois routine")
-	defer close(g.whois.response)
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case v, ok := <-g.whois.request:
-			if !ok {
-				return
-			}
-			err := g.client.rest.whois(ctx, g.whois.response, v)
-			if err != nil {
-				xlog.Errata.Printf("whois %v: %v", v, err)
-			}
-		}
+	if g.llu6.IsValid() && da.Compare(g.llu6) == 0 {
+		xlog.Trace.Println("link-local loopback", da)
+		g.tun.Write(m.Data)
+		return nil
 	}
+	if !g.vpn.Contains(da) {
+		xlog.Trace.Println(da, "out of", g.vpn)
+		return nil
+	}
+	to, ok := g.addressed[da]
+	if !ok {
+		put = false
+		g.pending.tx = append(g.pending.tx, m)
+		g.whoisQueue(ctx, da)
+		return nil
+	}
+
+	pdu := netpdu.TunPI(m.Data)
+	pdu.Proto(da.Is6())
+	xlog.Trace.Print("tx ", to, "<-", MyId, netpdu.Mark, pdu)
+
+	ito := to.Index()
+	lbl, ok := g.lbl[ito]
+	if !ok {
+		xlog.Trace.Println(to, "label not found")
+		return nil
+	}
+	gcm, ok := g.gcm[ito]
+	if !ok {
+		xlog.Trace.Println(to, "gcm not found")
+		return nil
+	}
+	cb, ok := g.cb[ito]
+	if !ok {
+		xlog.Trace.Println(to, "cipher-block not found")
+		return nil
+	}
+	m.Data = gcm.Seal(m.Data[:0], nil, m.Data, lbl)
+	cb.Encrypt(m.Data[:aes.BlockSize], m.Data[:aes.BlockSize])
+	m.Data = append(m.Data, lbl...)
+	m.AddrPort = g.via.Service
+	return udpSend(ctx, m)
 }

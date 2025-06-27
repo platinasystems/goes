@@ -6,8 +6,10 @@ package vpn
 
 import (
 	"context"
+	"crypto/ed25519"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/json"
 	"encoding/pem"
 	"errors"
 	"flag"
@@ -23,11 +25,11 @@ import (
 	"runtime"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/platinasystems/goes/v2/pkg/box"
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xflag"
 	"github.com/platinasystems/goes/v2/pkg/xlog"
@@ -36,51 +38,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-type registry struct {
-	mutex sync.RWMutex
-
-	sig  *Signatures
-	crt  *x509.Certificate
-	url  *url.URL
-	http *http.Server
-	vpn  map[string]*regVpn
-
-	vcsrev string
-}
-
-type regVpn struct {
-	mutex sync.RWMutex
-	name  string
-
-	prefix netip.Prefix
-
-	addr struct {
-		name  map[netip.Addr]string
-		named map[string]netip.Addr
-		top   netip.Addr
-	}
-
-	admin map[string]bool
-
-	reg *x509.Certificate
-
-	pending,
-	subscribers []*x509.Certificate
-
-	subscriberNamed map[string]*x509.Certificate
-
-	block struct {
-		addressed  map[netip.Addr]*pem.Block
-		identified map[int]*pem.Block
-		named      map[string]*pem.Block
-	}
-
-	idbook   box.IdBook
-	exchange box.IdRing
-}
-
-// [Registry] unmarshals the [Flags.FN.Cfg] YAML file into ConfigByName.
-var ConfigByName map[string]*struct {
+type Config *struct {
 	// Required network prefix.
 	Prefix netip.Prefix
 	// Optional static VPN address assignment. All others are dynamically
@@ -90,6 +48,49 @@ var ConfigByName map[string]*struct {
 	// Optional list of subscriber's that are enabled to
 	// approve/deny/unscribe others.
 	Admins []string
+	// A required list of packet exchange names.
+	Exchanges []string
+}
+
+// [Registry] unmarshals the [Flags.FN.Cfg] YAML file into ConfigByName.
+var ConfigByName map[string]Config
+
+type Registration struct {
+	Name,
+	// Via subscriber CommonName
+	Via string
+	Id Id
+	// VPN tunnel address
+	Addr netip.Addr
+	// VPN service address
+	Service netip.AddrPort
+	DNSNames,
+	IPAddresses,
+	URIs []string
+	SigAlg x509.SignatureAlgorithm
+	SigDER,
+	PubKey,
+	CipherText []byte
+}
+
+func (reg *Registration) verifier() (func([]byte) bool, error) {
+	pub, err := x509.ParsePKIXPublicKey(reg.SigDER)
+	if err != nil {
+		return nil, err
+	}
+	switch reg.SigAlg {
+	case x509.UnknownSignatureAlgorithm:
+		return nil, fmt.Errorf("%q: %w signature algorithm",
+			reg.Name, xerrors.ErrIncomplete)
+	case x509.PureEd25519:
+		k, ok := pub.(ed25519.PublicKey)
+		if !ok {
+			return nil, fmt.Errorf("%T isn't %v", pub, reg.SigAlg)
+		}
+		return pureEd25519{k}.verify, nil
+	}
+	return nil, fmt.Errorf("%q: %w signature algorithm: %v",
+		reg.Name, xerrors.ErrUnsupported, reg.SigAlg)
 }
 
 // Registry is a web server providing a REST interface to persistent
@@ -134,12 +135,7 @@ A RESTful WWW server.
 		reg.crt = cs[0]
 	}
 
-	sfn := filepath.Join(vpnConfigDir, vpnSig)
-	if reg.sig, err = NewSignatures(sfn); err != nil {
-		return err
-	}
-
-	svc := ":8003"
+	svc := fmt.Sprint(":", defaultRegistryPort)
 	if len(reg.crt.URIs) > 0 {
 		if s := reg.crt.URIs[0].Port(); len(s) > 0 {
 			svc = ":" + s
@@ -165,9 +161,11 @@ A RESTful WWW server.
 		},
 	}
 
-	reg.vcsrev = xprogram.VcsRevision.String()
+	now := time.Now().UnixMicro()
+	reg.start = strconv.FormatInt(now, 10)
+	reg.vcsRev = xprogram.VcsRevision.String()
 
-	xlog.Info.Println("start", svc)
+	xlog.Info.Println("start", svc, "vcsrev", reg.vcsRev)
 	defer xlog.Info.Println("stopped", svc)
 	defer wg.Wait()
 	defer cancel()
@@ -176,29 +174,62 @@ A RESTful WWW server.
 	wg.Go(func() { go xlog.AlarmHandler(cctx) })
 	wg.Go(func() { reg.shutdown(cctx) })
 
-	err = reg.http.ListenAndServeTLS(cfn, sfn)
+	err = reg.http.ListenAndServeTLS(cfn, PrivSigFileName())
 	if errors.Is(err, http.ErrServerClosed) {
 		err = nil
 	}
 	return err
 }
 
-func (reg *registry) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	w.Header().Add("Trailer", RestTrailerVcsRevision)
-	defer func() {
-		w.Header().Set(RestTrailerVcsRevision, reg.vcsrev)
-	}()
+type registry struct {
+	mutex sync.RWMutex
 
+	start,
+	vcsRev string
+
+	crt  *x509.Certificate
+	url  *url.URL
+	http *http.Server
+	vpn  map[string]*regVpn
+}
+
+type regVpn struct {
+	mutex sync.RWMutex
+	name  string
+	cfg   Config
+	crt   *x509.Certificate
+
+	addr struct {
+		name  map[netip.Addr]string
+		named map[string]netip.Addr
+		top   netip.Addr
+	}
+
+	admin map[string]bool
+
+	pending,
+	subscribers []*x509.Certificate
+
+	subscriberNamed map[string]*x509.Certificate
+
+	idbook IdBook
+
+	addressed map[netip.Addr]*Registration
+	indexed   map[int]*Registration
+	named     map[string]*Registration
+}
+
+func (reg *registry) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	defer req.Body.Close()
 
 	if !req.TLS.HandshakeComplete {
-		xlog.Info.Println("incomplete handshake")
 		w.WriteHeader(http.StatusUnauthorized)
+		w.Write([]byte("incomplete handshake"))
 		return
 	}
 	if len(req.TLS.PeerCertificates) == 0 {
-		xlog.Info.Println("no certificates")
 		w.WriteHeader(http.StatusUnauthorized)
+		w.Write([]byte("no certificates"))
 		return
 	}
 	peer0 := req.TLS.PeerCertificates[0]
@@ -219,184 +250,180 @@ func (reg *registry) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	vpn, found := reg.vpnNamed(name)
 	if !found || vpn == nil {
 		w.WriteHeader(http.StatusNotFound)
-		fmt.Fprint(w, name)
+		w.Write([]byte(name))
 		return
 	}
+
+	w.Header().Add(RestUnixMicroStart, reg.start)
+	w.Header().Add(RestVcsRevision, reg.vcsRev)
+
+	var err error
 	switch op {
 	case RestOpApprove:
-		if err := vpn.selfOrSubscriber(peer0); err != nil {
-			w.WriteHeader(http.StatusForbidden)
-			fmt.Fprint(w, cn)
+		if err = vpn.selfOrSubscriber(peer0); err != nil {
 		} else if err = vpn.selfOrAdmin(cn); err != nil {
-			w.WriteHeader(http.StatusForbidden)
-			fmt.Fprint(w, cn)
 		} else if req.Method != http.MethodPut {
-			w.WriteHeader(http.StatusMethodNotAllowed)
-			fmt.Fprint(w, req.Method)
-		} else if err = vpn.approve(req); err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			fmt.Fprint(w, err)
-		} else {
+			err = NewStatusError(http.StatusMethodNotAllowed,
+				req.Method)
+		} else if err = vpn.approve(req); err == nil {
 			fmt.Fprintln(w, "OK")
 		}
 	case RestOpCertify:
 		if req.Method != http.MethodGet {
-			w.WriteHeader(http.StatusMethodNotAllowed)
-			fmt.Fprint(w, req.Method)
+			err = NewStatusError(http.StatusMethodNotAllowed,
+				req.Method)
 		} else {
 			// empty response so that client may retrieve this
 			// certificate from TLS negotiation.
-			w.WriteHeader(http.StatusOK)
 		}
 	case RestOpCheckin:
-		if err := vpn.selfOrSubscriber(peer0); err != nil {
-			w.WriteHeader(http.StatusForbidden)
-			fmt.Fprint(w, cn)
+		if err = vpn.selfOrSubscriber(peer0); err != nil {
 		} else if req.Method != http.MethodPut {
-			w.WriteHeader(http.StatusMethodNotAllowed)
-			fmt.Fprint(w, req.Method)
-		} else if err = vpn.checkin(w, req); err != nil {
+			err = NewStatusError(http.StatusMethodNotAllowed,
+				req.Method)
+		} else {
+			switch ci := qv.Get(RestOpCheckin); ci {
+			case "":
+				err = xerrors.Incomplete(RestOpCheckin)
+			case RestOpCheckinExchange:
+				err = vpn.checkinExchange(w, req)
+			case RestOpCheckinGuest:
+				err = vpn.checkinGuest(w, req)
+			default:
+				err = xerrors.Invalid(RestOpCheckin, ci)
+			}
 			if errors.Is(err, xerrors.ErrUnavailable) {
-				w.WriteHeader(http.StatusTooEarly)
-			} else {
-				w.WriteHeader(http.StatusInternalServerError)
-				fmt.Fprint(w, err)
+				err = NewStatusError(http.StatusTooEarly)
 			}
 		}
 	case RestOpDeny:
-		if err := vpn.selfOrSubscriber(peer0); err != nil {
-			w.WriteHeader(http.StatusForbidden)
-			fmt.Fprint(w, cn)
+		if err = vpn.selfOrSubscriber(peer0); err != nil {
 		} else if err = vpn.selfOrAdmin(cn); err != nil {
-			w.WriteHeader(http.StatusForbidden)
-			fmt.Fprint(w, cn)
 		} else if req.Method != http.MethodPut {
-			w.WriteHeader(http.StatusMethodNotAllowed)
-			fmt.Fprint(w, req.Method)
+			err = NewStatusError(http.StatusMethodNotAllowed,
+				req.Method)
 		} else if err = vpn.deny(req); err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			fmt.Fprint(w, err)
 		} else {
 			fmt.Fprintln(w, "OK")
 		}
 	case RestOpDump:
-		switch qv.Get(RestOpDump) {
-		case RestDumpSubscribers:
-			if err := vpn.selfOrSubscriber(peer0); err != nil {
-				w.WriteHeader(http.StatusForbidden)
-				fmt.Fprint(w, cn)
+		switch dumpreq := qv.Get(RestOpDump); dumpreq {
+		case RestOpDumpSubscribers:
+			if err = vpn.selfOrSubscriber(peer0); err != nil {
 			} else if req.Method != http.MethodGet {
-				w.WriteHeader(http.StatusMethodNotAllowed)
-				fmt.Fprint(w, req.Method)
-			} else if err = vpn.dumpSubscribers(w); err != nil {
-				w.WriteHeader(http.StatusInternalServerError)
-				fmt.Fprint(w, err)
+				err = NewStatusError(http.
+					StatusMethodNotAllowed, req.Method)
+			} else {
+				err = vpn.dumpSubscribers(w)
 			}
 		default:
-			w.WriteHeader(http.StatusBadRequest)
+			err = NewStatusError(http.StatusBadRequest, dumpreq)
 		}
 	case RestOpPing:
-		if err := vpn.selfOrSubscriber(peer0); err != nil {
-			w.WriteHeader(http.StatusForbidden)
-			fmt.Fprint(w, cn)
+		if err = vpn.selfOrSubscriber(peer0); err != nil {
 		} else if req.Method != http.MethodGet {
-			w.WriteHeader(http.StatusMethodNotAllowed)
-			fmt.Fprint(w, req.Method)
+			err = NewStatusError(http.StatusMethodNotAllowed,
+				req.Method)
 		} else {
 			fmt.Fprintln(w, "OK")
 		}
 	case RestOpReload:
 		if name != "vpn" {
-			w.WriteHeader(http.StatusNotAcceptable)
-			fmt.Fprint(w, name, ": unacceptable")
-		} else if err := vpn.selfOrSubscriber(peer0); err != nil {
-			w.WriteHeader(http.StatusForbidden)
-			fmt.Fprint(w, cn)
+			err = NewStatusError(http.StatusNotAcceptable,
+				name)
+		} else if err = vpn.selfOrSubscriber(peer0); err != nil {
 		} else if req.Method != http.MethodPut {
-			w.WriteHeader(http.StatusMethodNotAllowed)
-			fmt.Fprint(w, req.Method)
-		} else if err := reg.reload(); err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			fmt.Fprint(w, err)
-		} else {
+			err = NewStatusError(http.StatusMethodNotAllowed,
+				req.Method)
+		} else if err := reg.reload(); err == nil {
 			fmt.Fprintln(w, "OK")
 		}
 	case RestOpShow:
-		if err := vpn.selfOrSubscriber(peer0); err != nil {
-			w.WriteHeader(http.StatusForbidden)
-			fmt.Fprint(w, cn)
+		if err = vpn.selfOrSubscriber(peer0); err != nil {
 		} else if req.Method != http.MethodGet {
-			w.WriteHeader(http.StatusMethodNotAllowed)
-			fmt.Fprint(w, req.Method)
+			err = NewStatusError(http.StatusMethodNotAllowed,
+				req.Method)
 		} else {
-			switch qv.Get(RestOpShow) {
-			case RestShowActive:
+			switch subject := qv.Get(RestOpShow); subject {
+			case RestOpShowActive:
 				err = vpn.showActive(w)
-			case RestShowAddress:
+			case RestOpShowAddress:
 				err = vpn.showAddress(w, qv)
-			case RestShowAdmins:
-				for _, s := range ConfigByName[name].Admins {
+			case RestOpShowAdmins:
+				for _, s := range vpn.cfg.Admins {
 					fmt.Fprintln(w, "-", s)
 				}
-			case RestShowHosts:
+			case RestOpShowExchanges:
+				for _, s := range vpn.cfg.Exchanges {
+					fmt.Fprintln(w, "-", s)
+				}
+			case RestOpShowHosts:
 				err = vpn.showHosts(w, qv)
-			case RestShowPending:
+			case RestOpShowPending:
 				err = vpn.showPending(w)
-			case RestShowSubscriber:
+			case RestOpShowPrefix:
+				fmt.Fprintln(w, vpn.cfg.Prefix)
+			case RestOpShowStart:
+				// no output, use response trailer
+			case RestOpShowSubscriber:
 				err = vpn.showSubscriber(w, qv)
-			case RestShowTenant:
+			case RestOpShowTenant:
 				err = vpn.showTenant(w, qv)
-			case RestShowVcsModified:
-				fmt.Fprintln(w, xprogram.VcsModified)
-			case RestShowVcsRevision:
-				fmt.Fprintln(w, xprogram.VcsRevision)
+			case RestOpShowVcs:
+				switch qv.Get(RestOpShowVcs) {
+				case RestOpShowVcsModified:
+					fmt.Fprintln(w, xprogram.VcsModified)
+				case RestOpShowVcsRevision:
+					// no output, use response trailer
+				}
 			default:
-				w.WriteHeader(http.StatusBadRequest)
-			}
-			if err != nil {
-				w.WriteHeader(http.StatusInternalServerError)
-				fmt.Fprint(w, err)
+				err = NewStatusError(http.StatusBadRequest,
+					op, " ", subject)
 			}
 		}
 	case RestOpSubscribe:
 		if req.Method != http.MethodPut {
-			w.WriteHeader(http.StatusMethodNotAllowed)
-			fmt.Fprint(w, req.Method)
-		} else if err := vpn.subscribe(req); err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			fmt.Fprint(w, err)
-		} else {
+			err = NewStatusError(http.StatusMethodNotAllowed,
+				req.Method)
+		} else if err = vpn.subscribe(req); err == nil {
 			fmt.Fprintln(w, "OK")
 		}
 	case RestOpUnsubscribe:
-		if err := vpn.selfOrSubscriber(peer0); err != nil {
-			w.WriteHeader(http.StatusForbidden)
-			fmt.Fprint(w, cn)
+		if err = vpn.selfOrSubscriber(peer0); err != nil {
 		} else if err = vpn.selfOrAdmin(cn); err != nil {
-			w.WriteHeader(http.StatusForbidden)
-			fmt.Fprint(w, cn)
 		} else if req.Method != http.MethodPut {
-			w.WriteHeader(http.StatusMethodNotAllowed)
-			fmt.Fprint(w, req.Method)
-		} else if err := vpn.unsubscribe(req); err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			fmt.Fprint(w, err)
-		} else {
+			err = NewStatusError(http.StatusMethodNotAllowed,
+				req.Method)
+		} else if err := vpn.unsubscribe(req); err == nil {
 			fmt.Fprintln(w, "OK")
 		}
 	case RestOpWhois:
-		if err := vpn.selfOrSubscriber(peer0); err != nil {
-			w.WriteHeader(http.StatusForbidden)
-			fmt.Fprint(w, cn)
+		if err = vpn.selfOrSubscriber(peer0); err != nil {
+			err = NewStatusError(http.StatusForbidden,
+				cn, ", ", err)
 		} else if req.Method != http.MethodGet {
-			w.WriteHeader(http.StatusMethodNotAllowed)
-			fmt.Fprint(w, req.Method)
-		} else if err = vpn.whois(w, req); err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			fmt.Fprint(w, err)
+			err = NewStatusError(http.StatusMethodNotAllowed,
+				req.Method)
+		} else {
+			var b []byte
+			if b, err = vpn.whois(req); err == nil {
+				xlog.Info.Printf("registration%s", b)
+				w.Write(b)
+			}
 		}
 	default:
-		w.WriteHeader(http.StatusBadRequest)
+		err = NewStatusError(http.StatusBadRequest, op)
+	}
+	if err == nil {
+		w.(http.Flusher).Flush()
+	} else if se, isStatusError := err.(*StatusError); isStatusError {
+		w.Header().Add(RestError, se.s)
+		w.WriteHeader(se.Code)
+		xlog.Errata.Println(se.Code, se.s)
+	} else {
+		w.Header().Add(RestError, err.Error())
+		w.WriteHeader(http.StatusInternalServerError)
+		xlog.Errata.Print(err)
 	}
 }
 
@@ -497,12 +524,17 @@ func (reg *registry) reload() error {
 		return err
 	}
 	for name, cfg := range ConfigByName {
+		if !cfg.Prefix.IsValid() {
+			return xerrors.Invalid(name, "prefix")
+		}
+
 		vpn, found := reg.vpn[name]
 		if !found {
 			named := make(map[string]*x509.Certificate)
 			vpn = &regVpn{
 				name: name,
-				reg:  reg.crt,
+				cfg:  cfg,
+				crt:  reg.crt,
 
 				subscriberNamed: named,
 			}
@@ -510,19 +542,14 @@ func (reg *registry) reload() error {
 			vpn.addr.name = make(map[netip.Addr]string)
 			vpn.addr.named = make(map[string]netip.Addr)
 
-			vpn.block.addressed = make(map[netip.Addr]*pem.Block)
-			vpn.block.identified = make(map[int]*pem.Block)
-			vpn.block.named = make(map[string]*pem.Block)
+			vpn.addressed = make(map[netip.Addr]*Registration)
+			vpn.indexed = make(map[int]*Registration)
+			vpn.named = make(map[string]*Registration)
 
 			reg.vpn[name] = vpn
+		} else {
+			vpn.cfg = cfg
 		}
-
-		if !cfg.Prefix.IsValid() {
-			return xerrors.Invalid(name, "prefix")
-		}
-
-		// FIXME how to accept changed prefix?
-		vpn.prefix = cfg.Prefix
 
 		vpn.addr.top = cfg.Prefix.Addr()
 		for k, v := range cfg.Address {
@@ -581,7 +608,7 @@ func reqsub(req *http.Request) (string, error) {
 func (vpn *regVpn) approve(req *http.Request) error {
 	sub, err := reqsub(req)
 	if err != nil {
-		return err
+		return NewStatusError(http.StatusInternalServerError, err)
 	}
 	vpn.mutex.Lock()
 	defer vpn.mutex.Unlock()
@@ -591,7 +618,8 @@ func (vpn *regVpn) approve(req *http.Request) error {
 			err = os.MkdirAll(sd, 0755)
 		}
 		if err != nil {
-			return err
+			return NewStatusError(http.StatusInternalServerError,
+				err)
 		}
 	}
 	for i, c := range vpn.pending {
@@ -602,125 +630,118 @@ func (vpn *regVpn) approve(req *http.Request) error {
 				vpn.subscribers = append(vpn.subscribers, c)
 				vpn.subscriberNamed[c.Subject.CommonName] = c
 			}
-			return err
+			return NewStatusError(http.StatusInternalServerError,
+				err)
 		}
 	}
-	return xerrors.NotFound(sub)
+	return NewStatusError(http.StatusNotFound, sub)
 }
 
-func (vpn *regVpn) checkin(w http.ResponseWriter, req *http.Request) error {
-	var (
-		id,
-		via box.Id
-		addr netip.Addr
-		svc  netip.AddrPort
-		err  error
-		ok   bool
-	)
-
-	defer req.Body.Close()
-	qv := req.URL.Query()
-
-	vpn.mutex.Lock()
-	defer vpn.mutex.Unlock()
-
-	cn := req.TLS.PeerCertificates[0].Subject.CommonName
-
-	if qv.Has(RestService) {
-		svc, err = netip.ParseAddrPort(qv.Get(RestService))
-		if err != nil {
-			return xerrors.Label(err, RestService)
-		}
-		if svc.Addr().IsUnspecified() {
-			rap, err := netip.ParseAddrPort(req.RemoteAddr)
-			if err != nil {
-				return xerrors.Label(err, "remote-addr-port")
-			}
-			svc = netip.AddrPortFrom(rap.Addr(), svc.Port())
-		}
-		xlog.Info.Printf("new service %s @ %v", cn, svc)
-	} else if via, err = vpn.exchange.Next(); err != nil {
-		return err
-	} else {
-		xlog.Info.Printf("new quest %s via %d", cn, via.Index())
+func (vpn *regVpn) checkin(peer *x509.Certificate) (*Registration, error) {
+	der, err := x509.MarshalPKIXPublicKey(peer.PublicKey)
+	if err != nil {
+		return nil, err
 	}
 
-	data, err := io.ReadAll(req.Body)
+	cn := peer.Subject.CommonName
+	reg, ok := vpn.named[cn]
+	if ok {
+		reg.Id.Revise()
+	} else {
+		reg = &Registration{
+			Name: cn,
+			Id:   vpn.idbook.New(),
+		}
+	}
+
+	reg.DNSNames = peer.DNSNames
+	for _, ip := range peer.IPAddresses {
+		reg.IPAddresses = append(reg.IPAddresses, ip.String())
+	}
+	for _, uri := range peer.URIs {
+		reg.URIs = append(reg.URIs, uri.String())
+	}
+
+	reg.SigAlg = peer.SignatureAlgorithm
+	reg.SigDER = der
+
+	vpn.indexed[reg.Id.Index()] = reg
+	vpn.named[cn] = reg
+	xlog.Info.Println("checkin:", cn, reg.Id, reg.SigAlg)
+	return reg, nil
+}
+
+func (vpn *regVpn) checkinExchange(
+	w http.ResponseWriter, req *http.Request,
+) error {
+	vpn.mutex.Lock()
+	defer vpn.mutex.Unlock()
+	defer req.Body.Close()
+
+	peer := req.TLS.PeerCertificates[0]
+	cn := peer.Subject.CommonName
+	reg, err := vpn.checkin(peer)
+	if err != nil {
+		return err
+	}
+	if qv := req.URL.Query(); qv.Has(RestOpCheckinExchangeVia) {
+		reg.Via = qv.Get(RestOpCheckinExchangeVia)
+	}
+	if _, err = fmt.Fprint(w, uint(reg.Id)); err != nil {
+		return err
+	}
+	xlog.Info.Printf("exchange %s %v", cn, reg.Id)
+	return nil
+}
+
+func (vpn *regVpn) checkinGuest(
+	w http.ResponseWriter, req *http.Request,
+) error {
+	vpn.mutex.Lock()
+	defer vpn.mutex.Unlock()
+	defer req.Body.Close()
+
+	pk, err := io.ReadAll(req.Body)
 	if err != nil {
 		return err
 	}
 
-	blk, _ := pem.Decode(data)
-	if blk == nil {
-		return xerrors.Invalid("encoding")
-	} else if blk.Type != "PUBLIC KEY" {
-		return xerrors.Invalid("block_type", blk.Type)
+	peer := req.TLS.PeerCertificates[0]
+	cn := peer.Subject.CommonName
+	reg, err := vpn.checkin(peer)
+	if err != nil {
+		return err
 	}
-	if _, ok := blk.Headers["nonce"]; !ok {
-		return xerrors.Incomplete("nonce")
-	}
-
-	entry, exists := vpn.block.named[cn]
-	if exists {
-		entry.Headers["nonce"] = blk.Headers["nonce"]
-		entry.Bytes = blk.Bytes
-		if addr, err = addressHeader(entry); err != nil {
-			return xerrors.Label(err, "existing_address_header")
-		}
-		entry.Headers["address"] = addr.String()
-		if id, err = idHeader(entry); err != nil {
-			return xerrors.Label(err, "existing_id_header")
-		}
-		id.BumpVersion()
-		entry.Headers["id"] = fmt.Sprint(id)
-		if svc.IsValid() {
-			err = vpn.exchange.Update(id)
-			if err != nil {
-				return xerrors.Label(err, "exchange_id")
-			}
-			entry.Headers["service"] = svc.String()
-		} else {
-			via, err = vpn.exchange.Next()
-			if err != nil {
-				return xerrors.Label(err, "next_exchange")
-			}
-			entry.Headers["via"] = fmt.Sprint(via)
-		}
-	} else {
-		blk.Headers["name"] = cn
-
-		if addr, ok = vpn.addr.named[cn]; !ok {
-			if addr, err = vpn.lease(cn); err != nil {
-				return err
-			}
-		}
-		blk.Headers["address"] = addr.String()
-
-		id = vpn.idbook.New()
-		blk.Headers["id"] = fmt.Sprint(id)
-		if svc.IsValid() {
-			vpn.exchange.Append(id)
-			blk.Headers["service"] = fmt.Sprint(svc)
-		} else if via, err = vpn.exchange.Next(); err != nil {
-			return xerrors.Label(err, "exchange_id")
-		} else {
-			blk.Headers["via"] = fmt.Sprint(via)
-		}
-
-		vpn.block.named[cn] = blk
-		vpn.block.addressed[addr] = blk
-		vpn.block.identified[id.Index()] = blk
+	if qv := req.URL.Query(); qv.Has(RestOpCheckinGuestVia) {
+		reg.Via = qv.Get(RestOpCheckinGuestVia)
 	}
 
-	fmt.Fprintln(w, "id:", id)
-	fmt.Fprintln(w, "address:", addr)
-	fmt.Fprintln(w, "prefix:", ConfigByName[vpn.name].Prefix)
-	if !svc.IsValid() {
-		fmt.Fprintln(w, "via:", int(via))
-		xlog.Info.Printf("%s assigned %d @ %v via %v\n",
-			cn, id, addr, via)
-	} else {
-		xlog.Info.Printf("%s assigned %d @ %v\n", cn, id, addr)
+	reg.PubKey = pk
+
+	if !reg.Addr.IsValid() {
+		if addr, ok := vpn.cfg.Address[cn]; ok {
+			reg.Addr = addr
+		} else if reg.Addr, err = vpn.lease(cn); err != nil {
+			return err
+		}
+		vpn.addressed[reg.Addr] = reg
+	}
+	w.Header().Set("Content-Type", "application/json")
+	bits := ConfigByName[vpn.name].Prefix.Bits()
+	prefix := netip.PrefixFrom(reg.Addr, bits)
+	b, err := json.MarshalIndent(GuestReceipt{
+		Id:     reg.Id,
+		Prefix: prefix,
+	}, "", "  ")
+	if err != nil {
+		return err
+	}
+	if _, err = w.Write(b); err != nil {
+		return err
+	}
+	if true {
+		xlog.Info.Printf("guest %s %v @ %v, receipt%s",
+			cn, reg.Id, prefix, b)
 	}
 	return nil
 }
@@ -728,7 +749,7 @@ func (vpn *regVpn) checkin(w http.ResponseWriter, req *http.Request) error {
 func (vpn *regVpn) deny(req *http.Request) error {
 	sub, err := reqsub(req)
 	if err != nil {
-		return err
+		return NewStatusError(http.StatusInternalServerError, err)
 	}
 	vpn.mutex.Lock()
 	defer vpn.mutex.Unlock()
@@ -738,7 +759,7 @@ func (vpn *regVpn) deny(req *http.Request) error {
 			return nil
 		}
 	}
-	return xerrors.NotFound(sub)
+	return NewStatusError(http.StatusNotFound, sub)
 }
 
 func (vpn *regVpn) dumpSubscribers(w io.Writer) error {
@@ -761,7 +782,7 @@ func (vpn *regVpn) lease(name string) (netip.Addr, error) {
 	if !addr.IsValid() {
 		return addr, xerrors.Invalid("top")
 	}
-	if !vpn.prefix.Contains(addr) {
+	if !ConfigByName[vpn.name].Prefix.Contains(addr) {
 		return addr, xerrors.Range("lease")
 	}
 	vpn.addr.named[name] = addr
@@ -771,7 +792,7 @@ func (vpn *regVpn) lease(name string) (netip.Addr, error) {
 }
 
 func (vpn *regVpn) selfOrAdmin(cn string) error {
-	if vpn.reg.Subject.CommonName == cn {
+	if vpn.crt.Subject.CommonName == cn {
 		return nil
 	}
 	vpn.mutex.RLock()
@@ -779,14 +800,15 @@ func (vpn *regVpn) selfOrAdmin(cn string) error {
 	if t, found := vpn.admin[cn]; found && t {
 		return nil
 	}
-	return xerrors.NotFound("admin", cn)
+	return NewStatusError(http.StatusForbidden, cn)
 }
 
 func (vpn *regVpn) selfOrSubscriber(peer *x509.Certificate) error {
 	if peer == nil {
-		return xerrors.Invalid("peer")
+		return NewStatusError(http.StatusForbidden,
+			"no client certificate")
 	}
-	if peer.Equal(vpn.reg) {
+	if peer.Equal(vpn.crt) {
 		return nil
 	}
 
@@ -798,31 +820,21 @@ func (vpn *regVpn) selfOrSubscriber(peer *x509.Certificate) error {
 			return nil
 		}
 	}
-	return xerrors.NotFound(peer.Subject.CommonName)
+	return NewStatusError(http.StatusForbidden, peer.Subject.CommonName)
 }
 
 func (vpn *regVpn) showActive(w http.ResponseWriter) error {
 	vpn.mutex.RLock()
 	defer vpn.mutex.RUnlock()
 
-	for name, blk := range vpn.block.named {
-		id, err := idHeader(blk)
-		if err != nil {
-			continue
-		}
-		fmt.Fprintf(w, "%s (%d, %d", name, id.Index(), id.Version())
-		addr, err := addressHeader(blk)
-		if err == nil {
-			fmt.Fprintf(w, ", %v", addr)
+	for name, r := range vpn.named {
+		fmt.Fprint(w, name, " (", r.Id)
+		if r.Addr.IsValid() {
+			fmt.Fprintf(w, ", %v", r.Addr)
 		}
 		fmt.Fprint(w, ")")
-		via, err := viaHeader(blk)
-		if err == nil {
-			fmt.Fprintf(w, " via %d", via.Index())
-		}
-		svc, err := serviceHeader(blk)
-		if err == nil {
-			fmt.Fprintf(w, " service %v", svc)
+		if len(r.Via) > 0 {
+			fmt.Fprintf(w, " via %v", r.Via)
 		}
 		fmt.Fprintln(w)
 	}
@@ -979,41 +991,43 @@ func (vpn *regVpn) unsubscribe(req *http.Request) error {
 	return removeCertificate(vpn.StateDir(), sub, vpn.subscribers)
 }
 
-func (vpn *regVpn) whois(w http.ResponseWriter, req *http.Request) error {
-	var (
-		k   string
-		blk *pem.Block
-		ok  bool
-	)
+func (vpn *regVpn) whois(req *http.Request) ([]byte, error) {
+	var k, s string
+	var reg *Registration
+	var ok bool
+
+	qv := req.URL.Query()
 
 	vpn.mutex.RLock()
 	defer vpn.mutex.RUnlock()
 
-	qv := req.URL.Query()
-	if qv.Has(RestWhoisName) {
-		k = qv.Get(RestWhoisName)
-		blk, ok = vpn.block.named[k]
-	} else if qv.Has(RestWhoisId) {
-		s := qv.Get(RestWhoisId)
-		id, err := box.ParseId(s)
-		if err != nil {
-			return xerrors.Label(err, RestWhoisId)
-		}
-		k = fmt.Sprint(id)
-		blk, ok = vpn.block.identified[id.Index()]
-	} else if qv.Has(RestWhoisAddress) {
-		s := qv.Get(RestWhoisAddress)
+	switch {
+	case qv.Has(RestWhoisAddress):
+		k = RestWhoisAddress
+		s = qv.Get(RestWhoisAddress)
 		addr, err := netip.ParseAddr(s)
 		if err != nil {
-			return xerrors.Label(err, RestWhoisAddress)
+			return nil, err
 		}
-		k = fmt.Sprint(addr)
-		blk, ok = vpn.block.addressed[addr]
-	} else {
-		return xerrors.Incomplete("no <name>, <address> or <id>")
+		reg, ok = vpn.addressed[addr]
+	case qv.Has(RestWhoisId):
+		k = RestWhoisId
+		s = qv.Get(RestWhoisId)
+		id, err := ParseId(s)
+		if err != nil {
+			return nil, err
+		}
+		reg, ok = vpn.indexed[id.Index()]
+	case qv.Has(RestWhoisName):
+		k = RestWhoisName
+		s = qv.Get(RestWhoisName)
+		reg, ok = vpn.named[s]
+	default:
+		return nil, NewStatusError(http.StatusBadRequest,
+			"no <address>, <id>, or <name>: ", req.URL)
 	}
-	if blk == nil || !ok {
-		return xerrors.NotFound(k)
+	if !ok || reg == nil {
+		return nil, NewStatusError(http.StatusNotFound, k+" "+s)
 	}
-	return pem.Encode(w, blk)
+	return json.MarshalIndent(reg, "", "  ")
 }

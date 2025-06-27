@@ -29,66 +29,112 @@ secure, Virtual Private Network.
 
 # Daemons
 
-  - [Registry] is a web server providing a REST interface to its
-    ephemeral tables; and persistent, read-only
-    ValueOfStringFlag(NameConfigDirFlag)
-    and read-write
-    [ValueOfStringFlag]([NameStateDirFlag])
-    subscriber certificates.
+  - [Registry] is a web server providing a [REST] interface to adminster
+    and introduce subscribers.
 
-  - [Exchange] is a UDP server that forwards ciphered packets between guest's.
+  - [Exchange] is a VPN subscriber providing secure packet forwarding.
 
-  - [Guest] is a UDP server that forwards ciphered packets between an exchange
-    and a network tunnel interface.
+  - [Guest] is a VPN subscriber that encode/decodes secure packets
+    between an exchange and a network tunnel interface.
 
     <goes> start vpn <daemon> [flags]
 
+# Secure Packet Exchange
+
+This VPN uses [crypto/cipher.NewGCMWithRandomNonce]
+to secure [UDP] tunneled [IP] packets with
+Authenticated Encrypted and Associated Data [AEAD]
+
+The prefaced random [NONCE] is the encrypted
+with the the cipher block wrapped by the [GCM].
+
+The attached authenticated data has the FROM and TO subscriber
+identifiers uniquely assigned by the registry.
+
+[Unicast] packets are secured with guest/guest keys derived from
+registry introduction and are simply forwarded by the exchange.
+
+[Multicast] packets are secured with guest/exchange keys and are decoded
+by the exchange before replicating, encoding and forwarding to each of the
+other active guests.
+
 # Registry administration
 
-  - [Approve] VPN subscription.
+  - [RestAdmin] “approve” <candidate>
 
-  - [Deny] VPN subscription.
+  - [RestAdmin] “deny”  <candidate>
 
-  - [Ping] registry.
+  - [RestAdmin] “unsubscribe” <subscriber>
 
-  - [Revoke] VPN subscription.
+  - [RestPing]
 
     <goes> vpn <admin> [flags]
 
 # Registry information
 
-  - [Admins] prints the names of authorized VPN administrators.
+  - [RestShow] “active”
 
-  - [Pending] prints requesting subscriber certificates.
+    Print the names of checked-in subscribers.
 
-  - [Subscribers] prints the names of current subscribers.
+  - [RestShow] “address” [subscriber]
+
+    Print the assigned address of the named or all subscribers.
+
+  - [RestShow] “hosts” [address]
+
+    Print the addressed or all subscriber assignments.
+
+  - [RestShow] “pending”
+
+    Print the requesting subscriber certificates.
+
+  - [RestShow] “subscriber”
+
+    Prints the namesd or all current subscribers.
+
+  - [RestShow] “tenant”
+
+    Print subscriber at given address.
 
     <goes> show vpn <object> [flags]
 
 # Client administration
 
-  - [Certify] adds registry to subscriptions.
+  - [RestCertify] <url>
 
-  - [Subscribe] requests VPN subscription.
+    Adds registry certificate to root.
 
-  - [Unsubscribe] from VPN.
+  - [RestSubscribe]
+
+    Requests VPN subscription.
+
+  - [Unsubscribe]
+
+    Remove self from VPN.
 
     <goes> vpn <admin> [flags]
 
 # Client information
 
-  - [Certificaté] prints parsed certificate.
+  - [ShowCertificate]
 
-  - [Subscriptions] prints parsed registry subscriptions.
+    Prints formatted certificate.
 
-  - [Signature] prints algorithm.
+  - [ShowSignature]
+
+    Prints algorithm.
 
     <goes> show vpn <object> [flags]
 
 # References
 
+[AEAD]: https://en.wikipedia.org/wiki/Authenticated_encryption
+[GCM]: https://en.wikipedia.org/wiki/Galois/Counter_Mode
 [goes]: https://github.com/platinasystems/goes/v2/pkg/goes
-
-[goes-util]: https://github.com/platinasystems/goes/v2/pkg/goes-util
+[IP]: https://en.wikipedia.org/wiki/Internet_Protocol
+[Multicast]: https://en.wikipedia.org/wiki/Multicast
+[NONCE]: https://en.wikipedia.org/wiki/Nonce
+[REST]: https://en.wikipedia.org/wiki/REST
+[Unicast]: https://en.wikipedia.org/wiki/Unicast
 */
 package vpn

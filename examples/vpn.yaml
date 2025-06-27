@@ -110,12 +110,14 @@ data:
     vpn:
       prefix: fc00:1234::/64
       address:
-        hosta: fc00:1234::1
-        hostb: fc00:1234::2
-        hostc: fc00:1234::3
-        exchange0: fc00:1234::10
-        exchange1: fc00:1234::11
-        exchange2: fc00:1234::12
+        hosta: fc00:1234::a
+        hostb: fc00:1234::b
+        hostc: fc00:1234::c
+      exchanges:
+        - exchange0.vpn.default.svc.cluster.local
+        - exchange3.vpn.default.svc.cluster.local
+      routers:
+        - exchange2.vpn.default.svc.cluster.local
   registry.pem: |
     -----BEGIN CERTIFICATE-----
     MIIBszCCAWWgAwIBAgIBATAFBgMrZXAwQTEgMA4GA1UEChMHUGxhdGluYTAOBgNV
@@ -223,8 +225,6 @@ spec:
     - "start"
     - "vpn"
     - "registry"
-    - "-cert"
-    - "registry.pem"
     - "-v"
     ports:
     - protocol: TCP
@@ -266,10 +266,8 @@ spec:
     - "start"
     - "vpn"
     - "exchange"
-    - "-cert"
-    - "exchange0.pem"
     - "-v"
-#   - "-trace"
+    - "-trace"
     ports:
     - protocol: UDP
       containerPort: 8003
@@ -307,10 +305,9 @@ spec:
     - "start"
     - "vpn"
     - "guest"
-    - "-cert"
-    - "hosta.pem"
     - "-v"
-#   - "-trace"
+    - "-trace"
+    - "exchange0"
     securityContext:
       allowPrivilegeEscalation: true
       capabilities:
@@ -354,10 +351,9 @@ spec:
     - "start"
     - "vpn"
     - "guest"
-    - "-cert"
-    - "hostb.pem"
     - "-v"
-#   - "-trace"
+    - "-trace"
+    - "exchange0"
     securityContext:
       allowPrivilegeEscalation: true
       capabilities:
@@ -401,10 +397,9 @@ spec:
     - "start"
     - "vpn"
     - "guest"
-    - "-cert"
-    - "hostc.pem"
     - "-v"
-#   - "-trace"
+    - "-trace"
+    - "exchange0"
     securityContext:
       allowPrivilegeEscalation: true
       capabilities:

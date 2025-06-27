@@ -10,23 +10,23 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/hex"
+	"encoding/json"
 	"encoding/pem"
 	"errors"
 	"flag"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/netip"
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/platinasystems/goes/v2/pkg/box"
-	"github.com/platinasystems/goes/v2/pkg/xcontext"
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xflag"
 	"github.com/platinasystems/goes/v2/pkg/xlog"
@@ -36,12 +36,15 @@ import (
 const contextApplicationPKCS8 = "application/pkcs8"
 const dnsLookupTimeout = 30 * time.Second
 
-const RestTrailerVcsRevision = "Vcs-Revision"
-
 const (
-	RestService    = "service"
-	RestSubscriber = "subscriber"
+	RestError = "X-Error"
+
+	RestUnixMicroStart = "X-Unix-Micro-Start"
+
+	RestVcsRevision = "X-Vcs-Revision"
 )
+
+const RestSubscriber = "subscriber"
 
 const (
 	RestOp            = "op"
@@ -59,19 +62,34 @@ const (
 )
 
 const (
-	RestDumpSubscribers = "subscribers"
+	RestOpCheckinExchange = "exchange"
+	RestOpCheckinGuest    = "guest"
 )
 
 const (
-	RestShowActive      = "active"
-	RestShowAddress     = "address"
-	RestShowAdmins      = "admins"
-	RestShowHosts       = "hosts"
-	RestShowPending     = "pending"
-	RestShowSubscriber  = "subscriber"
-	RestShowTenant      = "tenant"
-	RestShowVcsModified = "vcs.modified"
-	RestShowVcsRevision = "vcs.revision"
+	RestOpCheckinExchangeVia = "via"
+	RestOpCheckinGuestVia    = "via"
+)
+
+const RestOpDumpSubscribers = "subscribers"
+
+const (
+	RestOpShowActive     = "active"
+	RestOpShowAddress    = "address"
+	RestOpShowAdmins     = "admins"
+	RestOpShowExchanges  = "exchanges"
+	RestOpShowHosts      = "hosts"
+	RestOpShowPending    = "pending"
+	RestOpShowPrefix     = "prefix"
+	RestOpShowStart      = "start"
+	RestOpShowSubscriber = "subscriber"
+	RestOpShowTenant     = "tenant"
+	RestOpShowVcs        = "vcs"
+)
+
+const (
+	RestOpShowVcsModified = "modified"
+	RestOpShowVcsRevision = "revision"
 )
 
 const (
@@ -82,20 +100,41 @@ const (
 
 var ErrVcsRevMismatch = errors.New("must upgrade")
 
+type StatusError struct {
+	Code int
+	s    string
+}
+
+func NewStatusError(code int, args ...any) *StatusError {
+	return &StatusError{code, fmt.Sprint(args...)}
+}
+
+func IsNotFound(err error) bool {
+	se, ok := err.(*StatusError)
+	return ok && se.Code == http.StatusNotFound
+}
+
+func (se *StatusError) Error() string {
+	if se == nil {
+		return "<nil>"
+	}
+	return se.s
+}
+
 // If [http.Response.StatusCode] != [http.StatusOK}, return non-nil, error
 // encapsulating the [http.Response.Body]; otherwise, return nil.
-func AssertOK(rsp *http.Response) error {
+func assertOK(rsp *http.Response) error {
 	if rsp.StatusCode == http.StatusOK {
 		return nil
 	}
-	defer rsp.Body.Close()
-	b, err := io.ReadAll(rsp.Body)
-	if err != nil || len(b) == 0 {
-		err = errors.New(rsp.Status)
+	se := NewStatusError(rsp.StatusCode, rsp.Status)
+	s := rsp.Header.Get(RestError)
+	if len(s) != 0 {
+		se.s += ", " + s
 	} else {
-		err = fmt.Errorf("%s, %s", rsp.Status, b)
+		se.s += ", without error message"
 	}
-	return err
+	return se
 }
 
 func RestAdmin(ctx context.Context, args []string) error {
@@ -107,7 +146,7 @@ RESTful registry administration.
 
 {{flags .}}`)
 
-	rest.defineFlags()
+	defineRestFlags()
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
 		return err
@@ -118,7 +157,7 @@ RESTful registry administration.
 	if err = rest.config(); err != nil {
 		return err
 	}
-	_, err = rest.request(ctx, os.Stdout, http.MethodPut,
+	_, err = rest.request(ctx, os.Stdout, http.MethodPut, "", nil,
 		RestOp, xflag.LastName(flag.CommandLine),
 		RestSubscriber, args[0])
 	return err
@@ -134,7 +173,7 @@ Import registry certificate.
 
 {{flags .}}`)
 
-	rest.defineFlags()
+	defineRestFlags()
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
 		return err
@@ -157,7 +196,7 @@ Import registry certificate.
 	}()
 	tp.TLSClientConfig.InsecureSkipVerify = true
 
-	rsp, err := rest.request(ctx, os.Stdout, http.MethodPut,
+	rsp, err := rest.request(ctx, os.Stdout, http.MethodPut, "", nil,
 		RestOp, RestOpCertify)
 	if err != nil {
 		return err
@@ -206,7 +245,7 @@ Get or list registry file(s).
 
 	var rest rest
 
-	rest.defineFlags()
+	defineRestFlags()
 
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
@@ -216,7 +255,7 @@ Get or list registry file(s).
 		return err
 	}
 	args = flag.CommandLine.Args()
-	_, err = rest.request(ctx, os.Stdout, http.MethodGet, args...)
+	_, err = rest.request(ctx, os.Stdout, http.MethodGet, "", nil, args...)
 	if errors.Is(err, ErrVcsRevMismatch) {
 		err = nil
 	}
@@ -232,7 +271,7 @@ RESTful ping registry.
 
 {{flags .}}`)
 
-	rest.defineFlags()
+	defineRestFlags()
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
 		return err
@@ -240,7 +279,7 @@ RESTful ping registry.
 	if err = rest.config(); err != nil {
 		return err
 	}
-	_, err = rest.request(ctx, os.Stdout, http.MethodGet,
+	_, err = rest.request(ctx, os.Stdout, http.MethodGet, "", nil,
 		RestOp, RestOpPing)
 	return err
 }
@@ -254,7 +293,7 @@ RESTful reload registry configuration.
 
 {{flags .}}`)
 
-	rest.defineFlags()
+	defineRestFlags()
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
 		return err
@@ -262,21 +301,23 @@ RESTful reload registry configuration.
 	if err = rest.config(); err != nil {
 		return err
 	}
-	_, err = rest.request(ctx, os.Stdout, http.MethodPut,
+	_, err = rest.request(ctx, os.Stdout, http.MethodPut, "", nil,
 		RestOp, RestOpReload)
 	return err
 }
 
-func RestShow(ctx context.Context, args []string) error {
-	var rest rest
-
-	xflag.TemplateUsage(`
+const restShowUsageTemplate = `
 usage: {{.Name}} [flags] [args]
 RESTful query and print registry object.
 
-{{flags .}}`)
+{{flags .}}`
 
-	rest.defineFlags()
+func RestShow(ctx context.Context, args []string) error {
+	var rest rest
+
+	xflag.TemplateUsage(restShowUsageTemplate)
+
+	defineRestFlags()
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
 		return err
@@ -284,11 +325,52 @@ RESTful query and print registry object.
 	if err = rest.config(); err != nil {
 		return err
 	}
-	_, err = rest.request(ctx, os.Stdout, http.MethodGet,
+	show := xflag.LastName(flag.CommandLine)
+	op := []string{
 		RestOp, RestOpShow,
-		RestOpShow, xflag.LastName(flag.CommandLine))
-	if errors.Is(err, ErrVcsRevMismatch) {
-		err = nil
+		RestOpShow, show,
+	}
+	for i, arg := range flag.Args() {
+		op = append(op, fmt.Sprint("arg", i), arg)
+	}
+	rsp, err := rest.request(ctx, os.Stdout, http.MethodGet, "", nil, op...)
+	if err == nil || errors.Is(err, ErrVcsRevMismatch) {
+		if show == RestOpShowStart {
+			var i int64
+			s := rsp.Header.Get(RestUnixMicroStart)
+			i, err = strconv.ParseInt(s, 10, 64)
+			if err == nil {
+				fmt.Println(time.UnixMicro(i))
+			}
+		}
+	}
+	return err
+}
+
+func RestShowVcs(ctx context.Context, args []string) error {
+	var rest rest
+
+	xflag.TemplateUsage(restShowUsageTemplate)
+
+	defineRestFlags()
+	err := flag.CommandLine.Parse(args)
+	if err != nil {
+		return err
+	}
+	if err = rest.config(); err != nil {
+		return err
+	}
+	show := xflag.LastName(flag.CommandLine)
+	op := []string{
+		RestOp, RestOpShow,
+		RestOpShow, RestOpShowVcs,
+		RestOpShowVcs, show,
+	}
+	rsp, err := rest.request(ctx, os.Stdout, http.MethodGet, "", nil, op...)
+	if err == nil || errors.Is(err, ErrVcsRevMismatch) {
+		if show == RestOpShowVcsRevision {
+			fmt.Println(rsp.Header.Get(RestVcsRevision))
+		}
 	}
 	return err
 }
@@ -302,7 +384,7 @@ RESTful subscribe to VPN.
 
 {{flags .}}`)
 
-	rest.defineFlags()
+	defineRestFlags()
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
 		return err
@@ -325,29 +407,15 @@ RESTful subscribe to VPN.
 	if err != nil {
 		return err
 	}
-	if err = AssertOK(rsp); err != nil {
+	defer rsp.Body.Close()
+	if err = assertOK(rsp); err != nil {
 		return err
 	}
-	defer rsp.Body.Close()
 	_, err = io.Copy(os.Stdout, rsp.Body)
 	return err
 }
 
-type rest struct {
-	bufs sync.Pool
-	crt,
-	reg *x509.Certificate
-	sig *Signatures
-	url *url.URL
-	http.Client
-	vcsrev string
-}
-
-func (rest *rest) alloc() *bytes.Buffer {
-	return rest.bufs.Get().(*bytes.Buffer)
-}
-
-func (*rest) defineFlags() {
+func defineRestFlags() {
 	defineCert()
 	defineConfigDir()
 	defineRegistry()
@@ -355,60 +423,43 @@ func (*rest) defineFlags() {
 	defineVPN()
 }
 
+type rest struct {
+	bufs sync.Pool
+	crt,
+	reg *x509.Certificate
+	url *url.URL
+	http.Client
+	vcsrev string
+	fault  chan error
+	ips    []net.IP
+}
+
+func (rest *rest) alloc() *bytes.Buffer {
+	return rest.bufs.Get().(*bytes.Buffer)
+}
+
 func (rest *rest) free(buf *bytes.Buffer) {
 	buf.Reset()
 	rest.bufs.Put(buf)
 }
 
-func (rest *rest) checkin(
-	ctx context.Context,
-	pubder,
-	nonce []byte,
-	optsvc netip.AddrPort,
-) (
-	id, via box.Id,
-	addr netip.Addr,
-	prefix netip.Prefix,
-	err error,
-) {
-	const period = 5 * time.Second
-	for try := 1; true; try++ {
-		var resp *http.Response
-		xlog.Info.Println("checkin try", try)
-		id, via, addr, prefix, resp, err = rest.tryCheckin(
-			ctx, pubder, nonce, optsvc,
-		)
-		if err == nil {
-			return
-		} else if resp == nil {
-			return
-		} else if resp.StatusCode != http.StatusTooEarly {
-			return
-		} else if try == 10 {
-			err = xerrors.Unavailable("exchange")
-			return
-		}
-		time.Sleep(period)
-	}
-	return
-}
-
 func (rest *rest) config() error {
+	rest.fault = make(chan error, 1)
 	rest.bufs.New = func() any { return new(bytes.Buffer) }
 	rest.vcsrev = xprogram.VcsRevision.String()
 	fn := filepath.Join(vpnConfigDir, vpnCert)
 	cs, err := certificates(fn)
 	if err != nil {
-		return err
+		return xerrors.Mark(err)
 	} else if len(cs) == 0 {
-		return xerrors.Invalid(fn)
+		return xerrors.Mark(xerrors.Invalid(fn))
 	} else {
 		rest.crt = cs[0]
 	}
 
-	rest.sig, err = NewSignatures(filepath.Join(vpnConfigDir, vpnSig))
+	pk, err := FirstPrivSigFileKey()
 	if err != nil {
-		return err
+		return xerrors.Mark(err)
 	}
 
 	cfg := &tls.Config{
@@ -416,7 +467,7 @@ func (rest *rest) config() error {
 		Certificates: []tls.Certificate{
 			{
 				Certificate: [][]byte{rest.crt.Raw},
-				PrivateKey:  rest.sig.First(),
+				PrivateKey:  pk,
 			},
 		},
 	}
@@ -450,6 +501,7 @@ func (rest *rest) config() error {
 		tp.TLSClientConfig.InsecureSkipVerify = true
 	}
 	rest.Client.Transport = tp
+
 	return nil
 }
 
@@ -457,8 +509,20 @@ func (rest *rest) config() error {
 // - With one arg, copy registry file.
 // - With one or more (key, value) pairs, RESTful registry query response.
 func (rest *rest) request(
-	ctx context.Context, w io.Writer, method string, args ...string,
+	ctx context.Context,
+	// rsp body
+	w io.Writer,
+	method string,
+	// req body
+	contentType string, r io.Reader,
+	args ...string,
 ) (*http.Response, error) {
+	if len(rest.ips) == 0 {
+		if err := rest.waitForResolution(ctx); err != nil {
+			return nil, err
+		}
+	}
+
 	clone := *rest.url
 	switch len(args) {
 	case 0:
@@ -467,110 +531,83 @@ func (rest *rest) request(
 		clone.Path = args[0]
 	default:
 		q := clone.Query()
-		for i := 0; i < len(args); i += 2 {
-			q.Set(args[i], args[i+1])
+		for i, n := 0, len(args); i < n; i += 2 {
+			if i < n-1 {
+				q.Set(args[i], args[i+1])
+			} else {
+				q.Set(args[i], "")
+			}
 		}
 		clone.RawQuery = q.Encode()
 	}
-	req, err := http.NewRequestWithContext(ctx, method, clone.String(), nil)
+
+	req, err := http.NewRequestWithContext(ctx, method, clone.String(), r)
 	if err != nil {
 		return nil, err
 	}
+	if len(contentType) > 0 {
+		req.Header.Set("Content-Type", contentType)
+	}
 	rsp, err := rest.Do(req)
 	if err == nil {
-		if err = AssertOK(rsp); err == nil {
-			defer rsp.Body.Close()
-			_, err = io.Copy(w, rsp.Body)
+		defer rsp.Body.Close()
+		vcsrev := rsp.Header.Get(RestVcsRevision)
+		if len(vcsrev) == 0 {
+			xlog.Info.Println("no vcsrev", rsp.Header)
+		} else if len(rest.vcsrev) == 0 {
+			rest.vcsrev = vcsrev
+		} else if rest.vcsrev != vcsrev {
+			return nil, fmt.Errorf("%w: %s != %s",
+				ErrVcsRevMismatch, rest.vcsrev, vcsrev)
 		}
-		if rsp.Trailer.Get(RestTrailerVcsRevision) != rest.vcsrev {
-			err = ErrVcsRevMismatch
+		if err = assertOK(rsp); err == nil {
+			_, err = io.Copy(w, rsp.Body)
 		}
 	}
 	return rsp, err
 }
 
-func (rest *rest) tryCheckin(
-	ctx context.Context,
-	pubder,
-	nonce []byte,
-	optsvc netip.AddrPort,
-) (
-	id, via box.Id,
-	addr netip.Addr,
-	prefix netip.Prefix,
-	rsp *http.Response,
-	err error,
-) {
-	clone := *rest.url
-	q := clone.Query()
-	q.Set(RestOp, RestOpCheckin)
-	if optsvc.Addr().IsValid() {
-		q.Set(RestService, optsvc.String())
-	}
-	clone.RawQuery = q.Encode()
-	body := new(bytes.Buffer)
-	err = xerrors.Mark(pem.Encode(body, &pem.Block{
-		Type: "PUBLIC KEY",
-		Headers: map[string]string{
-			"nonce": hex.EncodeToString(nonce),
-		},
-		Bytes: pubder,
-	}))
-	if err != nil {
-		return
-	}
-	req, err := xerrors.MarkResult(http.NewRequestWithContext(ctx,
-		http.MethodPut, clone.String(), body))
-	if err != nil {
-		return
-	}
-	req.Header.Set("Content-Type", contextApplicationPKCS8)
-	if rsp, err = rest.Do(req); err != nil {
-		return
-	}
-	if err = AssertOK(rsp); err != nil {
-		return
-	}
-	defer rsp.Body.Close()
-	scanner := bufio.NewScanner(rsp.Body)
-	scanner.Split(bufio.ScanWords)
-	for err == nil && scanner.Scan() {
-		key := scanner.Text()
-		if !scanner.Scan() {
-			break
-		}
-		val := scanner.Text()
-		switch key {
-		case "id:":
-			id, err = xerrors.MarkResult(box.ParseId(val))
-		case "via:":
-			via, err = xerrors.MarkResult(box.ParseId(val))
-		case "address:":
-			addr, err = xerrors.MarkResult(netip.ParseAddr(val))
-		case "prefix:":
-			prefix, err = xerrors.MarkResult(netip.ParsePrefix(val))
-		}
+func (rest *rest) waitForResolution(ctx context.Context) (err error) {
+	const timeout = 60 * time.Second
+	hn := rest.url.Hostname()
+	rest.ips, err = WaitForResolution(ctx, "ip", hn, timeout)
+	if err == nil {
+		xlog.Info.Println(hn, rest.ips)
 	}
 	return
 }
 
-// Forward cloned [http.Response.Body] to [RestOpWhois] [Rest.Request] of
-// [netip.Addr] or [box.ID] value.
-func (rest *rest) whois(
-	ctx context.Context, ch chan<- *bytes.Buffer, value any,
-) error {
+func (rest *rest) whois(ctx context.Context, q any) (*Registration, error) {
+	var k, s string
 	buf := rest.alloc()
-	key := RestWhoisId
-	if _, isAddr := value.(netip.Addr); isAddr {
-		key = RestWhoisAddress
+	defer rest.free(buf)
+	switch t := q.(type) {
+	case Id:
+		k = RestWhoisId
+		s = fmt.Sprint(t.Index())
+	case int:
+		k = RestWhoisId
+		s = fmt.Sprint(t)
+	case string:
+		k = RestWhoisName
+		s = t
+	case netip.Addr:
+		k = RestWhoisAddress
+		s = t.String()
+	default:
+		xlog.Errata.Printf("%T: unsupported", t)
+		return nil, xerrors.Unsupported(fmt.Sprintf("%T", t))
 	}
-	_, err := rest.request(ctx, buf, http.MethodGet,
+	_, err := rest.request(ctx, buf, http.MethodGet, "", nil,
 		RestOp, RestOpWhois,
-		key, fmt.Sprint(value))
-	if err != nil || !xcontext.Queue(ctx, ch, buf) {
-		rest.free(buf)
+		RestOpWhois, k,
+		k, s)
+	if err != nil {
+		return nil, err
 	}
-	return err
+	gx := new(Registration)
+	err = json.Unmarshal(buf.Bytes(), gx)
+	return gx, err
 }
 
 // eXtract registry url from its certificate.
@@ -589,7 +626,8 @@ func (rest *rest) xregurl() error {
 		return xerrors.Invalid("no registry URL or DNS")
 	}
 	var err error
-	s := fmt.Sprint("https://", rest.reg.DNSNames[0], ":8003")
+	s := fmt.Sprint("https://", rest.reg.DNSNames[0],
+		":", defaultRegistryPort)
 	rest.url, err = url.Parse(s)
 	return err
 }

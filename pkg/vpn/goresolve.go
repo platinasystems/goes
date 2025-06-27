@@ -6,11 +6,9 @@ package vpn
 
 import (
 	"context"
-	"errors"
 	"net"
 	"time"
 
-	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xlog"
 )
 
@@ -23,44 +21,27 @@ var Resolver = net.Resolver{
 	PreferGo: true,
 }
 
-func PatientLookupIP(
+func WaitForResolution(
 	ctx context.Context, network, hostname string, timeout time.Duration,
-) ([]net.IP, error) {
-	var (
-		dnserr *net.DNSError
-		total  time.Duration
-	)
-	dur := MinResolveRetryInterval
-	if dur >= timeout {
-		dur = timeout / 3
-	}
-	for true {
-		ips, err := Resolver.LookupIP(ctx, network, hostname)
+) (ips []net.IP, err error) {
+	begin := time.Now()
+	for {
+		ips, err = Resolver.LookupIP(ctx, network, hostname)
 		if err == nil {
-			if total > MinResolveRetryInterval {
-				xlog.Info.Println("found", hostname, ips, total)
-			}
-			return ips, err
+			break
 		}
-		if total >= timeout ||
-			!errors.As(err, &dnserr) ||
-			!dnserr.IsNotFound {
-			return ips, err
+		if time.Now().Sub(begin) > timeout {
+			return
 		}
 		select {
 		case <-ctx.Done():
-			return ips, ctx.Err()
-		case <-time.After(dur):
-			if total == 0 {
-				xlog.Info.Println("wait for", hostname, "...")
-			}
-			total += dur
-			if dur *= 2; dur > MaxResolveRetryInterval {
-				dur = MaxResolveRetryInterval
-			} else if total+dur > timeout {
-				dur = timeout - total
-			}
+			err = ctx.Err()
+			return
+		case <-time.After(time.Second):
+			xlog.Info.Println("retry", hostname, "...")
 		}
 	}
-	return []net.IP{}, xerrors.Broken()
+	xlog.Info.Println("after", time.Now().Sub(begin), "found", hostname,
+		"with", ips)
+	return
 }

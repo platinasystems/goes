@@ -1,4 +1,4 @@
-// Copyright © 2022-2024 Platina Systems, Inc. All rights reserved.
+// Copyright © 2022-2025 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the BSD-style license
 // described in the golang/LICENSE file.
 
@@ -54,6 +54,21 @@ func Test(t *testing.T) {
 		{func() error {
 			return Broken("arrow")
 		}, "arrow: broken"},
+		{func() (err error) {
+			defer Recovery(&err)
+			Assert(example)
+			return
+		}, "xerrors_test.go:59: example"},
+		{func() (err error) {
+			defer Recovery(&err)
+			AssertResult("foo", example)
+			return
+		}, "xerrors_test.go:64: example"},
+		{func() (err error) {
+			defer Recovery(&err)
+			AssertTrue(AssertResult("foo", nil) == "bar")
+			return
+		}, "xerrors_test.go:69: false"},
 	} {
 		t.Run(fmt.Sprint(i), func(t *testing.T) {
 			got := unit.test()
@@ -62,7 +77,7 @@ func Test(t *testing.T) {
 					t.Error("unexpected: ", got)
 				}
 			} else if got == nil {
-				t.Errorf("expected: %q", unit.expect)
+				t.Errorf("got nil, expected: %q", unit.expect)
 			} else if s := got.Error(); s != unit.expect {
 				t.Errorf("%q != %q", s, unit.expect)
 			}

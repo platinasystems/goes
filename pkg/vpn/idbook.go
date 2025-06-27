@@ -2,9 +2,11 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-package box
+package vpn
 
-import "sync"
+import (
+	"sync"
+)
 
 const (
 	IdBookPageSize = 4 << 10

@@ -98,13 +98,6 @@ Create PEM encoded x509 certificate file.
 
 {{flags .}}`)
 
-	if hostname, err := os.Hostname(); err != nil {
-		return err
-	} else {
-		vpnName = hostname
-		vpnDNS = hostname
-	}
-
 	defineCert()
 	defineConfigDir()
 	defineCountry()
@@ -127,14 +120,9 @@ Create PEM encoded x509 certificate file.
 		return err
 	}
 
-	sig, err := NewSignatures(filepath.Join(vpnConfigDir, vpnSig))
+	priv, err := FirstPrivSigFileKey()
 	if err != nil {
 		return err
-	}
-
-	priv := sig.First()
-	if priv == nil {
-		return xerrors.Incomplete(sig.String())
 	}
 
 	if vpnDuration > longest {

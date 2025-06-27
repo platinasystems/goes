@@ -14,6 +14,12 @@ type Uint interface {
 	~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64 | ~uintptr
 }
 
+var (
+	Uint16 = binary.BigEndian.Uint16
+	Uint32 = binary.BigEndian.Uint32
+	Uint64 = binary.BigEndian.Uint64
+)
+
 func Attach16[I Int | Uint](buf []byte, i I) []byte {
 	return binary.BigEndian.AppendUint16(buf, uint16(i))
 }
@@ -26,16 +32,16 @@ func Attach64[I Int | Uint](buf []byte, i I) []byte {
 	return binary.BigEndian.AppendUint64(buf, uint64(i))
 }
 
-func Decode16[I Int | Uint](data []byte) I {
-	return I(binary.BigEndian.Uint16(data))
+func Decode16[I Int | Uint](data []byte, p *I) {
+	*p = I(binary.BigEndian.Uint16(data))
 }
 
-func Decode32[I Int | Uint](data []byte) I {
-	return I(binary.BigEndian.Uint32(data))
+func Decode32[I Int | Uint](data []byte, p *I) {
+	*p = I(binary.BigEndian.Uint32(data))
 }
 
-func Decode64[I Int | Uint](data []byte) I {
-	return I(binary.BigEndian.Uint64(data))
+func Decode64[I Int | Uint](data []byte, p *I) {
+	*p = I(binary.BigEndian.Uint64(data))
 }
 
 func Detach16[I Int | Uint](buf []byte, p *I) []byte {
@@ -64,6 +70,10 @@ func Encode32[I Int | Uint](buf []byte, i I) {
 func Encode64[I Int | Uint](buf []byte, i I) {
 	binary.BigEndian.PutUint64(buf, uint64(i))
 }
+
+func Int16(buf []byte) int16 { return int16(Uint16(buf)) }
+func Int32(buf []byte) int32 { return int32(Uint32(buf)) }
+func Int64(buf []byte) int64 { return int64(Uint64(buf)) }
 
 func Remove16[I Int | Uint](data []byte, p *I) []byte {
 	*p = I(binary.BigEndian.Uint16(data))
