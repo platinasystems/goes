@@ -173,7 +173,11 @@ Import registry certificate.
 
 {{flags .}}`)
 
+	rfn := filepath.Join(vpnConfigDir, vpnRegistry)
+
 	defineRestFlags()
+	yes := flag.CommandLine.Bool("y", false,
+		fmt.Sprint("Yes, write remote certificate to ", rfn))
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
 		return err
@@ -217,11 +221,12 @@ Import registry certificate.
 		return err
 	}
 
-	rfn := filepath.Join(vpnConfigDir, vpnRegistry)
-	fmt.Fprintf(w, `Enter "yes" to write above to %s: `, rfn)
-	s, err := r.ReadString('\n')
-	if err != nil && strings.TrimSpace(s) != "yes" {
-		return err
+	if !*yes {
+		fmt.Fprintf(w, `Enter "yes" to write above to %s: `, rfn)
+		s, err := r.ReadString('\n')
+		if err != nil && strings.TrimSpace(s) != "yes" {
+			return err
+		}
 	}
 
 	blk := pem.Block{
