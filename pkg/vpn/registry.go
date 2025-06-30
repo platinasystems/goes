@@ -960,12 +960,17 @@ func (vpn *regVpn) subscribe(req *http.Request) error {
 
 	c := req.TLS.PeerCertificates[0]
 	cn := c.Subject.CommonName
-	if _, present := vpn.subscriberNamed[cn]; present {
-		return xerrors.Unavailable(cn)
+	if x, present := vpn.subscriberNamed[cn]; present {
+		if c.Equal(x) {
+			return NewStatusError(http.StatusGone,
+				"already subscribed")
+		}
+		return NewStatusError(http.StatusForbidden, "name is use")
 	}
 	for _, p := range vpn.pending {
 		if p.Subject.CommonName == cn {
-			return xerrors.Unavailable(cn)
+			return NewStatusError(http.StatusConflict,
+				"subscription pending approval")
 		}
 	}
 	vpn.pending = append(vpn.pending, c)
