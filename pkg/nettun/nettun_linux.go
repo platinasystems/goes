@@ -5,6 +5,7 @@
 package nettun
 
 import (
+	"context"
 	"encoding/binary"
 	"fmt"
 	"net"
@@ -24,11 +25,12 @@ const (
 	CanPersist     = false
 	CanChangeOwner = false
 	CanChangeGroup = false
-	DevNetTun      = "/dev/net/tun"
+	DevNet         = "/dev/net"
+	DevNetTun      = DevNet + "/tun"
 )
 
 func New(
-	unit uint,
+	unit int,
 	isTAP bool,
 	persist bool,
 	owner, group int,
@@ -44,7 +46,13 @@ func New(
 	} else {
 		ifr.PutFlags(IFF_TUN)
 	}
-	copy(ifr.Ifrn[:], []byte(fmt.Sprintf("%s%d", prefix, unit)))
+	if unit >= 0 {
+		copy(ifr.Ifrn[:], []byte(fmt.Sprint(prefix, unit)))
+	} else {
+		ctx := context.Background()
+		_, s := netif.NextUnit(ctx, prefix)
+		copy(ifr.Ifrn[:], []byte(s))
+	}
 
 	if _, err := os.Stat(DevNetTun); err != nil {
 		const (
@@ -53,7 +61,7 @@ func New(
 			dev   = (major << 8) | (minor & 0xff) |
 				((minor & 0xfff00) << 12)
 		)
-		if _, err = os.Stat("/dev/net"); err != nil {
+		if _, err = os.Stat("DevNet"); err != nil {
 			return nil, xerrors.Mark(err)
 		}
 		err = unix.Mknod(DevNetTun, unix.S_IFCHR, dev)

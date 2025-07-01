@@ -65,7 +65,20 @@ func Named(ctx context.Context, name string) (*NetIf, error) {
 	return nif, err
 }
 
-// Call function `f` with each interface but stops if `f` returns falses
+// Returns first available unit numbered interface with given prefix.
+func NextUnit(ctx context.Context, prefix string) (int, string) {
+	nif := new(NetIf)
+	for unit := 0; true; unit++ {
+		nif.Name = fmt.Sprint(prefix, unit)
+		nif.Index = 0
+		if nif.Refresh(ctx) != nil {
+			return unit, nif.Name
+		}
+	}
+	return -1, ""
+}
+
+// Call function `f` with each interface but stops if `f` returns false.
 func Range(ctx context.Context, f func(context.Context, *NetIf) bool) {
 	nifs, err := List(ctx)
 	if err == nil {

@@ -5,6 +5,7 @@
 package nettun
 
 import (
+	"context"
 	"os"
 	"unsafe"
 
@@ -26,7 +27,7 @@ const (
 var namsiz = uintptr(IFNAMSIZ)
 
 func New(
-	unit uint,
+	unit int,
 	isTAP bool,
 	persist bool,
 	owner, group int,
@@ -62,6 +63,10 @@ func New(
 		return nil, err
 	}
 
+	if unit < 0 {
+		ctx := context.Background()
+		unit, _ = netif.NextUnit(ctx, "utun")
+	}
 	sac := &SockaddrCtl{
 		Sc_len:     SizeofSockaddrCtl,
 		Sc_family:  AF_SYSTEM,

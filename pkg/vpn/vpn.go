@@ -116,7 +116,7 @@ var (
 	vpnURI,
 	vpnVPN string
 
-	vpnTunnel uint
+	vpnTunnel = -1
 
 	wg xsync.WaitGroup
 )
