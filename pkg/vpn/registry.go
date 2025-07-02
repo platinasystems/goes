@@ -415,7 +415,7 @@ func (reg *registry) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		err = NewStatusError(http.StatusBadRequest, op)
 	}
 	if err == nil {
-		w.(http.Flusher).Flush()
+		return
 	} else if se, isStatusError := err.(*StatusError); isStatusError {
 		w.Header().Add(RestError, se.s)
 		w.WriteHeader(se.Code)
