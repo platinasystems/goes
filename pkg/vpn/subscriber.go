@@ -197,6 +197,9 @@ func (sub *subscriber) viaWhom(ctx context.Context, namePort string) error {
 		addr, err = sub.resolve(ctx, name)
 	}
 	if err == nil {
+		if addr.Is4In6() {
+			addr = addr.Unmap()
+		}
 		sub.via.Service = netip.AddrPortFrom(addr, port)
 	}
 	return err
