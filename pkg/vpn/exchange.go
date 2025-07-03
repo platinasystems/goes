@@ -20,11 +20,11 @@ import (
 
 // Exchange is a UDP server that forwards ciphered packets between guest's.
 func Exchange(ctx context.Context, args []string) error {
-	var svc, via string
+	var svc string
 	defer xlog.Info.Println("stopped", svc)
 
 	xflag.TemplateUsage(`
-usage: {{.Name}} [flags] [via[:port]]
+usage: {{.Name}} [flags]
 Exchange ciphered packets between guests.
 
 {{flags .}}`)
@@ -40,9 +40,6 @@ Exchange ciphered packets between guests.
 	if err != nil {
 		return err
 	}
-	if flag.CommandLine.NArg() > 0 {
-		via = flag.CommandLine.Arg(0)
-	}
 	ex := exchange{
 		rap: make(map[int]netip.AddrPort),
 		ver: make(map[int]uint8),
@@ -57,7 +54,7 @@ Exchange ciphered packets between guests.
 
 	wg.Go(func() { xlog.AlarmHandler(ctx) })
 
-	if err = ex.checkin(ctx, via); err != nil {
+	if err = ex.checkin(ctx); err != nil {
 		return err
 	}
 	if ex.udp, err = udpListen(vpnListen); err != nil {
@@ -85,14 +82,6 @@ Exchange ciphered packets between guests.
 	wg.Go(func() { ex.whoisService(ctx) })
 	defer close(ex.whoisReqCh)
 
-	var tc <-chan time.Time
-	if ex.via != nil {
-		tkr := time.NewTicker(10 * time.Second)
-		defer tkr.Stop()
-	} else {
-		tc = make(chan time.Time)
-	}
-
 	m := mp.Get()
 	defer mp.Put(m)
 selection:
@@ -102,12 +91,6 @@ selection:
 		case <-ctx.Done():
 			break selection
 		case err = <-ex.fault:
-		case t := <-tc:
-			err = greetings(ctx, ex.udp, ex.start, t.UnixMicro(),
-				ex.via.Id, ex.via.Service)
-			if err != nil {
-				return err
-			}
 		case gx, ok := <-ex.whoisRspCh:
 			if !ok {
 				break selection
@@ -164,7 +147,7 @@ type exchange struct {
 	udp *net.UDPConn
 }
 
-func (ex *exchange) checkin(ctx context.Context, via string) error {
+func (ex *exchange) checkin(ctx context.Context) error {
 	var id uint
 
 	buf := ex.subscriber.rest.alloc()
@@ -173,9 +156,7 @@ func (ex *exchange) checkin(ctx context.Context, via string) error {
 	rsp, err := ex.subscriber.rest.request(ctx, buf, http.MethodPut,
 		"", nil,
 		RestOp, RestOpCheckin,
-		RestOpCheckin, RestOpCheckinExchange,
-		RestOpCheckinExchange, RestOpCheckinExchangeVia,
-		RestOpCheckinExchangeVia, via)
+		RestOpCheckin, RestOpCheckinExchange)
 	if err != nil {
 		return err
 	}
@@ -188,10 +169,7 @@ func (ex *exchange) checkin(ctx context.Context, via string) error {
 	MyId = Id(id)
 	MyLabel = MakeLabel(MyId, MyId)
 	xlog.Info.Println("registration:", MyId)
-	if len(via) > 0 {
-		err = ex.waitForExchange(ctx, via)
-	}
-	return err
+	return nil
 }
 
 func (ex *exchange) isOK(id Id) bool {
