@@ -35,12 +35,14 @@ import (
 )
 
 const (
-	CipherOverhead = 28
+	GCMNonceSize = 12
+	GCMTagSize   = 16
+	GCMOverhead  = GCMNonceSize + GCMTagSize
 
-	IP6MTU  = netph.ETHMTU - netph.IP6Size
+	VPNMTU  = netph.ETHMTU - VPNSize
+	IP6MTU  = VPNMTU - netph.IP6Size
 	UDP6MTU = IP6MTU - netph.UDPSize
-	VPNMTU  = UDP6MTU - VPNSize
-	TunMTU  = VPNMTU - CipherOverhead
+	TunMTU  = UDP6MTU - GCMOverhead - SizeofLabel
 
 	IsTap = false
 
