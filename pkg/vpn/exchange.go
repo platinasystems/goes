@@ -8,6 +8,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"net"
 	"net/http"
 	"net/netip"
 	"time"
@@ -15,7 +16,6 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xflag"
 	"github.com/platinasystems/goes/v2/pkg/xlog"
-	"github.com/platinasystems/goes/v2/pkg/xnet"
 )
 
 // Exchange is a UDP server that forwards ciphered packets between guest's.
@@ -68,11 +68,6 @@ Exchange ciphered packets between guests.
 		defer udp.Close()
 		<-ctx.Done()
 	})
-	wg.Go(func() {
-		if t := udpStream(ctx); err == nil {
-			err = t
-		}
-	})
 	sap, err := udpLocalAddrPort(udp)
 	if err != nil {
 		return err
@@ -98,14 +93,20 @@ Exchange ciphered packets between guests.
 		tc = make(chan time.Time)
 	}
 
+	m := mp.Get()
+	defer mp.Put(m)
 selection:
 	for err == nil {
+		var n int
 		select {
 		case <-ctx.Done():
-			err = ctx.Err()
+			break selection
 		case err = <-ex.fault:
 		case t := <-tc:
 			err = ex.greetings(ctx, t, ex.via.Id, ex.via.Service)
+			if err != nil {
+				return err
+			}
 		case gx, ok := <-ex.whoisRspCh:
 			if !ok {
 				break selection
@@ -113,15 +114,45 @@ selection:
 			iid := gx.Id.Index()
 			ex.ver[iid] = gx.Id.Version()
 			ex.verifiers[iid], err = gx.verifier()
-		case m, ok := <-rmc:
-			if !ok {
-				break selection
+		default:
+		}
+		m.Data = m.Data[:cap(m.Data)]
+		n, m.AddrPort, err = udp.ReadFromUDPAddrPort(m.Data)
+		if err != nil {
+			return xerrors.Suppress(err, net.ErrClosed)
+		}
+		m.Data = m.Data[:n]
+		i := n - SizeofLabel
+		if i < 0 {
+			xlog.Errata.Print("underrun")
+		} else if tid, fid := ScanLabel(m.Data); !ex.isOK(fid) {
+			xlog.Trace.Println("whois from", fid)
+			ex.whoisQueue(ctx, fid.Index())
+		} else if tid == fid {
+			if ex.verifyHello(m, fid) {
+				ex.rap[fid.Index()] = m.AddrPort
+				err = ex.greetings(ctx, time.Now(), fid,
+					m.AddrPort)
+				if err != nil {
+					return err
+				}
 			}
-			err = ex.rx(ctx, m)
-			mp.Put(m)
+		} else if !ex.isOK(tid) {
+			xlog.Trace.Println("whois from", tid)
+			ex.whoisQueue(ctx, tid.Index())
+		} else if rap, ok := ex.rap[tid.Index()]; ok {
+			xlog.Trace.Print("forward ", tid, "@", rap,
+				"<-", fid, "@", m.AddrPort)
+			_, err = udp.WriteToUDPAddrPort(m.Data, rap)
+			if err != nil {
+				return err
+			}
+		} else {
+			xlog.Trace.Print("dropped ", tid, "<-", fid, "@",
+				m.AddrPort)
 		}
 	}
-	return xerrors.Suppress(err, context.Canceled, errEOC)
+	return nil
 }
 
 type exchange struct {
@@ -163,33 +194,4 @@ func (ex *exchange) checkin(ctx context.Context, via string) error {
 func (ex *exchange) isOK(id Id) bool {
 	v, ok := ex.ver[id.Index()]
 	return ok && v == id.Version()
-}
-
-func (ex *exchange) rx(ctx context.Context, m *xnet.Msg) error {
-	if to, from := ScanLabel(m.Data); !ex.isOK(from) {
-		xlog.Trace.Println("whois from", from)
-		ex.whoisQueue(ctx, from.Index())
-	} else if to == from {
-		if ex.verifyHello(m, from) {
-			ex.rap[from.Index()] = m.AddrPort
-			return ex.greetings(ctx, time.Now(), from, m.AddrPort)
-		}
-	} else if !ex.isOK(to) {
-		xlog.Trace.Println("whois from", to)
-		ex.whoisQueue(ctx, to.Index())
-	} else if rap, ok := ex.rap[to.Index()]; ok {
-		xlog.Trace.Print("forward ", to, "@", rap,
-			"<-", from, "@", m.AddrPort)
-		m.AddrPort = rap
-		return udpSend(ctx, m)
-	} else if ex.via.Service.IsValid() {
-		xlog.Trace.Print("forward ", to, "<-", from, "@", m.AddrPort,
-			" via ", ex.via.Id, "@", ex.via.Service)
-		m.AddrPort = ex.via.Service
-		return udpSend(ctx, m)
-	} else {
-		// FIXME forward to closest via
-		xlog.Trace.Printf("dropped %v -> %v", from, to)
-	}
-	return nil
 }

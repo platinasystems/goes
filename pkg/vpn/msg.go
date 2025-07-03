@@ -5,14 +5,10 @@
 package vpn
 
 import (
-	"context"
-	"io"
 	"net"
 	"net/netip"
-	"runtime"
 
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
-	"github.com/platinasystems/goes/v2/pkg/xlog"
 	"github.com/platinasystems/goes/v2/pkg/xnet"
 	"github.com/platinasystems/goes/v2/pkg/xnet/netph"
 )
@@ -20,7 +16,6 @@ import (
 var (
 	mp  *xnet.MsgPool
 	udp *net.UDPConn
-	rmc chan *xnet.Msg
 )
 
 func udpLocalAddrPort(udp *net.UDPConn) (netip.AddrPort, error) {
@@ -30,12 +25,6 @@ func udpLocalAddrPort(udp *net.UDPConn) (netip.AddrPort, error) {
 
 func udpListen() (err error) {
 	mp = xnet.NewMsgPool(netph.ETHMTU)
-
-	if runtime.NumCPU() > 1 {
-		rmc = make(chan *xnet.Msg, 4)
-	} else {
-		rmc = make(chan *xnet.Msg)
-	}
 
 	udpnet := "udp"
 	if a := vpnListen.Addr(); a.Is4() {
@@ -48,17 +37,4 @@ func udpListen() (err error) {
 		Port: int(vpnListen.Port()),
 	}))
 	return
-}
-
-func udpSend(ctx context.Context, m *xnet.Msg) error {
-	_, err := udp.WriteToUDPAddrPort(m.Data, m.AddrPort)
-	return err
-}
-
-func udpStream(ctx context.Context) error {
-	la := udp.LocalAddr()
-	xlog.Info.Println("start stream from", la)
-	defer xlog.Info.Println("stopped stream from", la)
-	err := mp.RecvMsgs(ctx, udp, rmc)
-	return xerrors.Suppress(err, net.ErrClosed, context.Canceled, io.EOF)
 }

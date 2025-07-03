@@ -63,7 +63,8 @@ func (sub *subscriber) greetings(
 	}
 	m.Data = append(m.Data, MyLabel...)
 	xlog.Trace.Print("tx hello ", to, ", ", now)
-	return udpSend(ctx, m)
+	_, err = udp.WriteToUDPAddrPort(m.Data, ap)
+	return err
 }
 
 func (sub *subscriber) validateCheckinResponse(rsp *http.Response) error {
