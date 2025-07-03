@@ -35,10 +35,10 @@ func MakeId(i int, v uint8) Id {
 	return Id(i) | Id(v)<<IdVersionBit
 }
 
-func MakeLabel(local, remote Id) []byte {
+func MakeLabel(from, to Id) []byte {
 	lbl := make([]byte, SizeofLabel)
-	binary.BigEndian.PutUint32(lbl, uint32(local))
-	binary.BigEndian.PutUint32(lbl[SizeofId:], uint32(remote))
+	binary.BigEndian.PutUint32(lbl, uint32(from))
+	binary.BigEndian.PutUint32(lbl[SizeofId:], uint32(to))
 	return lbl
 }
 
