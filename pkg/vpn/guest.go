@@ -525,6 +525,10 @@ func (g *guest) tunRead(ctx context.Context) {
 		m.Data = m.Data[:cap(m.Data)]
 		n, err := g.tun.Read(m.Data)
 		if err != nil {
+			if xos.IsBlocked(err) {
+				runtime.Gosched()
+				continue
+			}
 			xlog.Errata.Print(err)
 			return
 		}
