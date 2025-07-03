@@ -5,8 +5,10 @@
 package vpn
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"net"
 	"net/netip"
 	"os"
 	"path/filepath"
@@ -19,6 +21,8 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xflag"
 	"github.com/platinasystems/goes/v2/pkg/xlog"
+	"github.com/platinasystems/goes/v2/pkg/xnet"
+	"github.com/platinasystems/goes/v2/pkg/xnet/netph"
 	"github.com/platinasystems/goes/v2/pkg/xprogram"
 	"github.com/platinasystems/goes/v2/pkg/xsync"
 )
@@ -88,6 +92,8 @@ var (
 	errUnestablished = errors.New("unestablished")
 
 	errUnidentified = errors.New("unidentified")
+
+	mp = xnet.NewMsgPool(netph.ETHMTU)
 
 	vpnCert = "cert.pem"
 
@@ -360,4 +366,51 @@ func prefDir(primary string, alternates ...string) string {
 		}
 	}
 	return primary
+}
+
+func greetings(
+	ctx context.Context,
+	udp *net.UDPConn,
+	start, now int64,
+	to Id,
+	ap netip.AddrPort,
+) error {
+	m := mp.Get()
+	defer mp.Put(m)
+	m.Data = m.Data[:0]
+	m.AddrPort = ap
+
+	sign, err := FirstPrivSigFileSign()
+	if err != nil {
+		return err
+	}
+	m.Data, err = xnet.Attach(m.Data, start)
+	if err == nil {
+		m.Data, err = xnet.Attach(m.Data, now)
+		if err == nil {
+			m.Data = append(m.Data, sign(m.Data)...)
+		}
+	}
+	m.Data = append(m.Data, MyLabel...)
+	xlog.Trace.Print("tx hello ", to)
+	_, err = udp.WriteToUDPAddrPort(m.Data, ap)
+	return err
+}
+
+func udpListen(ap netip.AddrPort) (*net.UDPConn, error) {
+	udpnet := "udp"
+	if a := ap.Addr(); a.Is4() {
+		udpnet = "udp4"
+	} else if a.Is6() {
+		udpnet = "udp6"
+	}
+	return net.ListenUDP(udpnet, &net.UDPAddr{
+		IP:   ap.Addr().AsSlice(),
+		Port: int(ap.Port()),
+	})
+}
+
+func udpLocalAddrPort(udp *net.UDPConn) (netip.AddrPort, error) {
+	s := udp.LocalAddr().String()
+	return xerrors.MarkResult(netip.ParseAddrPort(s))
 }

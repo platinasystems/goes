@@ -42,31 +42,6 @@ func (sub *subscriber) config() error {
 	return sub.rest.config()
 }
 
-func (sub *subscriber) greetings(
-	ctx context.Context, now time.Time, to Id, ap netip.AddrPort,
-) error {
-	m := mp.Get()
-	defer mp.Put(m)
-	m.Data = m.Data[:0]
-	m.AddrPort = ap
-
-	sign, err := FirstPrivSigFileSign()
-	if err != nil {
-		return err
-	}
-	m.Data, err = xnet.Attach(m.Data, sub.start)
-	if err == nil {
-		m.Data, err = xnet.Attach(m.Data, now.UnixMicro())
-		if err == nil {
-			m.Data = append(m.Data, sign(m.Data)...)
-		}
-	}
-	m.Data = append(m.Data, MyLabel...)
-	xlog.Trace.Print("tx hello ", to, ", ", now)
-	_, err = udp.WriteToUDPAddrPort(m.Data, ap)
-	return err
-}
-
 func (sub *subscriber) validateCheckinResponse(rsp *http.Response) error {
 	var err error
 

@@ -60,15 +60,15 @@ Exchange ciphered packets between guests.
 	if err = ex.checkin(ctx, via); err != nil {
 		return err
 	}
-	if err = udpListen(); err != nil {
+	if ex.udp, err = udpListen(vpnListen); err != nil {
 		return err
 	}
 	wg.Go(func() {
-		defer xlog.Info.Println("closed", udp.LocalAddr())
-		defer udp.Close()
+		defer xlog.Info.Println("closed", ex.udp.LocalAddr())
+		defer ex.udp.Close()
 		<-ctx.Done()
 	})
-	sap, err := udpLocalAddrPort(udp)
+	sap, err := udpLocalAddrPort(ex.udp)
 	if err != nil {
 		return err
 	} else if !vpnPublic.Addr().IsUnspecified() {
@@ -103,7 +103,8 @@ selection:
 			break selection
 		case err = <-ex.fault:
 		case t := <-tc:
-			err = ex.greetings(ctx, t, ex.via.Id, ex.via.Service)
+			err = greetings(ctx, ex.udp, ex.start, t.UnixMicro(),
+				ex.via.Id, ex.via.Service)
 			if err != nil {
 				return err
 			}
@@ -117,7 +118,7 @@ selection:
 		default:
 		}
 		m.Data = m.Data[:cap(m.Data)]
-		n, m.AddrPort, err = udp.ReadFromUDPAddrPort(m.Data)
+		n, m.AddrPort, err = ex.udp.ReadFromUDPAddrPort(m.Data)
 		if err != nil {
 			return xerrors.Suppress(err, net.ErrClosed)
 		}
@@ -131,8 +132,9 @@ selection:
 		} else if tid == fid {
 			if ex.verifyHello(m, fid) {
 				ex.rap[fid.Index()] = m.AddrPort
-				err = ex.greetings(ctx, time.Now(), fid,
-					m.AddrPort)
+				now := time.Now().UnixMicro()
+				err = greetings(ctx, ex.udp, ex.start, now,
+					fid, m.AddrPort)
 				if err != nil {
 					return err
 				}
@@ -143,7 +145,7 @@ selection:
 		} else if rap, ok := ex.rap[tid.Index()]; ok {
 			xlog.Trace.Print("forward ", tid, "@", rap,
 				"<-", fid, "@", m.AddrPort)
-			_, err = udp.WriteToUDPAddrPort(m.Data, rap)
+			_, err = ex.udp.WriteToUDPAddrPort(m.Data, rap)
 			if err != nil {
 				return err
 			}
@@ -159,6 +161,7 @@ type exchange struct {
 	subscriber
 	rap map[int]netip.AddrPort
 	ver map[int]uint8
+	udp *net.UDPConn
 }
 
 func (ex *exchange) checkin(ctx context.Context, via string) error {

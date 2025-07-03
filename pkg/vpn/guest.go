@@ -107,24 +107,25 @@ Forward ciphered packets between exchange and tunnel interface.
 		return err
 	}
 
-	if err = udpListen(); err != nil {
+	if g.udp, err = udpListen(vpnListen); err != nil {
 		return err
 	}
 	wg.Go(func() { g.netRx(ctx) })
 	wg.Go(func() {
-		defer xlog.Info.Println("closed", udp.LocalAddr())
-		defer udp.Close()
+		defer xlog.Info.Println("closed", g.udp.LocalAddr())
+		defer g.udp.Close()
 		<-ctx.Done()
 	})
 
-	err = g.greetings(ctx, time.Now(), g.via.Id, g.via.Service)
+	now := time.Now().UnixMicro()
+	err = greetings(ctx, g.udp, g.start, now, g.via.Id, g.via.Service)
 	if err != nil {
 		return err
 	}
 
 	svc = fmt.Sprintf("%s %v@%v via %s %v@%v",
 		g.subscriber.rest.crt.Subject.CommonName,
-		MyId, udp.LocalAddr(),
+		MyId, g.udp.LocalAddr(),
 		g.via.Name, g.via.Id, g.via.Service)
 
 	xlog.Info.Println("start", svc)
@@ -220,7 +221,9 @@ selection:
 			err = ctx.Err()
 		case err = <-g.fault:
 		case t := <-tkr.C:
-			err = g.greetings(ctx, t, g.via.Id, g.via.Service)
+			now = t.UnixMicro()
+			err = greetings(ctx, g.udp, g.start, now, g.via.Id,
+				g.via.Service)
 		case reg, ok := <-g.whoisRspCh:
 			if !ok {
 				break selection
@@ -286,6 +289,8 @@ type guest struct {
 
 	// msgs pending whois response
 	pending struct{ rx, tx []*xnet.Msg }
+
+	udp *net.UDPConn
 }
 
 type contact struct {
@@ -338,7 +343,7 @@ func (g guest) netRx(ctx context.Context) {
 		n   int
 		err error
 	)
-	la := udp.LocalAddr()
+	la := g.udp.LocalAddr()
 	xlog.Info.Println("start stream from", la)
 	defer xlog.Info.Println("stopped stream from", la)
 	defer close(g.netC)
@@ -351,7 +356,7 @@ func (g guest) netRx(ctx context.Context) {
 		default:
 		}
 		m.Data = m.Data[:cap(m.Data)]
-		n, m.AddrPort, err = udp.ReadFromUDPAddrPort(m.Data)
+		n, m.AddrPort, err = g.udp.ReadFromUDPAddrPort(m.Data)
 		if err != nil {
 			err = xerrors.Suppress(err, net.ErrClosed)
 			if err != nil {
@@ -578,5 +583,5 @@ func (g *guest) tx(ctx context.Context, to *contact, m *xnet.Msg) {
 	m.Data = to.gcm.Seal(m.Data[:0], nil, m.Data, to.fromMe)
 	to.cb.Encrypt(m.Data[:aes.BlockSize], m.Data[:aes.BlockSize])
 	m.Data = append(m.Data, to.fromMe...)
-	udp.WriteToUDPAddrPort(m.Data, g.via.Service)
+	g.udp.WriteToUDPAddrPort(m.Data, g.via.Service)
 }
