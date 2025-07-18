@@ -18,6 +18,7 @@ import (
 	"net"
 	"net/netip"
 	"os"
+	"os/signal"
 	"runtime"
 	"slices"
 	"time"
@@ -31,6 +32,7 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xnet/netpdu"
 	"github.com/platinasystems/goes/v2/pkg/xnet/netph"
 	"github.com/platinasystems/goes/v2/pkg/xos"
+	"github.com/platinasystems/goes/v2/pkg/xsignal"
 )
 
 const (
@@ -73,8 +75,7 @@ var guest struct {
 // Guest is a UDP server that forwards ciphered packets between an exchange
 // and a network tunnel interface.
 func Guest(ctx context.Context, args []string) error {
-	var svc string
-	defer xlog.Info.Println("stopped", svc)
+	defer xlog.Info.Println("stopped")
 
 	xflag.TemplateUsage(`
 usage: {{.Name}} [flags]
@@ -100,6 +101,7 @@ Forward ciphered packets between exchange and tunnel interface.
 	if err = restInit(); err != nil {
 		return err
 	}
+	defer close(rest.whoisReqC)
 
 	guest.addressed = make(map[netip.Addr]*Subscriber)
 	guest.indexed = make(map[int]*Subscriber)
@@ -142,16 +144,8 @@ Forward ciphered packets between exchange and tunnel interface.
 		return err
 	}
 	defer udp.Close()
-	wg.Go(udpStream)
 
 	guestHelloOrWhoisAllVias(ctx, time.Now().UnixMicro())
-
-	svc = fmt.Sprintf("%s %v@%v via %v",
-		rest.crt.Subject.CommonName,
-		MyId, udp.LocalAddr(),
-		guest.receipt.ExchangePrecedence)
-
-	xlog.Info.Println("start", svc)
 
 	guest.tunC = make(chan *xnet.Msg, 1)
 	guest.tun, err = nettun.
@@ -226,18 +220,30 @@ Forward ciphered packets between exchange and tunnel interface.
 	tkr := time.NewTicker(10 * time.Second)
 	defer tkr.Stop()
 
+	alarm := make(chan os.Signal, 2)
+	signal.Notify(alarm, xsignal.Alarm)
+	defer signal.Stop(alarm)
+
 	wg.Go(func() { restWhoisService(ctx) })
 	wg.Go(guestTunStream)
-	wg.Go(func() { xlog.AlarmHandler(ctx) })
+	wg.Go(udpStream)
 
-	defer close(rest.whoisReqC)
-	defer xlog.Info.Println("stopping", svc, "...")
+	svc := fmt.Sprintf("%s %v@%v via %v",
+		rest.crt.Subject.CommonName,
+		MyId, udp.LocalAddr(),
+		guest.receipt.ExchangePrecedence)
+	xlog.Info.Println("start", svc)
 	defer cancel()
+	defer xlog.Trace.Println("stopping", svc, "...")
+
 selection:
 	for err == nil {
 		select {
 		case <-ctx.Done():
 			err = ctx.Err()
+		case <-alarm:
+			xlog.Info = xlog.ToggleMute(xlog.Info)
+			xlog.Trace = xlog.Mute(xlog.Trace)
 		case err = <-rest.fault:
 		case t := <-tkr.C:
 			guestHelloOrWhoisAllVias(ctx, t.UnixMicro())

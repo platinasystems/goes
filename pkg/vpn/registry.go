@@ -20,6 +20,7 @@ import (
 	"net/netip"
 	"net/url"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"runtime"
 	"slices"
@@ -35,6 +36,7 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xmaps"
 	"github.com/platinasystems/goes/v2/pkg/xnet"
 	"github.com/platinasystems/goes/v2/pkg/xprogram"
+	"github.com/platinasystems/goes/v2/pkg/xsignal"
 )
 
 type GuestReceipt struct {
@@ -213,18 +215,26 @@ A RESTful WWW server and packet exchange.
 		},
 	}
 
-	wg.Go(func() { xlog.AlarmHandler(ctx) })
+	alarm := make(chan os.Signal, 2)
+	signal.Notify(alarm, xsignal.Alarm)
+	defer signal.Stop(alarm)
+
 	wg.Go(func() { reg.shutdown(ctx) })
 	wg.Go(reg.restsvc)
 	wg.Go(udpStream)
 
+	xlog.Trace.Println("start")
 	defer cancel()
 	defer xlog.Trace.Println("stopping...")
+
 selection:
 	for {
 		select {
 		case <-ctx.Done():
 			break selection
+		case <-alarm:
+			xlog.Info = xlog.ToggleMute(xlog.Info)
+			xlog.Trace = xlog.Mute(xlog.Trace)
 		case rsvp, ok := <-reg.rsvpC:
 			if !ok {
 				break selection

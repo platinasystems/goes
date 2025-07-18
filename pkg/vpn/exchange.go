@@ -8,10 +8,13 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"os"
+	"os/signal"
 
 	"github.com/platinasystems/goes/v2/pkg/xflag"
 	"github.com/platinasystems/goes/v2/pkg/xlog"
 	"github.com/platinasystems/goes/v2/pkg/xnet"
+	"github.com/platinasystems/goes/v2/pkg/xsignal"
 )
 
 var exchange struct {
@@ -44,6 +47,7 @@ Exchange ciphered packets between guests.
 	if err = restInit(); err != nil {
 		return err
 	}
+	defer close(rest.whoisReqC)
 
 	exchange.sub = make(map[int]*Subscriber)
 
@@ -55,24 +59,27 @@ Exchange ciphered packets between guests.
 		return err
 	}
 	defer udp.Close()
-	wg.Go(udpStream)
 
-	wg.Go(func() { xlog.AlarmHandler(ctx) })
+	alarm := make(chan os.Signal, 2)
+	signal.Notify(alarm, xsignal.Alarm)
+	defer signal.Stop(alarm)
 
-	defer close(rest.whoisReqC)
 	wg.Go(func() { restWhoisService(ctx) })
+	wg.Go(udpStream)
 
 	svc := fmt.Sprintf("%v @ %v", MyId, udp.LocalAddr())
 	xlog.Trace.Println("start", svc)
-	defer xlog.Trace.Println("stopping", svc, "...")
-
 	defer cancel()
+	defer xlog.Trace.Println("stopping", svc, "...")
 
 selection:
 	for err == nil {
 		select {
 		case <-ctx.Done():
 			break selection
+		case <-alarm:
+			xlog.Info = xlog.ToggleMute(xlog.Info)
+			xlog.Trace = xlog.Mute(xlog.Trace)
 		case err = <-rest.fault:
 		case sub, ok := <-rest.whoisRspC:
 			if !ok {
