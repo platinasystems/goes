@@ -82,10 +82,10 @@ func (id Id) String() string {
 	return fmt.Sprint(id.Index(), ".", id.Version())
 }
 
-func (p *Id) UnmarshalJSON(b []byte) error {
-	id, err := ParseId(string(b))
+func (p *Id) UnmarshalJSON(data []byte) error {
+	u, err := strconv.ParseUint(string(data), 16, 32)
 	if err == nil {
-		*p = id
+		*p = Id(u)
 	}
 	return err
 }

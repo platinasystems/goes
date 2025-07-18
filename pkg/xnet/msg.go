@@ -17,6 +17,14 @@ import (
 
 var zap netip.AddrPort
 
+type AddrPorter interface {
+	AddrPort() netip.AddrPort
+}
+
+type RemoteAddrer interface {
+	RemoteAddr() net.Addr
+}
+
 type Msg struct {
 	netip.AddrPort
 	Data []byte
@@ -69,64 +77,62 @@ func (mp *MsgPool) Queue(ctx context.Context, ch chan<- *Msg, m *Msg) bool {
 	return false
 }
 
-// Forward messages from reader to channel until EOF or context is done;
+// Forward messages from reader to channel until not [xos.IsBlocked] error;
 // then close channel.
-func (mp *MsgPool) ReadMsgs(
-	ctx context.Context, r io.Reader, ch chan<- *Msg,
-) error {
+func (mp *MsgPool) StreamReader(ch chan<- *Msg, r io.Reader) error {
+	var (
+		err error
+		n   int
+		ra  netip.AddrPort
+	)
 	defer close(ch)
 	m := mp.Get()
 	defer mp.Put(m)
+	if raer, ok := r.(RemoteAddrer); ok {
+		if aper, ok := raer.RemoteAddr().(AddrPorter); ok {
+			ra = aper.AddrPort()
+		}
+	}
 	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
-		}
-		n, err := r.Read(m.Data)
-		if err != nil {
-			if !xos.IsBlocked(err) {
-				runtime.Gosched()
-				continue
-			}
-			return err
-		}
-		m.Data = m.Data[:n]
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case ch <- m:
+		n, err = r.Read(m.Data)
+		if err == nil {
+			m.AddrPort = ra
+			m.Data = m.Data[:n]
+			ch <- m
 			m = mp.Get()
+		} else if xos.IsBlocked(err) {
+			runtime.Gosched()
+		} else {
+			return err
 		}
 	}
 }
 
-// Forward messages from connection to channel until the connection is closed
-// or context is done; then close channel.
-func (mp *MsgPool) RecvMsgs(
-	ctx context.Context, conn *net.UDPConn, ch chan<- *Msg,
-) error {
-	var n int
-	var err error
+// Forward messages from socket to channel until not [xos.IsBlocked] error;
+// then close channel.
+func (mp *MsgPool) StreamUDP(ch chan<- *Msg, udp *net.UDPConn) error {
+	var (
+		err error
+		n   int
+	)
 	defer close(ch)
 	m := mp.Get()
 	defer mp.Put(m)
 	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
-		}
-		n, m.AddrPort, err = conn.ReadFromUDPAddrPort(m.Data)
-		if err != nil {
-			return err
-		}
-		m.Data = m.Data[:n]
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case ch <- m:
+		n, m.AddrPort, err = udp.ReadFromUDPAddrPort(m.Data)
+		if err == nil {
+			if addr := m.AddrPort.Addr(); addr.Is4In6() {
+				addr = addr.Unmap()
+				port := m.AddrPort.Port()
+				m.AddrPort = netip.AddrPortFrom(addr, port)
+			}
+			m.Data = m.Data[:n]
+			ch <- m
 			m = mp.Get()
+		} else if xos.IsBlocked(err) {
+			runtime.Gosched()
+		} else {
+			return err
 		}
 	}
 }

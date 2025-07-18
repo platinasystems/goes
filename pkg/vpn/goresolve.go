@@ -7,18 +7,39 @@ package vpn
 import (
 	"context"
 	"net"
+	"net/netip"
 	"time"
 
+	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xlog"
 )
 
 const (
-	MinResolveRetryInterval = 100 * time.Millisecond
-	MaxResolveRetryInterval = 3 * time.Second
+	ResolveRetryInterval = time.Second
+	ResolveTimeout       = time.Minute
 )
 
 var Resolver = net.Resolver{
 	PreferGo: true,
+}
+
+func resolve(ctx context.Context, hn string) (netip.Addr, error) {
+	var z netip.Addr
+	if addr, err := netip.ParseAddr(hn); err == nil {
+		return addr, err
+	}
+	ips, err := WaitForResolution(ctx, "ip", hn, ResolveTimeout)
+	if err != nil {
+		return z, err
+	}
+	if len(ips) == 0 {
+		return z, xerrors.Invalid(hn)
+	}
+	addr, ok := netip.AddrFromSlice(ips[0])
+	if !ok {
+		return z, xerrors.Invalid(hn)
+	}
+	return addr, nil
 }
 
 func WaitForResolution(
@@ -37,11 +58,9 @@ func WaitForResolution(
 		case <-ctx.Done():
 			err = ctx.Err()
 			return
-		case <-time.After(time.Second):
-			xlog.Info.Println("retry", hostname, "...")
+		case <-time.After(ResolveRetryInterval):
+			xlog.Trace.Println("retry", hostname)
 		}
 	}
-	xlog.Info.Println("after", time.Now().Sub(begin), "found", hostname,
-		"with", ips)
 	return
 }

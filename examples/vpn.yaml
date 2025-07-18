@@ -106,18 +106,10 @@ kind: ConfigMap
 metadata:
   name: vpn
 data:
-  config.yaml: |
-    vpn:
-      prefix: fc00:1234::/64
-      address:
-        hosta: fc00:1234::a
-        hostb: fc00:1234::b
-        hostc: fc00:1234::c
-      exchanges:
-        - exchange0.vpn.default.svc.cluster.local
-        - exchange3.vpn.default.svc.cluster.local
-      routers:
-        - exchange2.vpn.default.svc.cluster.local
+  hosts: |
+    fc00:1234::a hosta
+    fc00:1234::b hostb
+    fc00:1234::c hostc
   registry.pem: |
     -----BEGIN CERTIFICATE-----
     MIIBszCCAWWgAwIBAgIBATAFBgMrZXAwQTEgMA4GA1UEChMHUGxhdGluYTAOBgNV
@@ -226,8 +218,13 @@ spec:
     - "vpn"
     - "registry"
     - "-v"
+    - "-trace"
+    - "-prefix"
+    - "fc00:1234::/64"
     ports:
     - protocol: TCP
+      containerPort: 8003
+    - protocol: UDP
       containerPort: 8003
     volumeMounts:
     - name: config
@@ -307,7 +304,6 @@ spec:
     - "guest"
     - "-v"
     - "-trace"
-    - "exchange0"
     securityContext:
       allowPrivilegeEscalation: true
       capabilities:
@@ -353,7 +349,6 @@ spec:
     - "guest"
     - "-v"
     - "-trace"
-    - "exchange0"
     securityContext:
       allowPrivilegeEscalation: true
       capabilities:
@@ -399,7 +394,6 @@ spec:
     - "guest"
     - "-v"
     - "-trace"
-    - "exchange0"
     securityContext:
       allowPrivilegeEscalation: true
       capabilities:

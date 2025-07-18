@@ -5,10 +5,8 @@
 package vpn
 
 import (
-	"context"
 	"errors"
 	"fmt"
-	"net"
 	"net/netip"
 	"os"
 	"path/filepath"
@@ -70,8 +68,7 @@ var Features = map[string]any{
 }
 
 const (
-	defaultRegistryPort = 8003
-	defaultServicePort  = 8003
+	defaultPort = 8003
 
 	oAppend = os.O_WRONLY | os.O_CREATE | os.O_APPEND
 	oCreate = os.O_WRONLY | os.O_CREATE | os.O_TRUNC
@@ -79,6 +76,8 @@ const (
 	year    = 365 * 24 * time.Hour
 	longest = 10 * year
 )
+
+var Start time.Time // Registry start time
 
 var (
 	errEOC = errors.New("end of channel")
@@ -95,37 +94,44 @@ var (
 
 	mp = xnet.NewMsgPool(netph.ETHMTU)
 
-	vpnCert = "cert.pem"
-
-	vpnConfig       = "config.yaml"
-	vpnConfigDir    = "/etc/goes"
-	vpnDataDir      = "/usr/share/goes"
 	vpnDuration     = year
-	vpnRegistry     = "registry.pem"
+	vpnPort         = uint16(defaultPort)
 	vpnSerialNumber = int64(1)
-	vpnSig          = "sig.pk8"
-	vpnStateDir     = "/var/run/goes"
+	vpnPrefix       netip.Prefix
 
-	vpnListen,
-	vpnPublic netip.AddrPort
-
+	vpnAdminsFile,
+	vpnConfigDir,
+	vpnCertFile,
 	vpnCountry,
+	vpnDataDir,
 	vpnEmail,
 	vpnDNS,
+	vpnHostsFile,
 	vpnLocality,
 	vpnName,
 	vpnOrganization,
 	vpnOrganizationalUnit,
 	vpnPostalCode,
 	vpnProvince,
+	vpnRegistryFile,
+	vpnSigFile,
+	vpnStateDir,
 	vpnStreet,
 	vpnURI,
+	vpnViaFileName,
 	vpnVPN string
 
 	vpnTunnel = -1
 
+	// Unix Micro start of registry
+	vpnStart int64
+
 	wg xsync.WaitGroup
 )
+
+type empty = struct{}
+
+var novalue, done empty
 
 var DomainName = sync.OnceValues(func() (string, error) {
 	s, err := HostFQDN()
@@ -153,22 +159,26 @@ var HostFQDN = sync.OnceValues(func() (string, error) {
 	return os.Hostname()
 })
 
+func defineAdmins() {
+	vpnAdminsFile = filepath.Join(vpnConfigDir, "admins")
+	xflag.Define(&vpnAdminsFile, "admins", `
+An optional file containing a newline separated list of certificate
+common names that may administer subscriptions.
+`[1:])
+}
+
 func defineCert() {
+	fn := "cert.pem"
 	if s, err := Host(); err == nil {
-		vpnCert = fmt.Sprint(s, ".pem")
+		fn = fmt.Sprint(s, ".pem")
 	}
-	xflag.Define(&vpnCert, "cert",
-		"Certificate file name w/in config-dir.")
+	vpnCertFile = filepath.Join(vpnConfigDir, fn)
+	xflag.Define(&vpnCertFile, "cert", "Certificate file.")
 }
 
+// Default { [xdg.ConfigHome] or [fhs.Config] } + MAIN,
+// if MAIN as "-vpn", or MAIN/vpn
 func defineConfig() {
-	xflag.Define(&vpnConfig, "config",
-		"Configuration file name w/in config-dir.")
-}
-
-// Default [xdg.ConfigHome] or [fhs.Config] +
-// MAIN, if MAIN as "-vpn", or MAIN/vpn
-func defineConfigDir() {
 	subDir := mainSubDir()
 	fhsDir := filepath.Join(fhs.Config(), subDir)
 	if xprogram.IsKoApp() {
@@ -181,16 +191,17 @@ func defineConfigDir() {
 			vpnConfigDir = prefDir(xdgDir, fhsDir)
 		}
 	}
-	xflag.Define(&vpnConfigDir, "config-dir", "Configuration directory.")
+	xflag.Define(&vpnConfigDir, "config", "Configuration directory.")
 }
 
 func defineCountry() {
 	xflag.Define(&vpnCountry, "country", "")
 }
 
-// Default $KO_DATA_PATH; or [xdg.DataHome] or [fhs.Data] +
-// MAIN, if MAIN as "-vpn", or MAIN/vpn
-func defineDataDir() {
+// Default $KO_DATA_PATH; or
+// { [xdg.DataHome] or [fhs.Data] } + MAIN,
+// if MAIN as "-vpn", or MAIN/vpn
+func defineData() {
 	if s, ok := os.LookupEnv("KO_DATA_PATH"); ok {
 		vpnDataDir = s
 	} else {
@@ -203,7 +214,7 @@ func defineDataDir() {
 			vpnDataDir = prefDir(xdgDir, fhsDir)
 		}
 	}
-	xflag.Define(&vpnDataDir, "data-dir", "Registry service directory.")
+	xflag.Define(&vpnDataDir, "data", "Registry service directory.")
 }
 
 func defineDNS() {
@@ -221,12 +232,10 @@ func defineEmail() {
 	xflag.Define(&vpnEmail, "email", "Comma separated addresses.")
 }
 
-func defineListen(port uint16) {
-	vpnListen = netip.AddrPortFrom(netip.IPv4Unspecified(), port)
-	xflag.Define(&vpnListen, "listen", `
-Service {addr}:{port}.
-If “addr” is 0.0.0.0 or [::], listen on all ipv4 or ipv6
-interface addresses.  If “port” is 0, allocate from system.`[1:])
+func defineHosts() {
+	vpnHostsFile = filepath.Join(vpnConfigDir, "hosts")
+	xflag.Define(&vpnHostsFile, "hosts",
+		"Static address assignments in /ets/hosts format.")
 }
 
 func defineLocality() {
@@ -240,10 +249,13 @@ func defineName() {
 	xflag.Define(&vpnName, "name", "VPN identfier.")
 }
 
-func definePublic() {
-	vpnPublic = netip.AddrPortFrom(netip.IPv4Unspecified(), 0)
-	xflag.Define(&vpnPublic, "public",
-		"NAT'd listen {addr}:{port}. (0.0.0.0:0 ignored)")
+func definePort() {
+	xflag.Define(&vpnPort, "port", "Listener.")
+}
+
+func definePrefix() {
+	vpnPrefix = netip.MustParsePrefix("fc00:1234::/64")
+	xflag.Define(&vpnPrefix, "prefix", "Network prefix.")
 }
 
 func defineOrganization() {
@@ -264,8 +276,9 @@ func defineProvince() {
 }
 
 func defineRegistry() {
-	xflag.Define(&vpnRegistry, "registry",
-		"Registry certificate file name w/in config-dir.")
+	vpnRegistryFile = filepath.Join(vpnConfigDir, "registry.pem")
+	xflag.Define(&vpnRegistryFile, "registry",
+		"Registry certificate file.")
 }
 
 func defineSerialNumber() {
@@ -273,7 +286,27 @@ func defineSerialNumber() {
 }
 
 func defineSig() {
-	xflag.Define(&vpnSig, "sig", "Signature file name w/in config-dir.")
+	vpnSigFile = filepath.Join(vpnConfigDir, "sig.pk8")
+	xflag.Define(&vpnSigFile, "sig", "Signature file.")
+}
+
+// Default { [xdg.StateHome] or [fhs.State] } + MAIN,
+// if MAIN as "-vpn", or MAIN/vpn
+func defineState() {
+	subDir := mainSubDir()
+	fhsDir := filepath.Join(fhs.State(), subDir)
+	if xprogram.IsKoApp() {
+		vpnStateDir = fhsDir
+	} else {
+		xdgDir := filepath.Join(xdg.StateHome(), subDir)
+		if os.Geteuid() == 0 {
+			vpnStateDir = prefDir(fhsDir, xdgDir)
+		} else {
+			vpnStateDir = prefDir(xdgDir, fhsDir)
+		}
+	}
+	xflag.Define(&vpnStateDir, "state",
+		"State directory to save approved client certificates.")
 }
 
 func defineStreet() {
@@ -288,30 +321,21 @@ func defineURI() {
 	xflag.Define(&vpnURI, "uri", "Comma separated URLs.")
 }
 
+func defineVia() {
+	vpnViaFileName = filepath.Join(vpnConfigDir, "via")
+	xflag.Define(&vpnViaFileName, "via",
+		"Subscriber exchange precedence file.")
+}
+
+func defineVPN() {
+	xflag.Define(&vpnVPN, "vpn", "Named VPN. (default unnamed)")
+}
+
 func enableQuiet() {
 	xflag.Enable("q", "Quiet logging.", func() error {
 		xlog.MuteErrata()
 		return nil
 	})
-}
-
-// Default [xdg.StateHome] or [fhs.State] + GOES/vpn
-// MAIN, if MAIN as "-vpn", or MAIN/vpn
-func defineStateDir() {
-	subDir := mainSubDir()
-	fhsDir := filepath.Join(fhs.State(), subDir)
-	if xprogram.IsKoApp() {
-		vpnStateDir = fhsDir
-	} else {
-		xdgDir := filepath.Join(xdg.StateHome(), subDir)
-		if os.Geteuid() == 0 {
-			vpnStateDir = prefDir(fhsDir, xdgDir)
-		} else {
-			vpnStateDir = prefDir(xdgDir, fhsDir)
-		}
-	}
-	xflag.Define(&vpnStateDir, "state-dir",
-		"State directory to save approved client certificates.")
 }
 
 func enableTrace() {
@@ -326,10 +350,6 @@ func enableVerbose() {
 		xlog.UnmuteInfo()
 		return nil
 	})
-}
-
-func defineVPN() {
-	xflag.Define(&vpnVPN, "vpn", "Named VPN. (default unnamed)")
 }
 
 func noServiceError(args ...any) error {
@@ -366,51 +386,4 @@ func prefDir(primary string, alternates ...string) string {
 		}
 	}
 	return primary
-}
-
-func greetings(
-	ctx context.Context,
-	udp *net.UDPConn,
-	start, now int64,
-	to Id,
-	ap netip.AddrPort,
-) error {
-	m := mp.Get()
-	defer mp.Put(m)
-	m.Data = m.Data[:0]
-	m.AddrPort = ap
-
-	sign, err := FirstPrivSigFileSign()
-	if err != nil {
-		return err
-	}
-	m.Data, err = xnet.Attach(m.Data, start)
-	if err == nil {
-		m.Data, err = xnet.Attach(m.Data, now)
-		if err == nil {
-			m.Data = append(m.Data, sign(m.Data)...)
-		}
-	}
-	m.Data = append(m.Data, MyLabel...)
-	xlog.Trace.Print("tx hello ", to)
-	_, err = udp.WriteToUDPAddrPort(m.Data, ap)
-	return err
-}
-
-func udpListen(ap netip.AddrPort) (*net.UDPConn, error) {
-	udpnet := "udp"
-	if a := ap.Addr(); a.Is4() {
-		udpnet = "udp4"
-	} else if a.Is6() {
-		udpnet = "udp6"
-	}
-	return net.ListenUDP(udpnet, &net.UDPAddr{
-		IP:   ap.Addr().AsSlice(),
-		Port: int(ap.Port()),
-	})
-}
-
-func udpLocalAddrPort(udp *net.UDPConn) (netip.AddrPort, error) {
-	s := udp.LocalAddr().String()
-	return xerrors.MarkResult(netip.ParseAddrPort(s))
 }

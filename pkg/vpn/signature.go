@@ -17,93 +17,17 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"strings"
-	"sync"
 
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xflag"
-	"github.com/platinasystems/goes/v2/pkg/xlog"
 )
 
-type Sign = func([]byte) []byte
-
-type PrivateSignatureKey interface {
-	Public() crypto.PublicKey
-	Equal(x crypto.PrivateKey) bool
-}
-
-var PrivSigFileName = sync.OnceValue(func() string {
-	return filepath.Join(vpnConfigDir, vpnSig)
-})
-
-var PrivSigFileData = sync.OnceValues(func() ([]byte, error) {
-	if fn := PrivSigFileName(); fn != "-" {
-		return os.ReadFile(fn)
-	}
-	return io.ReadAll(os.Stdin)
-})
-
-var PrivSigFilePEMBlocks = sync.OnceValues(func() ([]*pem.Block, error) {
-	var blks []*pem.Block
-	data, err := PrivSigFileData()
-	if err != nil {
-		return blks, err
-	}
-	for blk, r := pem.Decode(data); blk != nil; blk, r = pem.Decode(r) {
-		if strings.HasSuffix(blk.Type, "PRIVATE KEY") {
-			blks = append(blks, blk)
-		}
-	}
-	return blks, err
-})
-
-var PrivSigFileKeys = sync.OnceValues(func() ([]PrivateSignatureKey, error) {
-	var keys []PrivateSignatureKey
-	blks, err := PrivSigFilePEMBlocks()
-	if err != nil {
-		return keys, err
-	}
-	for i, blk := range blks {
-		k, err := x509.ParsePKCS8PrivateKey(blk.Bytes)
-		if err != nil {
-			return nil, xerrors.Label(err, "block", i)
-		} else {
-			keys = append(keys, k.(PrivateSignatureKey))
-		}
-	}
-	return keys, err
-})
-
-var FirstPrivSigFileKey = sync.OnceValues(func() (PrivateSignatureKey, error) {
-	keys, err := PrivSigFileKeys()
-	if err != nil {
-		return nil, err
-	}
-	if len(keys) == 0 {
-		return nil, xerrors.Invalid(PrivSigFileName())
-	}
-	return keys[0], nil
-})
-
-var FirstPrivSigFileSign = sync.OnceValues(func() (Sign, error) {
-	k, err := FirstPrivSigFileKey()
-	if err != nil {
-		return nil, err
-	}
-	switch t := k.(type) {
-	// case *rsa.PrivateKey:
-	// case *ecdsa.PrivateKey:
-	case ed25519.PrivateKey:
-		return func(msg []byte) []byte {
-			return ed25519.Sign(t, msg)
-		}, nil
-	// case *ecdh.PrivateKey:
-	default:
-		xlog.Errata.Printf("%T: unsupported", t)
-		return nil, fmt.Errorf("%T: %w", t, xerrors.ErrUnsupported)
-	}
-})
+var (
+	sign     func([]byte) []byte
+	signPriv crypto.PrivateKey
+	signPub  crypto.PublicKey
+)
 
 // ShowSignature prints algorithm.
 func ShowSignature(ctx context.Context, args []string) error {
@@ -113,7 +37,7 @@ Print algorithm.
 
 {{flags .}}`)
 
-	defineConfigDir()
+	defineConfig()
 	defineSig()
 
 	err := flag.CommandLine.Parse(args)
@@ -121,43 +45,69 @@ Print algorithm.
 		return err
 	}
 	if flag.CommandLine.NArg() > 0 {
-		PrivSigFileName = func() string {
-			return flag.CommandLine.Arg(0)
-		}
+		vpnSigFile = flag.CommandLine.Arg(0)
 	}
-	keys, err := PrivSigFileKeys()
-	if err != nil {
+	if err = signInit(); err != nil {
 		return err
 	}
-	if len(keys) == 0 {
-		fmt.Println("# none")
-		return nil
-	}
-	for _, k := range keys {
-		var s string
-		switch t := k.(type) {
-		case *rsa.PrivateKey:
-			s = "RSA"
-		case *ecdsa.PrivateKey:
-			s = "ECDSA"
-		case ed25519.PrivateKey:
-			s = "Ed25519"
-		case *ecdh.PrivateKey:
-			c := t.Curve()
-			if cs, ok := c.(fmt.Stringer); ok {
-				s = cs.String()
-			} else {
-				s = fmt.Sprintf("%T", c)
-			}
-		default:
-			s = fmt.Sprintf("%T", t)
+	switch t := signPriv.(type) {
+	case *rsa.PrivateKey:
+		fmt.Println("RSA")
+	case *ecdsa.PrivateKey:
+		fmt.Println("ECDSA")
+	case ed25519.PrivateKey:
+		fmt.Println("Ed25519")
+	case *ecdh.PrivateKey:
+		c := t.Curve()
+		if cs, ok := c.(fmt.Stringer); ok {
+			fmt.Println(cs)
+		} else {
+			fmt.Printf("%T\n", c)
 		}
-		if len(keys) > 1 {
-			fmt.Print("- ")
-		}
-		fmt.Println(s)
+	default:
+		fmt.Printf("%T\n", t)
 	}
 	return nil
 }
 
-var Verify = ed25519.Verify
+func signInit() error {
+	var data []byte
+	var err error
+
+	if signPriv != nil {
+		return err
+	}
+	input := vpnSigFile
+	if input == "-" {
+		input = "input"
+		data, err = io.ReadAll(os.Stdin)
+	} else {
+		data, err = os.ReadFile(input)
+	}
+	if err != nil {
+		return err
+	}
+	blk, _ := pem.Decode(data)
+	if blk == nil || !strings.HasSuffix(blk.Type, "PRIVATE KEY") {
+		return xerrors.Invalid(input)
+	}
+	signPriv, err = x509.ParsePKCS8PrivateKey(blk.Bytes)
+	if err != nil {
+		return xerrors.Label(err, input)
+	}
+	switch t := signPriv.(type) {
+	// case *rsa.PrivateKey:
+	// case *ecdsa.PrivateKey:
+	case ed25519.PrivateKey:
+		sign = signEd25519
+		signPub = t.Public()
+	// case *ecdh.PrivateKey:
+	default:
+		return fmt.Errorf("%T: %w", t, xerrors.ErrUnsupported)
+	}
+	return nil
+}
+
+func signEd25519(data []byte) []byte {
+	return ed25519.Sign(signPriv.(ed25519.PrivateKey), data)
+}

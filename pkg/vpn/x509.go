@@ -98,8 +98,9 @@ Create PEM encoded x509 certificate file.
 
 {{flags .}}`)
 
+	defineConfig()
+
 	defineCert()
-	defineConfigDir()
 	defineCountry()
 	defineDNS()
 	defineDuration()
@@ -120,8 +121,7 @@ Create PEM encoded x509 certificate file.
 		return err
 	}
 
-	priv, err := FirstPrivSigFileKey()
-	if err != nil {
+	if err = signInit(); err != nil {
 		return err
 	}
 
@@ -186,7 +186,7 @@ Create PEM encoded x509 certificate file.
 	}
 
 	der, err := x509.CreateCertificate(random, &t, parent,
-		priv.Public(), priv)
+		signPub, signPriv)
 	if err != nil {
 		return err
 	}
@@ -195,7 +195,7 @@ Create PEM encoded x509 certificate file.
 		Headers: map[string]string{},
 		Bytes:   der,
 	}
-	cfn := filepath.Join(vpnConfigDir, vpnCert)
+	cfn := vpnCertFile
 	if cfn == "-" {
 		return pem.Encode(os.Stdout, blk)
 	}
@@ -220,7 +220,8 @@ Print parsed certificate.
 
 {{flags .}}`)
 
-	defineConfigDir()
+	defineConfig()
+
 	defineCert()
 	defineSig()
 
@@ -229,19 +230,16 @@ Print parsed certificate.
 		return err
 	}
 
-	cs, err := certificates(filepath.Join(vpnConfigDir, vpnCert))
+	c, err := readCertificateFile(vpnCertFile)
 	if err != nil {
 		return err
-	} else if len(cs) == 0 {
-		fmt.Println("# none")
-		return nil
 	}
 
 	t, err := CertificatesTemplate()
 	if err != nil {
 		return err
 	}
-	return t.Execute(os.Stdout, cs)
+	return t.Execute(os.Stdout, []*x509.Certificate{c})
 }
 
 // This parses all of the PEM encoded [x509.Certificate](s) from
@@ -317,6 +315,18 @@ func readCertificates(r io.Reader) (cs []*x509.Certificate, err error) {
 		cs = append(cs, c)
 	}
 	return
+}
+
+func readCertificateFile(fn string) (*x509.Certificate, error) {
+	b, err := os.ReadFile(fn)
+	if err != nil {
+		return nil, err
+	}
+	blk, _ := pem.Decode(b)
+	if blk == nil {
+		return nil, xerrors.Invalid(fn)
+	}
+	return x509.ParseCertificate(blk.Bytes)
 }
 
 func addCertificate(dfn string, c *x509.Certificate) error {
