@@ -44,57 +44,47 @@ const (
 	RestVcsRevision = "X-Vcs-Revision"
 )
 
-const RestSubscriber = "subscriber"
-
 const (
-	RestOp            = "op"
-	RestOpApprove     = "approve"
-	RestOpCertify     = "certify"
-	RestOpCheckin     = "checkin"
-	RestOpDeny        = "deny"
-	RestOpDump        = "dump"
-	RestOpPing        = "ping"
-	RestOpReload      = "reload"
-	RestOpShow        = "show"
-	RestOpSubscribe   = "subscribe"
-	RestOpUnsubscribe = "unsubscribe"
-	RestOpWhois       = "whois"
-)
+	RestPathApprove = "/approve"
 
-const (
-	RestOpCheckinExchange = "exchange"
-	RestOpCheckinGuest    = "guest"
+	RestPathCertify = "/certify"
+
+	RestPathCheckinExchange = "/checkin/exchange"
+	RestPathCheckinGuest    = "/checkin/guest"
+
+	RestPathDeny = "/deny"
+
+	RestPathDumpSubscribers = "/dmup/subscribers"
+
+	RestPathPing = "/ping"
+
+	RestPathReload = "/reload"
+
+	RestPathShowAddress    = "/show/address"
+	RestPathShowAdmins     = "/show/admins"
+	RestPathShowExchanges  = "/show/exchanges"
+	RestPathShowGuests     = "/show/guests"
+	RestPathShowHosts      = "/show/hosts"
+	RestPathShowPending    = "/show/pending"
+	RestPathShowPrefix     = "/show/prefix"
+	RestPathShowStart      = "/show/start"
+	RestPathShowStatus     = "/show/status"
+	RestPathShowSubscriber = "/show/subscriber"
+	RestPathShowVCS        = "/show/vcs"
+
+	RestPathStatic = "/static"
+
+	RestPathSubscribe   = "/subscribe"
+	RestPathUnsubscribe = "/unsubscribe"
+
+	RestPathWhoisAddressed = "/whois/addressed"
+	RestPathWhoisId        = "/whois/id"
+	RestPathWhoisNamed     = "/whois/named"
 )
 
 const RestOpCheckinExchangePort = "port"
 
-const RestOpDumpSubscribers = "subscribers"
-
-const (
-	RestOpShowActive     = "active"
-	RestOpShowAddress    = "address"
-	RestOpShowAdmins     = "admins"
-	RestOpShowExchanges  = "exchanges"
-	RestOpShowHosts      = "hosts"
-	RestOpShowPending    = "pending"
-	RestOpShowPrefix     = "prefix"
-	RestOpShowStart      = "start"
-	RestOpShowSubscriber = "subscriber"
-	RestOpShowTenant     = "tenant"
-	RestOpShowVcs        = "vcs"
-)
-
-const (
-	RestOpShowVcsModified = "modified"
-	RestOpShowVcsRevision = "revision"
-)
-
-const (
-	RestWhoisAddress = "address"
-	RestWhoisId      = "id"
-	RestWhoisName    = "name"
-	RestWhoisDepth   = 8
-)
+const RestWhoisDepth = 8
 
 var (
 	ErrNoVCS  = errors.New("no VCS revision")
@@ -202,9 +192,16 @@ RESTful registry administration.
 	if err = restInit(); err != nil {
 		return err
 	}
-	_, err = restRequest(ctx, os.Stdout, http.MethodPut, "", nil,
-		RestOp, xflag.LastName(flag.CommandLine),
-		RestSubscriber, args[0])
+	var path string
+	switch op := xflag.LastName(flag.CommandLine); op {
+	case "approve":
+		path = restPath(RestPathApprove, args[0])
+	case "deny":
+		path = restPath(RestPathDeny, args[0])
+	default:
+		return xerrors.Invalid(op)
+	}
+	_, err = restPut(ctx, os.Stdout, "", nil, path)
 	return err
 }
 
@@ -244,8 +241,7 @@ Import registry certificate.
 	}()
 	tp.TLSClientConfig.InsecureSkipVerify = true
 
-	rsp, err := restRequest(ctx, os.Stdout, http.MethodPut, "", nil,
-		RestOp, RestOpCertify)
+	rsp, err := restGet(ctx, os.Stdout, RestPathCertify)
 	if err != nil {
 		return err
 	}
@@ -305,32 +301,10 @@ Get or list registry file(s).
 	}
 
 	args = flag.CommandLine.Args()
-	_, err = restRequest(ctx, os.Stdout, http.MethodGet, "", nil, args...)
+	_, err = restGet(ctx, os.Stdout, restPath(args...))
 	if errors.Is(err, ErrBadVCS) {
 		err = nil
 	}
-	return err
-}
-
-func RestPing(ctx context.Context, args []string) error {
-	xflag.TemplateUsage(`
-usage: {{.Name}} [flags]
-RESTful ping registry.
-
-{{flags .}}`)
-
-	defineRestFlags()
-	err := flag.CommandLine.Parse(args)
-	if err != nil {
-		return err
-	}
-
-	if err = restInit(); err != nil {
-		return err
-	}
-
-	_, err = restRequest(ctx, os.Stdout, http.MethodGet, "", nil,
-		RestOp, RestOpPing)
 	return err
 }
 
@@ -351,8 +325,7 @@ RESTful reload registry configuration.
 		return err
 	}
 
-	_, err = restRequest(ctx, os.Stdout, http.MethodPut, "", nil,
-		RestOp, RestOpReload)
+	_, err = restPut(ctx, os.Stdout, "", nil, RestPathReload)
 	return err
 }
 
@@ -375,53 +348,14 @@ func RestShow(ctx context.Context, args []string) error {
 		return err
 	}
 
-	show := xflag.LastName(flag.CommandLine)
-	op := []string{
-		RestOp, RestOpShow,
-		RestOpShow, show,
+	var path strings.Builder
+	path.WriteString("/show/")
+	path.WriteString(xflag.LastName(flag.CommandLine))
+	for _, s := range args {
+		path.WriteRune('/')
+		path.WriteString(s)
 	}
-	for i, arg := range flag.Args() {
-		op = append(op, fmt.Sprint("arg", i), arg)
-	}
-	rsp, err := restRequest(ctx, os.Stdout, http.MethodGet, "", nil, op...)
-	if err == nil || errors.Is(err, ErrBadVCS) {
-		if show == RestOpShowStart {
-			var i int64
-			s := rsp.Header.Get(RestUnixMicroStart)
-			i, err = strconv.ParseInt(s, 10, 64)
-			if err == nil {
-				fmt.Println(time.UnixMicro(i))
-			}
-		}
-	}
-	return err
-}
-
-func RestShowVcs(ctx context.Context, args []string) error {
-	xflag.TemplateUsage(restShowUsageTemplate)
-
-	defineRestFlags()
-	err := flag.CommandLine.Parse(args)
-	if err != nil {
-		return err
-	}
-
-	if err = restInit(); err != nil {
-		return err
-	}
-
-	show := xflag.LastName(flag.CommandLine)
-	op := []string{
-		RestOp, RestOpShow,
-		RestOpShow, RestOpShowVcs,
-		RestOpShowVcs, show,
-	}
-	rsp, err := restRequest(ctx, os.Stdout, http.MethodGet, "", nil, op...)
-	if err == nil || errors.Is(err, ErrBadVCS) {
-		if show == RestOpShowVcsRevision {
-			fmt.Println(rsp.Header.Get(RestVcsRevision))
-		}
-	}
+	_, err = restGet(ctx, os.Stdout, path.String())
 	return err
 }
 
@@ -443,9 +377,7 @@ RESTful subscribe to VPN.
 	}
 
 	clone := *rest.url
-	q := clone.Query()
-	q.Set(RestOp, RestOpSubscribe)
-	clone.RawQuery = q.Encode()
+	clone.Path = RestPathSubscribe
 	req, err := http.
 		NewRequestWithContext(ctx, http.MethodPut, clone.String(), nil)
 	if err != nil {
@@ -482,11 +414,8 @@ func restExchangeCheckin(ctx context.Context) error {
 	buf := restAlloc()
 	defer restFree(buf)
 
-	rsp, err := restRequest(ctx, buf, http.MethodPut,
-		"", nil,
-		RestOp, RestOpCheckin,
-		RestOpCheckin, RestOpCheckinExchange,
-		RestOpCheckinExchangePort, fmt.Sprint(vpnPort))
+	path := restPath(RestPathCheckinExchange, fmt.Sprint(vpnPort))
+	rsp, err := restPut(ctx, buf, "", nil, path)
 	if err != nil {
 		return err
 	}
@@ -523,6 +452,17 @@ func restExtractURL() error {
 	return err
 }
 
+func restGet(
+	ctx context.Context,
+	// rsp body
+	w io.Writer,
+	path string,
+	// optional query {key, value} pairs
+	kv ...string,
+) (*http.Response, error) {
+	return restRequest(ctx, http.MethodGet, w, "", nil, path, kv...)
+}
+
 func restGuestCheckin(ctx context.Context, pubpem []byte) (
 	*GuestReceipt, error,
 ) {
@@ -530,10 +470,9 @@ func restGuestCheckin(ctx context.Context, pubpem []byte) (
 	defer restFree(buf)
 
 	receipt := new(GuestReceipt)
-	rsp, err := restRequest(ctx, buf, http.MethodPut,
+	rsp, err := restPut(ctx, buf,
 		"application/x-pem-file", bytes.NewReader(pubpem),
-		RestOp, RestOpCheckin,
-		RestOpCheckin, RestOpCheckinGuest)
+		RestPathCheckinGuest)
 	if err != nil {
 		return receipt, err
 	}
@@ -548,21 +487,44 @@ func restGuestCheckin(ctx context.Context, pubpem []byte) (
 	return receipt, nil
 }
 
+// Join stringed args with "/".
+func restPath(args ...string) string {
+	var path strings.Builder
+	for _, s := range args {
+		if !strings.HasPrefix(s, "/") {
+			path.WriteRune('/')
+		}
+		path.WriteString(s)
+	}
+	return path.String()
+}
+
+func restPut(
+	ctx context.Context,
+	// rsp body
+	w io.Writer,
+	// req content Type and body
+	ct string, r io.Reader,
+	path string,
+	// optional query {key, value} pairs
+	kv ...string,
+) (*http.Response, error) {
+	return restRequest(ctx, http.MethodPut, w, ct, r, path, kv...)
+}
 func restQueueWhois(ctx context.Context, v any) bool {
 	return xcontext.Queue(ctx, rest.whoisReqC, v)
 }
 
-// - Without args, copy registry virtual directory listing.
-// - With one arg, copy registry file.
-// - With one or more (key, value) pairs, RESTful registry query response.
 func restRequest(
 	ctx context.Context,
+	method string,
 	// rsp body
 	w io.Writer,
-	method string,
-	// req body
-	contentType string, r io.Reader,
-	args ...string,
+	// req content Type and body
+	ct string, r io.Reader,
+	path string,
+	// optional query {key, value} pairs
+	kv ...string,
 ) (*http.Response, error) {
 	if len(rest.ips) == 0 {
 		if err := restWaitForResolution(ctx); err != nil {
@@ -571,29 +533,23 @@ func restRequest(
 	}
 
 	clone := *rest.url
-	switch len(args) {
-	case 0:
-		clone.Path = ""
-	case 1:
-		clone.Path = args[0]
-	default:
-		q := clone.Query()
-		for i, n := 0, len(args); i < n; i += 2 {
-			var v string
-			if i < n-1 {
-				v = args[i+1]
-			}
-			q.Set(args[i], v)
+	clone.Path = path
+	q := clone.Query()
+	for i, n := 0, len(kv); i < n; i += 2 {
+		var v string
+		if i < n-1 {
+			v = kv[i+1]
 		}
-		clone.RawQuery = q.Encode()
+		q.Set(kv[i], v)
 	}
+	clone.RawQuery = q.Encode()
 
 	req, err := http.NewRequestWithContext(ctx, method, clone.String(), r)
 	if err != nil {
 		return nil, err
 	}
-	if len(contentType) > 0 {
-		req.Header.Set("Content-Type", contentType)
+	if len(ct) > 0 {
+		req.Header.Set("Content-Type", ct)
 	}
 	rsp, err := rest.Do(req)
 	if rsp != nil {
@@ -651,37 +607,29 @@ func restWaitForResolution(ctx context.Context) error {
 	return err
 }
 
-func restWhois(ctx context.Context, q any) (*Subscriber, error) {
-	var k, s string
+func restWhois(ctx context.Context, v any) (*Subscriber, error) {
+	var path string
 	buf := restAlloc()
 	defer restFree(buf)
-	switch t := q.(type) {
+	switch t := v.(type) {
 	case Id:
-		k = RestWhoisId
-		s = fmt.Sprint(t.Index())
+		path = restPath(RestPathWhoisId, fmt.Sprint(t.Index()))
 	case int:
-		k = RestWhoisId
-		s = fmt.Sprint(t)
+		path = restPath(RestPathWhoisId, fmt.Sprint(t))
 	case string:
-		k = RestWhoisName
-		s = t
+		path = restPath(RestPathWhoisNamed, t)
 	case netip.Addr:
-		k = RestWhoisAddress
-		s = t.String()
+		path = restPath(RestPathWhoisAddressed, t.String())
 	default:
 		xlog.Errata.Printf("%T: unsupported", t)
 		return nil, xerrors.Unsupported(fmt.Sprintf("%T", t))
 	}
 	sub := new(Subscriber)
-	_, err := xerrors.MarkResult(restRequest(ctx, buf, http.MethodGet,
-		"", nil,
-		RestOp, RestOpWhois,
-		RestOpWhois, k,
-		k, s))
+	_, err := restGet(ctx, buf, path)
 	if err == nil {
-		err = xerrors.Mark(json.Unmarshal(buf.Bytes(), sub))
+		err = json.Unmarshal(buf.Bytes(), sub)
 		if err == nil {
-			err = xerrors.Mark(sub.validate())
+			err = sub.validate()
 		}
 	}
 	return sub, err
