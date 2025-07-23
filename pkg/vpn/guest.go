@@ -14,7 +14,6 @@ import (
 	"encoding/pem"
 	"flag"
 	"fmt"
-	"io/fs"
 	"net"
 	"net/netip"
 	"os"
@@ -68,8 +67,13 @@ var guest struct {
 
 	receipt *GuestReceipt
 
-	tun  *os.File
-	tunC chan *xnet.Msg
+	tun *os.File
+
+	fromTunC chan *xnet.Msg
+	toTunC   chan *xnet.Msg
+
+	fromVpnC <-chan *xnet.Msg
+	toVpnC   chan<- *xnet.Msg
 }
 
 // Guest is a UDP server that forwards ciphered packets between an exchange
@@ -140,14 +144,14 @@ Forward ciphered packets between exchange and tunnel interface.
 		return err
 	}
 
-	if err = udpInit(0); err != nil {
+	guest.fromVpnC, guest.toVpnC, err = startUDP(0)
+	if err != nil {
 		return err
 	}
-	defer udp.Close()
+	defer close(guest.toVpnC)
 
 	guestHelloOrWhoisAllVias(ctx, time.Now().UnixMicro())
 
-	guest.tunC = make(chan *xnet.Msg, 1)
 	guest.tun, err = nettun.
 		New(vpnTunnel, IsTap, TunPersist, TunOwner, TunGroup, ha)
 	if err != nil {
@@ -225,16 +229,13 @@ Forward ciphered packets between exchange and tunnel interface.
 	defer signal.Stop(alarm)
 
 	wg.Go(func() { restWhoisService(ctx) })
-	wg.Go(guestTunStream)
-	wg.Go(udpStream)
 
-	svc := fmt.Sprintf("%s %v@%v via %v",
-		rest.crt.Subject.CommonName,
-		MyId, udp.LocalAddr(),
-		guest.receipt.ExchangePrecedence)
-	xlog.Info.Println("start", svc)
+	guestStartTunneling(ctx)
+	defer close(guest.toTunC)
+
+	xlog.Info.Println("start guest", MyId)
 	defer cancel()
-	defer xlog.Trace.Println("stopping", svc, "...")
+	defer xlog.Trace.Println("stopping guest", MyId, "...")
 
 selection:
 	for err == nil {
@@ -256,16 +257,16 @@ selection:
 			} else {
 				guestPeerWith(ctx, sub)
 			}
-		case m, ok := <-guest.tunC:
+		case m, ok := <-guest.fromTunC:
 			if !ok {
 				break selection
 			}
 			guestFromTun(ctx, m)
-		case m, ok := <-udpC:
+		case m, ok := <-guest.fromVpnC:
 			if !ok {
 				break selection
 			}
-			guestFromUDP(ctx, m)
+			guestFromVpn(ctx, m)
 		}
 	}
 	return xerrors.Suppress(err, context.Canceled, errEOC)
@@ -277,57 +278,43 @@ func guestExchangeWith(ctx context.Context, sub *Subscriber) {
 	guest.indexed[sub.Id.Index()] = sub
 	if err := sub.resolve(ctx); err != nil {
 		xlog.Errata.Print(err)
+	} else if hello := newGreeting(0); hello != nil {
+		hello.AddrPort = sub.via
+		mp.Queue(ctx, guest.toVpnC, hello)
 	}
-	sub.hello(ctx, 0)
 }
 
 func guestFromTun(ctx context.Context, m *xnet.Msg) {
 	da, err := netpdu.TunPI(m.Data).ToWhom()
 	if err != nil {
 		xlog.Errata.Println("dropped:", err)
-	} else if !da.IsValid() {
-		xlog.Trace.Println("dropped non-ip[6]")
-	} else if da.IsMulticast() {
-		xlog.Trace.Println("dropped multicast", da)
-	} else if da.Compare(guest.receipt.Prefix.Addr()) == 0 {
-		xlog.Trace.Println("loopback", da)
-		guest.tun.Write(m.Data)
-	} else if guest.llu6.IsValid() && da.Compare(guest.llu6) == 0 {
-		xlog.Trace.Println("link-local loopback", da)
-		guest.tun.Write(m.Data)
-	} else if !vpnPrefix.Contains(da) {
-		xlog.Trace.Println("dropped ", da, "out of", vpnPrefix)
-	} else if to, ok := guest.addressed[da]; ok {
-		guestTx(ctx, to, m)
-	} else {
+		mp.Put(m)
+	} else if to, ok := guest.addressed[da]; !ok {
 		restQueueWhois(ctx, da)
-		xlog.Trace.Println("queue to", da, "pending whois")
 		guest.pending.tx = append(guest.pending.tx, m)
-		return
+	} else {
+		guestTx(ctx, to, m)
 	}
-	mp.Put(m)
 }
 
-func guestFromUDP(ctx context.Context, m *xnet.Msg) {
+func guestFromVpn(ctx context.Context, m *xnet.Msg) {
 	tid, fid := ScanLabel(m.Data)
 	fi := fid.Index()
 	from, ok := guest.indexed[fi]
 	if !ok || from.Id.Version() != fid.Version() {
-		guest.pending.rx = append(guest.pending.rx, m)
 		restQueueWhois(ctx, fid)
-		xlog.Trace.Println("queue from", fid, "pending whois")
-		return
-	}
-	if tid == fid {
-		if from.helloIsOK(ctx, m) {
+		guest.pending.rx = append(guest.pending.rx, m)
+	} else if tid == fid {
+		if from.helloIsOK(m) {
 			from.via = m.AddrPort
 		}
+		mp.Put(m)
 	} else if tid != MyId {
-		xlog.Trace.Println("dropped", tid, "<-", fid)
+		xlog.Trace.Println("dropped from", from.name(), "to", tid)
+		mp.Put(m)
 	} else {
 		guestRx(ctx, from, m)
 	}
-	mp.Put(m)
 }
 
 func guestHelloOrWhoisAllVias(ctx context.Context, now int64) {
@@ -337,8 +324,11 @@ func guestHelloOrWhoisAllVias(ctx context.Context, now int64) {
 	for name, sub := range guest.via {
 		if sub == nil || !sub.via.IsValid() {
 			restQueueWhois(ctx, name)
-		} else {
-			sub.hello(ctx, now)
+		} else if hello := newGreeting(0); hello != nil {
+			hello.AddrPort = sub.via
+			if !mp.Queue(ctx, guest.toVpnC, hello) {
+				break
+			}
 		}
 	}
 }
@@ -430,7 +420,6 @@ func guestPeerWith(ctx context.Context, sub *Subscriber) {
 		guestMatchPendingRx(sub.Id, func(m *xnet.Msg) {
 			sub.via = m.AddrPort
 			guestRx(ctx, sub, m)
-			mp.Put(m)
 		})
 	}
 	// If there weren't any pending rx msgs, use the best matching
@@ -453,7 +442,6 @@ func guestPeerWith(ctx context.Context, sub *Subscriber) {
 	if len(guest.pending.tx) > 0 {
 		guestMatchPendingTx(sub.Addr, func(m *xnet.Msg) {
 			guestTx(ctx, sub, m)
-			mp.Put(m)
 		})
 	}
 }
@@ -466,81 +454,86 @@ func guestRx(ctx context.Context, from *Subscriber, m *xnet.Msg) {
 	i := len(m.Data) - SizeofLabel
 	m.Data, err = from.gcm.Open(m.Data[:0], nil, m.Data[:i], m.Data[i:])
 	if err != nil {
-		xlog.Trace.Print("from ", name, netpdu.Mark, err)
+		xlog.Trace.Print("rx ", name, netpdu.Mark, err)
 	} else if _, err = guest.tun.Write(m.Data); err != nil {
-		xlog.Trace.Print("from ", name, netpdu.Mark, err)
+		xlog.Trace.Print("rx ", name, netpdu.Mark, err)
 	} else {
-		xlog.Trace.Print("from ", name, netpdu.Mark, PDU(m.Data))
+		xlog.Trace.Print("rx ", name, netpdu.Mark, PDU(m.Data))
 	}
+	mp.Put(m)
+}
+
+func guestStartTunneling(ctx context.Context) {
+	guest.fromTunC = make(chan *xnet.Msg, SizeofFromTunC)
+	guest.toTunC = make(chan *xnet.Msg, SizeofToTunC)
+	wg.Go(func() { guestTunRead(ctx) })
+	wg.Go(func() { guestTunWrite() })
 }
 
 func guestTunRead(ctx context.Context) {
 	name := guest.tun.Name()
 	xlog.Trace.Println("start", name, "read")
 	defer xlog.Trace.Println("stopped", name, "read")
-	defer close(guest.tunC)
+	defer close(guest.fromTunC)
 	m := mp.Get()
-	defer mp.Put(m)
 	for {
-		select {
-		case <-ctx.Done():
-			return
-		default:
-		}
 		m.Data = m.Data[:cap(m.Data)]
 		n, err := guest.tun.Read(m.Data)
 		if err != nil {
 			if xos.IsBlocked(err) {
 				runtime.Gosched()
-				continue
+			} else {
+				xlog.Errata.Print(err)
+				mp.Put(m)
+				break
 			}
-			xlog.Errata.Print(err)
-			return
 		}
 		m.Data = m.Data[:n]
 		da, err := netpdu.TunPI(m.Data).ToWhom()
 		if err != nil {
-			xlog.Trace.Println("dropped no tunPI")
-			continue
-		}
-		if !da.IsValid() {
-			xlog.Trace.Println("dropped non-ip[6]")
-			continue
-		}
-		m.AddrPort = netip.AddrPortFrom(da, 0)
-		if da.IsMulticast() {
-			xlog.Trace.Println("dropped multicast", da)
+			xlog.Trace.Println("dropped:", err)
+		} else if !da.IsValid() {
+			xlog.Trace.Println("dropped: non-ip[6]")
+		} else if m.AddrPort = netip.AddrPortFrom(da, 0); da.
+			IsMulticast() {
+			xlog.Trace.Println("dropped: multicast", da)
 		} else if da.Compare(guest.receipt.Prefix.Addr()) == 0 {
 			xlog.Trace.Println("loopback", da)
-			guest.tun.Write(m.Data)
+			if mp.Queue(ctx, guest.toTunC, m) {
+				m = mp.Get()
+			} else {
+				break
+			}
 		} else if guest.llu6.IsValid() && da.Compare(guest.llu6) == 0 {
-			xlog.Trace.Println("link-local loopback", da)
-			guest.tun.Write(m.Data)
+			xlog.Trace.Println("loopback", da)
+			if mp.Queue(ctx, guest.toTunC, m) {
+				m = mp.Get()
+			} else {
+				break
+			}
 		} else if !vpnPrefix.Contains(da) {
 			xlog.Trace.Println(da, "out of", vpnPrefix)
-			continue
+		} else if mp.Queue(ctx, guest.fromTunC, m) {
+			m = mp.Get()
 		} else {
-			select {
-			case <-ctx.Done():
-				mp.Put(m)
-				return
-			case guest.tunC <- m:
-				m = mp.Get()
-			}
+			break
 		}
 	}
 }
 
-func guestTunStream() {
-	xlog.Trace.Println("start", guest.tun.Name(), "stream")
-	err := mp.StreamReader(guest.tunC, guest.tun)
-	err = xerrors.Suppress(err, fs.ErrClosed)
-	if err != nil {
-		xlog.Errata.Println("quit", guest.tun.Name(), "stream", err)
-	} else {
-		xlog.Trace.Println("stopped", guest.tun.Name(), "stream")
+func guestTunWrite() {
+	name := guest.tun.Name()
+	defer guest.tun.Close()
+	xlog.Trace.Println("start", name, "write")
+	for m := range guest.toTunC {
+		_, err := guest.tun.Write(m.Data)
+		mp.Put(m)
+		if err != nil {
+			xlog.Errata.Println("quit", name, "write:", err)
+			return
+		}
 	}
-
+	xlog.Trace.Println("stopped", name, "write")
 }
 
 func guestTx(ctx context.Context, to *Subscriber, m *xnet.Msg) {
@@ -548,12 +541,14 @@ func guestTx(ctx context.Context, to *Subscriber, m *xnet.Msg) {
 	pdu := PDU(m.Data)
 	// FIXME pdu.Proto(m.AddrPort.Addr().Is6())
 	if to.via.IsValid() {
-		xlog.Trace.Print("to ", name, netpdu.Mark, pdu)
+		xlog.Trace.Print("tx ", name, netpdu.Mark, pdu)
 		m.Data = to.gcm.Seal(m.Data[:0], nil, m.Data, to.label.fromMe)
 		to.cb.Encrypt(m.Data[:aes.BlockSize], m.Data[:aes.BlockSize])
 		m.Data = append(m.Data, to.label.fromMe...)
-		udp.WriteToUDPAddrPort(m.Data, to.via)
+		m.AddrPort = to.via
+		mp.Queue(ctx, guest.toVpnC, m)
 	} else {
 		xlog.Trace.Print("dropped w/o path to ", name, netpdu.Mark, pdu)
+		mp.Put(m)
 	}
 }

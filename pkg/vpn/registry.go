@@ -63,6 +63,9 @@ type registry struct {
 
 	rsvpC chan *rsvp
 
+	fromVpnC <-chan *xnet.Msg
+	toVpnC   chan<- *xnet.Msg
+
 	hosts struct {
 		addr map[string]netip.Addr
 		name map[netip.Addr]string
@@ -197,10 +200,11 @@ A RESTful WWW server and packet exchange.
 		return err
 	}
 
-	if err = udpInit(vpnPort); err != nil {
+	reg.fromVpnC, reg.toVpnC, err = startUDP(vpnPort)
+	if err != nil {
 		return err
 	}
-	defer udp.Close()
+	defer close(reg.toVpnC)
 
 	reg.http = &http.Server{
 		Addr:    fmt.Sprintf(":%d", vpnPort),
@@ -220,7 +224,6 @@ A RESTful WWW server and packet exchange.
 
 	wg.Go(func() { reg.shutdown(ctx) })
 	wg.Go(reg.restsvc)
-	wg.Go(udpStream)
 
 	xlog.Trace.Println("start")
 	defer cancel()
@@ -239,16 +242,16 @@ selection:
 				break selection
 			}
 			reg.rest(rsvp)
-		case m, ok := <-udpC:
+		case m, ok := <-reg.fromVpnC:
 			if !ok {
 				break selection
 			}
 			if len(m.Data) < SizeofLabel {
 				xlog.Errata.Print("underrun")
+				mp.Put(m)
 			} else {
-				reg.fromUDP(ctx, m)
+				reg.fromVpn(ctx, m)
 			}
-			mp.Put(m)
 		}
 	}
 	return nil
@@ -256,6 +259,8 @@ selection:
 
 func (reg *registry) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	defer req.Body.Close()
+
+	ctx := req.Context()
 
 	if !req.TLS.HandshakeComplete {
 		w.WriteHeader(http.StatusUnauthorized)
@@ -287,14 +292,18 @@ func (reg *registry) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	rsvp := rsvpPool.Get().(*rsvp)
 	rsvp.ResponseWriter = w
 	rsvp.req = req
-	reg.rsvpC <- rsvp
 
 	select {
-	case <-req.Context().Done():
-	case <-rsvp.doneC:
-		rsvp.ResponseWriter = nil
-		rsvp.req = nil
+	case <-ctx.Done():
 		rsvpPool.Put(rsvp)
+	case reg.rsvpC <- rsvp:
+		select {
+		case <-ctx.Done():
+		case <-rsvp.doneC:
+			rsvp.ResponseWriter = nil
+			rsvp.req = nil
+			rsvpPool.Put(rsvp)
+		}
 	}
 }
 
@@ -480,45 +489,37 @@ func (reg *registry) dumpSubscribers(rsvp *rsvp) {
 	}
 }
 
-func (reg *registry) fromUDP(ctx context.Context, m *xnet.Msg) {
+func (reg *registry) fromVpn(ctx context.Context, m *xnet.Msg) {
 	tid, fid := ScanLabel(m.Data)
 
-	fi := fid.Index()
-	if fi >= len(reg.indexed) {
+	if fi := fid.Index(); fi >= len(reg.indexed) {
 		xlog.Trace.Println("dropped from unknown", fid)
+	} else if from := reg.indexed[fi]; from.Id.Version() != fid.Version() {
+		xlog.Trace.Print("dropped ", from.name(),
+			", version ", from.Id.Version(), " != ", fid.Version())
+	} else if fid == tid {
+		if from.helloIsOK(m) {
+			from.via = m.AddrPort
+			if hello := newGreeting(0); hello != nil {
+				hello.AddrPort = m.AddrPort
+				mp.Queue(ctx, reg.toVpnC, hello)
+			}
+		}
+	} else if ti := tid.Index(); ti >= len(reg.indexed) {
+		xlog.Trace.Println("dropped", from.name(), "-> unknown")
+	} else if to := reg.indexed[ti]; to.Id.Version() != tid.Version() {
+		xlog.Trace.Print("dropped ", from.name(), " -> ", to.name(),
+			", version ", to.Id.Version(), " != ", tid.Version())
+	} else if !to.via.IsValid() {
+		xlog.Trace.Println("dropped", from.name(), "-> unaddressed",
+			to.name())
+	} else {
+		m.AddrPort = to.via
+		mp.Queue(ctx, reg.toVpnC, m)
+		xlog.Trace.Println("forward", from.name(), "->", to.name())
 		return
 	}
-	from := reg.indexed[fi]
-	if got, want := fid.Version(), from.Id.Version(); got != want {
-		xlog.Trace.Println("dropped from", from.name(),
-			"with version", got, "!=", want)
-		return
-	}
-
-	if fid == tid {
-		from.hellohello(ctx, m)
-		return
-	}
-
-	ti := tid.Index()
-	if ti >= len(reg.indexed) {
-		xlog.Trace.Println("dropped from", from.name(), "to unknown")
-		return
-	}
-	to := reg.indexed[ti]
-	if got, want := tid.Version(), to.Id.Version(); got != want {
-		xlog.Trace.Println("dropped from", from.name(),
-			"to", to.name(),
-			"with version", got, "!=", want)
-		return
-	}
-	if !to.via.IsValid() {
-		xlog.Trace.Println("dropped from", from.name(),
-			"to unaddressed", to.name())
-		return
-	}
-	udp.WriteToUDPAddrPort(m.Data, to.via)
-	xlog.Trace.Println("forward from", from.name(), "to", to.name())
+	mp.Put(m)
 }
 
 func (reg *registry) getFileOrDir(w http.ResponseWriter, name string) {

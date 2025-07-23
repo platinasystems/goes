@@ -7,7 +7,6 @@ package vpn
 import (
 	"context"
 	"flag"
-	"fmt"
 	"os"
 	"os/signal"
 
@@ -19,6 +18,9 @@ import (
 
 var exchange struct {
 	sub map[int]*Subscriber
+
+	fromVpnC <-chan *xnet.Msg
+	toVpnC   chan<- *xnet.Msg
 }
 
 // Exchange is a UDP server that forwards ciphered packets between guest's.
@@ -55,22 +57,21 @@ Exchange ciphered packets between guests.
 		return err
 	}
 
-	if err = udpInit(vpnPort); err != nil {
+	exchange.fromVpnC, exchange.toVpnC, err = startUDP(vpnPort)
+	if err != nil {
 		return err
 	}
-	defer udp.Close()
+	defer close(exchange.toVpnC)
 
 	alarm := make(chan os.Signal, 2)
 	signal.Notify(alarm, xsignal.Alarm)
 	defer signal.Stop(alarm)
 
 	wg.Go(func() { restWhoisService(ctx) })
-	wg.Go(udpStream)
 
-	svc := fmt.Sprintf("%v @ %v", MyId, udp.LocalAddr())
-	xlog.Trace.Println("start", svc)
+	xlog.Trace.Println("start exchange", MyId)
 	defer cancel()
-	defer xlog.Trace.Println("stopping", svc, "...")
+	defer xlog.Trace.Println("stopping exchange", MyId, "...")
 
 selection:
 	for err == nil {
@@ -87,49 +88,49 @@ selection:
 			}
 			exchange.sub[sub.Id.Index()] = sub
 			xlog.Trace.Println("guest", sub)
-		case m, ok := <-udpC:
+		case m, ok := <-exchange.fromVpnC:
 			if !ok {
 				break selection
 			}
 			if len(m.Data) < SizeofLabel {
+				mp.Put(m)
 				xlog.Errata.Print("underrun")
 			} else {
-				exchangeFromUDP(ctx, m)
+				exchangeFromVpn(ctx, m)
 			}
-			mp.Put(m)
 		}
 	}
 	return err
 }
 
-func exchangeFromUDP(ctx context.Context, m *xnet.Msg) {
+func exchangeFromVpn(ctx context.Context, m *xnet.Msg) {
 	tid, fid := ScanLabel(m.Data)
+	ti, fi := tid.Index(), fid.Index()
 
-	fi := fid.Index()
-	from, fok := exchange.sub[fi]
-	if !fok || from.Id.Version() != fid.Version() {
+	if from, fok := exchange.sub[fi]; !fok ||
+		from.Id.Version() != fid.Version() {
 		restQueueWhois(ctx, fi)
 		xlog.Trace.Println("whois from", fi)
-		return
-	}
-
-	if fid == tid {
-		from.hellohello(ctx, m)
-		return
-	}
-
-	ti := tid.Index()
-	to, tok := exchange.sub[ti]
-	if !tok || to.Id.Version() != tid.Version() {
+	} else if fid == tid {
+		if from.helloIsOK(m) {
+			hello := newGreeting(0)
+			if hello != nil {
+				hello.AddrPort = m.AddrPort
+				mp.Queue(ctx, exchange.toVpnC, hello)
+			}
+		}
+	} else if to, tok := exchange.sub[ti]; !tok ||
+		to.Id.Version() != tid.Version() {
 		restQueueWhois(ctx, ti)
 		xlog.Trace.Println("whois to", ti)
+	} else if !to.via.IsValid() {
+		xlog.Trace.Println("dropped", from.name(), "-> unaddressed",
+			to.name())
+	} else {
+		m.AddrPort = to.via
+		mp.Queue(ctx, exchange.toVpnC, m)
+		xlog.Trace.Println("forward", from.name(), "->", to.name())
 		return
 	}
-	if !to.via.IsValid() {
-		xlog.Trace.Println("dropped from", from.name(),
-			"to unaddressed", to.name())
-		return
-	}
-	udp.WriteToUDPAddrPort(m.Data, to.via)
-	xlog.Trace.Println("forward from", from.name(), "to", to.name())
+	mp.Put(m)
 }

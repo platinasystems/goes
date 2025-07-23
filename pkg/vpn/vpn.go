@@ -64,6 +64,14 @@ var Features = map[string]any{
 }
 
 const (
+	SizeofFromTunC = 1
+	SizeofFromVpnC = 1
+
+	SizeofToTunC = 1
+	SizeofToVpnC = 1
+)
+
+const (
 	defaultPort = 8003
 
 	oAppend = os.O_WRONLY | os.O_CREATE | os.O_APPEND
@@ -155,6 +163,18 @@ var HostFQDN = sync.OnceValues(func() (string, error) {
 	return os.Hostname()
 })
 
+func bestDir(primary string, alternates ...string) string {
+	if fi, err := os.Stat(primary); err == nil && fi.IsDir() {
+		return primary
+	}
+	for _, alt := range alternates {
+		if fi, err := os.Stat(alt); err == nil && fi.IsDir() {
+			return alt
+		}
+	}
+	return primary
+}
+
 func defineAdmins() {
 	vpnAdminsFile = filepath.Join(vpnConfigDir, "admins")
 	xflag.Define(&vpnAdminsFile, "admins", `
@@ -182,9 +202,9 @@ func defineConfig() {
 	} else {
 		xdgDir := filepath.Join(xdg.ConfigHome(), subDir)
 		if os.Geteuid() == 0 {
-			vpnConfigDir = prefDir(fhsDir, xdgDir)
+			vpnConfigDir = bestDir(fhsDir, xdgDir)
 		} else {
-			vpnConfigDir = prefDir(xdgDir, fhsDir)
+			vpnConfigDir = bestDir(xdgDir, fhsDir)
 		}
 	}
 	xflag.Define(&vpnConfigDir, "config", "Configuration directory.")
@@ -205,9 +225,9 @@ func defineData() {
 		fhsDir := filepath.Join(fhs.Data(), subDir)
 		xdgDir := filepath.Join(xdg.DataHome(), subDir)
 		if os.Geteuid() == 0 {
-			vpnDataDir = prefDir(fhsDir, xdgDir)
+			vpnDataDir = bestDir(fhsDir, xdgDir)
 		} else {
-			vpnDataDir = prefDir(xdgDir, fhsDir)
+			vpnDataDir = bestDir(xdgDir, fhsDir)
 		}
 	}
 	xflag.Define(&vpnDataDir, "data", "Registry service directory.")
@@ -296,9 +316,9 @@ func defineState() {
 	} else {
 		xdgDir := filepath.Join(xdg.StateHome(), subDir)
 		if os.Geteuid() == 0 {
-			vpnStateDir = prefDir(fhsDir, xdgDir)
+			vpnStateDir = bestDir(fhsDir, xdgDir)
 		} else {
-			vpnStateDir = prefDir(xdgDir, fhsDir)
+			vpnStateDir = bestDir(xdgDir, fhsDir)
 		}
 	}
 	xflag.Define(&vpnStateDir, "state",
@@ -372,14 +392,30 @@ func mainSubDir() string {
 	return s
 }
 
-func prefDir(primary string, alternates ...string) string {
-	if fi, err := os.Stat(primary); err == nil && fi.IsDir() {
-		return primary
+func newGreeting(now int64) *xnet.Msg {
+	var err error
+
+	m := mp.Get()
+	m.Data = m.Data[:0]
+
+	if now == 0 {
+		now = time.Now().UnixMicro()
 	}
-	for _, alt := range alternates {
-		if fi, err := os.Stat(alt); err == nil && fi.IsDir() {
-			return alt
-		}
+
+	m.Data, err = xnet.Attach(m.Data, vpnStart)
+	if err != nil {
+		xlog.Errata.Print(err)
+		mp.Put(m)
+		return nil
 	}
-	return primary
+	m.Data, err = xnet.Attach(m.Data, now)
+	if err != nil {
+		xlog.Errata.Print(err)
+		mp.Put(m)
+		return nil
+	}
+	sig := sign(m.Data)
+	m.Data = append(m.Data, sig...)
+	m.Data = append(m.Data, MyLabel...)
+	return m
 }

@@ -12,7 +12,6 @@ import (
 	"fmt"
 	"net/netip"
 	"path/filepath"
-	"time"
 
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xlog"
@@ -59,40 +58,7 @@ func (sub *Subscriber) Format(w fmt.State, verb rune) {
 	}
 }
 
-func (sub *Subscriber) hello(ctx context.Context, now int64) {
-	var err error
-
-	m := mp.Get()
-	defer mp.Put(m)
-	m.Data = m.Data[:0]
-	m.AddrPort = sub.via
-
-	if now == 0 {
-		now = time.Now().UnixMicro()
-	}
-
-	m.Data, err = xnet.Attach(m.Data, vpnStart)
-	if err != nil {
-		xlog.Errata.Print(err)
-		return
-	}
-	m.Data, err = xnet.Attach(m.Data, now)
-	if err != nil {
-		xlog.Errata.Print(err)
-		return
-	}
-	sig := sign(m.Data)
-	m.Data = append(m.Data, sig...)
-	m.Data = append(m.Data, MyLabel...)
-	_, err = udp.WriteToUDPAddrPort(m.Data, sub.via)
-	if err != nil {
-		xlog.Errata.Print(err)
-	} else {
-		xlog.Trace.Println("hello to", sub)
-	}
-}
-
-func (sub *Subscriber) helloIsOK(ctx context.Context, m *xnet.Msg) bool {
+func (sub *Subscriber) helloIsOK(m *xnet.Msg) bool {
 	m.Data = TruncLabel(m.Data)
 	if len(m.Data) < 2*8 {
 		xlog.Errata.Println("incomplete hello from", sub)
@@ -103,14 +69,6 @@ func (sub *Subscriber) helloIsOK(ctx context.Context, m *xnet.Msg) bool {
 		return true
 	}
 	return false
-}
-
-func (sub *Subscriber) hellohello(ctx context.Context, m *xnet.Msg) {
-	if sub.helloIsOK(ctx, m) {
-		// ACK
-		sub.via = m.AddrPort
-		sub.hello(ctx, 0)
-	}
 }
 
 func (sub *Subscriber) name() string {
