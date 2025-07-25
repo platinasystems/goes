@@ -72,7 +72,8 @@ const (
 )
 
 const (
-	defaultPort = 8003
+	defaultExchangePort = 8003
+	defaultRegistryPort = 8003
 
 	oAppend = os.O_WRONLY | os.O_CREATE | os.O_APPEND
 	oCreate = os.O_WRONLY | os.O_CREATE | os.O_TRUNC
@@ -98,10 +99,13 @@ var (
 
 	mp = xnet.NewMsgPool(netph.ETHMTU)
 
+	vpnDomain       = ".example.platina.io."
 	vpnDuration     = year
-	vpnPort         = uint16(defaultPort)
 	vpnSerialNumber = int64(1)
 	vpnPrefix       netip.Prefix
+
+	vpnExchangePort = uint16(defaultExchangePort)
+	vpnRegistryPort = uint16(defaultRegistryPort)
 
 	vpnAdminsFile,
 	vpnConfigDir,
@@ -240,6 +244,10 @@ func defineDNS() {
 	xflag.Define(&vpnDNS, "dns", "Comma separated domain names.")
 }
 
+func defineDomain() {
+	xflag.Define(&vpnDomain, "domain", "Search domain suffix.")
+}
+
 func defineDuration() {
 	xflag.Define(&vpnDuration, "duration", "e.g. 360s, 60m, or 1h.")
 }
@@ -265,8 +273,12 @@ func defineName() {
 	xflag.Define(&vpnName, "name", "VPN identfier.")
 }
 
-func definePort() {
-	xflag.Define(&vpnPort, "port", "Listener.")
+func defineExchangePort() {
+	xflag.Define(&vpnExchangePort, "exchange-port", "Packet forwarding.")
+}
+
+func defineRegistryPort() {
+	xflag.Define(&vpnRegistryPort, "registry-port", "REST.")
 }
 
 func definePrefix() {

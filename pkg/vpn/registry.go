@@ -8,6 +8,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
 	"errors"
@@ -35,6 +36,7 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xlog"
 	"github.com/platinasystems/goes/v2/pkg/xmaps"
 	"github.com/platinasystems/goes/v2/pkg/xnet"
+	"github.com/platinasystems/goes/v2/pkg/xnet/xdns/xdnsmessage"
 	"github.com/platinasystems/goes/v2/pkg/xprogram"
 	"github.com/platinasystems/goes/v2/pkg/xsignal"
 )
@@ -159,9 +161,11 @@ A RESTful WWW server and packet exchange.
 
 	defineAdmins()
 	defineCert()
+	defineExchangePort()
+	defineDomain()
 	defineHosts()
-	definePort()
 	definePrefix()
+	defineRegistryPort()
 	defineSig()
 	defineVia()
 
@@ -174,16 +178,22 @@ A RESTful WWW server and packet exchange.
 		return err
 	}
 
+	if len(vpnDomain) == 0 {
+		return xerrors.Invalid("domain")
+	}
+
+	if !strings.HasSuffix(vpnDomain, ".") {
+		vpnDomain += "."
+	}
+	if !strings.HasPrefix(vpnDomain, ".") {
+		vpnDomain = "." + vpnDomain
+	}
 	if err = signInit(); err != nil {
 		return err
 	}
 
 	MyId = Id(0)
 	MyLabel = MakeLabel(MyId, MyId)
-
-	defer wg.Wait()
-
-	ctx, cancel := context.WithCancel(ctx)
 
 	reg := newRegistry()
 
@@ -200,18 +210,23 @@ A RESTful WWW server and packet exchange.
 		return err
 	}
 
-	reg.fromVpnC, reg.toVpnC, err = startUDP(vpnPort)
+	defer xlog.Trace.Println("stopped main")
+	defer wg.Wait()
+
+	ctx, cancel := context.WithCancel(ctx)
+
+	reg.fromVpnC, reg.toVpnC, err = startUDP(vpnExchangePort)
 	if err != nil {
 		return err
 	}
 	defer close(reg.toVpnC)
 
 	reg.http = &http.Server{
-		Addr:    fmt.Sprintf(":%d", vpnPort),
+		Addr:    fmt.Sprintf(":%d", vpnRegistryPort),
 		Handler: reg,
 		TLSConfig: &tls.Config{
 			MinVersion: tls.VersionTLS13,
-			ClientAuth: tls.RequireAnyClientCert,
+			ClientAuth: tls.RequestClientCert,
 		},
 		BaseContext: func(net.Listener) context.Context {
 			return ctx
@@ -225,9 +240,9 @@ A RESTful WWW server and packet exchange.
 	wg.Go(func() { reg.shutdown(ctx) })
 	wg.Go(reg.restsvc)
 
-	xlog.Trace.Println("start")
+	xlog.Trace.Println("start main")
 	defer cancel()
-	defer xlog.Trace.Println("stopping...")
+	defer xlog.Trace.Println("stopping main...")
 
 selection:
 	for {
@@ -260,17 +275,8 @@ selection:
 func (reg *registry) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	defer req.Body.Close()
 
-	ctx := req.Context()
-
 	if !req.TLS.HandshakeComplete {
-		w.WriteHeader(http.StatusUnauthorized)
-		w.Write([]byte("incomplete handshake"))
-		return
-	}
-	if len(req.TLS.PeerCertificates) == 0 ||
-		req.TLS.PeerCertificates[0] == nil {
-		w.WriteHeader(http.StatusUnauthorized)
-		w.Write([]byte("no client certificate"))
+		http.Error(w, "incomplete handshake", http.StatusUnauthorized)
 		return
 	}
 
@@ -279,8 +285,7 @@ func (reg *registry) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	if strings.HasPrefix(req.URL.Path, RestPathStatic) {
 		if req.Method != http.MethodGet {
-			w.WriteHeader(http.StatusMethodNotAllowed)
-			w.Write([]byte(req.Method))
+			http.Error(w, req.Method, http.StatusMethodNotAllowed)
 		} else {
 			name := strings.TrimPrefix(req.URL.Path, RestPathStatic)
 			reg.getFileOrDir(w, name)
@@ -293,6 +298,7 @@ func (reg *registry) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	rsvp.ResponseWriter = w
 	rsvp.req = req
 
+	ctx := req.Context()
 	select {
 	case <-ctx.Done():
 		rsvpPool.Put(rsvp)
@@ -387,6 +393,10 @@ func (reg *registry) assignAddr(sub *Subscriber) error {
 }
 
 func (reg *registry) checkin(rsvp *rsvp) *Subscriber {
+	if !reg.hasCertificate(rsvp) {
+		return nil
+	}
+
 	peer0 := rsvp.req.TLS.PeerCertificates[0]
 	cn := peer0.Subject.CommonName
 
@@ -421,7 +431,7 @@ func (reg *registry) checkinExchange(rsvp *rsvp) {
 		return
 	}
 	fmt.Fprint(rsvp, uint(sub.Id))
-	xlog.Trace.Println("exchange", sub)
+	xlog.Trace.Println("checked in exchange", sub)
 }
 
 func (reg *registry) checkinGuest(rsvp *rsvp) {
@@ -459,7 +469,7 @@ func (reg *registry) checkinGuest(rsvp *rsvp) {
 		rsvp.WriteHeader(http.StatusInternalServerError)
 	}
 	rsvp.Write(b)
-	xlog.Trace.Println("guest", sub)
+	xlog.Trace.Println("checked in guest", sub)
 }
 
 func (reg *registry) deny(rsvp *rsvp) {
@@ -473,6 +483,97 @@ func (reg *registry) deny(rsvp *rsvp) {
 		rsvp.WriteHeader(http.StatusNotFound)
 	} else {
 		delete(reg.pending, s)
+	}
+}
+
+func (reg *registry) dnsAnswer(query *xdnsmessage.Message) *xdnsmessage.Message {
+	reply := xdnsmessage.NewMessage()
+	reply.Addr = query.Addr
+	reply.ID = query.ID
+	reply.HF = xdnsmessage.HFResponse
+	reply.OpCode = query.OpCode
+	reply.Questions = query.Questions
+	if len(query.Questions) == 0 {
+		reply.RCode = xdnsmessage.RCodeFormatError
+		return reply
+	}
+	if query.OpCode != xdnsmessage.OpCodeQuery {
+		reply.RCode = xdnsmessage.RCodeNotImplemented
+		return reply
+	}
+	for _, q := range query.Questions {
+		uniqueName := q.Name
+		name := uniqueName.String()
+		if !strings.HasSuffix(name, ".") {
+			name += "."
+		}
+		if !strings.HasSuffix(name, vpnDomain) {
+			xlog.Trace.Print("domain(", name, ") !=", vpnDomain)
+			continue
+		}
+		name = strings.TrimSuffix(name, vpnDomain)
+		sub, ok := reg.named[name]
+		if !ok {
+			xlog.Trace.Println(name, "not found")
+			continue
+		}
+		reply.RCode = xdnsmessage.RCodeSuccess
+		var resource xdnsmessage.TypedResource
+		if sub.Addr.Is4() {
+			resource = xdnsmessage.TypeAResource{sub.Addr}
+		} else if sub.Addr.Is6() {
+			resource = xdnsmessage.TypeAAAAResource{sub.Addr}
+		}
+		if resource != nil {
+			xlog.Trace.Println(name, sub.Addr)
+			reply.Answers = append(reply.Answers,
+				xdnsmessage.WireResource{
+					Name:          uniqueName,
+					Duration:      3600 * time.Second,
+					Class:         xdnsmessage.ClassINET,
+					TypedResource: resource,
+				})
+		}
+	}
+	return reply
+}
+
+func (reg *registry) dnsQuery(rsvp *rsvp) {
+	var b []byte
+	var err error
+
+	if rsvp.req.Method == http.MethodPost {
+		b, err = io.ReadAll(rsvp.req.Body)
+	} else if ev := rsvp.req.URL.Query().Get("dns"); len(ev) == 0 {
+		err = xerrors.Incomplete("dns")
+	} else if b, err = base64.StdEncoding.DecodeString(ev); err != nil {
+		b, err = base64.URLEncoding.DecodeString(ev)
+	}
+	if err != nil {
+		http.Error(rsvp, err.Error(), http.StatusBadRequest)
+		xlog.Errata.Println(err)
+		return
+	}
+
+	query := xdnsmessage.NewMessage()
+	defer query.Free()
+
+	if err = query.UnmarshalBinary(b); err != nil {
+		http.Error(rsvp, err.Error(), http.StatusBadRequest)
+		xlog.Errata.Println(err)
+		return
+	}
+
+	answer := reg.dnsAnswer(query)
+	defer answer.Free()
+
+	rsvp.Header().Set("Content-Type", "application/dns-message")
+	b, err = answer.AppendTo(make([]byte, 0, 4<<10))
+	if err != nil {
+		http.Error(rsvp, err.Error(), http.StatusInternalServerError)
+		xlog.Errata.Println(err)
+	} else if _, err = rsvp.Write(b); err != nil {
+		xlog.Errata.Print(err)
 	}
 }
 
@@ -523,6 +624,8 @@ func (reg *registry) fromVpn(ctx context.Context, m *xnet.Msg) {
 }
 
 func (reg *registry) getFileOrDir(w http.ResponseWriter, name string) {
+	xlog.Trace.Println(http.MethodGet, name)
+	ecode := http.StatusInternalServerError
 	if len(name) == 0 {
 		names := []string{vlink()}
 		if entries, err := os.ReadDir(vpnDataDir); err == nil {
@@ -539,11 +642,9 @@ func (reg *registry) getFileOrDir(w http.ResponseWriter, name string) {
 		f, err := os.Open(xprogram.Path())
 		if err != nil {
 			if errors.Is(err, fs.ErrPermission) {
-				w.WriteHeader(http.StatusForbidden)
-			} else {
-				w.WriteHeader(http.StatusInternalServerError)
+				ecode = http.StatusForbidden
 			}
-			fmt.Fprint(w, err)
+			http.Error(w, err.Error(), ecode)
 		} else {
 			io.Copy(w, f)
 			f.Close()
@@ -554,21 +655,17 @@ func (reg *registry) getFileOrDir(w http.ResponseWriter, name string) {
 	name = filepath.Join(vpnDataDir, name)
 	if fi, err := os.Stat(name); err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
-			w.WriteHeader(http.StatusNotFound)
+			ecode = http.StatusNotFound
 		} else if errors.Is(err, fs.ErrPermission) {
-			w.WriteHeader(http.StatusForbidden)
-		} else {
-			w.WriteHeader(http.StatusInternalServerError)
+			ecode = http.StatusForbidden
 		}
-		fmt.Fprint(w, err)
+		http.Error(w, err.Error(), ecode)
 	} else if fi.IsDir() {
 		if des, err := os.ReadDir(name); err != nil {
 			if errors.Is(err, fs.ErrPermission) {
-				w.WriteHeader(http.StatusForbidden)
-			} else {
-				w.WriteHeader(http.StatusInternalServerError)
+				ecode = http.StatusForbidden
 			}
-			fmt.Fprint(w, err)
+			http.Error(w, err.Error(), ecode)
 		} else {
 			var names []string
 			for _, de := range des {
@@ -581,21 +678,36 @@ func (reg *registry) getFileOrDir(w http.ResponseWriter, name string) {
 		}
 	} else if f, err := os.Open(name); err != nil {
 		if errors.Is(err, fs.ErrPermission) {
-			w.WriteHeader(http.StatusForbidden)
-		} else {
-			w.WriteHeader(http.StatusInternalServerError)
+			ecode = http.StatusForbidden
 		}
-		fmt.Fprint(w, err)
+		http.Error(w, err.Error(), ecode)
 	} else {
 		_, err = io.Copy(w, f)
 		f.Close()
 	}
 }
 
+func (reg *registry) hasCertificate(rsvp *rsvp) bool {
+	t := len(rsvp.req.TLS.PeerCertificates) > 0 &&
+		rsvp.req.TLS.PeerCertificates[0] != nil
+	if !t {
+		const emsg = "no client certificate"
+		xlog.Errata.Println(emsg)
+		http.Error(rsvp, emsg, http.StatusUnauthorized)
+	}
+	return t
+}
+
 func (reg *registry) isMember(
 	rsvp *rsvp, club map[string]*Subscriber,
 ) bool {
+	if !reg.hasCertificate(rsvp) {
+		return false
+	}
 	peer0 := rsvp.req.TLS.PeerCertificates[0]
+	if peer0.Equal(reg.cert) {
+		return true
+	}
 	cn := peer0.Subject.CommonName
 	sub, ok := club[cn]
 	t := ok && peer0.Equal(sub.cert)
@@ -607,13 +719,11 @@ func (reg *registry) isMember(
 }
 
 func (reg *registry) isAdmin(rsvp *rsvp) bool {
-	peer0 := rsvp.req.TLS.PeerCertificates[0]
-	return peer0.Equal(reg.cert) || reg.isMember(rsvp, reg.admin)
+	return reg.isMember(rsvp, reg.admin)
 }
 
 func (reg *registry) isSubscriber(rsvp *rsvp) bool {
-	peer0 := rsvp.req.TLS.PeerCertificates[0]
-	return peer0.Equal(reg.cert) || reg.isMember(rsvp, reg.named)
+	return reg.isMember(rsvp, reg.named)
 }
 
 func (reg *registry) loadAdminsFile() error {
@@ -732,13 +842,15 @@ func (reg *registry) reload(rsvp *rsvp) {
 func (reg *registry) rest(rsvp *rsvp) {
 	defer rsvp.done()
 	method, path := rsvp.req.Method, rsvp.req.URL.Path
-	xlog.Info.Print(method, ":", path)
+	xlog.Trace.Println(method, path)
 	switch method {
 	case http.MethodGet:
 		switch {
 		case path == RestPathCertify:
 			// empty response so that client may retrieve this
 			// certificate from TLS negotiation.
+		case path == RestPathDnsQuery:
+			reg.dnsQuery(rsvp)
 		case strings.HasPrefix(path, RestPathShowAddress):
 			if reg.isSubscriber(rsvp) {
 				reg.showAddress(rsvp)
@@ -811,6 +923,14 @@ func (reg *registry) rest(rsvp *rsvp) {
 			rsvp.Header().Add(RestError, path)
 			rsvp.WriteHeader(http.StatusNotFound)
 		}
+	case http.MethodPost:
+		switch {
+		case path == RestPathDnsQuery:
+			reg.dnsQuery(rsvp)
+		default:
+			rsvp.Header().Add(RestError, path)
+			rsvp.WriteHeader(http.StatusNotFound)
+		}
 	case http.MethodPut:
 		switch {
 		case strings.HasPrefix(path, RestPathApprove):
@@ -855,13 +975,13 @@ func (reg *registry) rest(rsvp *rsvp) {
 }
 
 func (reg *registry) restsvc() {
-	xlog.Trace.Println("rest start")
+	xlog.Trace.Println("start rest", reg.http.Addr)
 	err := reg.http.ListenAndServeTLS(vpnCertFile, vpnSigFile)
 	err = xerrors.Suppress(err, http.ErrServerClosed)
 	if err == nil {
-		xlog.Trace.Println("rest stopped")
+		xlog.Trace.Println("stopped rest", reg.http.Addr)
 	} else {
-		xlog.Errata.Println("rest", err)
+		xlog.Errata.Println("quit rest", reg.http.Addr, err)
 	}
 }
 
@@ -950,6 +1070,9 @@ func (reg *registry) shutdown(ctx context.Context) {
 // through its TLS negotiation; then prompt the user to ise as root certificate
 // authority.
 func (reg *registry) subscribe(rsvp *rsvp) {
+	if !reg.hasCertificate(rsvp) {
+		return
+	}
 	c := rsvp.req.TLS.PeerCertificates[0]
 	cn := c.Subject.CommonName
 	if sub, found := reg.named[cn]; found {
@@ -969,6 +1092,9 @@ func (reg *registry) subscribe(rsvp *rsvp) {
 }
 
 func (reg *registry) unsubscribe(rsvp *rsvp) {
+	if !reg.hasCertificate(rsvp) {
+		return
+	}
 	peer0 := rsvp.req.TLS.PeerCertificates[0]
 	name := rsvp.trimPrefix(RestPathUnsubscribe)
 	if len(name) == 0 {

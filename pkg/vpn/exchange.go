@@ -31,7 +31,7 @@ Exchange ciphered packets between guests.
 
 {{flags .}}`)
 
-	definePort()
+	defineExchangePort()
 	defineRestFlags()
 	enableTrace()
 	enableQuiet()
@@ -57,7 +57,7 @@ Exchange ciphered packets between guests.
 		return err
 	}
 
-	exchange.fromVpnC, exchange.toVpnC, err = startUDP(vpnPort)
+	exchange.fromVpnC, exchange.toVpnC, err = startUDP(vpnExchangePort)
 	if err != nil {
 		return err
 	}

@@ -54,6 +54,8 @@ const (
 
 	RestPathDeny = "/deny"
 
+	RestPathDnsQuery = "/dns-query"
+
 	RestPathDumpSubscribers = "/dmup/subscribers"
 
 	RestPathPing = "/ping"
@@ -95,6 +97,7 @@ func defineRestFlags() {
 	defineConfig()
 	defineCert()
 	defineRegistry()
+	defineRegistryPort()
 	defineSig()
 	defineVPN()
 }
@@ -414,7 +417,7 @@ func restExchangeCheckin(ctx context.Context) error {
 	buf := restAlloc()
 	defer restFree(buf)
 
-	path := restPath(RestPathCheckinExchange, fmt.Sprint(vpnPort))
+	path := restPath(RestPathCheckinExchange, fmt.Sprint(vpnExchangePort))
 	rsp, err := restPut(ctx, buf, "", nil, path)
 	if err != nil {
 		return err
@@ -447,7 +450,7 @@ func restExtractURL() error {
 	if len(rest.reg.DNSNames) == 0 {
 		return xerrors.Invalid("no registry URL or DNS")
 	}
-	s := fmt.Sprint("https://", rest.reg.DNSNames[0], ":", defaultPort)
+	s := fmt.Sprint("https://", rest.reg.DNSNames[0], ":", vpnRegistryPort)
 	rest.url, err = url.Parse(s)
 	return err
 }

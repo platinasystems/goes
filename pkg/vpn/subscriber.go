@@ -105,7 +105,7 @@ func (sub *Subscriber) resolve(ctx context.Context) error {
 			addr = addr.Unmap()
 		}
 		if port == 0 {
-			port = defaultPort
+			port = vpnExchangePort
 		}
 		sub.via = netip.AddrPortFrom(addr, port)
 		xlog.Trace.Println("resolved", sub.name(), "via", sub.via)

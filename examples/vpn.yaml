@@ -3,26 +3,18 @@ kind: Service
 metadata:
   name: vpn
 spec:
+  type: NodePort
   selector:
     name: vpn
-  clusterIP: None
   ports:
-  - name: https
-    port: 8003
+  - name: rest
     protocol: TCP
-    targetPort: 8003
-  - name: exchange0
-    port: 10030
+    port: 8003
+    nodePort: 30003
+  - name: exchange
     protocol: UDP
-    targetPort: 8003
-  - name: exchange1
-    port: 10031
-    protocol: UDP
-    targetPort: 8003
-  - name: exchange2
-    port: 10032
-    protocol: UDP
-    targetPort: 8003
+    port: 8003
+    nodePort: 30003
 ---
 apiVersion: v1
 kind: Secret
@@ -219,8 +211,6 @@ spec:
     - "registry"
     - "-v"
     - "-trace"
-    - "-prefix"
-    - "fc00:1234::/64"
     ports:
     - protocol: TCP
       containerPort: 8003
@@ -263,11 +253,13 @@ spec:
     - "start"
     - "vpn"
     - "exchange"
+    - "-exchange-port"
+    - "8030"
     - "-v"
     - "-trace"
     ports:
     - protocol: UDP
-      containerPort: 8003
+      containerPort: 8030
     volumeMounts:
     - name: config
       mountPath: "/etc/goes/vpn"
@@ -310,9 +302,6 @@ spec:
         add:
         - NET_ADMIN
       privileged: true
-    ports:
-    - protocol: UDP
-      containerPort: 8003
     volumeMounts:
     - name: config
       mountPath: "/etc/goes/vpn"
@@ -355,9 +344,6 @@ spec:
         add:
         - NET_ADMIN
       privileged: true
-    ports:
-    - protocol: UDP
-      containerPort: 8003
     volumeMounts:
     - name: config
       mountPath: "/etc/goes/vpn"
@@ -400,9 +386,6 @@ spec:
         add:
         - NET_ADMIN
       privileged: true
-    ports:
-    - protocol: UDP
-      containerPort: 8003
     volumeMounts:
     - name: config
       mountPath: "/etc/goes/vpn"
