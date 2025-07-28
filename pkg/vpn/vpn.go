@@ -127,8 +127,7 @@ var (
 	vpnStateDir,
 	vpnStreet,
 	vpnURI,
-	vpnViaFileName,
-	vpnVPN string
+	vpnViaFileName string
 
 	vpnTunnel = -1
 
@@ -354,10 +353,6 @@ func defineVia() {
 	vpnViaFileName = filepath.Join(vpnConfigDir, "via")
 	xflag.Define(&vpnViaFileName, "via",
 		"Subscriber exchange precedence file.")
-}
-
-func defineVPN() {
-	xflag.Define(&vpnVPN, "vpn", "Named VPN. (default unnamed)")
 }
 
 func enableQuiet() {

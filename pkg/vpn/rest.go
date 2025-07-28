@@ -97,7 +97,6 @@ func defineRestFlags() {
 	defineRegistry()
 	defineRegistryPort()
 	defineSig()
-	defineVPN()
 }
 
 var rest struct {
@@ -158,9 +157,6 @@ func restInit() error {
 			return err
 		}
 		cfg.RootCAs.AddCert(rest.reg)
-		if len(vpnVPN) > 0 {
-			rest.url = rest.url.JoinPath(vpnVPN)
-		}
 	}
 
 	tp := http.DefaultTransport.(*http.Transport).Clone()
