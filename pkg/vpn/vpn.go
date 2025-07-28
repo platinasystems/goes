@@ -56,6 +56,7 @@ var Features = map[string]any{
 		"exchange":    Exchange,
 		"get":         RestGet,
 		"guest":       Guest,
+		"nc":          NetCat,
 		"reload":      RestReload,
 		"registry":    Registry,
 		"subscribe":   RestSubscribe,
