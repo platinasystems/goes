@@ -37,8 +37,6 @@ const contextApplicationPKCS8 = "application/pkcs8"
 const dnsLookupTimeout = 30 * time.Second
 
 const (
-	RestError = "X-Error"
-
 	RestUnixMicroStart = "X-Unix-Micro-Start"
 
 	RestVcsRevision = "X-Vcs-Revision"
@@ -303,8 +301,15 @@ Get or list registry file(s).
 		return err
 	}
 
-	args = flag.CommandLine.Args()
-	_, err = restGet(ctx, os.Stdout, restPath(args...))
+	path := new(strings.Builder)
+	path.WriteString(RestPathStatic)
+	if args = flag.CommandLine.Args(); len(args) > 0 {
+		if !strings.HasPrefix(args[0], "/") {
+			path.WriteRune('/')
+		}
+		path.WriteString(args[0])
+	}
+	_, err = restGet(ctx, os.Stdout, path.String())
 	if errors.Is(err, ErrBadVCS) {
 		err = nil
 	}
@@ -394,10 +399,10 @@ RESTful subscribe to VPN.
 	if err != nil {
 	} else if rsp.StatusCode == http.StatusOK {
 		_, err = io.Copy(os.Stdout, rsp.Body)
-	} else if s := rsp.Header.Get(RestError); len(s) > 0 {
-		err = fmt.Errorf("%s, %s", rsp.Status, s)
 	} else {
-		err = errors.New(rsp.Status)
+		sb := new(strings.Builder)
+		io.Copy(sb, rsp.Body)
+		err = fmt.Errorf("%s, %s", rsp.Status, sb)
 	}
 	return err
 }
@@ -570,10 +575,10 @@ func restRequest(
 	}
 	if rsp.StatusCode == http.StatusOK {
 		_, err = io.Copy(w, rsp.Body)
-	} else if s := rsp.Header.Get(RestError); len(s) > 0 {
-		err = fmt.Errorf("%s, %s", rsp.Status, s)
 	} else {
-		err = errors.New(rsp.Status)
+		sb := new(strings.Builder)
+		io.Copy(sb, rsp.Body)
+		err = fmt.Errorf("%s, %s", rsp.Status, sb)
 	}
 	return rsp, err
 }
