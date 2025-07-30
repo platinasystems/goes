@@ -48,12 +48,19 @@ type GuestReceipt struct {
 	ExchangePrecedence []string
 }
 
+type invitation struct {
+	from, to Id
+	text     []byte
+}
+
 type registry struct {
 	start, vcsRev string
 
 	cert *x509.Certificate
 
 	indexed []*Subscriber
+
+	invitations []*invitation
 
 	addressed map[netip.Addr]*Subscriber
 
@@ -100,27 +107,6 @@ func newRegistry() *registry {
 	reg.hosts.name = make(map[netip.Addr]string)
 
 	return reg
-}
-
-type rsvp struct {
-	http.ResponseWriter
-	req   *http.Request
-	doneC chan empty
-}
-
-var rsvpPool = &sync.Pool{
-	New: func() any {
-		return &rsvp{
-			doneC: make(chan empty),
-		}
-	},
-}
-
-func (rsvp *rsvp) done() { rsvp.doneC <- done }
-
-func (rsvp *rsvp) trimPrefix(prefix string) string {
-	s := strings.TrimPrefix(rsvp.req.URL.Path, prefix)
-	return strings.TrimPrefix(s, "/")
 }
 
 // virtual-link, this program may be fetched as MAIN-GOOS-GOARCH
@@ -416,22 +402,18 @@ func (reg *registry) checkinExchange(rsvp *rsvp) {
 }
 
 func (reg *registry) checkinGuest(rsvp *rsvp) {
+	var err error
+
 	sub := reg.checkin(rsvp)
 	if sub == nil {
 		return
 	}
 
-	data, err := io.ReadAll(rsvp.req.Body)
+	sub.EncapKey, err = io.ReadAll(rsvp.req.Body)
 	if err != nil {
 		http.Error(rsvp, err.Error(), http.StatusBadRequest)
 		return
 	}
-	blk, _ := pem.Decode(data)
-	if blk == nil {
-		http.Error(rsvp, "non-PEM input", http.StatusBadRequest)
-		return
-	}
-	sub.CipherKeyDER = blk.Bytes
 
 	rsvp.Header().Set("Content-Type", "application/json")
 	bits := vpnPrefix.Bits()
@@ -675,6 +657,35 @@ func (reg *registry) hasCertificate(rsvp *rsvp) bool {
 	return t
 }
 
+func (reg *registry) invite(rsvp *rsvp) {
+	from := reg.named[rsvp.req.TLS.PeerCertificates[0].Subject.CommonName]
+	text, err := io.ReadAll(rsvp.req.Body)
+	if err != nil {
+		http.Error(rsvp, err.Error(), http.StatusBadRequest)
+	}
+	s := rsvp.trimPrefix(RestPathInvite)
+	if len(s) == 0 {
+		http.Error(rsvp, "incomplete subscriber", http.StatusBadRequest)
+	}
+	to, ok := reg.named[s]
+	if !ok {
+		xlog.Errata.Println(s, "not found in", xmaps.Keys(reg.named))
+		http.Error(rsvp, s, http.StatusNotFound)
+	}
+	for i, x := range reg.invitations {
+		if x.from == to.Id && x.to == from.Id {
+			rsvp.Write(x.text)
+			reg.invitations = slices.Delete(reg.invitations, i, i+1)
+			return
+		}
+	}
+	reg.invitations = append(reg.invitations, &invitation{
+		from: from.Id,
+		to:   to.Id,
+		text: text,
+	})
+}
+
 func (reg *registry) isMember(
 	rsvp *rsvp, club map[string]*Subscriber,
 ) bool {
@@ -850,7 +861,7 @@ func (reg *registry) rest(rsvp *rsvp) {
 		case path == RestPathShowGuests:
 			if reg.isSubscriber(rsvp) {
 				for _, sub := range reg.indexed {
-					if len(sub.CipherKeyDER) > 0 {
+					if len(sub.EncapKey) > 0 {
 						fmt.Fprintln(rsvp, sub)
 					}
 				}
@@ -926,6 +937,10 @@ func (reg *registry) rest(rsvp *rsvp) {
 		case path == RestPathDumpSubscribers:
 			if reg.isSubscriber(rsvp) {
 				reg.dumpSubscribers(rsvp)
+			}
+		case strings.HasPrefix(path, RestPathInvite):
+			if reg.isSubscriber(rsvp) {
+				reg.invite(rsvp)
 			}
 		case path == RestPathReload:
 			if reg.isAdmin(rsvp) {

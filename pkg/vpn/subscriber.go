@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"net/netip"
 	"path/filepath"
+	"sync"
 
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xlog"
@@ -28,9 +29,12 @@ type Subscriber struct {
 
 	// Complete ASN.1 DER content
 	// (CSR, signature algorithm and signature).
-	CertDER,
-	CipherKeyDER,
-	CipherText []byte
+	CertDER []byte
+
+	// [mlkem.DecapsulationKey768].EncapsulationKey.Bytes
+	EncapKey []byte
+
+	sharedKey []byte `json:"-"`
 
 	cert  *x509.Certificate `json:"-"`
 	cb    cipher.Block      `json:"-"`
@@ -75,17 +79,24 @@ func (sub *Subscriber) name() string {
 	return sub.cert.Subject.CommonName
 }
 
-func (sub *Subscriber) resolve(ctx context.Context) error {
+func (sub *Subscriber) resolve(ctx context.Context) {
 	var addr netip.Addr
+	var ok bool
 	var err error
 
+	if sub.via.IsValid() {
+		sync.OnceFunc(func() {
+			xlog.Errata.Println(sub.name(), "already", sub.via)
+		})()
+		return
+	}
+	sub.via = netip.AddrPort{}
 	port := sub.Port
 	switch {
 	case len(sub.cert.IPAddresses) > 0:
-		var ok bool
-		addr, ok = netip.AddrFromSlice(sub.cert.IPAddresses[0])
-		if !ok {
-			err = xerrors.Invalid("address")
+		if addr, ok = netip.AddrFromSlice(sub.cert.IPAddresses[0]); !ok {
+			xlog.Errata.Println(sub.name(), "IPAddresses[0] invalid")
+			return
 		}
 	case len(sub.cert.URIs) > 0:
 		uri := sub.cert.URIs[0]
@@ -94,25 +105,29 @@ func (sub *Subscriber) resolve(ctx context.Context) error {
 				port = 0
 			}
 		}
-		addr, err = resolve(ctx, uri.Hostname())
+		if addr, err = resolve(ctx, uri.Hostname()); err != nil {
+			xlog.Errata.Println(sub.name(), err)
+			return
+		}
 	case len(sub.cert.DNSNames) > 0:
-		addr, err = resolve(ctx, sub.cert.DNSNames[0])
+		if addr, err = resolve(ctx, sub.cert.DNSNames[0]); err != nil {
+			xlog.Errata.Println(sub.name(), err)
+			return
+		}
 	default:
-		addr, err = resolve(ctx, sub.name())
-	}
-	if err == nil {
-		if addr.Is4In6() {
-			addr = addr.Unmap()
+		if addr, err = resolve(ctx, sub.name()); err != nil {
+			xlog.Errata.Println(sub.name(), err)
+			return
 		}
-		if port == 0 {
-			port = vpnExchangePort
-		}
-		sub.via = netip.AddrPortFrom(addr, port)
-		xlog.Trace.Println("resolved", sub.name(), "via", sub.via)
-	} else {
-		sub.via = netip.AddrPort{}
 	}
-	return err
+	if addr.Is4In6() {
+		addr = addr.Unmap()
+	}
+	if port == 0 {
+		port = vpnExchangePort
+	}
+	sub.via = netip.AddrPortFrom(addr, port)
+	xlog.Trace.Println("resolved", sub.name(), "via", sub.via)
 }
 
 func (sub *Subscriber) stateFileName() string {

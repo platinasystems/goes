@@ -56,6 +56,8 @@ const (
 
 	RestPathDumpSubscribers = "/dmup/subscribers"
 
+	RestPathInvite = "/invite"
+
 	RestPathPing = "/ping"
 
 	RestPathReload = "/reload"
@@ -467,7 +469,7 @@ func restGet(
 	return restRequest(ctx, http.MethodGet, w, "", nil, path, kv...)
 }
 
-func restGuestCheckin(ctx context.Context, pubpem []byte) (
+func restGuestCheckin(ctx context.Context, encap []byte) (
 	*GuestReceipt, error,
 ) {
 	buf := restAlloc()
@@ -475,7 +477,7 @@ func restGuestCheckin(ctx context.Context, pubpem []byte) (
 
 	receipt := new(GuestReceipt)
 	rsp, err := restPut(ctx, buf,
-		"application/x-pem-file", bytes.NewReader(pubpem),
+		"application/octet-stream", bytes.NewReader(encap),
 		RestPathCheckinGuest)
 	if err != nil {
 		return receipt, err
@@ -489,6 +491,21 @@ func restGuestCheckin(ctx context.Context, pubpem []byte) (
 	MyId = receipt.Id
 	MyLabel = MakeLabel(MyId, MyId)
 	return receipt, nil
+}
+
+func restInvite(ctx context.Context, name string, cipherText []byte) (
+	[]byte, error,
+) {
+	buf := restAlloc()
+	defer restFree(buf)
+
+	_, err := restRequest(ctx, http.MethodPut, buf,
+		"application/octet-stream", bytes.NewBuffer(cipherText),
+		restPath(RestPathInvite, name))
+	if err != nil {
+		return nil, err
+	}
+	return bytes.Clone(buf.Bytes()), nil
 }
 
 // Join stringed args with "/".
@@ -515,6 +532,7 @@ func restPut(
 ) (*http.Response, error) {
 	return restRequest(ctx, http.MethodPut, w, ct, r, path, kv...)
 }
+
 func restQueueWhois(ctx context.Context, v any) bool {
 	return xcontext.Queue(ctx, rest.whoisReqC, v)
 }

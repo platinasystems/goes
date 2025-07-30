@@ -8,10 +8,7 @@ import (
 	"context"
 	"crypto/aes"
 	"crypto/cipher"
-	"crypto/ecdh"
-	"crypto/rand"
-	"crypto/x509"
-	"encoding/pem"
+	"crypto/mlkem"
 	"flag"
 	"fmt"
 	"net"
@@ -62,12 +59,13 @@ var guest struct {
 	// msgs pending whois response
 	pending struct{ rx, tx []*xnet.Msg }
 
-	// FIXME replace w/ MLKEM
-	priv *ecdh.PrivateKey
+	decapKey *mlkem.DecapsulationKey768
 
 	receipt *GuestReceipt
 
 	tun *os.File
+
+	newPeerC chan *Subscriber
 
 	fromTunC chan *xnet.Msg
 	toTunC   chan *xnet.Msg
@@ -111,19 +109,12 @@ Forward ciphered packets between exchange and tunnel interface.
 	guest.indexed = make(map[int]*Subscriber)
 	guest.via = make(map[string]*Subscriber)
 
-	guest.priv, err = ecdh.X25519().GenerateKey(rand.Reader)
+	guest.decapKey, err = mlkem.GenerateKey768()
 	if err != nil {
 		return err
 	}
-	pubder, err := x509.MarshalPKIXPublicKey(guest.priv.PublicKey())
-	if err != nil {
-		return err
-	}
-	pubpem := pem.EncodeToMemory(&pem.Block{
-		Type:  "PUBLIC KEY",
-		Bytes: pubder,
-	})
-	guest.receipt, err = restGuestCheckin(ctx, pubpem)
+	encapKey := guest.decapKey.EncapsulationKey()
+	guest.receipt, err = restGuestCheckin(ctx, encapKey.Bytes())
 	if err != nil {
 		return err
 	}
@@ -252,10 +243,14 @@ selection:
 			if !ok {
 				break selection
 			}
-			if _, ok = guest.via[sub.name()]; ok {
-				guestExchangeWith(ctx, sub)
+			if x, ok := guest.via[sub.name()]; !ok {
+				guestFound(ctx, sub)
 			} else {
-				guestPeerWith(ctx, sub)
+				if x != nil {
+					xlog.Trace.Println("update",
+						x.name(), sub.via)
+				}
+				guestExchangeWith(ctx, sub)
 			}
 		case m, ok := <-guest.fromTunC:
 			if !ok {
@@ -267,21 +262,143 @@ selection:
 				break selection
 			}
 			guestFromVpn(ctx, m)
+		case sub, ok := <-guest.newPeerC:
+			if !ok {
+				break selection
+			}
+			for i := 0; i < len(guest.pending.tx); {
+				m := guest.pending.tx[i]
+				da, err := netpdu.TunPI(m.Data).ToWhom()
+				if err == nil && da.Compare(sub.Addr) == 0 {
+					guest.pending.tx = slices.
+						Delete(guest.pending.tx, i, i+1)
+					guestFromTun(ctx, m)
+				} else {
+					i += 1
+				}
+			}
+			for i := 0; i < len(guest.pending.rx); {
+				m := guest.pending.rx[i]
+				_, from := ScanLabel(m.Data)
+				if sub.Id.Index() == from.Index() {
+					guest.pending.rx = slices.
+						Delete(guest.pending.rx, i, i+1)
+					guestFromVpn(ctx, m)
+				} else {
+					i += 1
+				}
+			}
 		}
 	}
 	return xerrors.Suppress(err, context.Canceled, errEOC)
+}
+
+func guestDiscardPending(sub *Subscriber) {
+	for i := 0; i < len(guest.pending.rx); {
+		m := guest.pending.rx[i]
+		_, from := ScanLabel(m.Data)
+		if sub.Id.Index() == from.Index() {
+			guest.pending.rx = slices.
+				Delete(guest.pending.rx, i, i+1)
+			mp.Put(m)
+		} else {
+			i += 1
+		}
+	}
+	for i := 0; i < len(guest.pending.tx); {
+		m := guest.pending.tx[i]
+		da, err := netpdu.TunPI(m.Data).ToWhom()
+		if err == nil && da.Compare(sub.Addr) == 0 {
+			guest.pending.tx = slices.
+				Delete(guest.pending.tx, i, i+1)
+			mp.Put(m)
+		} else {
+			i += 1
+		}
+	}
 }
 
 func guestExchangeWith(ctx context.Context, sub *Subscriber) {
 	guest.via[sub.name()] = sub
 	guest.addressed[sub.Addr] = sub
 	guest.indexed[sub.Id.Index()] = sub
-	if err := sub.resolve(ctx); err != nil {
-		xlog.Errata.Print(err)
-	} else if hello := newGreeting(0); hello != nil {
-		hello.AddrPort = sub.via
-		mp.Queue(ctx, guest.toVpnC, hello)
+	sub.resolve(ctx)
+	if sub.via.IsValid() {
+		if hello := newGreeting(0); hello != nil {
+			hello.AddrPort = sub.via
+			mp.Queue(ctx, guest.toVpnC, hello)
+		}
 	}
+}
+
+func guestFound(ctx context.Context, sub *Subscriber) {
+	var cipherText []byte
+
+	name := sub.name()
+
+	if len(sub.EncapKey) == 0 {
+		xlog.Errata.Println(name, "missing cipher key")
+		guestDiscardPending(sub)
+		return
+	}
+	encap, err := mlkem.NewEncapsulationKey768(sub.EncapKey)
+	if err != nil {
+		xlog.Errata.Println(name, "bad encap key:", err)
+		guestDiscardPending(sub)
+		return
+	}
+	sub.sharedKey, cipherText = encap.Encapsulate()
+
+	// use best matching exchange or, in last resort, the registry.
+	for _, name := range sub.ExchangePrecedence {
+		if x, ok := guest.via[name]; ok {
+			if x.via.IsValid() {
+				sub.via = x.via
+				break
+			} else {
+				xlog.Trace.Println("unaddressed", name)
+			}
+		}
+	}
+	if !sub.via.IsValid() {
+		sub.via = guest.via[rest.reg.Subject.CommonName].via
+	}
+
+	sub.label.fromMe = MakeLabel(MyId, sub.Id)
+	sub.label.toMe = MakeLabel(sub.Id, MyId)
+	guest.indexed[sub.Id.Index()] = sub
+	guest.addressed[sub.Addr] = sub
+
+	xlog.Trace.Println(name, "via", sub.via)
+
+	wg.Go(func() {
+		invite, err := restInvite(ctx, name, cipherText)
+		if err != nil {
+			xlog.Errata.Println(name, "invite:", err)
+			guestDiscardPending(sub)
+			return
+		}
+		if len(invite) > 0 {
+			sub.sharedKey, err = guest.decapKey.Decapsulate(invite)
+			if err != nil {
+				xlog.Errata.Println(name, "decap:", err)
+				guestDiscardPending(sub)
+				return
+			}
+		}
+		if sub.cb, err = aes.NewCipher(sub.sharedKey); err != nil {
+			xlog.Errata.Println(name, "shared cipher:", err)
+			guestDiscardPending(sub)
+			return
+		}
+		sub.gcm, err = cipher.NewGCMWithRandomNonce(sub.cb)
+		if err != nil {
+			xlog.Errata.Println(name, "gcm:", err)
+			guestDiscardPending(sub)
+			return
+		}
+		guest.newPeerC <- sub
+	})
 }
 
 func guestFromTun(ctx context.Context, m *xnet.Msg) {
@@ -290,7 +407,11 @@ func guestFromTun(ctx context.Context, m *xnet.Msg) {
 		xlog.Errata.Println("dropped:", err)
 		mp.Put(m)
 	} else if to, ok := guest.addressed[da]; !ok {
+		xlog.Trace.Println("queue whois", da)
 		restQueueWhois(ctx, da)
+		guest.pending.tx = append(guest.pending.tx, m)
+	} else if to.gcm == nil {
+		xlog.Trace.Println("pending invite", da)
 		guest.pending.tx = append(guest.pending.tx, m)
 	} else {
 		guestTx(ctx, to, m)
@@ -302,8 +423,9 @@ func guestFromVpn(ctx context.Context, m *xnet.Msg) {
 	fi := fid.Index()
 	from, ok := guest.indexed[fi]
 	if !ok || from.Id.Version() != fid.Version() {
-		restQueueWhois(ctx, fid)
 		guest.pending.rx = append(guest.pending.rx, m)
+		xlog.Trace.Println("queue whois", fid)
+		restQueueWhois(ctx, fid)
 	} else if tid == fid {
 		if from.helloIsOK(m) {
 			from.via = m.AddrPort
@@ -321,11 +443,15 @@ func guestHelloOrWhoisAllVias(ctx context.Context, now int64) {
 	if now == 0 {
 		now = time.Now().UnixMicro()
 	}
-	for name, sub := range guest.via {
-		if sub == nil || !sub.via.IsValid() {
+	for name, x := range guest.via {
+		if x == nil {
+			xlog.Trace.Println("queue whois", name)
+			restQueueWhois(ctx, name)
+		} else if !x.via.IsValid() {
+			xlog.Trace.Println("re-ask whois", name, x)
 			restQueueWhois(ctx, name)
 		} else if hello := newGreeting(0); hello != nil {
-			hello.AddrPort = sub.via
+			hello.AddrPort = x.via
 			if !mp.Queue(ctx, guest.toVpnC, hello) {
 				break
 			}
@@ -333,123 +459,15 @@ func guestHelloOrWhoisAllVias(ctx context.Context, now int64) {
 	}
 }
 
-func guestDiscardPending(sub *Subscriber) {
-	guestMatchPendingRx(sub.Id, func(m *xnet.Msg) {
-		mp.Put(m)
-	})
-	guestMatchPendingTx(sub.Addr, func(m *xnet.Msg) {
-		mp.Put(m)
-	})
-}
-
-func guestMatchPendingRx(id Id, f func(*xnet.Msg)) {
-	var m *xnet.Msg
-	for i := 0; i < len(guest.pending.rx); {
-		m = guest.pending.rx[i]
-		_, from := ScanLabel(m.Data)
-		if id.Index() == from.Index() {
-			guest.pending.rx = slices.
-				Delete(guest.pending.rx, i, i+1)
-			f(m)
-		} else {
-			i += 1
-		}
-	}
-}
-
-func guestMatchPendingTx(addr netip.Addr, f func(*xnet.Msg)) {
-	for i := 0; i < len(guest.pending.tx); {
-		m := guest.pending.tx[i]
-		da, err := netpdu.TunPI(m.Data).ToWhom()
-		if err == nil && da.Compare(addr) == 0 {
-			guest.pending.tx = slices.
-				Delete(guest.pending.tx, i, i+1)
-			f(m)
-		} else {
-			i += 1
-		}
-	}
-}
-
-func guestPeerWith(ctx context.Context, sub *Subscriber) {
-	sub.label.fromMe = MakeLabel(MyId, sub.Id)
-	sub.label.toMe = MakeLabel(sub.Id, MyId)
-	i := sub.Id.Index()
-
-	// FIXME replace w/ MLKEM
-	if len(sub.CipherKeyDER) == 0 {
-		guestDiscardPending(sub)
-		xlog.Errata.Print("cipher key")
-		return
-	}
-	k, err := x509.ParsePKIXPublicKey(sub.CipherKeyDER)
-	if err != nil {
-		guestDiscardPending(sub)
-		xlog.Errata.Print(err)
-		return
-	}
-	ecdhpub, ok := k.(*ecdh.PublicKey)
-	if !ok {
-		guestDiscardPending(sub)
-		xlog.Errata.Printf("unsupported cipher key: %T", k)
-		return
-	}
-	shared, err := guest.priv.ECDH(ecdhpub)
-	if err != nil {
-		guestDiscardPending(sub)
-		xlog.Errata.Print(err)
-		return
-	}
-
-	if sub.cb, err = aes.NewCipher(shared); err != nil {
-		guestDiscardPending(sub)
-		xlog.Errata.Print(err)
-		return
-	}
-	if sub.gcm, err = cipher.NewGCMWithRandomNonce(sub.cb); err != nil {
-		guestDiscardPending(sub)
-		xlog.Errata.Print(err)
-		return
-	}
-	guest.addressed[sub.Addr] = sub
-	guest.indexed[i] = sub
-	// First see if there are msgs pending this whois response.
-	// If there are, then the received remote AddrPort is the
-	// preferred subscriber exchange.
-	if len(guest.pending.rx) > 0 {
-		guestMatchPendingRx(sub.Id, func(m *xnet.Msg) {
-			sub.via = m.AddrPort
-			guestRx(ctx, sub, m)
-		})
-	}
-	// If there weren't any pending rx msgs, use the best matching
-	// exchange or, in last resort, the registry.
-	if !sub.via.IsValid() {
-		for _, name := range sub.ExchangePrecedence {
-			if x, ok := guest.via[name]; ok {
-				if x.via.IsValid() {
-					sub.via = x.via
-					break
-				} else {
-					xlog.Trace.Println("unaddressed", name)
-				}
-			}
-		}
-		if !sub.via.IsValid() {
-			sub.via = guest.via[rest.reg.Subject.CommonName].via
-		}
-	}
-	if len(guest.pending.tx) > 0 {
-		guestMatchPendingTx(sub.Addr, func(m *xnet.Msg) {
-			guestTx(ctx, sub, m)
-		})
-	}
-}
-
 func guestRx(ctx context.Context, from *Subscriber, m *xnet.Msg) {
 	var err error
 
 	name := from.name()
+	if from.cb == nil || from.gcm == nil {
+		xlog.Trace.Println("dropped ", name, "w/o handshake")
+		mp.Put(m)
+		return
+	}
 	from.cb.Decrypt(m.Data[:aes.BlockSize], m.Data[:aes.BlockSize])
 	i := len(m.Data) - SizeofLabel
 	m.Data, err = from.gcm.Open(m.Data[:0], nil, m.Data[:i], m.Data[i:])
@@ -459,11 +477,13 @@ func guestRx(ctx context.Context, from *Subscriber, m *xnet.Msg) {
 		xlog.Trace.Print("rx ", name, netpdu.Mark, err)
 	} else {
 		xlog.Trace.Print("rx ", name, netpdu.Mark, PDU(m.Data))
+		from.via = m.AddrPort
 	}
 	mp.Put(m)
 }
 
 func guestStartTunneling(ctx context.Context) {
+	guest.newPeerC = make(chan *Subscriber, 1)
 	guest.fromTunC = make(chan *xnet.Msg, SizeofFromTunC)
 	guest.toTunC = make(chan *xnet.Msg, SizeofToTunC)
 	wg.Go(func() { guestTunRead(ctx) })
@@ -538,6 +558,12 @@ func guestTunWrite() {
 
 func guestTx(ctx context.Context, to *Subscriber, m *xnet.Msg) {
 	name := to.name()
+	if to.cb == nil || to.gcm == nil {
+		xlog.Trace.Println("dropped to", name,
+			"w/ incomplete handshake")
+		mp.Put(m)
+		return
+	}
 	pdu := PDU(m.Data)
 	// FIXME pdu.Proto(m.AddrPort.Addr().Is6())
 	if to.via.IsValid() {
