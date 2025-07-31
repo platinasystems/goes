@@ -184,7 +184,7 @@ RESTful registry administration.
 	if err != nil {
 		return err
 	}
-	if args = flag.Args(); len(args) == 0 {
+	if args = flag.CommandLine.Args(); len(args) == 0 {
 		return xerrors.Incomplete("subscriber")
 	}
 
@@ -220,7 +220,7 @@ Import registry certificate.
 	if err != nil {
 		return err
 	}
-	if args = flag.Args(); len(args) == 0 {
+	if args = flag.CommandLine.Args(); len(args) == 0 {
 		return xerrors.Incomplete("registry")
 	}
 
@@ -349,6 +349,7 @@ func RestShow(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
+	args = flag.CommandLine.Args()
 
 	if err = restInit(); err != nil {
 		return err
