@@ -11,7 +11,7 @@ import (
 )
 
 var features = map[string]any{
-	"netstat": net_tool.Netstat,
+	"go-netstat": net_tool.Netstat,
 }
 
 func init() { goes.Install(features) }

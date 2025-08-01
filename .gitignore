@@ -1,4 +1,5 @@
 *.orig
+*.patch
 *.pem
 *.rej
 *.so
@@ -9,18 +10,6 @@
 *#*#
 _cgo_.o
 kodata
-/*.patch
 /goes
-/ifconfig
-/log-style
-/netstat
-/pty
-/rawtty
-/route
-/textembedder
-/tlsx
-/tuntap
-/debian/debhelper-build-stamp
-/debian/files
-/debian/goes-completion.substvars
-/debian/goes-completion/
+/goes-*-*
+/go-*
