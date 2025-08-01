@@ -5,11 +5,10 @@ go 1.24.0
 require (
 	github.com/creack/pty v1.1.18
 	github.com/prometheus-community/pro-bing v0.3.0
-	golang.org/x/net v0.39.0
-	golang.org/x/sys v0.32.0
-	golang.org/x/term v0.31.0
+	golang.org/x/net v0.42.0
+	golang.org/x/sys v0.34.0
+	golang.org/x/term v0.33.0
 	golang/buildid v1.19.1+incompatible
-	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
