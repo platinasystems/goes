@@ -1,4 +1,4 @@
-// Copyright © 2023-2024 Platina Systems, Inc. All rights reserved.
+// Copyright © 2023-2025 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -7,11 +7,11 @@ package main
 
 import (
 	"github.com/platinasystems/goes/v2/pkg/goes"
-	"github.com/platinasystems/goes/v2/pkg/net-tool/netstat"
+	net_tool "github.com/platinasystems/goes/v2/pkg/net-tool"
 )
 
 var features = map[string]any{
-	"netstat": netstat.Feature,
+	"netstat": net_tool.Netstat,
 }
 
 func init() { goes.Install(features) }
