@@ -31,6 +31,8 @@ type MsgPool struct {
 	p   *sync.Pool
 }
 
+const BatchCap = 8
+
 func NewMsgPool(mtu int) *MsgPool {
 	return &MsgPool{
 		mtu: mtu,
@@ -71,4 +73,15 @@ func (mp *MsgPool) Queue(ctx context.Context, ch chan<- *Msg, m *Msg) bool {
 		return true
 	}
 	return false
+}
+
+// Copy pooled messages from socket to channel until socket is closed.
+func (mp *MsgPool) RecvService(ch chan<- *Msg, sock *net.UDPConn) error {
+	return mp.rcvsvc(ch, sock)
+}
+
+// Copy messages from channel to socket and return to pool until channel is
+// closed or write error.
+func (mp *MsgPool) SendService(sock *net.UDPConn, ch <-chan *Msg) error {
+	return mp.sndsvc(sock, ch)
 }

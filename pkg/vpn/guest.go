@@ -484,8 +484,8 @@ func guestRx(ctx context.Context, from *Subscriber, m *xnet.Msg) {
 
 func guestStartTunneling(ctx context.Context) {
 	guest.newPeerC = make(chan *Subscriber, 1)
-	guest.fromTunC = make(chan *xnet.Msg, SizeofFromTunC)
-	guest.toTunC = make(chan *xnet.Msg, SizeofToTunC)
+	guest.fromTunC = make(chan *xnet.Msg, FromTunCap)
+	guest.toTunC = make(chan *xnet.Msg, ToTunCap)
 	wg.Go(func() { guestTunRead(ctx) })
 	wg.Go(func() { guestTunWrite() })
 }

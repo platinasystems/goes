@@ -65,11 +65,11 @@ var Features = map[string]any{
 }
 
 const (
-	SizeofFromTunC = 1
-	SizeofFromVpnC = 1
+	FromTunCap = xnet.BatchCap
+	FromVpnCap = xnet.BatchCap
 
-	SizeofToTunC = 1
-	SizeofToVpnC = 1
+	ToTunCap = xnet.BatchCap
+	ToVpnCap = xnet.BatchCap
 )
 
 const (
