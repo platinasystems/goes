@@ -26,7 +26,9 @@ const AddressCommands = `
 	If necessary, create or just change address parameters.
 `
 
-const AddressParameters = ""
+const AddressParameters = `
+  -dad	Disable duplicate address detection (DAD).
+`
 
 func (nif *NetIf) Add(
 	ctx context.Context,
@@ -138,6 +140,21 @@ func (nif *NetIf) addr(
 	}
 
 	req = netlink.CatBytesAttr(req, ifaddr.IFA_LOCAL, addr.AsSlice())
+
+	var ifa_flags uint32
+
+	for len(args) > 0 {
+		if args[0] == "-dad" {
+			ifa_flags |= ifaddr.IFA_F_NODAD
+			args = args[1:]
+		} else {
+			break
+		}
+	}
+
+	if ifa_flags != 0 {
+		req = netlink.CatAttr(req, ifaddr.IFA_FLAGS, ifa_flags)
+	}
 
 	if err = nl.Request(req); err != nil {
 		return args, xerrors.Mark(err)
