@@ -68,7 +68,7 @@ const (
 	FromTunCap = xnet.BatchCap
 	FromVpnCap = xnet.BatchCap
 
-	ToTunCap = xnet.BatchCap
+	ToTunCap = xnet.BatchCap + 4
 	ToVpnCap = xnet.BatchCap
 )
 
