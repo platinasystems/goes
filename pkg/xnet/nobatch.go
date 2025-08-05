@@ -16,11 +16,30 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xos"
 )
 
-func (mp *MsgPool) rcvsvc(ch chan<- *Msg, sock *net.UDPConn) error {
+type ReadFromUDPAddrPorter interface {
+	ReadFromUDPAddrPort([]byte) (int, netip.AddrPort, error)
+}
+
+type WriteToUDPAddrPorter interface {
+	WriteToUDPAddrPort([]byte, netip.AddrPort) (int, error)
+}
+
+func (mp *MsgPool) rcvsvc(ch chan<- *Msg, conn net.PacketConn) error {
 	var (
 		err error
 		n   int
 	)
+	rcv := func(b []byte) (int, netip.AddrPort, error) {
+		var ap netip.AddrPort
+		n, addr, err := conn.ReadFrom(b)
+		if err == nil {
+			ap, err = netip.ParseAddrPort(addr.String())
+		}
+		return n, ap, err
+	}
+	if udp, ok := conn.(ReadFromUDPAddrPorter); ok {
+		rcv = udp.ReadFromUDPAddrPort
+	}
 
 	defer close(ch)
 
@@ -28,12 +47,15 @@ func (mp *MsgPool) rcvsvc(ch chan<- *Msg, sock *net.UDPConn) error {
 	defer mp.Put(m)
 
 	for {
-		n, m.AddrPort, err = sock.ReadFromUDPAddrPort(m.Data)
+		n, m.AddrPort, err = rcv(m.Data)
 		if err == nil {
-			if addr := m.AddrPort.Addr(); addr.Is4In6() {
-				addr = addr.Unmap()
-				port := m.AddrPort.Port()
-				m.AddrPort = netip.AddrPortFrom(addr, port)
+			if m.AddrPort.IsValid() {
+				if addr := m.AddrPort.Addr(); addr.Is4In6() {
+					addr = addr.Unmap()
+					port := m.AddrPort.Port()
+					m.AddrPort = netip.
+						AddrPortFrom(addr, port)
+				}
 			}
 			m.Data = m.Data[:n]
 			ch <- m
@@ -48,19 +70,19 @@ func (mp *MsgPool) rcvsvc(ch chan<- *Msg, sock *net.UDPConn) error {
 	}
 }
 
-func (mp *MsgPool) sndsvc(sock *net.UDPConn, ch <-chan *Msg) error {
-	var err error
+func (mp *MsgPool) sndsvc(conn net.PacketConn, ch <-chan *Msg) error {
+	snd := func(b []byte, ap netip.AddrPort) (int, error) {
+		addr := net.UDPAddrFromAddrPort(ap)
+		return conn.WriteTo(b, addr)
+	}
+	if udp, ok := conn.(WriteToUDPAddrPorter); ok {
+		snd = udp.WriteToUDPAddrPort
+	}
 
-	defer sock.Close()
+	defer conn.Close()
 
 	for m := range ch {
-		if !m.AddrPort.IsValid() {
-			return xerrors.Invalid("address")
-		} else if m.AddrPort.Port() == 0 {
-			return xerrors.Invalid("port")
-		} else {
-			_, err = sock.WriteToUDPAddrPort(m.Data, m.AddrPort)
-		}
+		_, err := snd(m.Data, m.AddrPort)
 		mp.Put(m)
 		if err != nil {
 			return xerrors.Suppress(err, net.ErrClosed)

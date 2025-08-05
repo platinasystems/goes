@@ -15,7 +15,6 @@ import (
 	"net/netip"
 	"os"
 	"os/signal"
-	"runtime"
 	"slices"
 	"time"
 
@@ -27,7 +26,6 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xnet"
 	"github.com/platinasystems/goes/v2/pkg/xnet/netpdu"
 	"github.com/platinasystems/goes/v2/pkg/xnet/netph"
-	"github.com/platinasystems/goes/v2/pkg/xos"
 	"github.com/platinasystems/goes/v2/pkg/xsignal"
 )
 
@@ -149,13 +147,6 @@ Forward ciphered packets between exchange and tunnel interface.
 		return err
 	}
 	defer guest.tun.Close()
-
-	// FIXME do we ever want non-blocking reads or rely on stdlib?
-	if false && runtime.NumCPU() == 1 {
-		if err = xos.SetNonblockFile(guest.tun, true); err != nil {
-			return err
-		}
-	}
 
 	nif, err := netif.Named(ctx, guest.tun.Name())
 	if err != nil {
@@ -406,6 +397,21 @@ func guestFromTun(ctx context.Context, m *xnet.Msg) {
 	if err != nil {
 		xlog.Errata.Println("dropped:", err)
 		mp.Put(m)
+	} else if !da.IsValid() {
+		xlog.Trace.Println("dropped: non-ip[6]")
+		mp.Put(m)
+	} else if m.AddrPort = netip.AddrPortFrom(da, 0); da.IsMulticast() {
+		xlog.Trace.Println("dropped: multicast", da)
+		mp.Put(m)
+	} else if da.Compare(guest.receipt.Prefix.Addr()) == 0 {
+		xlog.Trace.Println("loopback", da)
+		mp.Queue(ctx, guest.toTunC, m)
+	} else if guest.llu6.IsValid() && da.Compare(guest.llu6) == 0 {
+		xlog.Trace.Println("loopback", da)
+		mp.Queue(ctx, guest.toTunC, m)
+	} else if !vpnPrefix.Contains(da) {
+		xlog.Trace.Println(da, "out of", vpnPrefix)
+		mp.Put(m)
 	} else if to, ok := guest.addressed[da]; !ok {
 		xlog.Trace.Println("queue whois", da)
 		restQueueWhois(ctx, da)
@@ -486,74 +492,27 @@ func guestStartTunneling(ctx context.Context) {
 	guest.newPeerC = make(chan *Subscriber, 1)
 	guest.fromTunC = make(chan *xnet.Msg, FromTunCap)
 	guest.toTunC = make(chan *xnet.Msg, ToTunCap)
-	wg.Go(func() { guestTunRead(ctx) })
-	wg.Go(func() { guestTunWrite() })
-}
-
-func guestTunRead(ctx context.Context) {
-	name := guest.tun.Name()
-	xlog.Trace.Println("start", name, "read")
-	defer xlog.Trace.Println("stopped", name, "read")
-	defer close(guest.fromTunC)
-	m := mp.Get()
-	for {
-		m.Data = m.Data[:cap(m.Data)]
-		n, err := guest.tun.Read(m.Data)
+	name := guest.tun.Name() + " read service"
+	wg.Go(func() {
+		const kind = "read service"
+		xlog.Trace.Println("start", name, kind)
+		err := mp.ReadService(guest.fromTunC, guest.tun)
 		if err != nil {
-			if xos.IsBlocked(err) {
-				runtime.Gosched()
-			} else {
-				xlog.Errata.Print(err)
-				mp.Put(m)
-				break
-			}
-		}
-		m.Data = m.Data[:n]
-		da, err := netpdu.TunPI(m.Data).ToWhom()
-		if err != nil {
-			xlog.Trace.Println("dropped:", err)
-		} else if !da.IsValid() {
-			xlog.Trace.Println("dropped: non-ip[6]")
-		} else if m.AddrPort = netip.AddrPortFrom(da, 0); da.
-			IsMulticast() {
-			xlog.Trace.Println("dropped: multicast", da)
-		} else if da.Compare(guest.receipt.Prefix.Addr()) == 0 {
-			xlog.Trace.Println("loopback", da)
-			if mp.Queue(ctx, guest.toTunC, m) {
-				m = mp.Get()
-			} else {
-				break
-			}
-		} else if guest.llu6.IsValid() && da.Compare(guest.llu6) == 0 {
-			xlog.Trace.Println("loopback", da)
-			if mp.Queue(ctx, guest.toTunC, m) {
-				m = mp.Get()
-			} else {
-				break
-			}
-		} else if !vpnPrefix.Contains(da) {
-			xlog.Trace.Println(da, "out of", vpnPrefix)
-		} else if mp.Queue(ctx, guest.fromTunC, m) {
-			m = mp.Get()
+			xlog.Errata.Println("quit", name, kind, err)
 		} else {
-			break
+			xlog.Trace.Println("stopped", name, kind)
 		}
-	}
-}
-
-func guestTunWrite() {
-	name := guest.tun.Name()
-	defer guest.tun.Close()
-	xlog.Trace.Println("start", name, "write")
-	for m := range guest.toTunC {
-		_, err := guest.tun.Write(m.Data)
-		mp.Put(m)
+	})
+	wg.Go(func() {
+		const kind = "write service"
+		xlog.Trace.Println("start", name, kind)
+		err := mp.WriteService(guest.tun, guest.toTunC)
 		if err != nil {
-			xlog.Errata.Println("quit", name, "write:", err)
-			return
+			xlog.Errata.Println("quit", name, kind, err)
+		} else {
+			xlog.Trace.Println("stopped", name, kind)
 		}
-	}
-	xlog.Trace.Println("stopped", name, "write")
+	})
 }
 
 func guestTx(ctx context.Context, to *Subscriber, m *xnet.Msg) {

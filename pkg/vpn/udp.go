@@ -16,28 +16,30 @@ import (
 func startUDP(port uint16) (<-chan *xnet.Msg, chan<- *xnet.Msg, error) {
 	fromC := make(chan *xnet.Msg, FromVpnCap)
 	toC := make(chan *xnet.Msg, ToVpnCap)
-	sock, err := net.ListenUDP("udp", &net.UDPAddr{
+	conn, err := net.ListenUDP("udp", &net.UDPAddr{
 		Port: int(port),
 	})
 	if err != nil {
 		return nil, nil, err
 	}
 	wg.Go(func() {
-		xlog.Trace.Println("start receive service")
-		err := mp.RecvService(fromC, sock)
+		const kind = "receive service"
+		xlog.Trace.Println("start", kind)
+		err := mp.RecvService(fromC, conn)
 		if err != nil {
-			xlog.Errata.Println("quit receive service:", err)
+			xlog.Errata.Println("quit", kind, err)
 		} else {
-			xlog.Trace.Println("stopped receive service")
+			xlog.Trace.Println("stopped", kind)
 		}
 	})
 	wg.Go(func() {
-		xlog.Trace.Println("start send service")
-		err := mp.SendService(sock, toC)
+		const kind = "send service"
+		xlog.Trace.Println("start", kind)
+		err := mp.SendService(conn, toC)
 		if err != nil {
-			xlog.Errata.Println("quit send service:", err)
+			xlog.Errata.Println("quit", kind, err)
 		} else {
-			xlog.Trace.Println("stopped send service")
+			xlog.Trace.Println("stopped", kind)
 		}
 	})
 	return fromC, toC, err

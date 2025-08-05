@@ -6,9 +6,15 @@ package xnet
 
 import (
 	"context"
+	"errors"
+	"io"
 	"net"
 	"net/netip"
+	"runtime"
 	"sync"
+
+	"github.com/platinasystems/goes/v2/pkg/xerrors"
+	"github.com/platinasystems/goes/v2/pkg/xos"
 )
 
 var zap netip.AddrPort
@@ -75,13 +81,45 @@ func (mp *MsgPool) Queue(ctx context.Context, ch chan<- *Msg, m *Msg) bool {
 	return false
 }
 
+func (mp *MsgPool) ReadService(ch chan<- *Msg, r io.Reader) error {
+	m := mp.Get()
+	defer mp.Put(m)
+	for {
+		n, err := r.Read(m.Data)
+		if err == nil {
+			m.Data = m.Data[:n]
+			ch <- m
+			m = mp.Get()
+		} else if xos.IsBlocked(err) {
+			runtime.Gosched()
+		} else if errors.Is(err, net.ErrClosed) {
+			return nil
+		} else {
+			return err
+		}
+	}
+}
+
 // Copy pooled messages from socket to channel until socket is closed.
-func (mp *MsgPool) RecvService(ch chan<- *Msg, sock *net.UDPConn) error {
-	return mp.rcvsvc(ch, sock)
+func (mp *MsgPool) RecvService(ch chan<- *Msg, conn net.PacketConn) error {
+	return mp.rcvsvc(ch, conn)
 }
 
 // Copy messages from channel to socket and return to pool until channel is
 // closed or write error.
-func (mp *MsgPool) SendService(sock *net.UDPConn, ch <-chan *Msg) error {
-	return mp.sndsvc(sock, ch)
+func (mp *MsgPool) SendService(conn net.PacketConn, ch <-chan *Msg) error {
+	return mp.sndsvc(conn, ch)
+}
+
+// Copy messages from channel and return to pool until channel.
+func (mp *MsgPool) WriteService(w io.WriteCloser, ch <-chan *Msg) error {
+	defer w.Close()
+	for m := range ch {
+		_, err := w.Write(m.Data)
+		mp.Put(m)
+		if err != nil {
+			return xerrors.Suppress(err, net.ErrClosed)
+		}
+	}
+	return nil
 }

@@ -19,9 +19,9 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-func (mp *MsgPool) rcvsvc(ch chan<- *Msg, sock *net.UDPConn) error {
+func (mp *MsgPool) rcvsvc(ch chan<- *Msg, conn net.PacketConn) error {
 	defer close(ch)
-	xsock := ipv4.NewPacketConn(sock)
+	xconn := ipv4.NewPacketConn(conn)
 	msgs := make([]*Msg, BatchCap, BatchCap)
 	batch := make([]ipv4.Message, BatchCap, BatchCap)
 	for i := range msgs {
@@ -36,7 +36,7 @@ func (mp *MsgPool) rcvsvc(ch chan<- *Msg, sock *net.UDPConn) error {
 		flags = unix.MSG_DONTWAIT
 	}
 	for {
-		n, err := xsock.ReadBatch(batch, flags)
+		n, err := xconn.ReadBatch(batch, flags)
 		if err != nil {
 			if xos.IsBlocked(err) {
 				runtime.Gosched()
@@ -69,10 +69,10 @@ func (mp *MsgPool) rcvsvc(ch chan<- *Msg, sock *net.UDPConn) error {
 	}
 }
 
-func (mp *MsgPool) sndsvc(sock *net.UDPConn, ch <-chan *Msg) error {
-	defer sock.Close()
+func (mp *MsgPool) sndsvc(conn net.PacketConn, ch <-chan *Msg) error {
+	xconn := ipv4.NewPacketConn(conn)
+	defer xconn.Close()
 
-	xsock := ipv4.NewPacketConn(sock)
 	msgs := make([]*Msg, BatchCap, BatchCap)
 	batch := make([]ipv4.Message, BatchCap, BatchCap)
 	for i := range batch {
@@ -97,14 +97,17 @@ func (mp *MsgPool) sndsvc(sock *net.UDPConn, ch <-chan *Msg) error {
 					return nil
 				}
 				msgs[i] = m
-				batch[i].Addr = netip2UDPAddr(m.AddrPort)
 				batch[i].Buffers[0] = m.Data
+				if m.AddrPort.IsValid() {
+					batch[i].Addr = net.
+						UDPAddrFromAddrPort(m.AddrPort)
+				}
 			default:
 				break selection
 			}
 		}
 		for tn := 0; tn < i; {
-			n, err := xsock.WriteBatch(batch[tn:i], 0)
+			n, err := xconn.WriteBatch(batch[tn:i], 0)
 			if err != nil {
 				return xerrors.Suppress(err, net.ErrClosed)
 			}
@@ -115,18 +118,4 @@ func (mp *MsgPool) sndsvc(sock *net.UDPConn, ch <-chan *Msg) error {
 			msgs[i] = nil
 		}
 	}
-}
-
-func netip2UDPAddr(ap netip.AddrPort) *net.UDPAddr {
-	var ip net.IP
-	var zone string
-	if a := ap.Addr(); a.Is4() {
-		a4 := a.As4()
-		ip = net.IP(a4[:])
-	} else {
-		a16 := a.As16()
-		ip = net.IP(a16[:])
-		// FIXME on guests, set zone to interface name (e.g. "tun0")
-	}
-	return &net.UDPAddr{IP: ip, Port: int(ap.Port()), Zone: zone}
 }
