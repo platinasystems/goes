@@ -393,24 +393,25 @@ func guestFound(ctx context.Context, sub *Subscriber) {
 }
 
 func guestFromTun(ctx context.Context, m *xnet.Msg) {
-	da, err := netpdu.TunPI(m.Data).ToWhom()
+	tunpi := netpdu.TunPI(m.Data)
+	da, err := tunpi.ToWhom()
 	if err != nil {
 		xlog.Errata.Println("dropped:", err)
 		mp.Put(m)
 	} else if !da.IsValid() {
-		xlog.Trace.Println("dropped: non-ip[6]")
+		xlog.Trace.Println("dropped", tunpi)
 		mp.Put(m)
 	} else if m.AddrPort = netip.AddrPortFrom(da, 0); da.IsMulticast() {
-		xlog.Trace.Println("dropped: multicast", da)
+		xlog.Trace.Println("dropped", tunpi)
 		mp.Put(m)
 	} else if da.Compare(guest.receipt.Prefix.Addr()) == 0 {
-		xlog.Trace.Println("loopback", da)
+		xlog.Trace.Println("loopback", tunpi)
 		mp.Queue(ctx, guest.toTunC, m)
 	} else if guest.llu6.IsValid() && da.Compare(guest.llu6) == 0 {
-		xlog.Trace.Println("loopback", da)
+		xlog.Trace.Println("loopback", tunpi)
 		mp.Queue(ctx, guest.toTunC, m)
 	} else if !vpnPrefix.Contains(da) {
-		xlog.Trace.Println(da, "out of", vpnPrefix)
+		xlog.Trace.Println("dropped", tunpi)
 		mp.Put(m)
 	} else if to, ok := guest.addressed[da]; !ok {
 		xlog.Trace.Println("queue whois", da)
@@ -419,8 +420,18 @@ func guestFromTun(ctx context.Context, m *xnet.Msg) {
 	} else if to.gcm == nil {
 		xlog.Trace.Println("pending invite", da)
 		guest.pending.tx = append(guest.pending.tx, m)
+	} else if !to.via.IsValid() {
+		xlog.Trace.Println("dropped", to.name(), netpdu.Mark, tunpi)
+		mp.Put(m)
 	} else {
-		guestTx(ctx, to, m)
+		vpn := PDU(m.Data)
+		// FIXME vpn.Proto(m.AddrPort.Addr().Is6())
+		xlog.Trace.Print("tx ", to.name(), netpdu.Mark, vpn)
+		m.Data = to.gcm.Seal(m.Data[:0], nil, m.Data, to.label.fromMe)
+		to.cb.Encrypt(m.Data[:aes.BlockSize], m.Data[:aes.BlockSize])
+		m.Data = append(m.Data, to.label.fromMe...)
+		m.AddrPort = to.via
+		mp.Queue(ctx, guest.toVpnC, m)
 	}
 }
 
@@ -513,27 +524,4 @@ func guestStartTunneling(ctx context.Context) {
 			xlog.Trace.Println("stopped", name, kind)
 		}
 	})
-}
-
-func guestTx(ctx context.Context, to *Subscriber, m *xnet.Msg) {
-	name := to.name()
-	if to.cb == nil || to.gcm == nil {
-		xlog.Trace.Println("dropped to", name,
-			"w/ incomplete handshake")
-		mp.Put(m)
-		return
-	}
-	pdu := PDU(m.Data)
-	// FIXME pdu.Proto(m.AddrPort.Addr().Is6())
-	if to.via.IsValid() {
-		xlog.Trace.Print("tx ", name, netpdu.Mark, pdu)
-		m.Data = to.gcm.Seal(m.Data[:0], nil, m.Data, to.label.fromMe)
-		to.cb.Encrypt(m.Data[:aes.BlockSize], m.Data[:aes.BlockSize])
-		m.Data = append(m.Data, to.label.fromMe...)
-		m.AddrPort = to.via
-		mp.Queue(ctx, guest.toVpnC, m)
-	} else {
-		xlog.Trace.Print("dropped w/o path to ", name, netpdu.Mark, pdu)
-		mp.Put(m)
-	}
 }
