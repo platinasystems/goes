@@ -27,41 +27,47 @@ import (
 
 var Features = map[string]any{
 	"new": map[string]any{
-		"vpn": map[string]any{
-			"certificate": CreateCertificate,
-			"signature":   NewEd25519,
-		},
+		"vpn": NewFeatures,
 	},
 	"show": map[string]any{
-		"vpn": map[string]any{
-			"address":     RestShow,
-			"admins":      RestShow,
-			"certificate": ShowCertificate,
-			"exchanges":   RestShow,
-			"guests":      RestShow,
-			"hosts":       RestShow,
-			"pending":     RestShow,
-			"prefix":      RestShow,
-			"signature":   ShowSignature,
-			"start":       RestShow,
-			"status":      RestShow,
-			"subscriber":  RestShow,
-			"vcs":         RestShow,
-		},
+		"vpn": ShowFeatures,
 	},
-	"vpn": map[string]any{
-		"approve":     RestAdmin,
-		"certify":     RestCertify,
-		"deny":        RestAdmin,
-		"exchange":    Exchange,
-		"get":         RestGet,
-		"guest":       Guest,
-		"nc":          NetCat,
-		"reload":      RestReload,
-		"registry":    Registry,
-		"subscribe":   RestSubscribe,
-		"unsubscribe": RestAdmin,
-	},
+	"vpn": MainFeatures,
+}
+
+var MainFeatures = map[string]any{
+	"approve":     RestAdmin,
+	"certify":     RestCertify,
+	"deny":        RestAdmin,
+	"exchange":    Exchange,
+	"get":         RestGet,
+	"guest":       Guest,
+	"nc":          NetCat,
+	"reload":      RestReload,
+	"registry":    Registry,
+	"subscribe":   RestSubscribe,
+	"unsubscribe": RestAdmin,
+}
+
+var NewFeatures = map[string]any{
+	"certificate": CreateCertificate,
+	"signature":   NewEd25519,
+}
+
+var ShowFeatures = map[string]any{
+	"address":     RestShow,
+	"admins":      RestShow,
+	"certificate": ShowCertificate,
+	"exchanges":   RestShow,
+	"guests":      RestShow,
+	"hosts":       RestShow,
+	"pending":     RestShow,
+	"prefix":      RestShow,
+	"signature":   ShowSignature,
+	"start":       RestShow,
+	"status":      RestShow,
+	"subscriber":  RestShow,
+	"vcs":         RestShow,
 }
 
 const (
