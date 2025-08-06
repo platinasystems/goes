@@ -7,7 +7,6 @@ package xprogram
 import (
 	"golang/buildid"
 	"os"
-	"path"
 	"path/filepath"
 	"regexp"
 	"runtime"
@@ -145,13 +144,16 @@ func MainModule() *debug.Module {
 }
 
 var MainName = sync.OnceValue(func() string {
+	const major = "^v[1-9][0-9]*$"
 	bi := BuildInfo()
 	if bi == nil {
 		return filepath.Base(Path())
 	}
-	name := path.Base(bi.Path)
-	if t, _ := regexp.MatchString("v[0-9]*", name); t {
-		name = path.Base(path.Dir(bi.Path))
+	name := filepath.Base(bi.Path)
+	if t, err := regexp.MatchString(major, name); err != nil {
+		name = err.Error()
+	} else if t {
+		name = filepath.Base(filepath.Dir(bi.Path))
 	}
 	return name
 })
