@@ -57,7 +57,7 @@ Exchange ciphered packets between guests.
 		return err
 	}
 
-	exchange.fromVpnC, exchange.toVpnC, err = startUDP(vpnExchangePort)
+	exchange.fromVpnC, exchange.toVpnC, err = startUDP(ctx, vpnExchangePort)
 	if err != nil {
 		return err
 	}

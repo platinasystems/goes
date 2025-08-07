@@ -7,6 +7,7 @@
 package xnet
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net"
@@ -19,8 +20,15 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-func (mp *MsgPool) rcvsvc(ch chan<- *Msg, conn net.PacketConn) error {
+const CanBatch = true
+
+// Copy to pooled messages from socket with “recvmmsg” then send to channel
+// until context is done; then close channel before returning.
+func (mp *MsgPool) RecvBatchService(
+	cts context.Context, ch chan<- *Msg, conn net.PacketConn,
+) error {
 	defer close(ch)
+
 	xconn := ipv4.NewPacketConn(conn)
 	msgs := make([]*Msg, BatchCap, BatchCap)
 	batch := make([]ipv4.Message, BatchCap, BatchCap)
@@ -29,13 +37,15 @@ func (mp *MsgPool) rcvsvc(ch chan<- *Msg, conn net.PacketConn) error {
 		batch[i].Buffers = make([][]byte, 1)
 		batch[i].Buffers[0] = msgs[i].Data
 	}
+
 	var flags int
 	if runtime.NumCPU() > 1 {
 		flags = unix.MSG_WAITFORONE
 	} else {
 		flags = unix.MSG_DONTWAIT
 	}
-	for {
+
+	for ctx.Err() == nil {
 		n, err := xconn.ReadBatch(batch, flags)
 		if err != nil {
 			if xos.IsBlocked(err) {
@@ -69,9 +79,12 @@ func (mp *MsgPool) rcvsvc(ch chan<- *Msg, conn net.PacketConn) error {
 	}
 }
 
-func (mp *MsgPool) sndsvc(conn net.PacketConn, ch <-chan *Msg) error {
+// Copy messages from channel to socket with “sendmmsg” and return to pool
+// until channel is closed; then close socket before returning.
+func (mp *MsgPool) SendBatchService(conn net.PacketConn, ch <-chan *Msg) error {
+	defer conn.Close()
+
 	xconn := ipv4.NewPacketConn(conn)
-	defer xconn.Close()
 
 	msgs := make([]*Msg, BatchCap, BatchCap)
 	batch := make([]ipv4.Message, BatchCap, BatchCap)

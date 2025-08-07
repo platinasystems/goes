@@ -133,7 +133,7 @@ Forward ciphered packets between exchange and tunnel interface.
 		return err
 	}
 
-	guest.fromVpnC, guest.toVpnC, err = startUDP(0)
+	guest.fromVpnC, guest.toVpnC, err = startUDP(ctx, 0)
 	if err != nil {
 		return err
 	}

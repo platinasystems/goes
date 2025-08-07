@@ -5,6 +5,7 @@
 package vpn
 
 import (
+	"context"
 	"net"
 
 	"github.com/platinasystems/goes/v2/pkg/xlog"
@@ -13,7 +14,9 @@ import (
 
 // Open socket, make channels and start packet read/write routines.
 // If not error, close the returned write channel when done.
-func startUDP(port uint16) (<-chan *xnet.Msg, chan<- *xnet.Msg, error) {
+func startUDP(ctx context.Context, port uint16) (
+	<-chan *xnet.Msg, chan<- *xnet.Msg, error,
+) {
 	fromC := make(chan *xnet.Msg, FromVpnCap)
 	toC := make(chan *xnet.Msg, ToVpnCap)
 	conn, err := net.ListenUDP("udp", &net.UDPAddr{
@@ -25,7 +28,7 @@ func startUDP(port uint16) (<-chan *xnet.Msg, chan<- *xnet.Msg, error) {
 	wg.Go(func() {
 		const kind = "receive service"
 		xlog.Trace.Println("start", kind)
-		err := mp.RecvService(fromC, conn)
+		err := mp.RecvBatchService(ctx, fromC, conn)
 		if err != nil {
 			xlog.Errata.Println("quit", kind, err)
 		} else {
@@ -35,12 +38,13 @@ func startUDP(port uint16) (<-chan *xnet.Msg, chan<- *xnet.Msg, error) {
 	wg.Go(func() {
 		const kind = "send service"
 		xlog.Trace.Println("start", kind)
-		err := mp.SendService(conn, toC)
+		err := mp.SendBatchService(conn, toC)
 		if err != nil {
 			xlog.Errata.Println("quit", kind, err)
 		} else {
 			xlog.Trace.Println("stopped", kind)
 		}
+		conn.Close()
 	})
 	return fromC, toC, err
 }

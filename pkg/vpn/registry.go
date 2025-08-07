@@ -186,7 +186,7 @@ A RESTful WWW server and packet exchange.
 
 	ctx, cancel := context.WithCancel(ctx)
 
-	reg.fromVpnC, reg.toVpnC, err = startUDP(vpnExchangePort)
+	reg.fromVpnC, reg.toVpnC, err = startUDP(ctx, vpnExchangePort)
 	if err != nil {
 		return err
 	}
