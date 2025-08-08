@@ -25,7 +25,7 @@ const CanBatch = true
 // Copy to pooled messages from socket with “recvmmsg” then send to channel
 // until context is done; then close channel before returning.
 func (mp *MsgPool) RecvBatchService(
-	cts context.Context, ch chan<- *Msg, conn net.PacketConn,
+	ctx context.Context, ch chan<- *Msg, conn net.PacketConn,
 ) error {
 	defer close(ch)
 
@@ -77,6 +77,7 @@ func (mp *MsgPool) RecvBatchService(
 			}
 		}
 	}
+	return nil
 }
 
 // Copy messages from channel to socket with “sendmmsg” and return to pool
