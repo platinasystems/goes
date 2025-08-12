@@ -20,6 +20,10 @@ import (
 
 var zap netip.AddrPort
 
+type AddrPorter interface {
+	AddrPort() netip.AddrPort
+}
+
 type RemoteAddrer interface {
 	RemoteAddr() net.Addr
 }
@@ -46,8 +50,6 @@ type MsgPool struct {
 	mtu int
 	p   *sync.Pool
 }
-
-const BatchCap = 8
 
 func NewMsgPool(mtu int) *MsgPool {
 	return &MsgPool{
@@ -180,8 +182,8 @@ func (mp *MsgPool) RecvService(
 	return nil
 }
 
-// Copy messages from channel to socket and return to pool
-// until channel is closed; then close socket before returning.
+// Copy messages from channel to socket and return to pool until the channel is
+// closed.
 func (mp *MsgPool) SendService(conn net.PacketConn, ch <-chan *Msg) error {
 	var err error
 

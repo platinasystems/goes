@@ -106,7 +106,7 @@ func benchmarkMsgService(
 				b.Error(err)
 				return
 			}
-			// sconn Closed w/in sndsvc
+			defer sconn.Close()
 
 			rch := make(chan *Msg, depth)
 			sch := make(chan *Msg, depth)

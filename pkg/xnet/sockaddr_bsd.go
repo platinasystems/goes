@@ -35,6 +35,20 @@ var (
 	SAPointerSADataLink = SAPointer[SADataLink]
 )
 
+func (b SAInBuf) Family() int {
+	return int(b[1])
+}
+
+func (b SAInBuf) SetINET() {
+	b[0] = byte(SizeofSockaddrInet4)
+	b[1] = unix.AF_INET
+}
+
+func (b SAInBuf) SetINET6() {
+	b[0] = byte(SizeofSockaddrInet6)
+	b[1] = unix.AF_INET6
+}
+
 // sockaddr_in
 type SAIn struct{ unix.RawSockaddrInet4 }
 
