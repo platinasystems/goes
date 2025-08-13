@@ -2,7 +2,7 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-package net_tool
+package www_echo
 
 import (
 	"context"
@@ -18,14 +18,19 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xsync"
 )
 
-const WWWEchoPort = ":8080"
+const DefaultPort = ":8080"
 
-func WWWEcho(ctx context.Context, args []string) error {
+var Features = map[string]any{
+	"ping":   Ping,
+	"server": Server,
+}
+
+func Server(ctx context.Context, args []string) error {
 	xflag.TemplateUsage(`
 usage: {{.Name}} [<address>:<port>]
 WWW echo server that responds with path of http request.
 
-Default: “` + WWWEchoPort + `”
+Default: “` + DefaultPort + `”
 `)
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
@@ -34,7 +39,7 @@ Default: “` + WWWEchoPort + `”
 
 	args = flag.Args()
 
-	a := WWWEchoPort
+	a := DefaultPort
 	if len(args) > 0 {
 		a = args[0]
 	}
@@ -61,7 +66,7 @@ Default: “` + WWWEchoPort + `”
 	return err
 }
 
-func WWWPing(ctx context.Context, args []string) error {
+func Ping(ctx context.Context, args []string) error {
 	const nl = "\n"
 
 	xflag.TemplateUsage(`
@@ -73,7 +78,7 @@ Host:
   - <ip4>:<port>
   - <name>:<port>
 
-Default: “127.0.0.1` + WWWEchoPort + `”
+Default: “127.0.0.1` + DefaultPort + `”
 `)
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
@@ -82,7 +87,7 @@ Default: “127.0.0.1` + WWWEchoPort + `”
 
 	args = flag.Args()
 
-	url := fmt.Sprint("http://127.0.0.1", WWWEchoPort, "/hello")
+	url := fmt.Sprint("http://127.0.0.1", DefaultPort, "/hello")
 	if len(args) > 0 {
 		url = fmt.Sprint("http://", args[0], "/hello")
 	}

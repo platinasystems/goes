@@ -2,7 +2,7 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-package net_tool
+package udp_echo
 
 import (
 	"context"
@@ -22,12 +22,17 @@ import (
 )
 
 const (
-	UDPEchoPackets = 1024
-	UDPEchoPort    = 7
-	UDPEchoWindow  = 4
+	DefaultPort     = 7
+	PacketWindow    = 4
+	ExpectedPackets = 1024
 )
 
-func UDPEcho(ctx context.Context, args []string) error {
+var Features = map[string]any{
+	"ping":   Ping,
+	"server": Server,
+}
+
+func Server(ctx context.Context, args []string) error {
 	var udpa *net.UDPAddr
 
 	xflag.TemplateUsage(`
@@ -63,7 +68,7 @@ UDP Echo server. (default listen “address:port”: “:7”)
 	return nil
 }
 
-func UDPPing(ctx context.Context, args []string) error {
+func Ping(ctx context.Context, args []string) error {
 	xflag.TemplateUsage(`
 usage: {{.Name}} [host]
 Ping host with sequenced packets.
@@ -91,7 +96,7 @@ Default: 127.0.0.1:7
 		addr = args[0]
 	}
 
-	aps, err := xnet.ResolveAddrPort(ctx, nil, addr, UDPEchoPort)
+	aps, err := xnet.ResolveAddrPort(ctx, nil, addr, DefaultPort)
 	if err != nil {
 		return err
 	}
@@ -144,16 +149,16 @@ Default: 127.0.0.1:7
 			if seq <= acked {
 				continue
 			} else if seq == acked+1 {
-				if acked = seq; acked == UDPEchoPackets {
+				if acked = seq; acked == ExpectedPackets {
 					break
 				}
-				win = UDPEchoWindow - (next - acked) + 1
+				win = PacketWindow - (next - acked) + 1
 			} else {
 				retx += 1
 				next = acked + 1
 			}
 		}
-		for i := 0; i < win && next <= UDPEchoPackets; i++ {
+		for i := 0; i < win && next <= ExpectedPackets; i++ {
 			binary.BigEndian.PutUint64(pg, uint64(next))
 			if _, err = c.Write(pg[:8]); err != nil {
 				return err
@@ -162,7 +167,7 @@ Default: 127.0.0.1:7
 		}
 	}
 	fmt.Print(retx, " retransmits, ",
-		UDPEchoPackets/time.Now().Sub(start).Seconds(), "pps\n")
+		ExpectedPackets/time.Now().Sub(start).Seconds(), "pps\n")
 	return ctx.Err()
 }
 

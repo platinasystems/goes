@@ -4,7 +4,11 @@
 
 package net_tool
 
-import "github.com/platinasystems/goes/v2/pkg/net-tool/route"
+import (
+	"github.com/platinasystems/goes/v2/pkg/net-tool/route"
+	udp_echo "github.com/platinasystems/goes/v2/pkg/net-tool/udp-echo"
+	www_echo "github.com/platinasystems/goes/v2/pkg/net-tool/www-echo"
+)
 
 // Features mapped by name that emulate Unix net-tools.
 var Features = map[string]any{
@@ -14,8 +18,6 @@ var Features = map[string]any{
 	"nslookup": Nslookup,
 	"ping":     ICMPPing,
 	"route":    route.Features,
-	"udp-echo": UDPEcho,
-	"udp-ping": UDPPing,
-	"www-echo": WWWEcho,
-	"www-ping": WWWPing,
+	"udp-echo": udp_echo.Features,
+	"www-echo": www_echo.Features,
 }
