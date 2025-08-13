@@ -19,7 +19,7 @@ spec:
 apiVersion: v1
 kind: Secret
 metadata:
-  name: vpn-registry
+  name: registry
 type: Opaque
 stringData:
   sig.pk8: |
@@ -30,7 +30,7 @@ stringData:
 apiVersion: v1
 kind: Secret
 metadata:
-  name: vpn-exchange0
+  name: exchange0
 type: Opaque
 stringData:
   sig.pk8: |
@@ -41,7 +41,7 @@ stringData:
 apiVersion: v1
 kind: Secret
 metadata:
-  name: vpn-exchange1
+  name: exchange1
 type: Opaque
 stringData:
   sig.pk8: |
@@ -52,7 +52,7 @@ stringData:
 apiVersion: v1
 kind: Secret
 metadata:
-  name: vpn-exchange2
+  name: exchange2
 type: Opaque
 stringData:
   sig.pk8: |
@@ -63,7 +63,7 @@ stringData:
 apiVersion: v1
 kind: Secret
 metadata:
-  name: vpn-hosta
+  name: hosta
 type: Opaque
 stringData:
   sig.pk8: |
@@ -74,7 +74,7 @@ stringData:
 apiVersion: v1
 kind: Secret
 metadata:
-  name: vpn-hostb
+  name: hostb
 type: Opaque
 stringData:
   sig.pk8: |
@@ -85,7 +85,7 @@ stringData:
 apiVersion: v1
 kind: Secret
 metadata:
-  name: vpn-hostc
+  name: hostc
 type: Opaque
 stringData:
   sig.pk8: |
@@ -194,7 +194,7 @@ data:
 apiVersion: v1
 kind: Pod
 metadata:
-  name: vpn-registry
+  name: registry
   labels:
     name: vpn
 spec:
@@ -202,12 +202,11 @@ spec:
   hostname: registry
   subdomain: vpn
   containers:
-  - name: goes
+  - name: vpn
     imagePullPolicy: IfNotPresent
-    image: ko://github.com/platinasystems/goes/v2
+    image: ko://github.com/platinasystems/goes/v2/examples/go-vpn
     args:
     - "start"
-    - "vpn"
     - "registry"
     - "-v"
     - "-trace"
@@ -218,16 +217,16 @@ spec:
       containerPort: 8003
     volumeMounts:
     - name: config
-      mountPath: "/etc/goes/vpn"
+      mountPath: "/etc/go-vpn"
       readOnly: true
     - name: state
-      mountPath: "/var/lib/goes/vpn"
+      mountPath: "/var/lib/go-vpn"
   volumes:
   - name: config
     projected:
       sources:
       - secret:
-          name: vpn-registry
+          name: registry
       - configMap:
           name: vpn
   - name: state
@@ -238,7 +237,7 @@ spec:
 apiVersion: v1
 kind: Pod
 metadata:
-  name: vpn-exchange0
+  name: exchange0
   labels:
     name: vpn
 spec:
@@ -246,12 +245,11 @@ spec:
   hostname: exchange0
   subdomain: vpn
   containers:
-  - name: goes
+  - name: vpn
     imagePullPolicy: IfNotPresent
-    image: ko://github.com/platinasystems/goes/v2
+    image: ko://github.com/platinasystems/goes/v2/examples/go-vpn
     args:
     - "start"
-    - "vpn"
     - "exchange"
     - "-exchange-port"
     - "8030"
@@ -262,21 +260,21 @@ spec:
       containerPort: 8030
     volumeMounts:
     - name: config
-      mountPath: "/etc/goes/vpn"
+      mountPath: "/etc/go-vpn"
       readOnly: true
   volumes:
   - name: config
     projected:
       sources:
       - secret:
-          name: vpn-exchange0
+          name: exchange0
       - configMap:
           name: vpn
 ---
 apiVersion: v1
 kind: Pod
 metadata:
-  name: vpn-hosta
+  name: hosta
   labels:
     name: vpn
 spec:
@@ -287,12 +285,11 @@ spec:
     runAsUser: 0
     runAsGroup: 0
   containers:
-  - name: goes
+  - name: vpn
     imagePullPolicy: IfNotPresent
-    image: ko://github.com/platinasystems/goes/v2
+    image: ko://github.com/platinasystems/goes/v2/examples/go-vpn
     args:
     - "start"
-    - "vpn"
     - "guest"
     - "-v"
     - "-trace"
@@ -304,21 +301,21 @@ spec:
       privileged: true
     volumeMounts:
     - name: config
-      mountPath: "/etc/goes/vpn"
+      mountPath: "/etc/go-vpn"
       readOnly: true
   volumes:
   - name: config
     projected:
       sources:
       - secret:
-          name: vpn-hosta
+          name: hosta
       - configMap:
           name: vpn
 ---
 apiVersion: v1
 kind: Pod
 metadata:
-  name: vpn-hostb
+  name: hostb
   labels:
     name: vpn
 spec:
@@ -329,12 +326,11 @@ spec:
     runAsUser: 0
     runAsGroup: 0
   containers:
-  - name: goes
+  - name: vpn
     imagePullPolicy: IfNotPresent
-    image: ko://github.com/platinasystems/goes/v2
+    image: ko://github.com/platinasystems/goes/v2/examples/go-vpn
     args:
     - "start"
-    - "vpn"
     - "guest"
     - "-v"
     - "-trace"
@@ -346,21 +342,21 @@ spec:
       privileged: true
     volumeMounts:
     - name: config
-      mountPath: "/etc/goes/vpn"
+      mountPath: "/etc/go-vpn"
       readOnly: true
   volumes:
   - name: config
     projected:
       sources:
       - secret:
-          name: vpn-hostb
+          name: hostb
       - configMap:
           name: vpn
 ---
 apiVersion: v1
 kind: Pod
 metadata:
-  name: vpn-hostc
+  name: hostc
   labels:
     name: vpn
 spec:
@@ -371,12 +367,11 @@ spec:
     runAsUser: 0
     runAsGroup: 0
   containers:
-  - name: goes
+  - name: vpn
     imagePullPolicy: IfNotPresent
-    image: ko://github.com/platinasystems/goes/v2
+    image: ko://github.com/platinasystems/goes/v2/examples/go-vpn
     args:
     - "start"
-    - "vpn"
     - "guest"
     - "-v"
     - "-trace"
@@ -388,14 +383,14 @@ spec:
       privileged: true
     volumeMounts:
     - name: config
-      mountPath: "/etc/goes/vpn"
+      mountPath: "/etc/go-vpn"
       readOnly: true
   volumes:
   - name: config
     projected:
       sources:
       - secret:
-          name: vpn-hostc
+          name: hostc
       - configMap:
           name: vpn
 ---
