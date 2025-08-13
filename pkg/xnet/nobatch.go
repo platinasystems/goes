@@ -11,6 +11,7 @@ import (
 	"net"
 )
 
+const BatchCap = 1
 const CanBatch = false
 
 // This GOOS doesn't have “recvmmsg” so RecvBatchService calls
