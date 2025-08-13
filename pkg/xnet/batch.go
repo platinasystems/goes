@@ -135,7 +135,7 @@ func (mp *MsgPool) RecvBatchService(
 }
 
 func RecvMMsg(sock uintptr, hs []MMsghdr, flags int) (int, error) {
-	const trap = syscall.SYS_RECVMMSG
+	const trap = unix.SYS_RECVMMSG
 	var err error
 	hsp := uintptr(unsafe.Pointer(&hs[0]))
 	hsn := uintptr(len(hs))
@@ -208,7 +208,7 @@ func (mp *MsgPool) SendBatchService(conn syscall.Conn, ch <-chan *Msg) error {
 }
 
 func SendMMsg(sock uintptr, hs []MMsghdr, flags int) (int, error) {
-	const trap = syscall.SYS_SENDMMSG
+	const trap = unix.SYS_SENDMMSG
 	var err error
 	hsp := uintptr(unsafe.Pointer(&hs[0]))
 	hsn := uintptr(len(hs))
