@@ -73,7 +73,7 @@ func ResolveAddrPort(
 		port = uint16(u64)
 		s = s[:lastColon]
 	}
-	ips, err := r.LookupNetIP(ctx, "ip", s[:lastColon])
+	ips, err := r.LookupNetIP(ctx, "ip", s)
 	if err != nil {
 		return
 	}
