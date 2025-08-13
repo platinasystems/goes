@@ -193,7 +193,7 @@ func (nrt *netrt) Format(w fmt.State, verb rune) {
 		return
 	}
 	fmt.Fprintln(w, name)
-	fmt.Fprintf(w, "%11s: <%s>\n", "flags", xnet.IFFNames(nrt.flags))
+	fmt.Fprintf(w, "%11s: <%#x>\n", "flags", nrt.flags)
 	fmt.Fprintf(w, "%11s: ", "expire")
 	if nrt.expire == 0 {
 		fmt.Fprint(w, 0, "\n")
