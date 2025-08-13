@@ -43,6 +43,7 @@ var MainFeatures = map[string]any{
 	"get":         RestGet,
 	"guest":       Guest,
 	"nc":          NetCat,
+	"ping":        Ping,
 	"reload":      RestReload,
 	"registry":    Registry,
 	"subscribe":   RestSubscribe,
