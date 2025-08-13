@@ -21,7 +21,7 @@ const (
 type SAInBuf []byte
 
 func (b SAInBuf) Decode() (ap netip.AddrPort, id uint32) {
-	port := Uint16(b[2:4])
+	port := ByteOrder.Uint16(b[2:4])
 	switch b.Family() {
 	case unix.AF_INET:
 		ptr := (*[4]byte)(b[4:8])
@@ -47,10 +47,10 @@ func (b SAInBuf) Encode(ap netip.AddrPort, id uint32) (n int) {
 	} else {
 		b.SetINET6()
 		copy(b[8:24], addr.AsSlice())
-		Encode32(b[24:28], id)
+		ByteOrder.PutUint32(b[24:28], id)
 		n = SizeofSockaddrInet6
 	}
-	Encode16(b[2:4], port)
+	ByteOrder.PutUint16(b[2:4], port)
 	return
 }
 

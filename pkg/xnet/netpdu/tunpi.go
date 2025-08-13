@@ -40,7 +40,7 @@ func (pdu TunPI) Proto(is6 bool) {
 	if is6 {
 		ethp = netph.ETH_P_IPV6
 	}
-	xnet.Encode(pdu, netph.TunPI{
+	xnet.ByteOrderEncode(pdu, netph.TunPI{
 		Proto: ethp,
 	})
 }

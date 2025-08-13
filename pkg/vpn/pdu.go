@@ -65,7 +65,7 @@ func (pdu PDU) Parse() (netph.TunPI, []byte, error) {
 func (pdu HelloPDU) Format(w fmt.State, verb rune) {
 	var t int64
 	fmt.Fprint(w, "hello ")
-	if _, err := xnet.Remove(pdu, &t); err != nil {
+	if _, err := xnet.ByteOrderRemove(pdu, &t); err != nil {
 		fmt.Fprint(w, err)
 	} else {
 		fmt.Fprint(w, time.UnixMicro(t))

@@ -416,13 +416,13 @@ func newGreeting(now int64) *xnet.Msg {
 		now = time.Now().UnixMicro()
 	}
 
-	m.Data, err = xnet.Attach(m.Data, vpnStart)
+	m.Data, err = xnet.ByteOrderAppend(m.Data, vpnStart)
 	if err != nil {
 		xlog.Errata.Print(err)
 		mp.Put(m)
 		return nil
 	}
-	m.Data, err = xnet.Attach(m.Data, now)
+	m.Data, err = xnet.ByteOrderAppend(m.Data, now)
 	if err != nil {
 		xlog.Errata.Print(err)
 		mp.Put(m)
