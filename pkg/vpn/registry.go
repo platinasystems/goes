@@ -779,9 +779,8 @@ func (reg *registry) loadCerts() error {
 }
 
 func (reg *registry) loadHostsFile() error {
-	return xerrors.Suppress(kvc.
-		RangeFile(vpnHostsFile, reg.loadHostsKeyValues),
-		fs.ErrNotExist)
+	err := kvc.RangeFile(vpnHostsFile, reg.loadHostsKeyValues)
+	return xerrors.Suppress(err, fs.ErrNotExist)
 }
 
 func (reg *registry) loadHostsKeyValues(
@@ -806,9 +805,8 @@ func (reg *registry) loadHostsKeyValues(
 }
 
 func (reg *registry) loadViaFile() error {
-	return xerrors.Suppress(kvc.
-		RangeFile(vpnViaFileName, reg.loadViaKeyValues),
-		fs.ErrNotExist)
+	err := kvc.RangeFile(vpnViaFileName, reg.loadViaKeyValues)
+	return xerrors.Suppress(err, fs.ErrNotExist)
 }
 
 func (reg *registry) loadViaKeyValues(
@@ -818,7 +816,7 @@ func (reg *registry) loadViaKeyValues(
 	if len(values) < 0 {
 		return xerrors.Incomplete(name, lno)
 	}
-	reg.subscriberExchangePrecedence[name] = values
+	reg.subscriberExchangePrecedence[key] = values
 	return nil
 }
 
