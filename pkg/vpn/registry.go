@@ -823,7 +823,15 @@ func (reg *registry) loadViaKeyValues(
 }
 
 func (reg *registry) reload(rsvp *rsvp) {
-	fmt.Fprint(rsvp, "FIXME reload admins, hosts, and via")
+	err := reg.loadAdminsFile()
+	if err == nil {
+		if err = reg.loadHostsFile(); err == nil {
+			err = reg.loadViaFile()
+		}
+	}
+	if err != nil {
+		http.Error(rsvp, err.Error(), http.StatusInternalServerError)
+	}
 }
 
 func (reg *registry) rest(rsvp *rsvp) {
