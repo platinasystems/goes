@@ -113,8 +113,8 @@ func exchangeFromVpn(ctx context.Context, m *xnet.Msg) {
 		xlog.Trace.Println("whois from", fi)
 	} else if fid == tid {
 		if from.helloIsOK(m) {
-			hello := newGreeting(0)
-			if hello != nil {
+			from.via = m.AddrPort
+			if hello := newGreeting(0); hello != nil {
 				hello.AddrPort = m.AddrPort
 				mp.Queue(ctx, exchange.toVpnC, hello)
 			}
