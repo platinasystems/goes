@@ -98,6 +98,9 @@ kind: ConfigMap
 metadata:
   name: vpn
 data:
+  via: |
+    hosta exchange0
+    hostb exchange0
   hosts: |
     fc00:1234::a hosta
     fc00:1234::b hostb
