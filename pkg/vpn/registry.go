@@ -558,9 +558,9 @@ func (reg *registry) fromVpn(ctx context.Context, m *xnet.Msg) {
 			", version ", from.Id.Version(), " != ", fid.Version())
 	} else if fid == tid {
 		if from.helloIsOK(m) {
-			from.via = m.AddrPort
+			from.setVia(m.AddrPort)
 			if hello := newGreeting(0); hello != nil {
-				hello.AddrPort = m.AddrPort
+				hello.AddrPort = from.via
 				mp.Queue(ctx, reg.toVpnC, hello)
 			}
 		}
