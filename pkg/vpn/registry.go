@@ -345,9 +345,8 @@ func (reg *registry) assignAddr(sub *Subscriber) error {
 	}
 	if !reg.topAddr.IsValid() {
 		reg.topAddr = vpnPrefix.Masked().Addr()
-	} else {
-		reg.topAddr = reg.topAddr.Next()
 	}
+	reg.topAddr = reg.topAddr.Next()
 	for {
 		if _, found = reg.hosts.name[reg.topAddr]; !found {
 			break
@@ -735,10 +734,11 @@ func (reg *registry) loadCerts() error {
 	}
 	cn := reg.cert.Subject.CommonName
 	sub := NewSubscriber(reg.cert)
+	sub.Id = 0
+	sub.Port = vpnExchangePort
 	if err = reg.assignAddr(sub); err != nil {
 		return err
 	}
-	sub.Id = 0
 	reg.indexed = append(reg.indexed, sub)
 	reg.named[cn] = sub
 
