@@ -14,10 +14,7 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xlog"
 )
 
-const (
-	ResolveRetryInterval = time.Second
-	ResolveTimeout       = time.Minute
-)
+const ResolveRetryInterval = time.Second
 
 var Resolver = net.Resolver{
 	PreferGo: true,
@@ -28,7 +25,7 @@ func resolve(ctx context.Context, hn string) (netip.Addr, error) {
 	if addr, err := netip.ParseAddr(hn); err == nil {
 		return addr, err
 	}
-	ips, err := WaitForResolution(ctx, "ip", hn, ResolveTimeout)
+	ips, err := WaitForResolution(ctx, "ip", hn, 10*time.Second)
 	if err != nil {
 		return z, err
 	}
