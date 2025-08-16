@@ -84,9 +84,10 @@ func (sub *Subscriber) resolve(ctx context.Context) {
 	var ok bool
 	var err error
 
+	name := sub.name()
 	if sub.via.IsValid() {
 		sync.OnceFunc(func() {
-			xlog.Errata.Println(sub.name(), "already", sub.via)
+			xlog.Errata.Println(name, "already", sub.via)
 		})()
 		return
 	}
@@ -94,8 +95,9 @@ func (sub *Subscriber) resolve(ctx context.Context) {
 	port := sub.Port
 	switch {
 	case len(sub.cert.IPAddresses) > 0:
-		if addr, ok = netip.AddrFromSlice(sub.cert.IPAddresses[0]); !ok {
-			xlog.Errata.Println(sub.name(), "IPAddresses[0] invalid")
+		addr, ok = netip.AddrFromSlice(sub.cert.IPAddresses[0])
+		if !ok {
+			xlog.Errata.Println(name, "IPAddresses[0] invalid")
 			return
 		}
 	case len(sub.cert.URIs) > 0:
@@ -106,17 +108,17 @@ func (sub *Subscriber) resolve(ctx context.Context) {
 			}
 		}
 		if addr, err = resolve(ctx, uri.Hostname()); err != nil {
-			xlog.Errata.Println(sub.name(), err)
+			xlog.Errata.Println(name, err)
 			return
 		}
 	case len(sub.cert.DNSNames) > 0:
 		if addr, err = resolve(ctx, sub.cert.DNSNames[0]); err != nil {
-			xlog.Errata.Println(sub.name(), err)
+			xlog.Errata.Println(name, err)
 			return
 		}
 	default:
-		if addr, err = resolve(ctx, sub.name()); err != nil {
-			xlog.Errata.Println(sub.name(), err)
+		if addr, err = resolve(ctx, name); err != nil {
+			xlog.Errata.Println(name, err)
 			return
 		}
 	}
@@ -127,7 +129,15 @@ func (sub *Subscriber) resolve(ctx context.Context) {
 		port = vpnExchangePort
 	}
 	sub.via = netip.AddrPortFrom(addr, port)
-	xlog.Trace.Println("resolved", sub.name(), "via", sub.via)
+	xlog.Trace.Println("resolved", sub)
+}
+
+func (sub *Subscriber) setVia(ap netip.AddrPort) {
+	if addr := ap.Addr(); addr.Is4In6() {
+		sub.via = netip.AddrPortFrom(addr.Unmap(), ap.Port())
+	} else {
+		sub.via = ap
+	}
 }
 
 func (sub *Subscriber) stateFileName() string {
