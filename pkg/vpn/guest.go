@@ -53,8 +53,9 @@ const (
 var guest struct {
 	addressed map[netip.Addr]*Subscriber
 	indexed   map[int]*Subscriber
-	exchanges map[string]*Subscriber
-	lastrx    map[netip.AddrPort]time.Time
+	exchanges []*Subscriber
+
+	tick uint64
 
 	llu6 netip.Addr
 
@@ -109,8 +110,6 @@ Forward ciphered packets between exchange and tunnel interface.
 
 	guest.addressed = make(map[netip.Addr]*Subscriber)
 	guest.indexed = make(map[int]*Subscriber)
-	guest.exchanges = make(map[string]*Subscriber)
-	guest.lastrx = make(map[netip.AddrPort]time.Time)
 
 	guest.decapKey, err = mlkem.GenerateKey768()
 	if err != nil {
@@ -122,30 +121,33 @@ Forward ciphered packets between exchange and tunnel interface.
 		return err
 	}
 
-	// the registry is always the least precedent exchange
+	// the registry is always the exchange of last resort
 	regname := rest.reg.Subject.CommonName
-	for i := 0; i < len(guest.receipt.ExchangePrecedence); {
-		if guest.receipt.ExchangePrecedence[i] == regname {
-			guest.receipt.ExchangePrecedence = slices.
-				Delete(guest.receipt.ExchangePrecedence, i, i+1)
-		} else {
-			i += 1
-		}
-	}
-	guest.receipt.ExchangePrecedence =
-		append(guest.receipt.ExchangePrecedence, regname)
-	// try to get info for all exchanges
-	// but insist on registry
-	for _, name := range guest.receipt.ExchangePrecedence {
-		guest.exchanges[name], err = restWhois(ctx, name)
-		if err != nil && name == regname {
-			return err
-		}
+	guest.exchanges =
+		make([]*Subscriber, 1+len(guest.receipt.ExchangePrecedence))
+	x, err := restWhois(ctx, regname)
+	if err != nil {
+		return fmt.Errorf("%s: %w", regname, err)
 	}
 	// derrive registry's exchange service AddrPort
-	regsub := guest.exchanges[regname]
 	regaddr, _ := netip.AddrFromSlice(rest.ips[0])
-	regsub.via = netip.AddrPortFrom(regaddr, regsub.Port)
+	x.ap = netip.AddrPortFrom(regaddr, x.Port)
+	guest.exchanges[0] = x
+	guest.addressed[x.Addr] = x
+	guest.indexed[x.Id.Index()] = x
+
+	for i, name := range guest.receipt.ExchangePrecedence {
+		if x, err = restWhois(ctx, name); err != nil {
+			xlog.Errata.Printf("%s: %w", name, err)
+		} else {
+			guest.exchanges[1+i] = x
+			guest.addressed[x.Addr] = x
+			guest.indexed[x.Id.Index()] = x
+			if x.resolve(ctx); !x.ap.IsValid() {
+				xlog.Errata.Println("unresolved", x)
+			}
+		}
+	}
 
 	vpnPrefix = guest.receipt.Prefix.Masked()
 
@@ -250,20 +252,13 @@ selection:
 			xlog.Trace = xlog.Mute(xlog.Trace)
 		case err = <-rest.fault:
 		case t := <-tkr.C:
+			guest.tick += 1
 			guestHelloToAllExchanges(ctx, t.UnixMicro())
 		case sub, ok := <-rest.whoisRspC:
 			if !ok {
 				break selection
 			}
-			if x, ok := guest.exchanges[sub.name()]; !ok {
-				guestFound(ctx, sub)
-			} else {
-				if x != nil {
-					xlog.Trace.Println("update",
-						x.name(), sub.via)
-				}
-				guestExchangeWith(ctx, sub)
-			}
+			guestFound(ctx, sub)
 		case m, ok := <-guest.fromTunC:
 			if !ok {
 				break selection
@@ -330,18 +325,59 @@ func guestDiscardPending(sub *Subscriber) {
 	}
 }
 
+func guestExchange(i int) *Subscriber {
+	const deltaLimit = 3
+	var delta uint64
+	x := guest.exchanges[i]
+	if x == nil {
+		delta = deltaLimit
+	} else if guest.tick < x.lt {
+		// wrap
+		delta = guest.tick
+		delta += (1<<64 - 1) - x.lt
+	} else {
+		delta = guest.tick - x.lt
+	}
+	if delta >= deltaLimit {
+		x = guest.exchanges[0]
+	}
+	return x
+}
+
+// use first matching exchange or, in last resort, the registry.
+func guestExchangeMatch(sub *Subscriber) {
+	sub.gxi = 0
+	for _, name := range sub.ExchangePrecedence {
+		for i, x := range guest.exchanges {
+			if name == x.name() {
+				sub.gxi = i
+				return
+			}
+		}
+	}
+}
+
 func guestExchangeWith(ctx context.Context, x *Subscriber) {
 	name := x.name()
-	guest.exchanges[name] = x
+	if name == rest.reg.Subject.CommonName {
+		guest.exchanges[0] = x
+	} else {
+		for i, xname := range guest.receipt.ExchangePrecedence {
+			if name == xname {
+				guest.exchanges[1+i] = x
+				break
+			}
+		}
+	}
 	guest.addressed[x.Addr] = x
 	guest.indexed[x.Id.Index()] = x
-	if x.resolve(ctx); !x.via.IsValid() {
+	if x.resolve(ctx); !x.ap.IsValid() {
 		xlog.Errata.Println(name, "unresolved")
 		return
 	}
 	if hello := newGreeting(0); hello != nil {
-		xlog.Trace.Println("hello", name, x.via)
-		hello.AddrPort = x.via
+		xlog.Trace.Println("hello", x)
+		hello.AddrPort = x.ap
 		mp.Queue(ctx, guest.toVpnC, hello)
 	}
 }
@@ -350,6 +386,17 @@ func guestFound(ctx context.Context, sub *Subscriber) {
 	var cipherText []byte
 
 	name := sub.name()
+
+	if name == rest.reg.Subject.CommonName {
+		guestExchangeWith(ctx, sub)
+		return
+	}
+	for _, xname := range guest.receipt.ExchangePrecedence {
+		if name == xname {
+			guestExchangeWith(ctx, sub)
+			return
+		}
+	}
 
 	if len(sub.EncapKey) == 0 {
 		xlog.Errata.Println(name, "missing cipher key")
@@ -364,27 +411,14 @@ func guestFound(ctx context.Context, sub *Subscriber) {
 	}
 	sub.sharedKey, cipherText = encap.Encapsulate()
 
-	// use best matching exchange or, in last resort, the registry.
-	for _, name := range sub.ExchangePrecedence {
-		if x, ok := guest.exchanges[name]; ok && x != nil {
-			if x.via.IsValid() {
-				sub.via = x.via
-				break
-			} else {
-				xlog.Trace.Println("unaddressed", name)
-			}
-		}
-	}
-	if !sub.via.IsValid() {
-		sub.via = guest.exchanges[rest.reg.Subject.CommonName].via
-	}
+	guestExchangeMatch(sub)
 
 	sub.label.fromMe = MakeLabel(MyId, sub.Id)
 	sub.label.toMe = MakeLabel(sub.Id, MyId)
 	guest.indexed[sub.Id.Index()] = sub
 	guest.addressed[sub.Addr] = sub
 
-	xlog.Trace.Println(name, "via", sub.via)
+	xlog.Trace.Println(name, "via", guest.exchanges[sub.gxi])
 
 	wg.Go(func() {
 		invite, err := restInvite(ctx, name, cipherText)
@@ -444,26 +478,8 @@ func guestFromTun(ctx context.Context, m *xnet.Msg) {
 	} else if to.gcm == nil {
 		xlog.Trace.Println("pending invite", da)
 		guest.pending.tx = append(guest.pending.tx, m)
-	} else if !to.via.IsValid() {
-		xlog.Trace.Println("dropped", to.name(), netpdu.Mark, tunpi)
-		mp.Put(m)
 	} else {
-		if rr := rest.reg; rr != nil {
-			rx, ok := guest.exchanges[rr.Subject.CommonName]
-			if ok && rx != nil {
-				rxv := rx.via
-				if rxv.IsValid() && to.via.Compare(rxv) != 0 {
-					lastrx, ok := guest.lastrx[to.via]
-					if ok {
-						delta := time.Now().Sub(lastrx)
-						if delta > maxInactivity {
-							to.via = rxv
-						}
-					}
-				}
-			}
-		}
-		m.AddrPort = to.via
+		m.AddrPort = guestExchange(to.gxi).ap
 		vpn := PDU(m.Data)
 		// FIXME vpn.Proto(m.AddrPort.Addr().Is6())
 		xlog.Trace.Print("tx ", to.name(), " via ", m.AddrPort,
@@ -476,7 +492,6 @@ func guestFromTun(ctx context.Context, m *xnet.Msg) {
 }
 
 func guestFromVpn(ctx context.Context, m *xnet.Msg) {
-	guest.lastrx[m.AddrPort] = time.Now()
 	tid, fid := ScanLabel(m.Data)
 	fi := fid.Index()
 	from, ok := guest.indexed[fi]
@@ -486,7 +501,8 @@ func guestFromVpn(ctx context.Context, m *xnet.Msg) {
 		restQueueWhois(ctx, fid)
 	} else if tid == fid {
 		if from.helloIsOK(m) {
-			from.setVia(m.AddrPort)
+			from.lt = guest.tick
+			from.ap = unmap4in6(m.AddrPort)
 		}
 		mp.Put(m)
 	} else if tid != MyId {
@@ -501,22 +517,27 @@ func guestHelloToAllExchanges(ctx context.Context, now int64) {
 	if now == 0 {
 		now = time.Now().UnixMicro()
 	}
-	for _, name := range guest.receipt.ExchangePrecedence {
-		x, ok := guest.exchanges[name]
-		if !ok || x == nil {
+	for i, x := range guest.exchanges {
+		if x == nil {
+			var name string
+			if i == 0 {
+				name = rest.reg.Subject.CommonName
+			} else {
+				name = guest.receipt.ExchangePrecedence[i-1]
+			}
 			xlog.Trace.Println("queue whois", name)
 			restQueueWhois(ctx, name)
 			continue
 		}
-		if !x.via.IsValid() {
-			if x.resolve(ctx); !x.via.IsValid() {
-				xlog.Errata.Println(name, "unresolved")
+		if !x.ap.IsValid() {
+			if x.resolve(ctx); !x.ap.IsValid() {
+				xlog.Errata.Println("unresolved", x)
 				continue
 			}
 		}
 		if hello := newGreeting(now); hello != nil {
-			xlog.Trace.Println("hello", x)
-			hello.AddrPort = x.via
+			xlog.Trace.Println("hello to", x)
+			hello.AddrPort = x.ap
 			if !mp.Queue(ctx, guest.toVpnC, hello) {
 				break
 			}
@@ -541,8 +562,7 @@ func guestRx(ctx context.Context, from *Subscriber, m *xnet.Msg) {
 	} else if _, err = guest.tun.Write(m.Data); err != nil {
 		xlog.Trace.Print("rx ", name, netpdu.Mark, err)
 	} else {
-		from.setVia(m.AddrPort)
-		xlog.Trace.Print("rx ", name, " via ", from.via,
+		xlog.Trace.Print("rx ", name, " via ", unmap4in6(m.AddrPort),
 			netpdu.Mark, PDU(m.Data))
 	}
 	mp.Put(m)

@@ -96,8 +96,8 @@ var (
 func defineRestFlags() {
 	defineConfig()
 	defineCert()
+	definePort()
 	defineRegistry()
-	defineRegistryPort()
 	defineSig()
 }
 
@@ -415,26 +415,26 @@ func restFree(buf *bytes.Buffer) {
 	rest.bufs.Put(buf)
 }
 
-func restExchangeCheckin(ctx context.Context) error {
+func restExchangeCheckin(ctx context.Context) (uint16, error) {
 	var id uint
+	var port uint16
 
 	buf := restAlloc()
 	defer restFree(buf)
 
-	path := restPath(RestPathCheckinExchange, fmt.Sprint(vpnExchangePort))
-	rsp, err := restPut(ctx, buf, "", nil, path)
+	rsp, err := restPut(ctx, buf, "", nil, RestPathCheckinExchange)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	if err = restValidateCheckinResponse(rsp); err != nil {
-		return err
+		return 0, err
 	}
-	if _, err = fmt.Fscan(buf, &id); err != nil {
-		return err
+	if _, err = fmt.Fscan(buf, &id, &port); err != nil {
+		return 0, err
 	}
 	MyId = Id(id)
 	MyLabel = MakeLabel(MyId, MyId)
-	return nil
+	return port, nil
 }
 
 // eXtract registry url from its certificate.
@@ -454,7 +454,7 @@ func restExtractURL() error {
 	if len(rest.reg.DNSNames) == 0 {
 		return xerrors.Invalid("no registry URL or DNS")
 	}
-	s := fmt.Sprint("https://", rest.reg.DNSNames[0], ":", vpnRegistryPort)
+	s := fmt.Sprint("https://", rest.reg.DNSNames[0], ":", vpnPort)
 	rest.url, err = url.Parse(s)
 	return err
 }

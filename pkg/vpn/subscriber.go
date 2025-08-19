@@ -12,7 +12,6 @@ import (
 	"fmt"
 	"net/netip"
 	"path/filepath"
-	"sync"
 
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xlog"
@@ -42,7 +41,16 @@ type Subscriber struct {
 	label struct {
 		fromMe, toMe []byte
 	} `json:"-"`
-	via netip.AddrPort `json:"-"`
+
+	// An exchanges sets “ap” of each guest.
+	// A guest only sets “ap” of its exchange(s).
+	ap netip.AddrPort `json:"-"`
+
+	// Last hello reply Tick
+	lt uint64
+
+	// Guest eXchange Index
+	gxi int
 }
 
 func NewSubscriber(c *x509.Certificate) *Subscriber {
@@ -57,8 +65,8 @@ func (sub *Subscriber) Format(w fmt.State, verb rune) {
 	if sub.Addr.IsValid() {
 		fmt.Fprint(w, ",", sub.Addr)
 	}
-	if sub.via.IsValid() {
-		fmt.Fprint(w, ",", sub.via)
+	if sub.ap.IsValid() {
+		fmt.Fprint(w, ",", sub.ap)
 	}
 }
 
@@ -85,14 +93,16 @@ func (sub *Subscriber) resolve(ctx context.Context) {
 	var err error
 
 	name := sub.name()
-	if sub.via.IsValid() {
-		sync.OnceFunc(func() {
-			xlog.Errata.Println(name, "already", sub.via)
-		})()
+	if sub.ap.IsValid() {
+		xlog.Errata.Println(name, "already", sub.ap)
 		return
 	}
-	sub.via = netip.AddrPort{}
+	sub.ap = netip.AddrPort{}
 	port := sub.Port
+	if port == 0 {
+		xlog.Errata.Println(name, "unassigned port")
+		return
+	}
 	switch {
 	case len(sub.cert.IPAddresses) > 0:
 		addr, ok = netip.AddrFromSlice(sub.cert.IPAddresses[0])
@@ -125,19 +135,8 @@ func (sub *Subscriber) resolve(ctx context.Context) {
 	if addr.Is4In6() {
 		addr = addr.Unmap()
 	}
-	if port == 0 {
-		port = vpnExchangePort
-	}
-	sub.via = netip.AddrPortFrom(addr, port)
+	sub.ap = netip.AddrPortFrom(addr, port)
 	xlog.Trace.Println("resolved", sub)
-}
-
-func (sub *Subscriber) setVia(ap netip.AddrPort) {
-	if addr := ap.Addr(); addr.Is4In6() {
-		sub.via = netip.AddrPortFrom(addr.Unmap(), ap.Port())
-	} else {
-		sub.via = ap
-	}
 }
 
 func (sub *Subscriber) stateFileName() string {

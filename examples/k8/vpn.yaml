@@ -98,7 +98,8 @@ kind: ConfigMap
 metadata:
   name: vpn
 data:
-  via: |
+  exchanges: |
+    exchange0 8030
     hosta exchange0
     hostb exchange0
   hosts: |
@@ -254,8 +255,6 @@ spec:
     args:
     - "start"
     - "exchange"
-    - "-exchange-port"
-    - "8030"
     - "-v"
     - "-trace"
     ports:

@@ -6,6 +6,7 @@ package vpn
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"os"
 	"os/signal"
@@ -31,7 +32,6 @@ Exchange ciphered packets between guests.
 
 {{flags .}}`)
 
-	defineExchangePort()
 	defineRestFlags()
 	enableTrace()
 	enableQuiet()
@@ -41,6 +41,10 @@ Exchange ciphered packets between guests.
 	if err != nil {
 		return err
 	}
+
+	alarm := make(chan os.Signal, 2)
+	signal.Notify(alarm, xsignal.Alarm)
+	defer signal.Stop(alarm)
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer xlog.Trace.Println("stopped")
@@ -53,19 +57,18 @@ Exchange ciphered packets between guests.
 
 	exchange.sub = make(map[int]*Subscriber)
 
-	if err = restExchangeCheckin(ctx); err != nil {
+	port, err := restExchangeCheckin(ctx)
+	if err != nil {
 		return err
+	} else if port == 0 {
+		return errors.New("unassigned port")
 	}
 
-	exchange.fromVpnC, exchange.toVpnC, err = startUDP(ctx, vpnExchangePort)
+	exchange.fromVpnC, exchange.toVpnC, err = startUDP(ctx, port)
 	if err != nil {
 		return err
 	}
 	defer close(exchange.toVpnC)
-
-	alarm := make(chan os.Signal, 2)
-	signal.Notify(alarm, xsignal.Alarm)
-	defer signal.Stop(alarm)
 
 	wg.Go(func() { restWhoisService(ctx) })
 
@@ -113,9 +116,10 @@ func exchangeFromVpn(ctx context.Context, m *xnet.Msg) {
 		xlog.Trace.Println("whois from", fi)
 	} else if fid == tid {
 		if from.helloIsOK(m) {
-			from.setVia(m.AddrPort)
+			from.ap = unmap4in6(m.AddrPort)
 			if hello := newGreeting(0); hello != nil {
-				hello.AddrPort = from.via
+				xlog.Trace.Println("hello reply", from)
+				hello.AddrPort = from.ap
 				mp.Queue(ctx, exchange.toVpnC, hello)
 			}
 		}
@@ -123,11 +127,11 @@ func exchangeFromVpn(ctx context.Context, m *xnet.Msg) {
 		to.Id.Version() != tid.Version() {
 		restQueueWhois(ctx, ti)
 		xlog.Trace.Println("whois to", ti)
-	} else if !to.via.IsValid() {
+	} else if !to.ap.IsValid() {
 		xlog.Trace.Println("dropped", from.name(), "-> unaddressed",
 			to.name())
 	} else {
-		m.AddrPort = to.via
+		m.AddrPort = to.ap
 		mp.Queue(ctx, exchange.toVpnC, m)
 		xlog.Trace.Println("forward", from.name(), "->", to.name())
 		return

@@ -64,7 +64,7 @@ type registry struct {
 
 	addressed map[netip.Addr]*Subscriber
 
-	subscriberExchangePrecedence map[string][]string
+	exchangeAssignment map[string][]string
 
 	admin,
 	named, // guest or exchange
@@ -99,7 +99,7 @@ func newRegistry() *registry {
 	reg.named = make(map[string]*Subscriber)
 	reg.pending = make(map[string]*Subscriber)
 
-	reg.subscriberExchangePrecedence = make(map[string][]string)
+	reg.exchangeAssignment = make(map[string][]string)
 
 	reg.rsvpC = make(chan *rsvp, 1)
 
@@ -132,13 +132,12 @@ A RESTful WWW server and packet exchange.
 
 	defineAdmins()
 	defineCert()
-	defineExchangePort()
+	defineExchanges()
 	defineDomain()
 	defineHosts()
+	definePort()
 	definePrefix()
-	defineRegistryPort()
 	defineSig()
-	defineVia()
 
 	enableQuiet()
 	enableTrace()
@@ -174,26 +173,30 @@ A RESTful WWW server and packet exchange.
 	if err = reg.loadHostsFile(); err != nil {
 		return err
 	}
-	if err = reg.loadViaFile(); err != nil {
+	if err = reg.loadExchangesFile(); err != nil {
 		return err
 	}
-	if err = reg.loadCerts(); err != nil {
+	if err = reg.loadSubscribers(); err != nil {
 		return err
 	}
+
+	alarm := make(chan os.Signal, 2)
+	signal.Notify(alarm, xsignal.Alarm)
+	defer signal.Stop(alarm)
 
 	defer xlog.Trace.Println("stopped main")
 	defer wg.Wait()
 
 	ctx, cancel := context.WithCancel(ctx)
 
-	reg.fromVpnC, reg.toVpnC, err = startUDP(ctx, vpnExchangePort)
+	reg.fromVpnC, reg.toVpnC, err = startUDP(ctx, reg.indexed[0].Port)
 	if err != nil {
 		return err
 	}
 	defer close(reg.toVpnC)
 
 	reg.http = &http.Server{
-		Addr:    fmt.Sprintf(":%d", vpnRegistryPort),
+		Addr:    fmt.Sprintf(":%d", vpnPort),
 		Handler: reg,
 		TLSConfig: &tls.Config{
 			MinVersion: tls.VersionTLS13,
@@ -203,10 +206,6 @@ A RESTful WWW server and packet exchange.
 			return ctx
 		},
 	}
-
-	alarm := make(chan os.Signal, 2)
-	signal.Notify(alarm, xsignal.Alarm)
-	defer signal.Stop(alarm)
 
 	wg.Go(func() { reg.shutdown(ctx) })
 	wg.Go(reg.restsvc)
@@ -380,24 +379,15 @@ func (reg *registry) checkin(rsvp *rsvp) *Subscriber {
 }
 
 func (reg *registry) checkinExchange(rsvp *rsvp) {
-	sub := reg.checkin(rsvp)
-	if sub == nil {
+	x := reg.checkin(rsvp)
+	if x == nil {
 		return
 	}
-	s := rsvp.trimPrefix(RestPathCheckinExchange)
-	if len(s) > 0 {
-		u, err := strconv.ParseUint(s, 0, 16)
-		if err != nil {
-			http.Error(rsvp, err.Error(), http.StatusBadRequest)
-			return
-		}
-		sub.Port = uint16(u)
+	if x.Port == 0 {
+		http.Error(rsvp, "unassigned port", http.StatusBadRequest)
 	} else {
-		http.Error(rsvp, "no port", http.StatusBadRequest)
-		return
+		fmt.Fprint(rsvp, uint(x.Id), " ", x.Port)
 	}
-	fmt.Fprint(rsvp, uint(sub.Id))
-	xlog.Trace.Println("checked in exchange", sub)
 }
 
 func (reg *registry) checkinGuest(rsvp *rsvp) {
@@ -428,7 +418,6 @@ func (reg *registry) checkinGuest(rsvp *rsvp) {
 		http.Error(rsvp, err.Error(), http.StatusInternalServerError)
 	} else {
 		rsvp.Write(b)
-		xlog.Trace.Println("checked in guest", sub)
 	}
 }
 
@@ -558,9 +547,10 @@ func (reg *registry) fromVpn(ctx context.Context, m *xnet.Msg) {
 			", version ", from.Id.Version(), " != ", fid.Version())
 	} else if fid == tid {
 		if from.helloIsOK(m) {
-			from.setVia(m.AddrPort)
+			from.ap = unmap4in6(m.AddrPort)
 			if hello := newGreeting(0); hello != nil {
-				hello.AddrPort = from.via
+				xlog.Trace.Println("hello reply", from)
+				hello.AddrPort = from.ap
 				mp.Queue(ctx, reg.toVpnC, hello)
 			}
 		}
@@ -569,11 +559,11 @@ func (reg *registry) fromVpn(ctx context.Context, m *xnet.Msg) {
 	} else if to := reg.indexed[ti]; to.Id.Version() != tid.Version() {
 		xlog.Trace.Print("dropped ", from.name(), " -> ", to.name(),
 			", version ", to.Id.Version(), " != ", tid.Version())
-	} else if !to.via.IsValid() {
+	} else if !to.ap.IsValid() {
 		xlog.Trace.Println("dropped", from.name(), "-> unaddressed",
 			to.name())
 	} else {
-		m.AddrPort = to.via
+		m.AddrPort = to.ap
 		mp.Queue(ctx, reg.toVpnC, m)
 		xlog.Trace.Println("forward", from.name(), "->", to.name())
 		return
@@ -725,7 +715,49 @@ func (reg *registry) loadAdminsKeyValues(
 	return nil
 }
 
-func (reg *registry) loadCerts() error {
+func (reg *registry) loadExchangesFile() error {
+	err := kvc.RangeFile(vpnExchangesFileName, reg.loadExchangesKeyValues)
+	return xerrors.Suppress(err, fs.ErrNotExist)
+}
+
+func (reg *registry) loadExchangesKeyValues(
+	lno int, key string, values []string,
+) error {
+	name := vpnExchangesFileName
+	if len(values) < 0 {
+		return xerrors.Incomplete(name, lno)
+	}
+	reg.exchangeAssignment[key] = values
+	return nil
+}
+
+func (reg *registry) loadHostsFile() error {
+	err := kvc.RangeFile(vpnHostsFile, reg.loadHostsKeyValues)
+	return xerrors.Suppress(err, fs.ErrNotExist)
+}
+
+func (reg *registry) loadHostsKeyValues(
+	lno int, key string, values []string,
+) error {
+	name := vpnHostsFile
+	if len(values) < 0 {
+		return xerrors.Incomplete(name, lno)
+	}
+	addr, err := netip.ParseAddr(key)
+	if err != nil {
+		return xerrors.Label(err, name, lno)
+	}
+	if !vpnPrefix.Contains(addr) {
+		return xerrors.Range(name, lno)
+	}
+	reg.hosts.name[addr] = values[0]
+	for _, hn := range values {
+		reg.hosts.addr[hn] = addr
+	}
+	return nil
+}
+
+func (reg *registry) loadSubscribers() error {
 	var err error
 
 	reg.cert, err = readCertificateFile(vpnCertFile)
@@ -735,11 +767,11 @@ func (reg *registry) loadCerts() error {
 	cn := reg.cert.Subject.CommonName
 	sub := NewSubscriber(reg.cert)
 	sub.Id = 0
-	sub.Port = vpnExchangePort
+	sub.Port = defaultExchangePort
 	if err = reg.assignAddr(sub); err != nil {
 		return err
 	}
-	reg.indexed = append(reg.indexed, sub)
+	reg.indexed = []*Subscriber{sub}
 	reg.named[cn] = sub
 
 	var fns []string
@@ -772,51 +804,20 @@ func (reg *registry) loadCerts() error {
 		if _, isAdmin := reg.admin[cn]; isAdmin {
 			reg.admin[cn] = sub
 		}
-		sub.ExchangePrecedence = reg.
-			subscriberExchangePrecedence[sub.name()]
+		sub.ExchangePrecedence = reg.exchangeAssignment[sub.name()]
 	}
-	return nil
-}
 
-func (reg *registry) loadHostsFile() error {
-	err := kvc.RangeFile(vpnHostsFile, reg.loadHostsKeyValues)
-	return xerrors.Suppress(err, fs.ErrNotExist)
-}
+	for name, sl := range reg.exchangeAssignment {
+		var xp uint16
+		if x := reg.named[name]; x != nil {
+			if len(sl) > 0 {
+				if _, e := fmt.Sscan(sl[0], &xp); e == nil {
+					x.Port = xp
+				}
+			}
+		}
+	}
 
-func (reg *registry) loadHostsKeyValues(
-	lno int, key string, values []string,
-) error {
-	name := vpnHostsFile
-	if len(values) < 0 {
-		return xerrors.Incomplete(name, lno)
-	}
-	addr, err := netip.ParseAddr(key)
-	if err != nil {
-		return xerrors.Label(err, name, lno)
-	}
-	if !vpnPrefix.Contains(addr) {
-		return xerrors.Range(name, lno)
-	}
-	reg.hosts.name[addr] = values[0]
-	for _, hn := range values {
-		reg.hosts.addr[hn] = addr
-	}
-	return nil
-}
-
-func (reg *registry) loadViaFile() error {
-	err := kvc.RangeFile(vpnViaFileName, reg.loadViaKeyValues)
-	return xerrors.Suppress(err, fs.ErrNotExist)
-}
-
-func (reg *registry) loadViaKeyValues(
-	lno int, key string, values []string,
-) error {
-	name := vpnViaFileName
-	if len(values) < 0 {
-		return xerrors.Incomplete(name, lno)
-	}
-	reg.subscriberExchangePrecedence[key] = values
 	return nil
 }
 
@@ -824,7 +825,7 @@ func (reg *registry) reload(rsvp *rsvp) {
 	err := reg.loadAdminsFile()
 	if err == nil {
 		if err = reg.loadHostsFile(); err == nil {
-			err = reg.loadViaFile()
+			err = reg.loadExchangesFile()
 		}
 	}
 	if err != nil {

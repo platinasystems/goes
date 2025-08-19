@@ -112,8 +112,7 @@ var (
 	vpnSerialNumber = int64(1)
 	vpnPrefix       netip.Prefix
 
-	vpnExchangePort = uint16(defaultExchangePort)
-	vpnRegistryPort = uint16(defaultRegistryPort)
+	vpnPort = uint16(defaultRegistryPort)
 
 	vpnAdminsFile,
 	vpnConfigDir,
@@ -121,6 +120,7 @@ var (
 	vpnCountry,
 	vpnDataDir,
 	vpnEmail,
+	vpnExchangesFileName,
 	vpnDNS,
 	vpnHostsFile,
 	vpnLocality,
@@ -133,8 +133,7 @@ var (
 	vpnSigFile,
 	vpnStateDir,
 	vpnStreet,
-	vpnURI,
-	vpnViaFileName string
+	vpnURI string
 
 	vpnTunnel = -1
 
@@ -280,19 +279,6 @@ func defineName() {
 	xflag.Define(&vpnName, "name", "VPN identfier.")
 }
 
-func defineExchangePort() {
-	xflag.Define(&vpnExchangePort, "exchange-port", "Packet forwarding.")
-}
-
-func defineRegistryPort() {
-	xflag.Define(&vpnRegistryPort, "registry-port", "REST.")
-}
-
-func definePrefix() {
-	vpnPrefix = netip.MustParsePrefix("fc00:1234::/64")
-	xflag.Define(&vpnPrefix, "prefix", "Network prefix.")
-}
-
 func defineOrganization() {
 	xflag.Define(&vpnOrganization, "organization", "aka. company")
 }
@@ -302,8 +288,17 @@ func defineOrganizationalUnit() {
 		"aka. department.")
 }
 
+func definePort() {
+	xflag.Define(&vpnPort, "port", "REST listener.")
+}
+
 func definePostalCode() {
 	xflag.Define(&vpnPostalCode, "postal-code", "aka. zip.")
+}
+
+func definePrefix() {
+	vpnPrefix = netip.MustParsePrefix("fc00:1234::/64")
+	xflag.Define(&vpnPrefix, "prefix", "Network prefix.")
 }
 
 func defineProvince() {
@@ -356,10 +351,10 @@ func defineURI() {
 	xflag.Define(&vpnURI, "uri", "Comma separated URLs.")
 }
 
-func defineVia() {
-	vpnViaFileName = filepath.Join(vpnConfigDir, "via")
-	xflag.Define(&vpnViaFileName, "via",
-		"Subscriber exchange precedence file.")
+func defineExchanges() {
+	vpnExchangesFileName = filepath.Join(vpnConfigDir, "exchanges")
+	xflag.Define(&vpnExchangesFileName, "exchanges",
+		"Lists guest exhange assignment and exchange port numbers.")
 }
 
 func enableQuiet() {
@@ -433,4 +428,11 @@ func newGreeting(now int64) *xnet.Msg {
 	m.Data = append(m.Data, sig...)
 	m.Data = append(m.Data, MyLabel...)
 	return m
+}
+
+func unmap4in6(ap netip.AddrPort) netip.AddrPort {
+	if addr := ap.Addr(); addr.Is4In6() {
+		ap = netip.AddrPortFrom(addr.Unmap(), ap.Port())
+	}
+	return ap
 }

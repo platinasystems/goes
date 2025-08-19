@@ -27,22 +27,22 @@ func startUDP(ctx context.Context, port uint16) (
 	}
 	wg.Go(func() {
 		const kind = "receive service"
-		xlog.Trace.Println("start", kind)
+		xlog.Trace.Println("start", port, kind)
 		err := mp.RecvBatchService(ctx, fromC, conn)
 		if err != nil {
-			xlog.Errata.Println("quit", kind, err)
+			xlog.Errata.Println("quit", port, kind, err)
 		} else {
-			xlog.Trace.Println("stopped", kind)
+			xlog.Trace.Println("stopped", port, kind)
 		}
 	})
 	wg.Go(func() {
 		const kind = "send service"
-		xlog.Trace.Println("start", kind)
+		xlog.Trace.Println("start", port, kind)
 		err := mp.SendBatchService(conn, toC)
 		if err != nil {
-			xlog.Errata.Println("quit", kind, err)
+			xlog.Errata.Println("quit", port, kind, err)
 		} else {
-			xlog.Trace.Println("stopped", kind)
+			xlog.Trace.Println("stopped", port, kind)
 		}
 		conn.Close()
 	})
