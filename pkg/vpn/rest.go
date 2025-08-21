@@ -16,6 +16,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"io/fs"
 	"net"
 	"net/http"
 	"net/netip"
@@ -94,11 +95,11 @@ var (
 )
 
 func defineRestFlags() {
-	defineConfig()
-	defineCert()
-	definePort()
-	defineRegistry()
-	defineSig()
+	defineConfigFlag()
+	defineCertFlag()
+	definePortFlag()
+	defineRegistryFlag()
+	defineSigFlag()
 }
 
 var rest struct {
@@ -125,7 +126,7 @@ func restInit() error {
 	rest.whoisReqC = make(chan any, RestWhoisDepth)
 	rest.whoisRspC = make(chan *Subscriber, RestWhoisDepth)
 
-	rest.crt, err = readCertificateFile(vpnCertFile)
+	rest.crt, err = readCertificateFile(vpnCertPath())
 	if err != nil {
 		return err
 	}
@@ -151,9 +152,12 @@ func restInit() error {
 	}
 
 	if cl := flag.CommandLine.Name(); !strings.HasSuffix(cl, "certify") {
-		rest.reg, err = readCertificateFile(vpnRegistryFile)
+		rest.reg, err = readCertificateFile(vpnRegistryPath())
 		if err != nil {
-			return err
+			if !errors.Is(err, fs.ErrNotExist) {
+				return err
+			}
+			rest.reg = rest.crt
 		}
 		if err = restExtractURL(); err != nil {
 			return err

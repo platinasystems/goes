@@ -89,7 +89,7 @@ Forward ciphered packets between exchange and tunnel interface.
 {{flags .}}`)
 
 	defineRestFlags()
-	defineTunnel()
+	defineTunnelFlag()
 	enableQuiet()
 	enableTrace()
 	enableVerbose()

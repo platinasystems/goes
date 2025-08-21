@@ -40,8 +40,8 @@ Create PEM encoded ed25519 signature key file.
 
 {{flags .}}`)
 
-	defineConfig()
-	defineSig()
+	defineConfigFlag()
+	defineSigFlag()
 
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
@@ -61,15 +61,16 @@ Create PEM encoded ed25519 signature key file.
 		Headers: map[string]string{},
 		Bytes:   der,
 	}
-	if vpnSigFile == "-" {
+	sp := vpnSigPath()
+	if sp == "-" {
 		return pem.Encode(os.Stdout, blk)
 	}
-	if _, err = os.Stat(vpnSigFile); err == nil {
-		return fmt.Errorf("%s: exists", vpnSigFile)
+	if _, err = os.Stat(sp); err == nil {
+		return fmt.Errorf("%s: exists", sp)
 	} else if !os.IsNotExist(err) {
 		return err
 	}
-	dn := filepath.Dir(vpnSigFile)
+	dn := filepath.Dir(sp)
 	if _, err = os.Stat(dn); err != nil {
 		if !os.IsNotExist(err) {
 			return err
@@ -78,7 +79,7 @@ Create PEM encoded ed25519 signature key file.
 			return err
 		}
 	}
-	w, err := os.OpenFile(vpnSigFile, oCreate, 0600)
+	w, err := os.OpenFile(sp, oCreate, 0600)
 	if err != nil {
 		return err
 	}

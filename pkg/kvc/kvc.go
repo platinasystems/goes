@@ -7,8 +7,10 @@ package kvc
 
 import (
 	"bufio"
+	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -41,7 +43,9 @@ func RangeFile(name string, method func(int, string, []string) error) error {
 	f, err := os.Open(name)
 	if err == nil {
 		defer f.Close()
-		err = Range(f, method)
+		if err = Range(f, method); err != nil {
+			err = fmt.Errorf("%s: %w", filepath.Base(name), err)
+		}
 	}
 	return err
 }

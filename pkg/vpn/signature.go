@@ -37,8 +37,8 @@ Print algorithm.
 
 {{flags .}}`)
 
-	defineConfig()
-	defineSig()
+	defineConfigFlag()
+	defineSigFlag()
 
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
@@ -77,7 +77,7 @@ func signInit() error {
 	if signPriv != nil {
 		return err
 	}
-	input := vpnSigFile
+	input := vpnSigPath()
 	if input == "-" {
 		input = "input"
 		data, err = io.ReadAll(os.Stdin)

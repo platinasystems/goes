@@ -98,23 +98,23 @@ Create PEM encoded x509 certificate file.
 
 {{flags .}}`)
 
-	defineConfig()
+	defineConfigFlag()
 
-	defineCert()
-	defineCountry()
-	defineDNS()
-	defineDuration()
-	defineEmail()
-	defineLocality()
-	defineName()
-	defineOrganization()
-	defineOrganizationalUnit()
-	definePostalCode()
-	defineProvince()
-	defineSerialNumber()
-	defineSig()
-	defineStreet()
-	defineURI()
+	defineCertFlag()
+	defineCountryFlag()
+	defineDNSFlag()
+	defineDurationFlag()
+	defineEmailFlag()
+	defineLocalityFlag()
+	defineNameFlag()
+	defineOrganizationFlag()
+	defineOrganizationalUnitFlag()
+	definePostalCodeFlag()
+	defineProvinceFlag()
+	defineSerialNumberFlag()
+	defineSigFlag()
+	defineStreetFlag()
+	defineURIFlag()
 
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
@@ -195,16 +195,16 @@ Create PEM encoded x509 certificate file.
 		Headers: map[string]string{},
 		Bytes:   der,
 	}
-	cfn := vpnCertFile
-	if cfn == "-" {
+	cp := vpnCertPath()
+	if cp == "-" {
 		return pem.Encode(os.Stdout, blk)
 	}
-	if _, err = os.Stat(cfn); err == nil {
-		return fmt.Errorf("%s: exists", cfn)
+	if _, err = os.Stat(cp); err == nil {
+		return fmt.Errorf("%s: exists", cp)
 	} else if !os.IsNotExist(err) {
 		return err
 	}
-	w, err := os.OpenFile(cfn, oCreate, 0644)
+	w, err := os.OpenFile(cp, oCreate, 0644)
 	if err != nil {
 		return err
 	}
@@ -220,17 +220,16 @@ Print parsed certificate.
 
 {{flags .}}`)
 
-	defineConfig()
-
-	defineCert()
-	defineSig()
+	defineConfigFlag()
+	defineCertFlag()
+	defineSigFlag()
 
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
 		return err
 	}
 
-	c, err := readCertificateFile(vpnCertFile)
+	c, err := readCertificateFile(vpnCertPath())
 	if err != nil {
 		return err
 	}

@@ -126,18 +126,18 @@ A RESTful WWW server and packet exchange.
 
 {{flags .}}`)
 
-	defineConfig()
-	defineData()
-	defineState()
+	defineConfigFlag()
+	defineDataFlag()
+	defineStateFlag()
 
-	defineAdmins()
-	defineCert()
-	defineExchanges()
-	defineDomain()
-	defineHosts()
-	definePort()
-	definePrefix()
-	defineSig()
+	defineAdminsFlag()
+	defineCertFlag()
+	defineExchangesFlag()
+	defineDomainFlag()
+	defineHostsFlag()
+	definePortFlag()
+	definePrefixFlag()
+	defineSigFlag()
 
 	enableQuiet()
 	enableTrace()
@@ -703,9 +703,8 @@ func (reg *registry) isSubscriber(rsvp *rsvp) bool {
 }
 
 func (reg *registry) loadAdminsFile() error {
-	return xerrors.Suppress(kvc.
-		RangeFile(vpnAdminsFile, reg.loadAdminsKeyValues),
-		fs.ErrNotExist)
+	err := kvc.RangeFile(vpnAdminsPath(), reg.loadAdminsKeyValues)
+	return xerrors.Suppress(err, fs.ErrNotExist)
 }
 
 func (reg *registry) loadAdminsKeyValues(
@@ -716,39 +715,37 @@ func (reg *registry) loadAdminsKeyValues(
 }
 
 func (reg *registry) loadExchangesFile() error {
-	err := kvc.RangeFile(vpnExchangesFileName, reg.loadExchangesKeyValues)
+	err := kvc.RangeFile(vpnExchangesPath(), reg.loadExchangesKeyValues)
 	return xerrors.Suppress(err, fs.ErrNotExist)
 }
 
 func (reg *registry) loadExchangesKeyValues(
 	lno int, key string, values []string,
 ) error {
-	name := vpnExchangesFileName
 	if len(values) < 0 {
-		return xerrors.Incomplete(name, lno)
+		return xerrors.Incomplete(lno)
 	}
 	reg.exchangeAssignment[key] = values
 	return nil
 }
 
 func (reg *registry) loadHostsFile() error {
-	err := kvc.RangeFile(vpnHostsFile, reg.loadHostsKeyValues)
+	err := kvc.RangeFile(vpnHostsPath(), reg.loadHostsKeyValues)
 	return xerrors.Suppress(err, fs.ErrNotExist)
 }
 
 func (reg *registry) loadHostsKeyValues(
 	lno int, key string, values []string,
 ) error {
-	name := vpnHostsFile
 	if len(values) < 0 {
-		return xerrors.Incomplete(name, lno)
+		return xerrors.Incomplete(lno)
 	}
 	addr, err := netip.ParseAddr(key)
 	if err != nil {
-		return xerrors.Label(err, name, lno)
+		return xerrors.Label(err, lno)
 	}
 	if !vpnPrefix.Contains(addr) {
-		return xerrors.Range(name, lno)
+		return xerrors.Range(lno)
 	}
 	reg.hosts.name[addr] = values[0]
 	for _, hn := range values {
@@ -760,7 +757,8 @@ func (reg *registry) loadHostsKeyValues(
 func (reg *registry) loadSubscribers() error {
 	var err error
 
-	reg.cert, err = readCertificateFile(vpnCertFile)
+	cp := vpnCertPath()
+	reg.cert, err = readCertificateFile(cp)
 	if err != nil {
 		return err
 	}
@@ -783,7 +781,7 @@ func (reg *registry) loadSubscribers() error {
 		fns = append(fns, matches...)
 	}
 	for _, fn := range fns {
-		if fn == vpnCertFile {
+		if fn == cp {
 			continue
 		}
 		c, err := readCertificateFile(fn)
@@ -969,7 +967,7 @@ func (reg *registry) rest(rsvp *rsvp) {
 
 func (reg *registry) restsvc() {
 	xlog.Trace.Println("start rest", reg.http.Addr)
-	err := reg.http.ListenAndServeTLS(vpnCertFile, vpnSigFile)
+	err := reg.http.ListenAndServeTLS(vpnCertPath(), vpnSigPath())
 	err = xerrors.Suppress(err, http.ErrServerClosed)
 	if err == nil {
 		xlog.Trace.Println("stopped rest", reg.http.Addr)
