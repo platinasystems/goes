@@ -33,7 +33,7 @@
 //	func() (any, error)
 //		Imply [PrintResults].
 //
-// Otherwise, imply [PrintOrScanObject].
+// Otherwise, imply [PrintOrSetObject].
 //
 // Goes has these intrinsic features:
 //
@@ -140,60 +140,55 @@ func Do(
 	preempt Preemption,
 	feature any,
 	args []string,
-) error {
+) (err error) {
 	switch t := feature.(type) {
 	case func(context.Context, []string) error:
 		switch preempt {
 		case None:
-			return t(ctx, args)
+			err = t(ctx, args)
 		case Complete:
-			return nil
 		case Help:
-			return t(ctx, xslices.Prepend(args, "-h"))
+			err = t(ctx, xslices.Prepend(args, "-h"))
 		}
 	case func(context.Context, bool, []string) error:
 		switch preempt {
 		case None:
-			return t(ctx, false, args)
+			err = t(ctx, false, args)
 		case Complete:
-			return t(ctx, true, args)
+			err = t(ctx, true, args)
 		case Help:
-			return t(ctx, false, xslices.Prepend(args, "-h"))
+			err = t(ctx, false, xslices.Prepend(args, "-h"))
 		}
 	case error:
 		switch preempt {
 		case None:
-			return t
+			err = t
 		case Complete:
-			return nil
 		case Help:
-			return t
-			flag.CommandLine.Usage()
+			err = t
 		}
 	case map[string]any:
-		return ImpliedSelect(ctx, preempt, t, args)
+		err = ImpliedSelect(ctx, preempt, t, args)
 	case func() (any, error):
 		switch preempt {
 		case None:
-			return ImpliedPrintResults(ctx, t, args)
+			err = ImpliedPrintResults(ctx, t, args)
 		case Complete:
-			return nil
 		case Help:
-			return ImpliedPrintResults(ctx, t,
-				xslices.Prepend(args, "-h"))
+			args = xslices.Prepend(args, "-h")
+			err = ImpliedPrintResults(ctx, t, args)
 		}
 	default:
 		switch preempt {
 		case None:
-			return ImpliedPrintOrScanObject(ctx, false, t, args)
+			err = ImpliedPrintOrSetObject(ctx, t, args)
 		case Complete:
-			return ImpliedPrintOrScanObject(ctx, true, t, args)
 		case Help:
-			return ImpliedPrintOrScanObject(ctx, false, t,
-				xslices.Prepend(args, "-h"))
+			args = xslices.Prepend(args, "-h")
+			err = ImpliedPrintOrSetObject(ctx, t, args)
 		}
 	}
-	return nil
+	return
 }
 
 func MatchingKeys(m map[string]any, prefixes ...string) []string {

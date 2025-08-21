@@ -18,9 +18,8 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xutf8"
 )
 
-func ImpliedPrintOrScanObject(
+func ImpliedPrintOrSetObject(
 	ctx context.Context,
-	complete bool,
 	v any,
 	args []string,
 ) error {
@@ -29,10 +28,7 @@ func ImpliedPrintOrScanObject(
 		err  error
 	)
 	if len(args) == 0 {
-		if complete {
-			// FIXME file completion
-			return nil
-		} else if tm, ok := v.(encoding.TextMarshaler); ok {
+		if tm, ok := v.(encoding.TextMarshaler); ok {
 			data, err = tm.MarshalText()
 			if err != nil {
 				return err
@@ -58,19 +54,17 @@ func ImpliedPrintOrScanObject(
 			os.Stdout.WriteString(s)
 		}
 		return nil
-	} else if args[0] == "-h" {
+	}
+	if args[0] == "-h" {
 		xflag.TemplateUsage(`
 usage: {{.Name}}
-Print or scan object.
+Print or set object with argument or stdin if that is “-”.
 `)
 		flag.CommandLine.Usage()
 		return nil
-	} else if args[0] == "-" {
-		data, err = io.ReadAll(os.Stdin)
-	} else {
-		data, err = os.ReadFile(args[0])
-	}
-	if err != nil {
+	} else if args[0] != "-" {
+		data = []byte(args[0])
+	} else if data, err = io.ReadAll(os.Stdin); err != nil {
 		return err
 	}
 	if ju, ok := v.(json.Unmarshaler); ok && json.Valid(data) {
@@ -78,7 +72,7 @@ Print or scan object.
 	} else if tu, ok := v.(encoding.TextUnmarshaler); ok {
 		err = tu.UnmarshalText(data)
 	} else {
-		_, err = fmt.Sscan(string(data), v)
+		_, err = fmt.Sscan(args[0], v)
 	}
 	return err
 }
