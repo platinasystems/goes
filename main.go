@@ -5,8 +5,6 @@
 package main
 
 import (
-	_ "embed"
-
 	"github.com/platinasystems/goes/v2/pkg/bind"
 	core_util "github.com/platinasystems/goes/v2/pkg/core-util"
 	"github.com/platinasystems/goes/v2/pkg/goes"
@@ -16,19 +14,7 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xprogram"
 )
 
-//go:embed LICENSE
-var license string
-
-//go:embed PATENTS
-var patents string
-
 var features = []map[string]any{
-	map[string]any{
-		"show": map[string]any{
-			"license": license,
-			"patents": patents,
-		},
-	},
 	goes_util.Features,
 	core_util.Features,
 	net_tool.Features,

@@ -5,8 +5,16 @@
 package goes_util
 
 import (
+	_ "embed"
+
 	"errors"
 )
+
+//go:embed LICENSE
+var license string
+
+//go:embed PATENTS
+var patents string
 
 var ErrUnavailable = errors.New("unavailable")
 
@@ -24,6 +32,8 @@ var Features = map[string]any{
 	"show": map[string]any{
 		"completion": ShowCompletion,
 		"daemons":    ShowDaemons,
+		"license":    license,
+		"patents":    patents,
 	},
 	"standby": Standby,
 	"start":   StartDaemon,
