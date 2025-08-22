@@ -6,8 +6,6 @@ package goes_util
 
 import (
 	"errors"
-
-	"github.com/platinasystems/goes/v2/pkg/xprogram"
 )
 
 var ErrUnavailable = errors.New("unavailable")
@@ -24,17 +22,7 @@ var Features = map[string]any{
 	"output":  Output,
 	"pty":     Pty,
 	"show": map[string]any{
-		"build": map[string]any{
-			"id":      xprogram.BuildId,
-			"info":    xprogram.BuildInfoString,
-			"setting": xprogram.BuildSettings,
-		},
 		"daemons": ShowDaemons,
-		"main": map[string]any{
-			"name":      xprogram.MainName,
-			"reference": xprogram.MainReference,
-			"version":   xprogram.MainVersion,
-		},
 	},
 	"standby": Standby,
 	"start":   StartDaemon,

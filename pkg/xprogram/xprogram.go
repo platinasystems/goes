@@ -33,27 +33,36 @@ const (
 	VcsType     = BuildSetting("type")
 )
 
-var BuildSettings = map[string]any{
-	string(BuildMode): BuildMode,
-	string(Compiler):  Compiler,
-	"cgo": map[string]any{
-		string(CgoEnabled): CgoEnabled,
-		"flags": map[string]any{
+var Show = map[string]any{
+	"show": map[string]any{
+		"build": map[string]any{
+			"id":   BuildId,
+			"info": BuildInfoString,
+			"mode": BuildMode,
+		},
+		"cgo": map[string]any{
 			string(CgoCPPFlags): CgoCPPFlags,
 			string(CgoCXXFlags): CgoCXXFlags,
+			string(CgoEnabled):  CgoEnabled,
 			string(CgoLDFlags):  CgoLDFlags,
 		},
-	},
-	"go": map[string]any{
-		string(GoARCH):      GoARCH,
-		string(GoMicroARCH): GoMicroARCH,
-		string(GoOS):        GoOS,
-	},
-	"vcs": map[string]any{
-		string(VcsModified): VcsModified,
-		string(VcsRevision): VcsRevision,
-		string(VcsTime):     VcsTime,
-		string(VcsType):     VcsType,
+		string(Compiler): Compiler,
+		"go": map[string]any{
+			string(GoARCH):      GoARCH,
+			string(GoMicroARCH): GoMicroARCH,
+			string(GoOS):        GoOS,
+		},
+		"main": map[string]any{
+			"name":      MainName,
+			"reference": MainReference,
+			"version":   MainVersion,
+		},
+		"vcs": map[string]any{
+			string(VcsModified): VcsModified,
+			string(VcsRevision): VcsRevision,
+			string(VcsTime):     VcsTime,
+			string(VcsType):     VcsType,
+		},
 	},
 }
 

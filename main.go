@@ -13,6 +13,7 @@ import (
 	goes_util "github.com/platinasystems/goes/v2/pkg/goes-util"
 	net_tool "github.com/platinasystems/goes/v2/pkg/net-tool"
 	"github.com/platinasystems/goes/v2/pkg/vpn"
+	"github.com/platinasystems/goes/v2/pkg/xprogram"
 )
 
 //go:embed LICENSE
@@ -43,6 +44,7 @@ var features = []map[string]any{
 	net_tool.Features,
 	bind.Features,
 	vpn.Features,
+	xprogram.Show,
 }
 
 func init() { goes.Install(features...) }

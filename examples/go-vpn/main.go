@@ -8,6 +8,7 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/goes"
 	goes_util "github.com/platinasystems/goes/v2/pkg/goes-util"
 	"github.com/platinasystems/goes/v2/pkg/vpn"
+	"github.com/platinasystems/goes/v2/pkg/xprogram"
 )
 
 var features = []map[string]any{
@@ -17,6 +18,7 @@ var features = []map[string]any{
 		"show": vpn.ShowFeatures,
 	},
 	goes_util.Features,
+	xprogram.Show,
 }
 
 func init() { goes.Install(features...) }
