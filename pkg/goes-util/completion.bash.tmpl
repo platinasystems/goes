@@ -1,0 +1,12 @@
+_{{.}}()
+{
+	if [ -z ${COMP_WORDS[COMP_CWORD]} ] ; then
+		COMPREPLY=( $({{.}} complete ${COMP_WORDS[@]:1} '') )
+	else
+		COMPREPLY=( $({{.}} complete ${COMP_WORDS[@]:1}) )
+	fi
+	return 0
+}
+
+type -p {{.}} >/dev/null &&
+	complete -F _{{.}} -o filenames {{.}}

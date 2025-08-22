@@ -22,7 +22,8 @@ var Features = map[string]any{
 	"output":  Output,
 	"pty":     Pty,
 	"show": map[string]any{
-		"daemons": ShowDaemons,
+		"completion": ShowCompletion,
+		"daemons":    ShowDaemons,
 	},
 	"standby": Standby,
 	"start":   StartDaemon,

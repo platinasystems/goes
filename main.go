@@ -22,19 +22,9 @@ var license string
 //go:embed PATENTS
 var patents string
 
-//go:embed completion.bash
-var bash string
-
-//go:embed completion.zsh
-var zsh string
-
 var features = []map[string]any{
 	map[string]any{
 		"show": map[string]any{
-			"completion": map[string]any{
-				"bash": bash,
-				"zsh":  zsh,
-			},
 			"license": license,
 			"patents": patents,
 		},

@@ -44,6 +44,8 @@ func ImpliedPrintOrSetObject(
 			if data = xutf8.AlineBytes(data); len(data) > 0 {
 				os.Stdout.Write(data)
 			}
+		} else if m, ok := v.(fmt.Stringer); ok {
+			os.Stdout.WriteString(xutf8.AlineString(m.String()))
 		} else if f, ok := v.(func() string); ok {
 			os.Stdout.WriteString(xutf8.AlineString(f()))
 		} else if b, ok := v.([]byte); ok {
