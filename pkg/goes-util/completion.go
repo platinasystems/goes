@@ -4,41 +4,15 @@
 
 package goes_util
 
-import (
-	_ "embed"
-	"os"
-	"path/filepath"
-	"strings"
+import _ "embed"
 
-	"text/template"
-)
+//go:embed completion.bash
+var bash string
 
-//go:embed completion.bash.tmpl
-var bashTmpl string
-
-//go:embed completion.zsh.tmpl
-var zshTmpl string
-
-type CompletionTemplate string
+//go:embed completion.zsh
+var zsh string
 
 var ShowCompletion = map[string]any{
-	"bash": CompletionTemplate(bashTmpl),
-	"zsh":  CompletionTemplate(zshTmpl),
-}
-
-func (ct CompletionTemplate) String() string {
-	var sb strings.Builder
-	tt, err := template.New("completion").Parse(string(ct))
-	if err != nil {
-		return err.Error()
-	}
-	exe, err := os.Executable()
-	if err != nil {
-		return err.Error()
-	}
-	err = tt.Execute(&sb, filepath.Base(exe))
-	if err != nil {
-		return err.Error()
-	}
-	return sb.String()
+	"bash": bash,
+	"zsh":  zsh,
 }
