@@ -208,7 +208,7 @@ spec:
   containers:
   - name: vpn
     imagePullPolicy: IfNotPresent
-    image: ko://github.com/platinasystems/goes/v2/examples/go-vpn
+    image: ko://github.com/platinasystems/goes/v2/cmd/goes-vpn
     args:
     - "start"
     - "registry"
@@ -221,10 +221,10 @@ spec:
       containerPort: 8003
     volumeMounts:
     - name: config
-      mountPath: "/etc/go-vpn"
+      mountPath: "/etc/goes-vpn"
       readOnly: true
     - name: state
-      mountPath: "/var/lib/go-vpn"
+      mountPath: "/var/lib/goes-vpn"
   volumes:
   - name: config
     projected:
@@ -251,7 +251,7 @@ spec:
   containers:
   - name: vpn
     imagePullPolicy: IfNotPresent
-    image: ko://github.com/platinasystems/goes/v2/examples/go-vpn
+    image: ko://github.com/platinasystems/goes/v2/cmd/goes-vpn
     args:
     - "start"
     - "exchange"
@@ -262,7 +262,7 @@ spec:
       containerPort: 8030
     volumeMounts:
     - name: config
-      mountPath: "/etc/go-vpn"
+      mountPath: "/etc/goes-vpn"
       readOnly: true
   volumes:
   - name: config
@@ -289,7 +289,7 @@ spec:
   containers:
   - name: vpn
     imagePullPolicy: IfNotPresent
-    image: ko://github.com/platinasystems/goes/v2/examples/go-vpn
+    image: ko://github.com/platinasystems/goes/v2/cmd/goes-vpn
     args:
     - "start"
     - "guest"
@@ -303,7 +303,7 @@ spec:
       privileged: true
     volumeMounts:
     - name: config
-      mountPath: "/etc/go-vpn"
+      mountPath: "/etc/goes-vpn"
       readOnly: true
   volumes:
   - name: config
@@ -330,7 +330,7 @@ spec:
   containers:
   - name: vpn
     imagePullPolicy: IfNotPresent
-    image: ko://github.com/platinasystems/goes/v2/examples/go-vpn
+    image: ko://github.com/platinasystems/goes/v2/cmd/goes-vpn
     args:
     - "start"
     - "guest"
@@ -344,7 +344,7 @@ spec:
       privileged: true
     volumeMounts:
     - name: config
-      mountPath: "/etc/go-vpn"
+      mountPath: "/etc/goes-vpn"
       readOnly: true
   volumes:
   - name: config
@@ -371,7 +371,7 @@ spec:
   containers:
   - name: vpn
     imagePullPolicy: IfNotPresent
-    image: ko://github.com/platinasystems/goes/v2/examples/go-vpn
+    image: ko://github.com/platinasystems/goes/v2/cmd/goes-vpn
     args:
     - "start"
     - "guest"
@@ -385,7 +385,7 @@ spec:
       privileged: true
     volumeMounts:
     - name: config
-      mountPath: "/etc/go-vpn"
+      mountPath: "/etc/goes-vpn"
       readOnly: true
   volumes:
   - name: config

@@ -17,7 +17,7 @@ spec:
   containers:
   - name: udp-echo
     imagePullPolicy: IfNotPresent
-    image: ko://github.com/platinasystems/goes/v2/examples/go-udp-echo
+    image: ko://github.com/platinasystems/goes/v2/cmd/goes-udp-echo
     args: ["server"]
     ports:
     - containerPort: 7

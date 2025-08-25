@@ -1,12 +1,7 @@
 ## deploy
 ```console
-$ ko apply -B --platform=linux/GOARCH -f ./examples/k8/vpn.yaml
-2025/08/13 15:44:23 Using base cgr.dev/chainguard/static:latest@sha256:6a4b683f4708f1f167ba218e31fcac0b7515d94c33c3acf223c36d5c6acd3783 for github.com/platinasystems/goes/v2/examples/go-vpn
-2025/08/13 15:44:23 Building github.com/platinasystems/goes/v2/examples/go-vpn for linux/arm64
-2025/08/13 15:44:24 Loading ko.local/go-vpn:fd86e5c05adbd6d4656c1acebb0de163218d4f9b940aa1337bc590ecc58e4848
-2025/08/13 15:44:25 Loaded ko.local/go-vpn:fd86e5c05adbd6d4656c1acebb0de163218d4f9b940aa1337bc590ecc58e4848
-2025/08/13 15:44:25 Adding tag latest
-2025/08/13 15:44:25 Added tag latest
+$ ko apply -L -B --platform=linux/GOARCH -f ./deployments/vpn.yaml
+...
 service/vpn created
 secret/registry created
 secret/exchange0 created
@@ -74,7 +69,7 @@ subscriber.go:72: hello from registry,0.0,fc00:1234::,[::ffff:10.42.0.53]:8003
 
 # ping
 ```console
-$ kubectl exec hosta -t -- go-vpn ping -c 3 hostb
+$ kubectl exec hosta -t -- goes-vpn ping -c 3 hostb
 PING fc00:1234::b (fc00:1234::b); 24 data bytes
 32 bytes from fc00:1234::b; icmp_seq=0 ttl=64 time=134.863711ms
 32 bytes from fc00:1234::b; icmp_seq=1 ttl=64 time=51.678622ms
@@ -87,5 +82,5 @@ round-trip min/avg/max/stddev = 51.678622ms/92.920076ms/134.863711ms/33.9638ms
 
 # delete
 ```console
-$ kubectl delete -f examples/k8/vpn.yaml
+$ kubectl delete -f deployments/vpn.yaml
 ```

@@ -17,7 +17,7 @@ spec:
   containers:
   - name: www-echo
     imagePullPolicy: IfNotPresent
-    image: ko://github.com/platinasystems/goes/v2/examples/go-www-echo
+    image: ko://github.com/platinasystems/goes/v2/cmd/goes-www-echo
     args: ["server"]
     ports:
     - containerPort: 8080
