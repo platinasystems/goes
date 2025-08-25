@@ -65,11 +65,13 @@ var ShowFeatures = map[string]any{
 	"hosts":       RestShow,
 	"pending":     RestShow,
 	"prefix":      RestShow,
-	"signature":   ShowSignature,
-	"start":       RestShow,
-	"status":      RestShow,
-	"subscriber":  RestShow,
-	"vcs":         RestShow,
+	"registry": map[string]any{
+		"vcs": RestShow,
+	},
+	"signature":  ShowSignature,
+	"start":      RestShow,
+	"status":     RestShow,
+	"subscriber": RestShow,
 }
 
 const (
