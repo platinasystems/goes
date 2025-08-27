@@ -394,24 +394,39 @@ RESTful subscribe to VPN.
 	if err != nil {
 		return xerrors.Mark(err)
 	}
-	req.Header.Set("Content-Type", "application/x-pem-file")
-	rsp, err := rest.Client.Do(req)
-	if rsp != nil {
-		defer rsp.Body.Close()
-	}
-	if err != nil {
-	} else if rsp.StatusCode == http.StatusOK {
-		_, err = io.Copy(os.Stdout, rsp.Body)
-	} else {
-		sb := new(strings.Builder)
-		io.Copy(sb, rsp.Body)
-		err = fmt.Errorf("%s, %s", rsp.Status, sb)
-	}
+	_, err = restDo(os.Stdout, req)
 	return err
 }
 
 func restAlloc() *bytes.Buffer {
 	return rest.bufs.Get().(*bytes.Buffer)
+}
+
+func restDo(w io.Writer, req *http.Request) (*http.Response, error) {
+	req.Header.Set(RestVcsRevision, rest.vcsrev)
+	rsp, err := rest.Do(req)
+	if err != nil {
+		err = fmt.Errorf("rest: %w", err)
+	} else if rsp.StatusCode != http.StatusOK {
+		err = errors.New(rsp.Status)
+	} else if s := rsp.Header.Get(RestVcsRevision); len(s) == 0 {
+		err = ErrNoVCS
+	} else if rest.vcsrev != s {
+		err = ErrBadVCS
+	}
+	if rsp != nil {
+		if err == nil {
+			io.Copy(w, rsp.Body)
+		} else {
+			sb := new(strings.Builder)
+			io.Copy(sb, rsp.Body)
+			if sb.Len() > 0 {
+				err = fmt.Errorf("%w, %s", err, sb)
+			}
+		}
+		rsp.Body.Close()
+	}
+	return rsp, err
 }
 
 func restFree(buf *bytes.Buffer) {
@@ -578,28 +593,7 @@ func restRequest(
 	if len(ct) > 0 {
 		req.Header.Set("Content-Type", ct)
 	}
-	rsp, err := rest.Do(req)
-	if rsp != nil {
-		defer rsp.Body.Close()
-	}
-	if err != nil {
-		return rsp, err
-	}
-	if s := rsp.Header.Get(RestVcsRevision); len(s) == 0 {
-		return rsp, ErrNoVCS
-	} else if len(rest.vcsrev) == 0 {
-		rest.vcsrev = s
-	} else if rest.vcsrev != s {
-		return rsp, ErrBadVCS
-	}
-	if rsp.StatusCode == http.StatusOK {
-		_, err = io.Copy(w, rsp.Body)
-	} else {
-		sb := new(strings.Builder)
-		io.Copy(sb, rsp.Body)
-		err = fmt.Errorf("%s, %s", rsp.Status, sb)
-	}
-	return rsp, err
+	return restDo(w, req)
 }
 
 func restValidateCheckinResponse(rsp *http.Response) error {
