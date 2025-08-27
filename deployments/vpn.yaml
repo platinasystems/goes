@@ -3,18 +3,17 @@ kind: Service
 metadata:
   name: vpn
 spec:
-  type: NodePort
+  type: ClusterIP
+  clusterIP: None
   selector:
     name: vpn
   ports:
   - name: rest
     protocol: TCP
     port: 8003
-    nodePort: 30003
   - name: exchange
     protocol: UDP
     port: 8003
-    nodePort: 30003
 ---
 apiVersion: v1
 kind: Secret
