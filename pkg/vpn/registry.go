@@ -66,9 +66,9 @@ type registry struct {
 
 	exchangeAssignment map[string][]string
 
-	admin,
-	named, // guest or exchange
-	pending map[string]*Subscriber
+	admin, named map[string]*Subscriber
+
+	pending []*Subscriber
 
 	rsvpC chan *rsvp
 
@@ -97,7 +97,6 @@ func newRegistry() *registry {
 	reg.addressed = make(map[netip.Addr]*Subscriber)
 	reg.admin = make(map[string]*Subscriber)
 	reg.named = make(map[string]*Subscriber)
-	reg.pending = make(map[string]*Subscriber)
 
 	reg.exchangeAssignment = make(map[string][]string)
 
@@ -300,11 +299,12 @@ func (reg *registry) approve(rsvp *rsvp) {
 			return
 		}
 	}
-	sub, ok := reg.pending[name]
-	if !ok {
+	i, sub := reg.lookupPending(name)
+	if i < 0 || sub == nil {
 		http.Error(rsvp, name, http.StatusNotFound)
 		return
 	}
+	reg.pending = slices.Delete(reg.pending, i, i+1)
 	blk := pem.Block{
 		Type:  BlockTypeCertificate,
 		Bytes: sub.CertDER,
@@ -321,7 +321,6 @@ func (reg *registry) approve(rsvp *rsvp) {
 	} else {
 		f.Close()
 	}
-	delete(reg.pending, name)
 
 	if err = reg.assignAddr(sub); err != nil {
 		http.Error(rsvp, err.Error(),
@@ -422,15 +421,16 @@ func (reg *registry) checkinGuest(rsvp *rsvp) {
 }
 
 func (reg *registry) deny(rsvp *rsvp) {
-	s := rsvp.trimPrefix(RestPathDeny)
-	if len(s) == 0 {
+	cn := rsvp.trimPrefix(RestPathDeny)
+	if len(cn) == 0 {
 		http.Error(rsvp, "incomplete subscriber", http.StatusBadRequest)
 	}
-	if _, ok := reg.pending[s]; !ok {
-		http.Error(rsvp, s, http.StatusNotFound)
-	} else {
-		delete(reg.pending, s)
+	i, sub := reg.lookupPending(cn)
+	if i < 0 || sub == nil {
+		http.Error(rsvp, cn, http.StatusNotFound)
+		return
 	}
+	reg.pending = slices.Delete(reg.pending, i, i+1)
 }
 
 func (reg *registry) dnsAnswer(query *xdnsmessage.Message) *xdnsmessage.Message {
@@ -819,6 +819,15 @@ func (reg *registry) loadSubscribers() error {
 	return nil
 }
 
+func (reg *registry) lookupPending(name string) (int, *Subscriber) {
+	for i, sub := range reg.pending {
+		if name == sub.name() {
+			return i, sub
+		}
+	}
+	return -1, nil
+}
+
 func (reg *registry) reload(rsvp *rsvp) {
 	err := reg.loadAdminsFile()
 	if err == nil {
@@ -1022,10 +1031,16 @@ func (reg *registry) showHosts(rsvp *rsvp) {
 }
 
 func (reg *registry) showPending(rsvp *rsvp) {
-	if t, err := CertificatesTemplate(); err != nil {
+	if len(reg.pending) == 0 {
+		http.Error(rsvp, "none", http.StatusNoContent)
+	} else if t, err := CertificatesTemplate(); err != nil {
 		http.Error(rsvp, err.Error(), http.StatusInternalServerError)
 	} else {
-		t.Execute(rsvp, reg.pending)
+		certs := make([]*x509.Certificate, len(reg.pending))
+		for i, sub := range reg.pending {
+			certs[i] = sub.cert
+		}
+		t.Execute(rsvp, certs)
 	}
 }
 
@@ -1068,11 +1083,12 @@ func (reg *registry) subscribe(rsvp *rsvp) {
 		} else {
 			http.Error(rsvp, "name in use", http.StatusForbidden)
 		}
-	} else if _, found = reg.pending[cn]; found {
+	} else if i, _ := reg.lookupPending(cn); i >= 0 {
 		http.Error(rsvp, "subscription pending approval",
 			http.StatusConflict)
 	} else {
-		reg.pending[cn] = NewSubscriber(c)
+		reg.pending = append(reg.pending, NewSubscriber(c))
+		fmt.Fprintln(rsvp, "pending approval")
 	}
 }
 
