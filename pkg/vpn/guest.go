@@ -34,7 +34,7 @@ const (
 	GCMTagSize   = 16
 	GCMOverhead  = GCMNonceSize + GCMTagSize
 
-	VPNMTU  = netph.ETHMTU - VPNSize
+	VPNMTU  = netph.ETHMTU - netph.TunPISize
 	IP6MTU  = VPNMTU - netph.IP6Size
 	UDP6MTU = IP6MTU - netph.UDPSize
 	TunMTU  = UDP6MTU - GCMOverhead - SizeofLabel
@@ -66,7 +66,8 @@ var guest struct {
 
 	receipt *GuestReceipt
 
-	tun *os.File
+	tun   *os.File
+	tunpi []byte
 
 	newPeerC chan *Subscriber
 
@@ -131,6 +132,12 @@ Forward ciphered packets between exchange and tunnel interface.
 	}
 	// derrive registry's exchange service AddrPort
 	regaddr, _ := netip.AddrFromSlice(rest.ips[0])
+	if regaddr.Is4In6() {
+		regaddr = regaddr.Unmap()
+	}
+	if x.Port == 0 {
+		x.Port = defaultExchangePort
+	}
 	x.ap = netip.AddrPortFrom(regaddr, x.Port)
 	guest.exchanges[0] = x
 	guest.addressed[x.Addr] = x
@@ -451,25 +458,30 @@ func guestFound(ctx context.Context, sub *Subscriber) {
 }
 
 func guestFromTun(ctx context.Context, m *xnet.Msg) {
-	tunpi := netpdu.TunPI(m.Data)
-	da, err := tunpi.ToWhom()
+	if len(guest.tunpi) == 0 {
+		guest.tunpi = make([]byte, netph.TunPISize)
+		copy(guest.tunpi, m.Data)
+		xlog.Info.Printf("tunpi: %x", guest.tunpi)
+	}
+	pdu := netpdu.TunPI(m.Data)
+	da, err := pdu.ToWhom()
 	if err != nil {
 		xlog.Errata.Println("dropped:", err)
 		mp.Put(m)
 	} else if !da.IsValid() {
-		xlog.Trace.Println("dropped", tunpi)
+		xlog.Trace.Println("dropped", pdu)
 		mp.Put(m)
 	} else if m.AddrPort = netip.AddrPortFrom(da, 0); da.IsMulticast() {
-		xlog.Trace.Println("dropped", tunpi)
+		xlog.Trace.Println("dropped", pdu)
 		mp.Put(m)
 	} else if da.Compare(guest.receipt.Prefix.Addr()) == 0 {
-		xlog.Trace.Println("loopback", tunpi)
+		xlog.Trace.Println("loopback", pdu)
 		mp.Queue(ctx, guest.toTunC, m)
 	} else if guest.llu6.IsValid() && da.Compare(guest.llu6) == 0 {
-		xlog.Trace.Println("loopback", tunpi)
+		xlog.Trace.Println("loopback", pdu)
 		mp.Queue(ctx, guest.toTunC, m)
 	} else if !vpnPrefix.Contains(da) {
-		xlog.Trace.Println("dropped", tunpi)
+		xlog.Trace.Println("dropped", pdu)
 		mp.Put(m)
 	} else if to, ok := guest.addressed[da]; !ok {
 		xlog.Trace.Println("queue whois", da)
@@ -480,10 +492,8 @@ func guestFromTun(ctx context.Context, m *xnet.Msg) {
 		guest.pending.tx = append(guest.pending.tx, m)
 	} else {
 		m.AddrPort = guestExchange(to.gxi).ap
-		vpn := PDU(m.Data)
-		// FIXME vpn.Proto(m.AddrPort.Addr().Is6())
 		xlog.Trace.Print("tx ", to.name(), " via ", m.AddrPort,
-			netpdu.Mark, vpn)
+			netpdu.Mark, pdu)
 		m.Data = to.gcm.Seal(m.Data[:0], nil, m.Data, to.label.fromMe)
 		to.cb.Encrypt(m.Data[:aes.BlockSize], m.Data[:aes.BlockSize])
 		m.Data = append(m.Data, to.label.fromMe...)
@@ -503,6 +513,10 @@ func guestFromVpn(ctx context.Context, m *xnet.Msg) {
 		if from.helloIsOK(m) {
 			from.lt = guest.tick
 			from.ap = unmap4in6(m.AddrPort)
+			if from.ap.Port() == 0 {
+				from.ap = netip.AddrPortFrom(from.ap.Addr(),
+					defaultExchangePort)
+			}
 		}
 		mp.Put(m)
 	} else if tid != MyId {
@@ -535,6 +549,10 @@ func guestHelloToAllExchanges(ctx context.Context, now int64) {
 				continue
 			}
 		}
+		if x.ap.Port() == 0 {
+			x.ap = netip.AddrPortFrom(x.ap.Addr(),
+				defaultExchangePort)
+		}
 		if hello := newGreeting(now); hello != nil {
 			xlog.Trace.Println("hello to", x)
 			hello.AddrPort = x.ap
@@ -547,11 +565,11 @@ func guestHelloToAllExchanges(ctx context.Context, now int64) {
 
 func guestRx(ctx context.Context, from *Subscriber, m *xnet.Msg) {
 	var err error
+	defer mp.Put(m)
 
 	name := from.name()
 	if from.cb == nil || from.gcm == nil {
 		xlog.Trace.Println("dropped ", name, "w/o handshake")
-		mp.Put(m)
 		return
 	}
 	from.cb.Decrypt(m.Data[:aes.BlockSize], m.Data[:aes.BlockSize])
@@ -559,13 +577,18 @@ func guestRx(ctx context.Context, from *Subscriber, m *xnet.Msg) {
 	m.Data, err = from.gcm.Open(m.Data[:0], nil, m.Data[:i], m.Data[i:])
 	if err != nil {
 		xlog.Trace.Print("rx ", name, netpdu.Mark, err)
-	} else if _, err = guest.tun.Write(m.Data); err != nil {
-		xlog.Trace.Print("rx ", name, netpdu.Mark, err)
-	} else {
-		xlog.Trace.Print("rx ", name, " via ", unmap4in6(m.AddrPort),
-			netpdu.Mark, PDU(m.Data))
+		return
 	}
-	mp.Put(m)
+	if len(guest.tunpi) > 0 {
+		copy(m.Data, guest.tunpi)
+	}
+	ap := unmap4in6(m.AddrPort)
+	pdu := netpdu.TunPI(m.Data)
+	if _, err = guest.tun.Write(m.Data); err != nil {
+		xlog.Errata.Print("rx ", name, " via ", ap, netpdu.Mark, err)
+	} else {
+		xlog.Trace.Print("rx ", name, " via ", ap, netpdu.Mark, pdu)
+	}
 }
 
 func guestStartTunneling(ctx context.Context) {
