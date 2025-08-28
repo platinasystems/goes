@@ -249,36 +249,26 @@ func (reg *registry) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	w.Header().Add(RestUnixMicroStart, reg.start)
-	w.Header().Add(RestVcsRevision, reg.vcsRev)
-
-	if strings.HasPrefix(req.URL.Path, RestPathStatic) {
+	if len(req.URL.Path) == 0 || req.URL.Path == "/" {
 		if req.Method != http.MethodGet {
 			http.Error(w, req.Method, http.StatusMethodNotAllowed)
 		} else {
-			name := strings.TrimPrefix(req.URL.Path, RestPathStatic)
-			reg.getFileOrDir(w, name)
+			reg.dir(w)
 		}
 		return
 	}
 
-	// single thread REST operations
-	rsvp := rsvpPool.Get().(*rsvp)
-	rsvp.ResponseWriter = w
-	rsvp.req = req
-
-	ctx := req.Context()
-	select {
-	case <-ctx.Done():
-		rsvpPool.Put(rsvp)
-	case reg.rsvpC <- rsvp:
-		select {
-		case <-ctx.Done():
-		case <-rsvp.doneC:
-			rsvp.ResponseWriter = nil
-			rsvp.req = nil
-			rsvpPool.Put(rsvp)
+	for _, rp := range RestPaths {
+		if strings.HasPrefix(req.URL.Path, rp) {
+			reg.background(w, req)
+			return
 		}
+	}
+
+	if req.Method != http.MethodGet {
+		http.Error(w, req.Method, http.StatusMethodNotAllowed)
+	} else {
+		reg.file(w, strings.TrimPrefix(req.URL.Path, "/"))
 	}
 }
 
@@ -359,6 +349,39 @@ func (reg *registry) assignAddr(sub *Subscriber) error {
 	return nil
 }
 
+// single thread REST operations
+func (reg *registry) background(w http.ResponseWriter, req *http.Request) {
+	if sl, ok := req.Header[RestVcsRevision]; !ok || len(sl) == 0 {
+		http.Error(w, "no "+RestVcsRevision, http.StatusUpgradeRequired)
+		return
+	} else if sl[0] != reg.vcsRev {
+		http.Error(w, "mismatched "+RestVcsRevision,
+			http.StatusUpgradeRequired)
+		return
+	}
+
+	w.Header().Add(RestUnixMicroStart, reg.start)
+	w.Header().Add(RestVcsRevision, reg.vcsRev)
+
+	rsvp := rsvpPool.Get().(*rsvp)
+	rsvp.ResponseWriter = w
+	rsvp.req = req
+
+	ctx := req.Context()
+	select {
+	case <-ctx.Done():
+		rsvpPool.Put(rsvp)
+	case reg.rsvpC <- rsvp:
+		select {
+		case <-ctx.Done():
+		case <-rsvp.doneC:
+			rsvp.ResponseWriter = nil
+			rsvp.req = nil
+			rsvpPool.Put(rsvp)
+		}
+	}
+}
+
 func (reg *registry) checkin(rsvp *rsvp) *Subscriber {
 	if !reg.hasCertificate(rsvp) {
 		return nil
@@ -431,6 +454,29 @@ func (reg *registry) deny(rsvp *rsvp) {
 		return
 	}
 	reg.pending = slices.Delete(reg.pending, i, i+1)
+}
+
+func (reg *registry) dir(w http.ResponseWriter) {
+	var names []string
+	for _, rp := range RestPaths {
+		names = append(names, rp)
+	}
+	names = append(names, "/"+vlink())
+	filepath.WalkDir(vpnDataDir,
+		func(path string, entry fs.DirEntry, err error) error {
+			if path == vpnDataDir || entry == nil || err != nil {
+				return err
+			}
+			if entry.Type().IsRegular() {
+				name := strings.TrimPrefix(path, vpnDataDir)
+				names = append(names, name)
+			}
+			return nil
+		})
+	slices.Sort(names)
+	for _, name := range names {
+		fmt.Fprintln(w, name)
+	}
 }
 
 func (reg *registry) dnsAnswer(query *xdnsmessage.Message) *xdnsmessage.Message {
@@ -571,22 +617,10 @@ func (reg *registry) fromVpn(ctx context.Context, m *xnet.Msg) {
 	mp.Put(m)
 }
 
-func (reg *registry) getFileOrDir(w http.ResponseWriter, name string) {
+func (reg *registry) file(w http.ResponseWriter, name string) {
 	xlog.Trace.Println(http.MethodGet, name)
 	ecode := http.StatusInternalServerError
-	if len(name) == 0 {
-		names := []string{vlink()}
-		if entries, err := os.ReadDir(vpnDataDir); err == nil {
-			for _, sub := range entries {
-				names = append(names, sub.Name())
-			}
-		}
-		slices.Sort(names)
-		for _, s := range names {
-			fmt.Fprintln(w, s)
-		}
-		return
-	} else if name == vlink() {
+	if name == vlink() {
 		f, err := os.Open(xprogram.Path())
 		if err != nil {
 			if errors.Is(err, fs.ErrPermission) {
@@ -608,22 +642,8 @@ func (reg *registry) getFileOrDir(w http.ResponseWriter, name string) {
 			ecode = http.StatusForbidden
 		}
 		http.Error(w, err.Error(), ecode)
-	} else if fi.IsDir() {
-		if des, err := os.ReadDir(name); err != nil {
-			if errors.Is(err, fs.ErrPermission) {
-				ecode = http.StatusForbidden
-			}
-			http.Error(w, err.Error(), ecode)
-		} else {
-			var names []string
-			for _, de := range des {
-				names = append(names, de.Name())
-			}
-			slices.Sort(names)
-			for _, s := range names {
-				fmt.Fprintln(w, s)
-			}
-		}
+	} else if !fi.Mode().IsRegular() {
+		http.Error(w, "irregular file", http.StatusUnprocessableEntity)
 	} else if f, err := os.Open(name); err != nil {
 		if errors.Is(err, fs.ErrPermission) {
 			ecode = http.StatusForbidden

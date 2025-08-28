@@ -75,8 +75,6 @@ const (
 	RestPathShowSubscriber = "/show/subscriber"
 	RestPathShowVCS        = "/show/vcs"
 
-	RestPathStatic = "/static"
-
 	RestPathSubscribe   = "/subscribe"
 	RestPathUnsubscribe = "/unsubscribe"
 
@@ -84,6 +82,35 @@ const (
 	RestPathWhoisId        = "/whois/id"
 	RestPathWhoisNamed     = "/whois/named"
 )
+
+var RestPaths = []string{
+	RestPathApprove,
+	RestPathCertify,
+	RestPathCheckinExchange,
+	RestPathCheckinGuest,
+	RestPathDeny,
+	RestPathDnsQuery,
+	RestPathDumpSubscribers,
+	RestPathInvite,
+	RestPathPing,
+	RestPathReload,
+	RestPathShowAddress,
+	RestPathShowAdmins,
+	RestPathShowExchanges,
+	RestPathShowGuests,
+	RestPathShowHosts,
+	RestPathShowPending,
+	RestPathShowPrefix,
+	RestPathShowStart,
+	RestPathShowStatus,
+	RestPathShowSubscriber,
+	RestPathShowVCS,
+	RestPathSubscribe,
+	RestPathUnsubscribe,
+	RestPathWhoisAddressed,
+	RestPathWhoisId,
+	RestPathWhoisNamed,
+}
 
 const RestOpCheckinExchangePort = "port"
 
@@ -304,7 +331,6 @@ Get or list registry file(s).
 	}
 
 	path := new(strings.Builder)
-	path.WriteString(RestPathStatic)
 	if args = flag.CommandLine.Args(); len(args) > 0 {
 		if !strings.HasPrefix(args[0], "/") {
 			path.WriteRune('/')
