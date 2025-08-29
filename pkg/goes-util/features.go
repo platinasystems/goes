@@ -29,13 +29,15 @@ var Features = map[string]any{
 	"notice":  Notice,
 	"output":  Output,
 	"pty":     Pty,
-	"show": map[string]any{
-		"completion": ShowCompletion,
-		"daemons":    ShowDaemons,
-		"license":    license,
-		"patents":    patents,
-	},
+	"show":    Shows,
 	"standby": Standby,
 	"start":   StartDaemon,
 	"stop":    StopDaemons,
+}
+
+var Shows = map[string]any{
+	"completion": ShowCompletion,
+	"daemons":    ShowDaemons,
+	"license":    license,
+	"patents":    patents,
 }
