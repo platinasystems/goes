@@ -915,9 +915,7 @@ func (reg *registry) rest(rsvp *rsvp) {
 		case path == RestPathShowStart:
 			fmt.Fprintln(rsvp, time.UnixMicro(vpnStart))
 		case path == RestPathShowStatus:
-			if reg.isSubscriber(rsvp) {
-				fmt.Fprintln(rsvp, "OK")
-			}
+			fmt.Fprintln(rsvp, "OK")
 		case strings.HasPrefix(path, RestPathShowSubscriber):
 			if reg.isSubscriber(rsvp) {
 				reg.showSubscriber(rsvp)
