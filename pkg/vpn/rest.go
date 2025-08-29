@@ -35,6 +35,12 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xprogram"
 )
 
+type RestError struct {
+	code int
+	txt,
+	body string
+}
+
 const contextApplicationPKCS8 = "application/pkcs8"
 const dnsLookupTimeout = 30 * time.Second
 
@@ -84,8 +90,13 @@ const (
 	RestPathWhoisNamed     = "/whois/named"
 )
 
+const RestOpCheckinExchangePort = "port"
+
+const RestWhoisDepth = 8
+
 var ErrKoApp = errors.New("ko app")
 var ErrRestartRequired = errors.New("restart required to complete upgrade")
+var ErrNilResponse = errors.New("rest: nil respone")
 
 var RestPaths = []string{
 	RestPathApprove,
@@ -115,15 +126,6 @@ var RestPaths = []string{
 	RestPathWhoisId,
 	RestPathWhoisNamed,
 }
-
-const RestOpCheckinExchangePort = "port"
-
-const RestWhoisDepth = 8
-
-var (
-	ErrNoVCS  = errors.New("no VCS revision")
-	ErrBadVCS = errors.New("mismatched VCS revision")
-)
 
 func defineRestFlags() {
 	defineConfigFlag()
@@ -342,9 +344,6 @@ Get or list registry file(s).
 		path.WriteString(args[0])
 	}
 	_, err = restGet(ctx, os.Stdout, path.String())
-	if errors.Is(err, ErrBadVCS) {
-		err = nil
-	}
 	return err
 }
 
@@ -428,6 +427,42 @@ RESTful subscribe to VPN.
 	return err
 }
 
+func RestUpdate(ctx context.Context, args []string) error {
+	xflag.TemplateUsage(`
+usage: {{.Name}} [flags]
+Download and install program update from registry.
+
+{{flags .}}`)
+
+	defineRestFlags()
+	err := flag.CommandLine.Parse(args)
+	if err != nil {
+		return err
+	}
+
+	if err = restInit(); err != nil {
+		return err
+	}
+
+	if err = restAssertVcsMatch(ctx); err != nil {
+		return err
+	}
+
+	fmt.Println(xprogram.Path(), "is up to date.")
+	return nil
+}
+
+func (re *RestError) Code() int {
+	return re.code
+}
+
+func (re *RestError) Error() string {
+	if len(re.body) == 0 {
+		return re.txt
+	}
+	return fmt.Sprint(re.txt, ", ", re.body)
+}
+
 func restAlloc() *bytes.Buffer {
 	return rest.bufs.Get().(*bytes.Buffer)
 }
@@ -484,27 +519,22 @@ func restDo(w io.Writer, req *http.Request) (*http.Response, error) {
 	req.Header.Set(RestVcsRevision, rest.vcsrev)
 	rsp, err := rest.Do(req)
 	if err != nil {
-		err = fmt.Errorf("rest: %w", err)
-	} else if rsp.StatusCode != http.StatusOK {
-		err = errors.New(rsp.Status)
-	} else if s := rsp.Header.Get(RestVcsRevision); len(s) == 0 {
-		err = ErrNoVCS
-	} else if rest.vcsrev != s {
-		err = ErrBadVCS
-	}
-	if rsp != nil {
-		if err == nil {
-			io.Copy(w, rsp.Body)
-		} else {
-			sb := new(strings.Builder)
-			io.Copy(sb, rsp.Body)
-			if sb.Len() > 0 {
-				err = fmt.Errorf("%w, %s", err, sb)
-			}
+		if rsp != nil {
+			rsp.Body.Close()
 		}
-		rsp.Body.Close()
+		return nil, fmt.Errorf("rest: %w", err)
 	}
-	return rsp, err
+	if rsp == nil {
+		return nil, ErrNilResponse
+	}
+	defer rsp.Body.Close()
+	if rsp.StatusCode == http.StatusOK {
+		io.Copy(w, rsp.Body)
+		return rsp, nil
+	}
+	sb := new(strings.Builder)
+	io.Copy(sb, rsp.Body)
+	return rsp, &RestError{rsp.StatusCode, rsp.Status, sb.String()}
 }
 
 func restFree(buf *bytes.Buffer) {

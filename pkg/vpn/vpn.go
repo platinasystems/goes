@@ -49,6 +49,7 @@ var MainFeatures = map[string]any{
 	"registry":    Registry,
 	"subscribe":   RestSubscribe,
 	"unsubscribe": RestAdmin,
+	"update":      RestUpdate,
 }
 
 var NewFeatures = map[string]any{
