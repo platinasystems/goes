@@ -104,10 +104,10 @@ func (bs BuildSetting) String() string {
 func Path() string {
 	s, err := os.Executable()
 	if err != nil {
-		s, err = filepath.EvalSymlinks(os.Args[0])
-		if err != nil {
-			s = os.Args[0]
-		}
+		s = os.Args[0]
+	}
+	if ś, err := filepath.EvalSymlinks(s); err == nil {
+		s = ś
 	}
 	return s
 }

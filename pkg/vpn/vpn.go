@@ -80,6 +80,8 @@ const (
 
 	ToTunCap = xnet.BatchCap + 4
 	ToVpnCap = xnet.BatchCap
+
+	UpgradeExitCode = 127
 )
 
 const (

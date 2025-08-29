@@ -112,6 +112,10 @@ Forward ciphered packets between exchange and tunnel interface.
 	guest.addressed = make(map[netip.Addr]*Subscriber)
 	guest.indexed = make(map[int]*Subscriber)
 
+	if err = restAssertVcsMatch(ctx); err != nil {
+		return err
+	}
+
 	guest.decapKey, err = mlkem.GenerateKey768()
 	if err != nil {
 		return err

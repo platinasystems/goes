@@ -22,6 +22,7 @@ import (
 	"net/netip"
 	"net/url"
 	"os"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -82,6 +83,9 @@ const (
 	RestPathWhoisId        = "/whois/id"
 	RestPathWhoisNamed     = "/whois/named"
 )
+
+var ErrKoApp = errors.New("ko app")
+var ErrRestartRequired = errors.New("restart required to complete upgrade")
 
 var RestPaths = []string{
 	RestPathApprove,
@@ -426,6 +430,54 @@ RESTful subscribe to VPN.
 
 func restAlloc() *bytes.Buffer {
 	return rest.bufs.Get().(*bytes.Buffer)
+}
+
+// Rest get registry status to validate version.
+// If mismatch, fetch and install upgrade then return [xerrors.ExitError]
+// to force [os.Exit] with [UpgradeExitCode].
+func restAssertVcsMatch(ctx context.Context) error {
+	const cantUpgrade = "can't upgrade"
+	rsp, err := restGet(ctx, io.Discard, RestPathShowStatus)
+	if err == nil {
+		return nil
+	}
+	if rsp == nil || rsp.StatusCode != http.StatusUpgradeRequired {
+		return err
+	}
+	if xprogram.IsKoApp() {
+		return xerrors.Label(ErrKoApp, cantUpgrade)
+	}
+	xp := xprogram.Path()
+	xpSave := fmt.Sprint(xp, "~")
+	xpPlus := fmt.Sprint(xp, "+")
+	mainPlatform := fmt.Sprint(xprogram.MainName(),
+		"-", runtime.GOOS,
+		"-", runtime.GOARCH)
+	fi, err := os.Stat(xp)
+	if err != nil {
+		return xerrors.Label(err, cantUpgrade)
+	}
+	f, err := os.OpenFile(xpPlus, os.O_CREATE|os.O_TRUNC|os.O_WRONLY,
+		fi.Mode())
+	if err != nil {
+		return xerrors.Label(err, cantUpgrade)
+	}
+	_, err = restGet(ctx, f, mainPlatform)
+	f.Close()
+	if err != nil {
+		return xerrors.Label(err, cantUpgrade)
+	}
+	os.Remove(xpSave)
+	if err = os.Link(xp, xpSave); err != nil {
+		return xerrors.Label(err, cantUpgrade)
+	}
+	if err = os.Remove(xp); err != nil {
+		return xerrors.Label(err, cantUpgrade)
+	}
+	if err = os.Link(xpPlus, xp); err != nil {
+		return xerrors.Label(err, cantUpgrade)
+	}
+	return xerrors.NewExitError(UpgradeExitCode, ErrRestartRequired)
 }
 
 func restDo(w io.Writer, req *http.Request) (*http.Response, error) {

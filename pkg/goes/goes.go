@@ -88,8 +88,12 @@ func Main() {
 			return
 		}
 		ecode := 1
+		if ecer, ok := err.(interface {
+			ExitCode() int
+		}); ok {
+			ecode = ecer.ExitCode()
+		}
 		if ee, ok := err.(*exec.ExitError); ok {
-			ecode = ee.ExitCode()
 			if len(ee.Stderr) == 0 {
 				err = nil
 			} else {
