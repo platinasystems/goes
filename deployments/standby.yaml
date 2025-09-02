@@ -1,0 +1,14 @@
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: standby
+  labels:
+    name: standby
+spec:
+  restartPolicy: Never
+  containers:
+  - name: goes
+    imagePullPolicy: IfNotPresent
+    image: ko://github.com/platinasystems/goes/v2
+    args: [ "standby" ]
