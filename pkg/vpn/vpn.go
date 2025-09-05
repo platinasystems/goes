@@ -22,6 +22,7 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xlog"
 	"github.com/platinasystems/goes/v2/pkg/xnet"
 	"github.com/platinasystems/goes/v2/pkg/xnet/netph"
+	"github.com/platinasystems/goes/v2/pkg/xos"
 	"github.com/platinasystems/goes/v2/pkg/xprogram"
 	"github.com/platinasystems/goes/v2/pkg/xsync"
 )
@@ -82,7 +83,7 @@ const (
 	ToTunCap = xnet.BatchCap + 4
 	ToVpnCap = xnet.BatchCap
 
-	UpgradeExitCode = 127
+	UpgradeExitCode = xos.EX_TEMPFAIL
 )
 
 const (
