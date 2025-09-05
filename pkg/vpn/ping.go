@@ -38,7 +38,7 @@ ICMP with named guest.
 		"Timeout regardless of how many received packets.")
 	xflag.Define(&vFlag, "v", "Verbose.")
 
-	defineRestFlags()
+	DefineRestFlags()
 
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
@@ -52,7 +52,7 @@ ICMP with named guest.
 	if err = restInit(); err != nil {
 		return err
 	}
-	sub, err := restWhois(ctx, args[0])
+	sub, err := RestWhois(ctx, args[0])
 	if err != nil {
 		return xerrors.Label(err, "guest")
 	}

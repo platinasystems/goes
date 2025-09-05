@@ -89,11 +89,11 @@ Forward ciphered packets between exchange and tunnel interface.
 
 {{flags .}}`)
 
-	defineRestFlags()
-	defineTunnelFlag()
-	enableQuiet()
-	enableTrace()
-	enableVerbose()
+	DefineRestFlags()
+	DefineTunnelFlag()
+	DefineQuietFlag()
+	DefineTraceFlag()
+	DefineVerboseFlag()
 
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
@@ -112,7 +112,7 @@ Forward ciphered packets between exchange and tunnel interface.
 	guest.addressed = make(map[netip.Addr]*Subscriber)
 	guest.indexed = make(map[int]*Subscriber)
 
-	if err = restAssertVcsMatch(ctx); err != nil {
+	if err = RestAssertVcsMatch(ctx); err != nil {
 		return err
 	}
 
@@ -121,7 +121,7 @@ Forward ciphered packets between exchange and tunnel interface.
 		return err
 	}
 	encapKey := guest.decapKey.EncapsulationKey()
-	guest.receipt, err = restGuestCheckin(ctx, encapKey.Bytes())
+	guest.receipt, err = RestGuestCheckin(ctx, encapKey.Bytes())
 	if err != nil {
 		return err
 	}
@@ -130,7 +130,7 @@ Forward ciphered packets between exchange and tunnel interface.
 	regname := rest.reg.Subject.CommonName
 	guest.exchanges =
 		make([]*Subscriber, 1+len(guest.receipt.ExchangePrecedence))
-	x, err := restWhois(ctx, regname)
+	x, err := RestWhois(ctx, regname)
 	if err != nil {
 		return fmt.Errorf("%s: %w", regname, err)
 	}
@@ -148,7 +148,7 @@ Forward ciphered packets between exchange and tunnel interface.
 	guest.indexed[x.Id.Index()] = x
 
 	for i, name := range guest.receipt.ExchangePrecedence {
-		if x, err = restWhois(ctx, name); err != nil {
+		if x, err = RestWhois(ctx, name); err != nil {
 			xlog.Errata.Printf("%s: %w", name, err)
 		} else {
 			guest.exchanges[1+i] = x
@@ -386,7 +386,7 @@ func guestExchangeWith(ctx context.Context, x *Subscriber) {
 		xlog.Errata.Println(name, "unresolved")
 		return
 	}
-	if hello := newGreeting(0); hello != nil {
+	if hello := NewGreeting(0); hello != nil {
 		xlog.Trace.Println("hello", x)
 		hello.AddrPort = x.ap
 		mp.Queue(ctx, guest.toVpnC, hello)
@@ -432,7 +432,7 @@ func guestFound(ctx context.Context, sub *Subscriber) {
 	xlog.Trace.Println(name, "via", guest.exchanges[sub.gxi])
 
 	wg.Go(func() {
-		invite, err := restInvite(ctx, name, cipherText)
+		invite, err := RestInvite(ctx, name, cipherText)
 		if err != nil {
 			xlog.Errata.Println(name, "invite:", err)
 			guestDiscardPending(sub)
@@ -557,7 +557,7 @@ func guestHelloToAllExchanges(ctx context.Context, now int64) {
 			x.ap = netip.AddrPortFrom(x.ap.Addr(),
 				defaultExchangePort)
 		}
-		if hello := newGreeting(now); hello != nil {
+		if hello := NewGreeting(now); hello != nil {
 			xlog.Trace.Println("hello to", x)
 			hello.AddrPort = x.ap
 			if !mp.Queue(ctx, guest.toVpnC, hello) {

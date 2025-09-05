@@ -23,7 +23,7 @@ Pipe stdin/out with TCP connection to numbered port of named guest.
 
 {{flags .}}`)
 
-	defineRestFlags()
+	DefineRestFlags()
 
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
@@ -39,7 +39,7 @@ Pipe stdin/out with TCP connection to numbered port of named guest.
 	if err = restInit(); err != nil {
 		return err
 	}
-	sub, err := restWhois(ctx, args[0])
+	sub, err := RestWhois(ctx, args[0])
 	if err != nil {
 		return xerrors.Label(err, "guest")
 	}

@@ -32,10 +32,10 @@ Exchange ciphered packets between guests.
 
 {{flags .}}`)
 
-	defineRestFlags()
-	enableTrace()
-	enableQuiet()
-	enableVerbose()
+	DefineRestFlags()
+	DefineTraceFlag()
+	DefineQuietFlag()
+	DefineVerboseFlag()
 
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
@@ -57,11 +57,11 @@ Exchange ciphered packets between guests.
 
 	exchange.sub = make(map[int]*Subscriber)
 
-	if err = restAssertVcsMatch(ctx); err != nil {
+	if err = RestAssertVcsMatch(ctx); err != nil {
 		return err
 	}
 
-	port, err := restExchangeCheckin(ctx)
+	port, err := RestExchangeCheckin(ctx)
 	if err != nil {
 		return err
 	} else if port == 0 {
@@ -121,7 +121,7 @@ func exchangeFromVpn(ctx context.Context, m *xnet.Msg) {
 	} else if fid == tid {
 		if from.helloIsOK(m) {
 			from.ap = unmap4in6(m.AddrPort)
-			if hello := newGreeting(0); hello != nil {
+			if hello := NewGreeting(0); hello != nil {
 				xlog.Trace.Println("hello reply", from)
 				hello.AddrPort = from.ap
 				mp.Queue(ctx, exchange.toVpnC, hello)

@@ -140,7 +140,7 @@ func (sub *Subscriber) resolve(ctx context.Context) {
 }
 
 func (sub *Subscriber) stateFileName() string {
-	return filepath.Join(vpnStateDir, fmt.Sprint(sub.name(), ".pem"))
+	return filepath.Join(VpnStateDir, fmt.Sprint(sub.name(), ".pem"))
 }
 
 // Parse [Subscriber.Cert] from [Subscriber.CertDER] and validate signature.

@@ -37,15 +37,15 @@ Print algorithm.
 
 {{flags .}}`)
 
-	defineConfigFlag()
-	defineSigFlag()
+	DefineConfigFlag()
+	DefineSigFlag()
 
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
 		return err
 	}
 	if flag.CommandLine.NArg() > 0 {
-		vpnSigFile = flag.CommandLine.Arg(0)
+		VpnSigFile = flag.CommandLine.Arg(0)
 	}
 	if err = signInit(); err != nil {
 		return err

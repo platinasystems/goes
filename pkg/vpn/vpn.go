@@ -122,14 +122,14 @@ var (
 
 	vpnPort = uint16(defaultRegistryPort)
 
-	vpnConfigDir, vpnDataDir, vpnStateDir string
+	VpnConfigDir, VpnDataDir, VpnStateDir string
 
-	vpnAdminsFile    = "admins"
-	vpnCertFile      = "cert.pem"
-	vpnExchangesFile = "exchanges"
-	vpnHostsFile     = "hosts"
-	vpnRegistryFile  = defaultRegistryFile
-	vpnSigFile       = "sig.pk8"
+	VpnAdminsFile    = "admins"
+	VpnCertFile      = "cert.pem"
+	VpnExchangesFile = "exchanges"
+	VpnHostsFile     = "hosts"
+	VpnRegistryFile  = defaultRegistryFile
+	VpnSigFile       = "sig.pk8"
 
 	vpnCountry,
 	vpnEmail,
@@ -181,7 +181,10 @@ var HostFQDN = sync.OnceValues(func() (string, error) {
 	return os.Hostname()
 })
 
-func bestDir(primary string, alternates ...string) string {
+// BestDir returns the primary directory name if it exists,
+// or the first existing alternate directory,
+// or the primary if none exist.
+func BestDir(primary string, alternates ...string) string {
 	if fi, err := os.Stat(primary); err == nil && fi.IsDir() {
 		return primary
 	}
@@ -193,75 +196,84 @@ func bestDir(primary string, alternates ...string) string {
 	return primary
 }
 
-func defineAdminsFlag() {
-	if s, ok := mainEnv("ADMINS"); ok {
-		vpnAdminsFile = s
+// If $ADMINS exists, use it to override the default [VpnAdminsFile] before
+// defining the “-admins” flag.
+func DefineAdminsFlag() {
+	if s, ok := MainEnv("ADMINS"); ok {
+		VpnAdminsFile = s
 	}
-	xflag.Define(&vpnAdminsFile, "admins", `
+	xflag.Define(&VpnAdminsFile, "admins", `
 An optional file w/in current or config directory containing a newline
 separated list of certificate common names that may administer subscriptions.
 `[1:])
 }
 
-func defineCertFlag() {
-	if s, ok := mainEnv("CERT"); ok {
-		vpnCertFile = s
-	} else if _, err := os.Stat(vpnCertFile); err == nil {
+// Default:
+//   - Value of existing [MainEnv]("CERT")
+//   - “cert.pem” if that exist in current or [VpnConfigDir]
+//   - otherwise, [Host] + ".pem“
+func DefineCertFlag() {
+	if s, ok := MainEnv("CERT"); ok {
+		VpnCertFile = s
+	} else if _, err := os.Stat(VpnCertFile); err == nil {
 	} else if _, err = os.Stat(filepath.
-		Join(vpnConfigDir, vpnCertFile)); err == nil {
+		Join(VpnConfigDir, VpnCertFile)); err == nil {
 	} else if s, err = Host(); err == nil {
-		vpnCertFile = fmt.Sprint(s, ".pem")
+		VpnCertFile = fmt.Sprint(s, ".pem")
 	}
-	xflag.Define(&vpnCertFile, "cert",
+	xflag.Define(&VpnCertFile, "cert",
 		"Certificate file w/in current or config directory.")
 }
 
-// Default { [xdg.ConfigHome] or [fhs.Config] } + MAIN,
-// if MAIN as "-vpn", or MAIN/vpn
-var defineConfigFlag = sync.OnceFunc(func() {
-	subDir := mainSubDir()
-	fhsDir := filepath.Join(fhs.Config(), subDir)
-	xdgDir := filepath.Join(xdg.ConfigHome(), subDir)
-	if s, ok := mainEnv("CONFIG"); ok {
-		vpnConfigDir = s
+var FhsConfigMainDir = func() string {
+	return filepath.Join(fhs.Config(), MainSubDir())
+}
+
+var XdgConfigMainDir = func() string {
+	return filepath.Join(xdg.ConfigHome(), MainSubDir())
+}
+
+var DefineConfigFlag = sync.OnceFunc(func() {
+	if s, ok := MainEnv("CONFIG"); ok {
+		VpnConfigDir = s
 	} else if xprogram.IsKoApp() {
-		vpnConfigDir = fhsDir
+		VpnConfigDir = FhsConfigMainDir()
 	} else if os.Geteuid() == 0 {
-		vpnConfigDir = bestDir(fhsDir, xdgDir)
+		VpnConfigDir = BestDir(FhsConfigMainDir(), XdgConfigMainDir())
 	} else {
-		vpnConfigDir = bestDir(xdgDir, fhsDir)
+		VpnConfigDir = BestDir(XdgConfigMainDir(), FhsConfigMainDir())
 	}
-	xflag.Define(&vpnConfigDir, "config", "Configuration directory.")
+	xflag.Define(&VpnConfigDir, "config", "Configuration directory.")
 })
 
-func defineCountryFlag() {
+func DefineCountryFlag() {
 	xflag.Define(&vpnCountry, "country",
 		"New certificate's country code.")
 }
 
-// Default $KO_DATA_PATH; or
-// { [xdg.DataHome] or [fhs.Data] } + MAIN,
-// if MAIN as "-vpn", or MAIN/vpn
-var defineDataFlag = sync.OnceFunc(func() {
+var FhsDataMainDir = func() string {
+	return filepath.Join(fhs.Data(), MainSubDir())
+}
+
+var XdgDataMainDir = func() string {
+	return filepath.Join(xdg.DataHome(), MainSubDir())
+}
+
+var DefineDataFlag = sync.OnceFunc(func() {
 	if s, ok := os.LookupEnv("KO_DATA_PATH"); ok {
-		vpnDataDir = s
-	} else if s, ok = mainEnv("DATA"); ok {
-		vpnDataDir = s
+		VpnDataDir = s
+	} else if s, ok = MainEnv("DATA"); ok {
+		VpnDataDir = s
+	} else if os.Geteuid() == 0 {
+		VpnDataDir = BestDir(FhsDataMainDir(), XdgDataMainDir())
 	} else {
-		subDir := mainSubDir()
-		fhsDir := filepath.Join(fhs.Data(), subDir)
-		xdgDir := filepath.Join(xdg.DataHome(), subDir)
-		if os.Geteuid() == 0 {
-			vpnDataDir = bestDir(fhsDir, xdgDir)
-		} else {
-			vpnDataDir = bestDir(xdgDir, fhsDir)
-		}
+		VpnDataDir = BestDir(XdgDataMainDir(), FhsDataMainDir())
 	}
-	xflag.Define(&vpnDataDir, "data",
+	xflag.Define(&VpnDataDir, "data",
 		"Registry directory containing alternate platforms.")
 })
 
-func defineDNSFlag() {
+func DefineDNSFlag() {
 	if s, err := HostFQDN(); err == nil && len(s) > 0 {
 		vpnDNS = s
 	}
@@ -269,148 +281,154 @@ func defineDNSFlag() {
 		"New certificate's comma separated domain names.")
 }
 
-func defineDomainFlag() {
+func DefineDomainFlag() {
 	xflag.Define(&vpnDomain, "domain", "Search domain suffix.")
 }
 
-func defineDurationFlag() {
+func DefineDurationFlag() {
 	xflag.Define(&vpnDuration, "duration",
 		"New certificate's life span, e.g. 360s, 60m, or 1h.")
 }
 
-func defineEmailFlag() {
+func DefineEmailFlag() {
 	xflag.Define(&vpnEmail, "email",
 		"New certificate's comma separated addresses.")
 }
 
-func defineExchangesFlag() {
-	if s, ok := mainEnv("EXCHANGES"); ok {
-		vpnExchangesFile = s
+var DefineExchangesFlag = func() {
+	if s, ok := MainEnv("EXCHANGES"); ok {
+		VpnExchangesFile = s
 	}
-	xflag.Define(&vpnExchangesFile, "exchanges", `
+	xflag.Define(&VpnExchangesFile, "exchanges", `
 An optional file w/in current or config directory containing a newline
 separated list of guest exhange assignment and exchange port numbers.
 `[1:])
 }
 
-func defineHostsFlag() {
-	if s, ok := mainEnv("HOSTS"); ok {
-		vpnHostsFile = s
+// Default:
+//   - Value of existing [MainEnv]("HOSTS")
+//   - othersise, "hosts" in current or [VpnConfigDir]
+var DefineHostsFlag = func() {
+	if s, ok := MainEnv("HOSTS"); ok {
+		VpnHostsFile = s
 	}
-	xflag.Define(&vpnHostsFile, "hosts", `
+	xflag.Define(&VpnHostsFile, "hosts", `
 An optional file w/in current or config directory containing a newline
 separated list of static address assignments in /ets/hosts format.
 `[1:])
 }
 
-func defineLocalityFlag() {
+func DefineLocalityFlag() {
 	xflag.Define(&vpnLocality, "locality",
 		"New certificate's city.")
 }
 
-func defineNameFlag() {
+func DefineNameFlag() {
 	if s, err := Host(); err == nil {
 		vpnName = s
 	}
 	xflag.Define(&vpnName, "name", "VPN identfier.")
 }
 
-func defineOrganizationFlag() {
+func DefineOrganizationFlag() {
 	xflag.Define(&vpnOrganization, "organization",
 		"New certificate's company")
 }
 
-func defineOrganizationalUnitFlag() {
+func DefineOrganizationalUnitFlag() {
 	xflag.Define(&vpnOrganizationalUnit, "organizational-unit",
 		"New certificate's department.")
 }
 
-func definePortFlag() {
+func DefinePortFlag() {
 	xflag.Define(&vpnPort, "port", "REST listener.")
 }
 
-func definePostalCodeFlag() {
+func DefinePostalCodeFlag() {
 	xflag.Define(&vpnPostalCode, "postal-code",
 		"New certificate's zip code.")
 }
 
-func definePrefixFlag() {
+func DefinePrefixFlag() {
 	vpnPrefix = netip.MustParsePrefix("fc00:1234::/64")
 	xflag.Define(&vpnPrefix, "prefix", "Network prefix.")
 }
 
-func defineProvinceFlag() {
+func DefineProvinceFlag() {
 	xflag.Define(&vpnProvince, "province",
 		"New certificate's state.")
 }
 
-func defineRegistryFlag() {
-	if s, ok := mainEnv("REGISTRY"); ok {
-		vpnRegistryFile = s
-	}
-	xflag.Define(&vpnRegistryFile, "registry",
-		"Registry certificate file w/in current or config directory.")
-}
-
-func defineSerialNumberFlag() {
-	xflag.Define(&vpnSerialNumber, "serial-number",
-		"New certificate's identifier, random if zero.")
-}
-
-func defineSigFlag() {
-	if s, ok := mainEnv("SIG"); ok {
-		vpnSigFile = s
-	}
-	xflag.Define(&vpnSigFile, "sig",
-		"Signature file w/in current or config directory.")
-}
-
-// Default { [xdg.StateHome] or [fhs.State] } + MAIN,
-// if MAIN as "-vpn", or MAIN/vpn
-func defineStateFlag() {
-	subDir := mainSubDir()
-	fhsDir := filepath.Join(fhs.State(), subDir)
-	xdgDir := filepath.Join(xdg.StateHome(), subDir)
-	if s, ok := mainEnv("STATE"); ok {
-		vpnStateDir = s
-	} else if xprogram.IsKoApp() {
-		vpnStateDir = fhsDir
-	} else if os.Geteuid() == 0 {
-		vpnStateDir = bestDir(fhsDir, xdgDir)
-	} else {
-		vpnStateDir = bestDir(xdgDir, fhsDir)
-	}
-	xflag.Define(&vpnStateDir, "state",
-		"Registry directory to save approved subscriber certificates.")
-}
-
-func defineStreetFlag() {
-	xflag.Define(&vpnStreet, "street", "")
-}
-
-func defineTunnelFlag() {
-	xflag.Define(&vpnTunnel, "t", "Tunnel unit number.")
-}
-
-func defineURIFlag() {
-	xflag.Define(&vpnURI, "uri", "Comma separated URLs.")
-}
-
-func enableQuiet() {
+func DefineQuietFlag() {
 	xflag.Enable("q", "Quiet logging.", func() error {
 		xlog.MuteErrata()
 		return nil
 	})
 }
 
-func enableTrace() {
+var DefineRegistryFlag = func() {
+	if s, ok := MainEnv("REGISTRY"); ok {
+		VpnRegistryFile = s
+	}
+	xflag.Define(&VpnRegistryFile, "registry",
+		"Registry certificate file w/in current or config directory.")
+}
+
+func DefineSerialNumberFlag() {
+	xflag.Define(&vpnSerialNumber, "serial-number",
+		"New certificate's identifier, random if zero.")
+}
+
+var DefineSigFlag = func() {
+	if s, ok := MainEnv("SIG"); ok {
+		VpnSigFile = s
+	}
+	xflag.Define(&VpnSigFile, "sig",
+		"Signature file w/in current or config directory.")
+}
+
+var FhsStateMainDir = func() string {
+	return filepath.Join(fhs.State(), MainSubDir())
+}
+
+var XdgStateMainDir = func() string {
+	return filepath.Join(xdg.StateHome(), MainSubDir())
+}
+
+var DefineStateFlag = func() {
+	if s, ok := MainEnv("STATE"); ok {
+		VpnStateDir = s
+	} else if xprogram.IsKoApp() {
+		VpnStateDir = FhsStateMainDir()
+	} else if os.Geteuid() == 0 {
+		VpnStateDir = BestDir(FhsStateMainDir(), XdgStateMainDir())
+	} else {
+		VpnStateDir = BestDir(XdgStateMainDir(), FhsStateMainDir())
+	}
+	xflag.Define(&VpnStateDir, "state",
+		"Registry directory to save approved subscriber certificates.")
+}
+
+func DefineStreetFlag() {
+	xflag.Define(&vpnStreet, "street", "")
+}
+
+func DefineTunnelFlag() {
+	xflag.Define(&vpnTunnel, "t", "Tunnel unit number.")
+}
+
+func DefineURIFlag() {
+	xflag.Define(&vpnURI, "uri", "Comma separated URLs.")
+}
+
+func DefineTraceFlag() {
 	xflag.Enable("trace", "Log packet forwarding.", func() error {
 		xlog.UnmuteTrace()
 		return nil
 	})
 }
 
-func enableVerbose() {
+func DefineVerboseFlag() {
 	xflag.Enable("v", "Verbose logging.", func() error {
 		xlog.UnmuteInfo()
 		return nil
@@ -433,30 +451,48 @@ func unestablishedError(args ...any) error {
 	return xerrors.Label(errUnestablished, args...)
 }
 
-func mainEnv(suffix string) (string, bool) {
-	s := fmt.Sprint(mainEnvPrefix(), "_", suffix)
-	return os.LookupEnv(s)
+// MainEnv returns the [os.LookupEnv] of [MainEnvPrefix] with the given suffix.
+func MainEnv(suffix string) (string, bool) {
+	return os.LookupEnv(fmt.Sprint(MainEnvPrefix(), suffix))
 }
 
-var mainEnvPrefix = sync.OnceValue(func() string {
-	s := xprogram.MainName()
-	if strings.Index(s, "-vpn") < 0 {
-		s += "_VPN"
+// MainEnvPrefix returns the [xprogram.MainName] as an uppercase, environment
+// keyword prefix.  If not [MainHasVpn], this appends that keyword with "_VPN".
+//
+// So, both “goes” and “goes-vpn” mains return “GOES_VPN_” prefix.
+var MainEnvPrefix = sync.OnceValue(func() string {
+	var sb strings.Builder
+	sb.WriteString(ToUpperEnvName(xprogram.MainName()))
+	if !MainHasVpn() {
+		sb.WriteString("_VPN")
 	}
-	s = strings.ToUpper(mainSubDir())
-	s = strings.Replace(s, "-", "_", -1)
-	return s
+	sb.WriteRune('_')
+	return sb.String()
 })
 
-var mainSubDir = sync.OnceValue(func() string {
+func ToUpperEnvName(s string) string {
+	return strings.Replace(strings.ToUpper(s), "-", "_", -1)
+}
+
+// MainHasVpn returns true if [xprogram.MainName] has "-vpn".
+var MainHasVpn = sync.OnceValue(func() bool {
+	return strings.Index(xprogram.MainName(), "-vpn") > 0
+})
+
+// MainSubDir returns [xprogram.MainName] if it has "-vpn";
+// otherwise, it filepath joins that with "vpn".
+//
+// So, a “goes” main returns “goes/vpn”
+// and the “goes-vpn” main returns “goes-vpn”.
+var MainSubDir = sync.OnceValue(func() string {
 	s := xprogram.MainName()
-	if strings.Index(s, "-vpn") < 0 {
+	if !MainHasVpn() {
 		s = filepath.Join(s, "vpn")
 	}
 	return s
 })
 
-func newGreeting(now int64) *xnet.Msg {
+func NewGreeting(now int64) *xnet.Msg {
 	var err error
 
 	m := mp.Get()
@@ -494,32 +530,32 @@ func unmap4in6(ap netip.AddrPort) netip.AddrPort {
 func vpnConfigFile(s string) string {
 	if s != "-" && strings.IndexRune(s, filepath.Separator) < 0 {
 		if _, err := os.Stat(s); errors.Is(err, fs.ErrNotExist) {
-			s = filepath.Join(vpnConfigDir, s)
+			s = filepath.Join(VpnConfigDir, s)
 		}
 	}
 	return s
 }
 
 var vpnAdminsPath = sync.OnceValue(func() string {
-	return vpnConfigFile(vpnAdminsFile)
+	return vpnConfigFile(VpnAdminsFile)
 })
 
 var vpnCertPath = sync.OnceValue(func() string {
-	return vpnConfigFile(vpnCertFile)
+	return vpnConfigFile(VpnCertFile)
 })
 
 var vpnExchangesPath = sync.OnceValue(func() string {
-	return vpnConfigFile(vpnExchangesFile)
+	return vpnConfigFile(VpnExchangesFile)
 })
 
 var vpnHostsPath = sync.OnceValue(func() string {
-	return vpnConfigFile(vpnHostsFile)
+	return vpnConfigFile(VpnHostsFile)
 })
 
 var vpnRegistryPath = sync.OnceValue(func() string {
-	return vpnConfigFile(vpnRegistryFile)
+	return vpnConfigFile(VpnRegistryFile)
 })
 
 var vpnSigPath = sync.OnceValue(func() string {
-	return vpnConfigFile(vpnSigFile)
+	return vpnConfigFile(VpnSigFile)
 })

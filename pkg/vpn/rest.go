@@ -127,12 +127,12 @@ var RestPaths = []string{
 	RestPathWhoisNamed,
 }
 
-func defineRestFlags() {
-	defineConfigFlag()
-	defineCertFlag()
-	definePortFlag()
-	defineRegistryFlag()
-	defineSigFlag()
+func DefineRestFlags() {
+	DefineConfigFlag()
+	DefineCertFlag()
+	DefinePortFlag()
+	DefineRegistryFlag()
+	DefineSigFlag()
 }
 
 var rest struct {
@@ -216,7 +216,7 @@ RESTful registry administration.
 
 {{flags .}}`)
 
-	defineRestFlags()
+	DefineRestFlags()
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
 		return err
@@ -249,10 +249,10 @@ Import registry certificate.
 
 {{flags .}}`)
 
-	defineRestFlags()
+	DefineRestFlags()
 	yes := flag.CommandLine.Bool("y", false,
 		fmt.Sprint("Yes, write remote certificate to ",
-			vpnRegistryFile))
+			VpnRegistryFile))
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
 		return err
@@ -299,7 +299,7 @@ Import registry certificate.
 
 	if !*yes {
 		fmt.Fprintf(w, `Enter "yes" to write above to %s: `,
-			vpnRegistryFile)
+			VpnRegistryFile)
 		s, err := r.ReadString('\n')
 		if err != nil && strings.TrimSpace(s) != "yes" {
 			return err
@@ -310,7 +310,7 @@ Import registry certificate.
 		Type:  "CERTIFICATE",
 		Bytes: rsp.TLS.PeerCertificates[0].Raw,
 	}
-	wc, err := os.OpenFile(vpnRegistryFile, oCreate, 0644)
+	wc, err := os.OpenFile(VpnRegistryFile, oCreate, 0644)
 	if err != nil {
 		return err
 	}
@@ -325,7 +325,7 @@ Get or list registry file(s).
 
 {{flags .}}`)
 
-	defineRestFlags()
+	DefineRestFlags()
 
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
@@ -354,7 +354,7 @@ RESTful reload registry configuration.
 
 {{flags .}}`)
 
-	defineRestFlags()
+	DefineRestFlags()
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
 		return err
@@ -377,7 +377,7 @@ RESTful query and print registry object.
 func RestShow(ctx context.Context, args []string) error {
 	xflag.TemplateUsage(restShowUsageTemplate)
 
-	defineRestFlags()
+	DefineRestFlags()
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
 		return err
@@ -406,7 +406,7 @@ RESTful subscribe to VPN.
 
 {{flags .}}`)
 
-	defineRestFlags()
+	DefineRestFlags()
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
 		return err
@@ -434,7 +434,7 @@ Download and install program update from registry.
 
 {{flags .}}`)
 
-	defineRestFlags()
+	DefineRestFlags()
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
 		return err
@@ -444,7 +444,7 @@ Download and install program update from registry.
 		return err
 	}
 
-	if err = restAssertVcsMatch(ctx); err != nil {
+	if err = RestAssertVcsMatch(ctx); err != nil {
 		return err
 	}
 
@@ -467,10 +467,10 @@ func restAlloc() *bytes.Buffer {
 	return rest.bufs.Get().(*bytes.Buffer)
 }
 
-// Rest get registry status to validate version.
+// REST get registry status to validate version.
 // If mismatch, fetch and install upgrade then return [xerrors.ExitError]
 // to force [os.Exit] with [UpgradeExitCode].
-func restAssertVcsMatch(ctx context.Context) error {
+func RestAssertVcsMatch(ctx context.Context) error {
 	const cantUpgrade = "can't upgrade"
 	rsp, err := restGet(ctx, io.Discard, RestPathShowStatus)
 	if err == nil {
@@ -542,7 +542,7 @@ func restFree(buf *bytes.Buffer) {
 	rest.bufs.Put(buf)
 }
 
-func restExchangeCheckin(ctx context.Context) (uint16, error) {
+func RestExchangeCheckin(ctx context.Context) (uint16, error) {
 	var id uint
 	var port uint16
 
@@ -553,7 +553,7 @@ func restExchangeCheckin(ctx context.Context) (uint16, error) {
 	if err != nil {
 		return 0, err
 	}
-	if err = restValidateCheckinResponse(rsp); err != nil {
+	if err = RestValidateCheckinResponse(rsp); err != nil {
 		return 0, err
 	}
 	if _, err = fmt.Fscan(buf, &id, &port); err != nil {
@@ -597,7 +597,7 @@ func restGet(
 	return restRequest(ctx, http.MethodGet, w, "", nil, path, kv...)
 }
 
-func restGuestCheckin(ctx context.Context, encap []byte) (
+func RestGuestCheckin(ctx context.Context, encap []byte) (
 	*GuestReceipt, error,
 ) {
 	buf := restAlloc()
@@ -610,7 +610,7 @@ func restGuestCheckin(ctx context.Context, encap []byte) (
 	if err != nil {
 		return receipt, err
 	}
-	if err = restValidateCheckinResponse(rsp); err != nil {
+	if err = RestValidateCheckinResponse(rsp); err != nil {
 		return receipt, err
 	}
 	if err = json.Unmarshal(buf.Bytes(), &receipt); err != nil {
@@ -621,7 +621,7 @@ func restGuestCheckin(ctx context.Context, encap []byte) (
 	return receipt, nil
 }
 
-func restInvite(ctx context.Context, name string, cipherText []byte) (
+func RestInvite(ctx context.Context, name string, cipherText []byte) (
 	[]byte, error,
 ) {
 	buf := restAlloc()
@@ -704,7 +704,7 @@ func restRequest(
 	return restDo(w, req)
 }
 
-func restValidateCheckinResponse(rsp *http.Response) error {
+func RestValidateCheckinResponse(rsp *http.Response) error {
 	if rsp == nil {
 		return xerrors.Invalid("checkin response")
 	}
@@ -736,7 +736,7 @@ func restWaitForResolution(ctx context.Context) error {
 	return err
 }
 
-func restWhois(ctx context.Context, v any) (*Subscriber, error) {
+func RestWhois(ctx context.Context, v any) (*Subscriber, error) {
 	var path string
 	buf := restAlloc()
 	defer restFree(buf)
@@ -779,7 +779,7 @@ func restWhoisService(ctx context.Context) {
 			if !ok {
 				return
 			}
-			sub, err := restWhois(ctx, q)
+			sub, err := RestWhois(ctx, q)
 			if err != nil {
 				xlog.Errata.Print(err)
 			} else {

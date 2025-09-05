@@ -40,8 +40,8 @@ Create PEM encoded ed25519 signature key file.
 
 {{flags .}}`)
 
-	defineConfigFlag()
-	defineSigFlag()
+	DefineConfigFlag()
+	DefineSigFlag()
 
 	err := flag.CommandLine.Parse(args)
 	if err != nil {

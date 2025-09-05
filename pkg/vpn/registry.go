@@ -125,22 +125,22 @@ A RESTful WWW server and packet exchange.
 
 {{flags .}}`)
 
-	defineConfigFlag()
-	defineDataFlag()
-	defineStateFlag()
+	DefineConfigFlag()
+	DefineDataFlag()
+	DefineStateFlag()
 
-	defineAdminsFlag()
-	defineCertFlag()
-	defineExchangesFlag()
-	defineDomainFlag()
-	defineHostsFlag()
-	definePortFlag()
-	definePrefixFlag()
-	defineSigFlag()
+	DefineAdminsFlag()
+	DefineCertFlag()
+	DefineExchangesFlag()
+	DefineDomainFlag()
+	DefineHostsFlag()
+	DefinePortFlag()
+	DefinePrefixFlag()
+	DefineSigFlag()
 
-	enableQuiet()
-	enableTrace()
-	enableVerbose()
+	DefineQuietFlag()
+	DefineTraceFlag()
+	DefineVerboseFlag()
 
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
@@ -278,10 +278,10 @@ func (reg *registry) approve(rsvp *rsvp) {
 		http.Error(rsvp, "incomplete subscriber", http.StatusBadRequest)
 		return
 	}
-	_, err := os.Stat(vpnStateDir)
+	_, err := os.Stat(VpnStateDir)
 	if err != nil {
 		if os.IsNotExist(err) {
-			err = os.MkdirAll(vpnStateDir, 0755)
+			err = os.MkdirAll(VpnStateDir, 0755)
 		}
 		if err != nil {
 			http.Error(rsvp, err.Error(),
@@ -462,13 +462,13 @@ func (reg *registry) dir(w http.ResponseWriter) {
 		names = append(names, rp)
 	}
 	names = append(names, "/"+vlink())
-	filepath.WalkDir(vpnDataDir,
+	filepath.WalkDir(VpnDataDir,
 		func(path string, entry fs.DirEntry, err error) error {
-			if path == vpnDataDir || entry == nil || err != nil {
+			if path == VpnDataDir || entry == nil || err != nil {
 				return err
 			}
 			if entry.Type().IsRegular() {
-				name := strings.TrimPrefix(path, vpnDataDir)
+				name := strings.TrimPrefix(path, VpnDataDir)
 				names = append(names, name)
 			}
 			return nil
@@ -594,7 +594,7 @@ func (reg *registry) fromVpn(ctx context.Context, m *xnet.Msg) {
 	} else if fid == tid {
 		if from.helloIsOK(m) {
 			from.ap = unmap4in6(m.AddrPort)
-			if hello := newGreeting(0); hello != nil {
+			if hello := NewGreeting(0); hello != nil {
 				xlog.Trace.Println("hello reply", from)
 				hello.AddrPort = from.ap
 				mp.Queue(ctx, reg.toVpnC, hello)
@@ -634,7 +634,7 @@ func (reg *registry) file(w http.ResponseWriter, name string) {
 		return
 	}
 
-	name = filepath.Join(vpnDataDir, name)
+	name = filepath.Join(VpnDataDir, name)
 	if fi, err := os.Stat(name); err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
 			ecode = http.StatusNotFound
@@ -793,7 +793,7 @@ func (reg *registry) loadSubscribers() error {
 	reg.named[cn] = sub
 
 	var fns []string
-	for _, dn := range []string{vpnConfigDir, vpnStateDir} {
+	for _, dn := range []string{VpnConfigDir, VpnStateDir} {
 		matches, err := filepath.Glob(filepath.Join(dn, "*.pem"))
 		if err != nil {
 			return err

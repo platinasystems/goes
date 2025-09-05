@@ -98,23 +98,23 @@ Create PEM encoded x509 certificate file.
 
 {{flags .}}`)
 
-	defineConfigFlag()
+	DefineConfigFlag()
 
-	defineCertFlag()
-	defineCountryFlag()
-	defineDNSFlag()
-	defineDurationFlag()
-	defineEmailFlag()
-	defineLocalityFlag()
-	defineNameFlag()
-	defineOrganizationFlag()
-	defineOrganizationalUnitFlag()
-	definePostalCodeFlag()
-	defineProvinceFlag()
-	defineSerialNumberFlag()
-	defineSigFlag()
-	defineStreetFlag()
-	defineURIFlag()
+	DefineCertFlag()
+	DefineCountryFlag()
+	DefineDNSFlag()
+	DefineDurationFlag()
+	DefineEmailFlag()
+	DefineLocalityFlag()
+	DefineNameFlag()
+	DefineOrganizationFlag()
+	DefineOrganizationalUnitFlag()
+	DefinePostalCodeFlag()
+	DefineProvinceFlag()
+	DefineSerialNumberFlag()
+	DefineSigFlag()
+	DefineStreetFlag()
+	DefineURIFlag()
 
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
@@ -220,9 +220,9 @@ Print parsed certificate.
 
 {{flags .}}`)
 
-	defineConfigFlag()
-	defineCertFlag()
-	defineSigFlag()
+	DefineConfigFlag()
+	DefineCertFlag()
+	DefineSigFlag()
 
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
