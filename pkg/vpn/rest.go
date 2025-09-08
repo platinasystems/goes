@@ -467,6 +467,7 @@ func restAlloc() *bytes.Buffer {
 // If mismatch, fetch and install upgrade then return [xerrors.ExitError]
 // to force [os.Exit] with [UpgradeExitCode].
 func RestAssertVcsMatch(ctx context.Context) error {
+	const ocreate = os.O_CREATE | os.O_TRUNC | os.O_WRONLY
 	const cantUpgrade = "can't upgrade"
 	rsp, err := restGet(ctx, io.Discard, RestPathShowStatus)
 	if err == nil {
@@ -488,8 +489,13 @@ func RestAssertVcsMatch(ctx context.Context) error {
 	if err != nil {
 		return xerrors.Label(err, cantUpgrade)
 	}
-	f, err := os.OpenFile(xpPlus, os.O_CREATE|os.O_TRUNC|os.O_WRONLY,
-		fi.Mode())
+	for _, s := range []string{xpSave, xpPlus} {
+		err = os.Remove(s)
+		if err != nil && errors.Is(err, fs.ErrPermission) {
+			return xerrors.Label(err, cantUpgrade)
+		}
+	}
+	f, err := os.OpenFile(xpPlus, ocreate, fi.Mode())
 	if err != nil {
 		return xerrors.Label(err, cantUpgrade)
 	}
@@ -498,7 +504,6 @@ func RestAssertVcsMatch(ctx context.Context) error {
 	if err != nil {
 		return xerrors.Label(err, cantUpgrade)
 	}
-	os.Remove(xpSave)
 	if err = os.Link(xp, xpSave); err != nil {
 		return xerrors.Label(err, cantUpgrade)
 	}
