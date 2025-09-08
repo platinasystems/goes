@@ -260,7 +260,20 @@ func (reg *registry) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	for _, rp := range RestPaths {
 		if strings.HasPrefix(req.URL.Path, rp) {
-			reg.background(w, req)
+			if rp != RestPathDnsQuery {
+				sl, ok := req.Header[RestVcsRevision]
+				if !ok || len(sl) == 0 {
+					http.Error(w, "no "+RestVcsRevision,
+						http.StatusUpgradeRequired)
+					return
+				}
+				if sl[0] != reg.vcsRev {
+					http.Error(w, "mismatched "+RestVcsRevision,
+						http.StatusUpgradeRequired)
+					return
+				}
+			}
+			reg.queueRestReq(w, req)
 			return
 		}
 	}
@@ -349,17 +362,8 @@ func (reg *registry) assignAddr(sub *Subscriber) error {
 	return nil
 }
 
-// single thread REST operations
-func (reg *registry) background(w http.ResponseWriter, req *http.Request) {
-	if sl, ok := req.Header[RestVcsRevision]; !ok || len(sl) == 0 {
-		http.Error(w, "no "+RestVcsRevision, http.StatusUpgradeRequired)
-		return
-	} else if sl[0] != reg.vcsRev {
-		http.Error(w, "mismatched "+RestVcsRevision,
-			http.StatusUpgradeRequired)
-		return
-	}
-
+// single threaded REST operations
+func (reg *registry) queueRestReq(w http.ResponseWriter, req *http.Request) {
 	w.Header().Add(RestUnixMicroStart, reg.start)
 	w.Header().Add(RestVcsRevision, reg.vcsRev)
 
@@ -457,10 +461,7 @@ func (reg *registry) deny(rsvp *rsvp) {
 }
 
 func (reg *registry) dir(w http.ResponseWriter) {
-	var names []string
-	for _, rp := range RestPaths {
-		names = append(names, rp)
-	}
+	names := append([]string{}, RestPaths...)
 	names = append(names, "/"+vlink())
 	filepath.WalkDir(VpnDataDir,
 		func(path string, entry fs.DirEntry, err error) error {
