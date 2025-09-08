@@ -73,8 +73,6 @@ const (
 	RestPathShowAddress    = "/show/address"
 	RestPathShowAdmins     = "/show/admins"
 	RestPathShowExchanges  = "/show/exchanges"
-	RestPathShowGuests     = "/show/guests"
-	RestPathShowHosts      = "/show/hosts"
 	RestPathShowPending    = "/show/pending"
 	RestPathShowPrefix     = "/show/prefix"
 	RestPathShowStart      = "/show/start"
@@ -112,8 +110,6 @@ var RestPaths = []string{
 	RestPathShowAddress,
 	RestPathShowAdmins,
 	RestPathShowExchanges,
-	RestPathShowGuests,
-	RestPathShowHosts,
 	RestPathShowPending,
 	RestPathShowPrefix,
 	RestPathShowStart,

@@ -63,8 +63,6 @@ var ShowFeatures = map[string]any{
 	"admins":      RestShow,
 	"certificate": ShowCertificate,
 	"exchanges":   RestShow,
-	"guests":      RestShow,
-	"hosts":       RestShow,
 	"pending":     RestShow,
 	"prefix":      RestShow,
 	"registry": map[string]any{

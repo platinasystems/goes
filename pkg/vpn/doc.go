@@ -86,8 +86,7 @@ command.
 	goes show vpn <object>			# or,
 	goes-vpn show <object>
 
-	object: admins, exchanges, guests, hosts, pending, start, status,
-		subscriber
+	object: admins, exchanges, pending, start, status, subscriber
 
 # Subscription
 

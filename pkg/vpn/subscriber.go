@@ -68,6 +68,9 @@ func (sub *Subscriber) Format(w fmt.State, verb rune) {
 	if sub.ap.IsValid() {
 		fmt.Fprint(w, ",", sub.ap)
 	}
+	if len(sub.EncapKey) > 0 {
+		fmt.Fprint(w, ",guest")
+	}
 }
 
 func (sub *Subscriber) helloIsOK(m *xnet.Msg) bool {

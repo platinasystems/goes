@@ -29,6 +29,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/platinasystems/goes/v2/pkg/kvc"
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
@@ -893,18 +895,6 @@ func (reg *registry) rest(rsvp *rsvp) {
 					}
 				}
 			}
-		case path == RestPathShowGuests:
-			if reg.isSubscriber(rsvp) {
-				for _, sub := range reg.indexed {
-					if len(sub.EncapKey) > 0 {
-						fmt.Fprintln(rsvp, sub)
-					}
-				}
-			}
-		case strings.HasPrefix(path, RestPathShowHosts):
-			if reg.isSubscriber(rsvp) {
-				reg.showHosts(rsvp)
-			}
 		case path == RestPathShowPending:
 			if reg.isSubscriber(rsvp) {
 				reg.showPending(rsvp)
@@ -1023,32 +1013,6 @@ func (reg *registry) showAddress(rsvp *rsvp) {
 	}
 }
 
-func (reg *registry) showHosts(rsvp *rsvp) {
-	s := rsvp.trimPrefix(RestPathShowHosts)
-	if len(s) > 0 {
-		addr, err := netip.ParseAddr(s)
-		if err != nil {
-			http.Error(rsvp, err.Error(), http.StatusBadRequest)
-		} else if name, ok := reg.hosts.name[addr]; !ok {
-			http.Error(rsvp, addr.String(), http.StatusNotFound)
-		} else {
-			fmt.Fprintln(rsvp, name)
-		}
-	} else {
-		addrs := make([]netip.Addr, 0, len(reg.hosts.name))
-		for addr := range reg.hosts.name {
-			addrs = append(addrs, addr)
-		}
-		slices.SortFunc(addrs, func(a, b netip.Addr) int {
-			return a.Compare(b)
-		})
-		for _, addr := range addrs {
-			name := reg.hosts.name[addr]
-			fmt.Fprintf(rsvp, "%v\t%s\n", addr, name)
-		}
-	}
-}
-
 func (reg *registry) showPending(rsvp *rsvp) {
 	if len(reg.pending) == 0 {
 		http.Error(rsvp, "none", http.StatusNoContent)
@@ -1069,12 +1033,29 @@ func (reg *registry) showSubscriber(rsvp *rsvp) {
 		names := xmaps.Keys(reg.named)
 		slices.Sort(names)
 		for _, name := range names {
-			fmt.Fprintln(rsvp, name)
+			fmt.Fprintln(rsvp, reg.named[name])
 		}
-	} else if sub, ok := reg.named[s]; !ok {
-		http.Error(rsvp, s, http.StatusNotFound)
-	} else {
+		return
+	}
+	sub, ok := reg.named[s]
+	if ok {
 		fmt.Fprintln(rsvp, sub)
+	} else if r, rsz := utf8.DecodeRuneInString(s); r == utf8.RuneError ||
+		rsz == 0 {
+		http.Error(rsvp, "can't decode: "+s, http.StatusBadRequest)
+	} else if unicode.IsDigit(r) ||
+		(r >= 'a' && r <= 'f') ||
+		(r >= 'A' && r <= 'F') {
+		if addr, err := netip.ParseAddr(s); err != nil {
+			http.Error(rsvp, err.Error(), http.StatusBadRequest)
+		} else if sub, ok := reg.addressed[addr]; !ok {
+			http.Error(rsvp, "addressed: "+addr.String(),
+				http.StatusNotFound)
+		} else {
+			fmt.Fprintln(rsvp, sub)
+		}
+	} else {
+		http.Error(rsvp, "named: "+s, http.StatusNotFound)
 	}
 }
 
@@ -1136,10 +1117,8 @@ func (reg *registry) unsubscribe(rsvp *rsvp) {
 
 func (reg *registry) whoisAddressed(rsvp *rsvp) {
 	s := rsvp.trimPrefix(RestPathWhoisAddressed)
-	addr, err := netip.ParseAddr(s)
-	if err != nil {
+	if addr, err := netip.ParseAddr(s); err != nil {
 		http.Error(rsvp, err.Error(), http.StatusBadRequest)
-		return
 	} else if sub, ok := reg.addressed[addr]; !ok || sub == nil {
 		http.Error(rsvp, s, http.StatusNotFound)
 	} else {
