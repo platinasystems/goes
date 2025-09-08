@@ -50,12 +50,12 @@ func Data() string {
 		return "/Library/Application Support"
 	case "freebsd":
 		if xprogram.IsUsrLocal() {
-			return "/usr/local"
+			return "/usr/local/share"
 		}
 		return "/usr/share"
 	}
 	if xprogram.IsUsrLocal() {
-		return "/usr/local"
+		return "/usr/local/share"
 	} else if xprogram.IsOpt() {
 		return "/opt/share"
 	}
