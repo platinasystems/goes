@@ -123,6 +123,8 @@ var RestPaths = []string{
 	RestPathWhoisNamed,
 }
 
+var RestRestartRequiredErr error
+
 func DefineRestFlags() {
 	DefineConfigFlag()
 	DefineCertFlag()
@@ -464,56 +466,18 @@ func restAlloc() *bytes.Buffer {
 }
 
 // REST get registry status to validate version.
-// If mismatch, fetch and install upgrade then return [xerrors.ExitError]
-// to force [os.Exit] with [UpgradeExitCode].
+// If [http.Response.StatusCode] == [http.StatusUpgradeRequired],
+// fetch and install upgrade then return [xerrors.ExitError]
+// to force [os.Exit] with [xos.EX_TEMPFAIL].
 func RestAssertVcsMatch(ctx context.Context) error {
-	const ocreate = os.O_CREATE | os.O_TRUNC | os.O_WRONLY
-	const cantUpgrade = "can't upgrade"
 	rsp, err := restGet(ctx, io.Discard, RestPathShowStatus)
 	if err == nil {
 		return nil
 	}
-	if rsp == nil || rsp.StatusCode != http.StatusUpgradeRequired {
-		return err
+	if rsp != nil && rsp.StatusCode == http.StatusUpgradeRequired {
+		err = restUpgrade(ctx)
 	}
-	if xprogram.IsKoApp() {
-		return xerrors.Label(ErrKoApp, cantUpgrade)
-	}
-	xp := xprogram.Path()
-	xpSave := fmt.Sprint(xp, "~")
-	xpPlus := fmt.Sprint(xp, "+")
-	mainPlatform := fmt.Sprint(xprogram.MainName(),
-		"-", runtime.GOOS,
-		"-", runtime.GOARCH)
-	fi, err := os.Stat(xp)
-	if err != nil {
-		return xerrors.Label(err, cantUpgrade)
-	}
-	for _, s := range []string{xpSave, xpPlus} {
-		err = os.Remove(s)
-		if err != nil && errors.Is(err, fs.ErrPermission) {
-			return xerrors.Label(err, cantUpgrade)
-		}
-	}
-	f, err := os.OpenFile(xpPlus, ocreate, fi.Mode())
-	if err != nil {
-		return xerrors.Label(err, cantUpgrade)
-	}
-	_, err = restGet(ctx, f, mainPlatform)
-	f.Close()
-	if err != nil {
-		return xerrors.Label(err, cantUpgrade)
-	}
-	if err = os.Link(xp, xpSave); err != nil {
-		return xerrors.Label(err, cantUpgrade)
-	}
-	if err = os.Remove(xp); err != nil {
-		return xerrors.Label(err, cantUpgrade)
-	}
-	if err = os.Link(xpPlus, xp); err != nil {
-		return xerrors.Label(err, cantUpgrade)
-	}
-	return xerrors.NewExitError(UpgradeExitCode, ErrRestartRequired)
+	return err
 }
 
 func restDo(w io.Writer, req *http.Request) (*http.Response, error) {
@@ -705,6 +669,51 @@ func restRequest(
 	return restDo(w, req)
 }
 
+// Fetch and install upgrade then return [xerrors.ExitError]
+// to force [os.Exit] with [xos.EX_TEMPFAIL].
+func restUpgrade(ctx context.Context) error {
+	const ocreate = os.O_CREATE | os.O_TRUNC | os.O_WRONLY
+	const cantUpgrade = "can't upgrade"
+	if xprogram.IsKoApp() {
+		return xerrors.Label(ErrKoApp, cantUpgrade)
+	}
+	xp := xprogram.Path()
+	xpSave := fmt.Sprint(xp, "~")
+	xpPlus := fmt.Sprint(xp, "+")
+	mainPlatform := fmt.Sprint(xprogram.MainName(),
+		"-", runtime.GOOS,
+		"-", runtime.GOARCH)
+	fi, err := os.Stat(xp)
+	if err != nil {
+		return xerrors.Label(err, cantUpgrade)
+	}
+	for _, s := range []string{xpSave, xpPlus} {
+		err = os.Remove(s)
+		if err != nil && errors.Is(err, fs.ErrPermission) {
+			return xerrors.Label(err, cantUpgrade)
+		}
+	}
+	f, err := os.OpenFile(xpPlus, ocreate, fi.Mode())
+	if err != nil {
+		return xerrors.Label(err, cantUpgrade)
+	}
+	_, err = restGet(ctx, f, mainPlatform)
+	f.Close()
+	if err != nil {
+		return xerrors.Label(err, cantUpgrade)
+	}
+	if err = os.Link(xp, xpSave); err != nil {
+		return xerrors.Label(err, cantUpgrade)
+	}
+	if err = os.Remove(xp); err != nil {
+		return xerrors.Label(err, cantUpgrade)
+	}
+	if err = os.Link(xpPlus, xp); err != nil {
+		return xerrors.Label(err, cantUpgrade)
+	}
+	return xerrors.NewExitError(UpgradeExitCode, ErrRestartRequired)
+}
+
 func RestValidateCheckinResponse(rsp *http.Response) error {
 	if rsp == nil {
 		return xerrors.Invalid("checkin response")
@@ -755,8 +764,10 @@ func RestWhois(ctx context.Context, v any) (*Subscriber, error) {
 		return nil, xerrors.Unsupported(fmt.Sprintf("%T", t))
 	}
 	sub := new(Subscriber)
-	_, err := restGet(ctx, buf, path)
-	if err == nil {
+	rsp, err := restGet(ctx, buf, path)
+	if rsp != nil && rsp.StatusCode == http.StatusUpgradeRequired {
+		err = restUpgrade(ctx)
+	} else if err == nil {
 		err = json.Unmarshal(buf.Bytes(), sub)
 		if err == nil {
 			err = sub.validate()
@@ -781,10 +792,13 @@ func restWhoisService(ctx context.Context) {
 				return
 			}
 			sub, err := RestWhois(ctx, q)
-			if err != nil {
-				xlog.Errata.Print(err)
-			} else {
+			if err == nil {
 				xcontext.Queue(ctx, rest.whoisRspC, sub)
+			} else if errors.Is(err, ErrRestartRequired) {
+				RestRestartRequiredErr = err
+				return
+			} else {
+				xlog.Errata.Print(err)
 			}
 		}
 	}

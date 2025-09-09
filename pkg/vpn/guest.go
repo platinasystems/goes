@@ -267,6 +267,7 @@ selection:
 			guestHelloToAllExchanges(ctx, t.UnixMicro())
 		case sub, ok := <-rest.whoisRspC:
 			if !ok {
+				err = RestRestartRequiredErr
 				break selection
 			}
 			guestFound(ctx, sub)

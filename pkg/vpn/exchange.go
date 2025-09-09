@@ -91,6 +91,7 @@ selection:
 		case err = <-rest.fault:
 		case sub, ok := <-rest.whoisRspC:
 			if !ok {
+				err = RestRestartRequiredErr
 				break selection
 			}
 			exchange.sub[sub.Id.Index()] = sub

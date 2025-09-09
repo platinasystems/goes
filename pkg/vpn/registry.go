@@ -265,12 +265,12 @@ func (reg *registry) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			if rp != RestPathDnsQuery {
 				sl, ok := req.Header[RestVcsRevision]
 				if !ok || len(sl) == 0 {
-					http.Error(w, "no "+RestVcsRevision,
+					http.Error(w, "no vcs",
 						http.StatusUpgradeRequired)
 					return
 				}
 				if sl[0] != reg.vcsRev {
-					http.Error(w, "mismatched "+RestVcsRevision,
+					http.Error(w, "mismatched vcs",
 						http.StatusUpgradeRequired)
 					return
 				}
