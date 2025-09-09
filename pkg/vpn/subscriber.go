@@ -146,6 +146,14 @@ func (sub *Subscriber) stateFileName() string {
 	return filepath.Join(VpnStateDir, fmt.Sprint(sub.name(), ".pem"))
 }
 
+func (sub *Subscriber) ticks(now uint64) uint64 {
+	if now < sub.lt {
+		// wrap
+		return now + ((1<<64 - 1) - sub.lt)
+	}
+	return now - sub.lt
+}
+
 // Parse [Subscriber.Cert] from [Subscriber.CertDER] and validate signature.
 func (sub *Subscriber) validate() error {
 	var err error

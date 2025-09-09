@@ -47,7 +47,7 @@ const (
 	TunPersist = false
 
 	helloInterval = 10 * time.Second
-	maxInactivity = 2 * helloInterval
+	noReplyLimit  = 3
 )
 
 var guest struct {
@@ -336,23 +336,17 @@ func guestDiscardPending(sub *Subscriber) {
 	}
 }
 
+// returns non-zero indexed exchange or the registry if the indexed exchange
+// hasn't replied w/in the noReplyLimit
 func guestExchange(i int) *Subscriber {
-	const deltaLimit = 3
-	var delta uint64
-	x := guest.exchanges[i]
-	if x == nil {
-		delta = deltaLimit
-	} else if guest.tick < x.lt {
-		// wrap
-		delta = guest.tick
-		delta += (1<<64 - 1) - x.lt
-	} else {
-		delta = guest.tick - x.lt
+	if i > 0 && i < len(guest.exchanges) {
+		if x := guest.exchanges[i]; x != nil {
+			if x.ticks(guest.tick) < noReplyLimit {
+				return x
+			}
+		}
 	}
-	if delta >= deltaLimit {
-		x = guest.exchanges[0]
-	}
-	return x
+	return guest.exchanges[0]
 }
 
 // use first matching exchange or, in last resort, the registry.
