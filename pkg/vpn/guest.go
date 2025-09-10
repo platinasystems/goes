@@ -237,8 +237,11 @@ Forward ciphered packets between exchange and tunnel interface.
 		}
 	}
 
-	tkr := time.NewTicker(helloInterval)
-	defer tkr.Stop()
+	helloTkr := time.NewTicker(helloInterval)
+	defer helloTkr.Stop()
+
+	vcsChkTkr := time.NewTicker(RestVcsCheckInterval)
+	defer vcsChkTkr.Stop()
 
 	alarm := make(chan os.Signal, 2)
 	signal.Notify(alarm, xsignal.Alarm)
@@ -261,16 +264,19 @@ selection:
 		case <-alarm:
 			xlog.Info = xlog.ToggleMute(xlog.Info)
 			xlog.Trace = xlog.Mute(xlog.Trace)
+		case <-vcsChkTkr.C:
+			RestQueueVcsCheck()
 		case err = <-rest.fault:
-		case t := <-tkr.C:
+		case t := <-helloTkr.C:
 			guest.tick += 1
 			guestHelloToAllExchanges(ctx, t.UnixMicro())
 		case sub, ok := <-rest.whoisRspC:
 			if !ok {
 				err = RestRestartRequiredErr
 				break selection
+			} else if sub != nil {
+				guestFound(ctx, sub)
 			}
-			guestFound(ctx, sub)
 		case m, ok := <-guest.fromTunC:
 			if !ok {
 				break selection

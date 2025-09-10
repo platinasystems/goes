@@ -48,6 +48,8 @@ const (
 	RestUnixMicroStart = "X-Unix-Micro-Start"
 
 	RestVcsRevision = "X-Vcs-Revision"
+
+	RestVcsCheckInterval = 30 * time.Second
 )
 
 const (
@@ -746,11 +748,18 @@ func restWaitForResolution(ctx context.Context) error {
 	return err
 }
 
+func RestQueueVcsCheck() {
+	rest.whoisReqC <- nil
+}
+
 func RestWhois(ctx context.Context, v any) (*Subscriber, error) {
 	var path string
+	var sub *Subscriber
 	buf := restAlloc()
 	defer restFree(buf)
 	switch t := v.(type) {
+	case nil:
+		path = RestPathShowStatus
 	case Id:
 		path = restPath(RestPathWhoisId, fmt.Sprint(t.Index()))
 	case int:
@@ -763,11 +772,11 @@ func RestWhois(ctx context.Context, v any) (*Subscriber, error) {
 		xlog.Errata.Printf("%T: unsupported", t)
 		return nil, xerrors.Unsupported(fmt.Sprintf("%T", t))
 	}
-	sub := new(Subscriber)
 	rsp, err := restGet(ctx, buf, path)
 	if rsp != nil && rsp.StatusCode == http.StatusUpgradeRequired {
 		err = restUpgrade(ctx)
-	} else if err == nil {
+	} else if err == nil && v != nil {
+		sub = new(Subscriber)
 		err = json.Unmarshal(buf.Bytes(), sub)
 		if err == nil {
 			err = sub.validate()

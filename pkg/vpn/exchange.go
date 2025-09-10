@@ -10,6 +10,7 @@ import (
 	"flag"
 	"os"
 	"os/signal"
+	"time"
 
 	"github.com/platinasystems/goes/v2/pkg/xflag"
 	"github.com/platinasystems/goes/v2/pkg/xlog"
@@ -80,6 +81,9 @@ Exchange ciphered packets between guests.
 	defer cancel()
 	defer xlog.Trace.Println("stopping exchange", MyId, "...")
 
+	vcsChkTkr := time.NewTicker(RestVcsCheckInterval)
+	defer vcsChkTkr.Stop()
+
 selection:
 	for err == nil {
 		select {
@@ -88,14 +92,17 @@ selection:
 		case <-alarm:
 			xlog.Info = xlog.ToggleMute(xlog.Info)
 			xlog.Trace = xlog.Mute(xlog.Trace)
+		case <-vcsChkTkr.C:
+			RestQueueVcsCheck()
 		case err = <-rest.fault:
 		case sub, ok := <-rest.whoisRspC:
 			if !ok {
 				err = RestRestartRequiredErr
 				break selection
+			} else if sub != nil {
+				exchange.sub[sub.Id.Index()] = sub
+				xlog.Trace.Println("guest", sub)
 			}
-			exchange.sub[sub.Id.Index()] = sub
-			xlog.Trace.Println("guest", sub)
 		case m, ok := <-exchange.fromVpnC:
 			if !ok {
 				break selection
