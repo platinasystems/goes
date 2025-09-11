@@ -261,12 +261,11 @@ Import registry certificate.
 		return xerrors.Incomplete("registry")
 	}
 
-	if err = restInit(); err != nil {
+	if rest.url, err = url.Parse(args[0]); err != nil {
 		return err
 	}
 
-	rest.url, err = url.Parse(args[0])
-	if err != nil {
+	if err = restInit(); err != nil {
 		return err
 	}
 
