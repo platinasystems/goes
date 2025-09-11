@@ -249,7 +249,11 @@ Import registry certificate.
 
 {{flags .}}`)
 
-	DefineRestFlags()
+	DefineConfigFlag()
+	DefineCertFlag()
+	DefineRegistryFlag()
+	DefineSigFlag()
+
 	yes := flag.CommandLine.Bool("y", false,
 		fmt.Sprint("Yes, write remote certificate to ",
 			VpnRegistryFile))
