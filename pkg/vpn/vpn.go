@@ -44,6 +44,7 @@ var MainFeatures = map[string]any{
 	"exchange":    Exchange,
 	"get":         RestGet,
 	"guest":       Guest,
+	"im":          InstantMessaging,
 	"nc":          NetCat,
 	"ping":        Ping,
 	"reload":      RestReload,
@@ -195,8 +196,9 @@ func BestDir(primary string, alternates ...string) string {
 	return primary
 }
 
-// If $ADMINS exists, use it to override the default [VpnAdminsFile] before
-// defining the “-admins” flag.
+// Default:
+//   - Value of existing [MainEnv]("ADMINS")
+//   - “admins” if that exist in current or [VpnConfigDir]
 func DefineAdminsFlag() {
 	if s, ok := MainEnv("ADMINS"); ok {
 		VpnAdminsFile = s
