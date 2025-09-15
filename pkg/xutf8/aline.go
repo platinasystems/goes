@@ -6,6 +6,23 @@ package xutf8
 
 import . "unicode/utf8"
 
+// Use Aline in MultiWriter to determine if last write has trailing newline.
+//
+//	var aline Aline
+//	mw := io.MultiWriter(&aline, w)
+//	mw.Write(...)
+//	if !aline {
+//		w.Write([]byte("\n")
+//	}
+type Aline bool
+
+func (p *Aline) Write(b []byte) (int, error) {
+	if r, sz := DecodeLastRune(b); sz == 1 {
+		*p = r == '\n'
+	}
+	return len(b), nil
+}
+
 // Assures that non-empty slice has one and only one trailing newline.
 func AlineBytes(s []byte) []byte {
 	if len(s) == 0 || !Valid(s) {
