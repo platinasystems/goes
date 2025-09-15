@@ -72,38 +72,37 @@ func (clio *CLIO) Cook(f func()) error {
 func (clio *CLIO) Interject(args ...any) (total int, err error) {
 	var n int
 	var n64 int64
-	var aline xutf8.Aline
 	if len(args) == 0 {
 		return
 	}
 	clio.mutex.Lock()
 	defer clio.mutex.Unlock()
 	clio.Write([]byte{'\r', 27, '[', 'K'})
-	mw := io.MultiWriter(&aline, clio)
+	w := xutf8.NewLastRuneWrapper(clio)
 	for _, arg := range args {
 		switch t := arg.(type) {
 		case []byte:
-			if n, err = mw.Write(t); err == nil {
+			if n, err = w.Write(t); err == nil {
 				total += n
 			} else {
 				return
 			}
 		case io.Reader:
-			if n64, err = io.Copy(mw, t); err == nil {
+			if n64, err = io.Copy(w, t); err == nil {
 				total += int(n64)
 			} else {
 				return
 			}
 		default:
-			if n, err = fmt.Fprint(mw, t); err == nil {
+			if n, err = fmt.Fprint(w, t); err == nil {
 				total += n
 			} else {
 				return
 			}
 		}
 	}
-	if !aline {
-		clio.Write([]byte("\n"))
+	if w.LastWrittenRune() != '\n' {
+		io.WriteString(clio, "\n")
 		n += 1
 	}
 	return

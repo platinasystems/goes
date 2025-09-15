@@ -105,7 +105,11 @@ func Main() {
 				Replace(flag.CommandLine.Name(), " ", ":", -1))
 		}
 		if err != nil {
-			os.Stderr.WriteString(xutf8.AlineString(err.Error()))
+			w := xutf8.NewLastRuneWrapper(os.Stderr)
+			fmt.Fprint(w, err)
+			if w.LastWrittenRune() != '\n' {
+				os.Stderr.WriteString("\n")
+			}
 		}
 		if ecode != 0 {
 			os.Exit(ecode)

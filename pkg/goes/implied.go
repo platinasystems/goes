@@ -28,32 +28,30 @@ func ImpliedPrintOrSetObject(
 		err  error
 	)
 	if len(args) == 0 {
+		w := xutf8.NewLastRuneWrapper(os.Stdout)
 		if tm, ok := v.(encoding.TextMarshaler); ok {
 			data, err = tm.MarshalText()
 			if err != nil {
 				return err
 			}
-			if data = xutf8.AlineBytes(data); len(data) > 0 {
-				os.Stdout.Write(data)
-			}
+			w.Write(data)
 		} else if jm, ok := v.(json.Marshaler); ok {
 			data, err = json.MarshalIndent(jm, "", "  ")
 			if err != nil {
 				return err
 			}
-			if data = xutf8.AlineBytes(data); len(data) > 0 {
-				os.Stdout.Write(data)
-			}
+			w.Write(data)
 		} else if m, ok := v.(fmt.Stringer); ok {
-			os.Stdout.WriteString(xutf8.AlineString(m.String()))
+			io.WriteString(w, m.String())
 		} else if f, ok := v.(func() string); ok {
-			os.Stdout.WriteString(xutf8.AlineString(f()))
+			io.WriteString(w, f())
 		} else if b, ok := v.([]byte); ok {
-			if b = xutf8.AlineBytes(b); len(b) > 0 {
-				os.Stdout.Write(b)
-			}
-		} else if s := xutf8.AlineString(fmt.Sprint(v)); len(s) > 0 {
-			os.Stdout.WriteString(s)
+			w.Write(b)
+		} else {
+			fmt.Fprint(w, v)
+		}
+		if w.LastWrittenRune() != '\n' {
+			os.Stdout.WriteString("\n")
 		}
 		return nil
 	}
@@ -92,16 +90,18 @@ Print results.
 		flag.CommandLine.Usage()
 		return nil
 	}
+	w := xutf8.NewLastRuneWrapper(os.Stdout)
 	v, err := f()
 	if err != nil {
 		return err
 	}
 	if b, ok := v.([]byte); ok {
-		if b = xutf8.AlineBytes(b); len(b) > 0 {
-			os.Stdout.Write(b)
-		}
-	} else if s := xutf8.AlineString(fmt.Sprint(v)); len(s) > 0 {
-		os.Stdout.WriteString(s)
+		w.Write(b)
+	} else {
+		fmt.Fprint(w, v)
+	}
+	if w.LastWrittenRune() != '\n' {
+		os.Stdout.WriteString("\n")
 	}
 	return nil
 }
