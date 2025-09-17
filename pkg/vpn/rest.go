@@ -234,8 +234,10 @@ RESTful registry administration.
 		path = restPath(RestPathApprove, args[0])
 	case "deny":
 		path = restPath(RestPathDeny, args[0])
+	case "unsubscribe":
+		path = restPath(RestPathUnsubscribe, args[0])
 	default:
-		return xerrors.Invalid(op)
+		return xerrors.ErrInvalid
 	}
 	_, err = restPut(ctx, os.Stdout, "", nil, path)
 	return err
