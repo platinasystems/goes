@@ -1037,6 +1037,9 @@ func (reg *registry) showSubscriber(rsvp *rsvp) {
 		}
 		return
 	}
+	if s == "self" {
+		s = rsvp.req.TLS.PeerCertificates[0].Subject.CommonName
+	}
 	sub, ok := reg.named[s]
 	if ok {
 		fmt.Fprintln(rsvp, sub)
