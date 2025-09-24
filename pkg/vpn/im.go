@@ -32,17 +32,20 @@ text <name|addr> ...
 const IMMTU = TunMTU - netph.UDPSize - netph.IP6Size
 const IMPrompt = "im> "
 
-var im = struct {
+var im struct {
 	sync.Mutex
-	port uint16
 	clio *clio.CLIO
 	udp  *net.UDPConn
 
 	addressed map[netip.Addr]string
 	named     map[string]netip.AddrPort
-}{
-	port: 8004,
 }
+
+var InstantMessagingPort = xflag.New[int]("imp", `
+Instant Messaging Port.
+`[1:], func() int { return 8004 })
+
+var InstantMessagingFlags = append(RestFlags, InstantMessagingPort)
 
 func InstantMessaging(ctx context.Context, args []string) error {
 	xflag.TemplateUsage(`
@@ -50,8 +53,11 @@ usage: {{.Name}} [flags] <tunnel-interface>
 Instant Messaging over the named interface.
 
 {{flags .}}`)
-	DefineRestFlags()
-	xflag.Define(&im.port, "imp", "Instant Messaging Port.")
+
+	for _, f := range InstantMessagingFlags {
+		f.Define()
+	}
+
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
 		return err
@@ -86,7 +92,7 @@ Instant Messaging over the named interface.
 	}
 	im.udp, err = net.ListenUDP("udp", &net.UDPAddr{
 		IP:   tunIPNet.IP,
-		Port: int(im.port),
+		Port: InstantMessagingPort.Value(),
 		Zone: zone,
 	})
 	if err != nil {
@@ -123,7 +129,8 @@ func imFrom(ctx context.Context, addr netip.Addr) string {
 	if err == nil {
 		name = sub.name()
 		im.addressed[sub.Addr] = name
-		im.named[sub.name()] = netip.AddrPortFrom(sub.Addr, im.port)
+		im.named[sub.name()] = netip.AddrPortFrom(sub.Addr,
+			uint16(InstantMessagingPort.Value()))
 		return name
 	}
 	return addr.String()
@@ -202,7 +209,8 @@ func imTo(ctx context.Context, to []string) (aps []netip.AddrPort, err error) {
 		if ap, ok := im.named[s]; ok {
 			aps = append(aps, ap)
 		} else if sub, err = RestWhois(ctx, s); err == nil {
-			ap := netip.AddrPortFrom(sub.Addr, im.port)
+			ap := netip.AddrPortFrom(sub.Addr,
+				uint16(InstantMessagingPort.Value()))
 			aps = append(aps, ap)
 			im.addressed[sub.Addr] = sub.name()
 			im.named[sub.name()] = ap

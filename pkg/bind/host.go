@@ -18,7 +18,6 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xnet/xdns"
 	"github.com/platinasystems/goes/v2/pkg/xnet/xdns/xdnsmessage"
 	"github.com/platinasystems/goes/v2/pkg/xnet/xdns/xdnspkt"
-	"github.com/platinasystems/goes/v2/pkg/xprogram"
 )
 
 func Host(ctx context.Context, args []string) error {
@@ -57,11 +56,7 @@ Mimic BIND9's DNS lookup utility.
 	}
 
 	if host_V {
-		if mm := xprogram.MainModule(); mm != nil {
-			fmt.Println(mm.Version)
-		} else {
-			fmt.Println("(unavailable)")
-		}
+		fmt.Println(Version())
 		return nil
 	}
 	if host_v {

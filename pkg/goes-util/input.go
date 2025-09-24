@@ -13,6 +13,7 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/goes"
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xflag"
+	"github.com/platinasystems/goes/v2/pkg/xmain"
 	"github.com/platinasystems/goes/v2/pkg/xprogram"
 )
 
@@ -43,7 +44,7 @@ Executes feature with file input.
 	defer r.Close()
 
 	cmd := exec.CommandContext(ctx, xprogram.Path(), args[1:]...)
-	cmd.Args[0] = xprogram.MainName()
+	cmd.Args[0] = xmain.PackageName()
 	cmd.Stdin = r
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr

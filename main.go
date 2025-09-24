@@ -1,4 +1,4 @@
-// Copyright © 2022-2024 Platina Systems, Inc. All rights reserved.
+// Copyright © 2022-2025 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -11,6 +11,7 @@ import (
 	goes_util "github.com/platinasystems/goes/v2/pkg/goes-util"
 	net_tool "github.com/platinasystems/goes/v2/pkg/net-tool"
 	"github.com/platinasystems/goes/v2/pkg/vpn"
+	"github.com/platinasystems/goes/v2/pkg/xmain"
 	"github.com/platinasystems/goes/v2/pkg/xprogram"
 )
 
@@ -20,7 +21,8 @@ var features = []map[string]any{
 	net_tool.Features,
 	bind.Features,
 	vpn.Features,
-	xprogram.Show,
+	xmain.Features,
+	xprogram.Features,
 }
 
 func init() { goes.Install(features...) }

@@ -11,10 +11,10 @@ import (
 	"crypto/x509"
 	"fmt"
 	"net/netip"
-	"path/filepath"
 
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xlog"
+	"github.com/platinasystems/goes/v2/pkg/xmain"
 	"github.com/platinasystems/goes/v2/pkg/xnet"
 )
 
@@ -143,7 +143,8 @@ func (sub *Subscriber) resolve(ctx context.Context) {
 }
 
 func (sub *Subscriber) stateFileName() string {
-	return filepath.Join(VpnStateDir, fmt.Sprint(sub.name(), ".pem"))
+	fn := fmt.Sprint(sub.name(), ".pem")
+	return xmain.State.File(fn)
 }
 
 func (sub *Subscriber) ticks(now uint64) uint64 {

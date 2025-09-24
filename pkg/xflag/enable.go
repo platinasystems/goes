@@ -6,29 +6,54 @@ package xflag
 
 import (
 	"flag"
+	"fmt"
 	"strconv"
 )
 
-// [EnableIn] [flag.CommandLine]
-func Enable(name, usage string, f func() error) {
-	EnableIn(flag.CommandLine, name, usage, f)
+type Enable struct {
+	name,
+	usage string
+	enable func() error
+	val    bool
 }
 
-// EnableIn defines a boolean flag that if parsed true, calls “f”.
-func EnableIn(fs *flag.FlagSet, name, usage string, f func() error) {
-	fs.Var(enabling{f}, name, usage)
+// After defined within a [flag.FlagSet] an [Enable] flag calls the given
+// function when set and, if that returns nil, sets true Value.
+func NewEnable(name, usage string, enable func() error) *Enable {
+	return &Enable{
+		name:   name,
+		usage:  usage,
+		enable: enable,
+	}
 }
 
-type enabling struct{ f func() error }
+func (p *Enable) Define() {
+	p.DefineIn(flag.CommandLine)
+}
 
-func (enabling) IsBoolFlag() bool { return true }
-func (enabling) String() string   { return "false" }
+func (p *Enable) DefineIn(fs *flag.FlagSet) {
+	fs.Var(p, p.name, p.usage)
+}
 
-func (r enabling) Set(s string) error {
+func (Enable) IsBoolFlag() bool {
+	return true
+}
+
+func (p *Enable) String() string {
+	return fmt.Sprint(p.val)
+}
+
+func (p *Enable) Set(s string) error {
 	if len(s) > 0 {
 		if t, err := strconv.ParseBool(s); !t || err != nil {
 			return err
 		}
 	}
-	return r.f()
+	err := p.enable()
+	p.val = err == nil
+	return err
+}
+
+func (p *Enable) Value() bool {
+	return p.val
 }

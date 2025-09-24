@@ -16,6 +16,7 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xexec"
 	"github.com/platinasystems/goes/v2/pkg/xflag"
+	"github.com/platinasystems/goes/v2/pkg/xmain"
 	"github.com/platinasystems/goes/v2/pkg/xos"
 	"github.com/platinasystems/goes/v2/pkg/xprogram"
 	"github.com/platinasystems/goes/v2/pkg/xsignal"
@@ -130,7 +131,7 @@ the system logger; otherwise, perform within the current process context.
 	cmd.Stdin = nil
 	cmd.Stdout = nil
 	cmd.Stderr = nil
-	cmd.Args[0] = xprogram.MainName()
+	cmd.Args[0] = xmain.PackageName()
 	cmd.Env = DaemonEnv()
 	cmd.Dir = DaemonWorkingDirectory
 	attr, err := xexec.DaemonSysProcAttr()

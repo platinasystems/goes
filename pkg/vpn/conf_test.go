@@ -35,8 +35,8 @@ fc00:1234::a hosta
 fc00:1234::b hostb
 fc00:1234::c hostc
 `)
-	vpnPrefix = netip.MustParsePrefix("fc00:1234::/64")
-	vpnHostsFile = "TestHost"
+	Prefix.Value = netip.MustParsePrefix("fc00:1234::/64")
+	HostsFile.Value = "TestHost"
 	reg := newRegistry()
 	err := kvc.Range(input, reg.loadHostsKeyValues)
 	if err != nil {
@@ -55,8 +55,8 @@ func TestHostsBadIP4(t *testing.T) {
 	input := strings.NewReader(`
 1.2.3.4.5 hosta
 `)
-	vpnPrefix = netip.MustParsePrefix("1.2.3.4/32")
-	vpnHostsFile = "TestHostBadIP4"
+	Prefix.Value = netip.MustParsePrefix("1.2.3.4/32")
+	HostsFile.Value = "TestHostBadIP4"
 	reg := newRegistry()
 	err := kvc.Range(input, reg.loadHostsKeyValues)
 	if err == nil {
@@ -70,8 +70,8 @@ func TestHostsBadIP6(t *testing.T) {
 	input := strings.NewReader(`
 fc00:1234::x hosta
 `)
-	vpnPrefix = netip.MustParsePrefix("fc00:1234::/64")
-	vpnHostsFile = "TestHostBadIP6"
+	Prefix.Value = netip.MustParsePrefix("fc00:1234::/64")
+	HostsFile.Value = "TestHostBadIP6"
 	reg := newRegistry()
 	err := kvc.Range(input, reg.loadHostsKeyValues)
 	if err == nil {
@@ -85,8 +85,8 @@ func TestHostsRangeIP6(t *testing.T) {
 	input := strings.NewReader(`
 fc00:5678::a hosta
 `)
-	vpnPrefix = netip.MustParsePrefix("fc00:1234::/64")
-	vpnHostsFile = "TestHostRangeIP6"
+	Prefix.Value = netip.MustParsePrefix("fc00:1234::/64")
+	HostsFile.Value = "TestHostRangeIP6"
 	reg := newRegistry()
 	err := kvc.Range(input, reg.loadHostsKeyValues)
 	if err == nil {

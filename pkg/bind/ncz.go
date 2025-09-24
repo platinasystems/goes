@@ -15,7 +15,6 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xlog"
 	"github.com/platinasystems/goes/v2/pkg/xnet/xdns/xdnsdb"
 	"github.com/platinasystems/goes/v2/pkg/xnet/xdns/xdnsmessage"
-	"github.com/platinasystems/goes/v2/pkg/xprogram"
 	"github.com/platinasystems/goes/v2/pkg/xsync"
 )
 
@@ -43,11 +42,7 @@ Mimic BIND9's config verification tool.
 	}()
 
 	if ncz_v {
-		if mm := xprogram.MainModule(); mm != nil {
-			fmt.Println(mm.Version)
-		} else {
-			fmt.Println("(unavailable)")
-		}
+		fmt.Println(Version())
 		return nil
 	}
 	if ncz_q {

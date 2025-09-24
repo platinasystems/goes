@@ -23,7 +23,9 @@ Pipe stdin/out with TCP connection to numbered port of named guest.
 
 {{flags .}}`)
 
-	DefineRestFlags()
+	for _, f := range RestFlags {
+		f.Define()
+	}
 
 	err := flag.CommandLine.Parse(args)
 	if err != nil {

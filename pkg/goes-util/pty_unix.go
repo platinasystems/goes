@@ -19,6 +19,7 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xexec"
 	"github.com/platinasystems/goes/v2/pkg/xflag"
+	"github.com/platinasystems/goes/v2/pkg/xmain"
 	"github.com/platinasystems/goes/v2/pkg/xprogram"
 	"github.com/platinasystems/goes/v2/pkg/xsync"
 	"golang.org/x/sys/unix"
@@ -74,7 +75,7 @@ Execute feature in an allocated TTY.
 	})
 
 	cmd := exec.CommandContext(ctx, xprogram.Path(), args...)
-	cmd.Args[0] = xprogram.MainName()
+	cmd.Args[0] = xmain.PackageName()
 	cmd.Stdin = tty
 	cmd.Stdout = tty
 	cmd.Stderr = tty

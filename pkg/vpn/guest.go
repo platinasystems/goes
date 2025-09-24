@@ -50,6 +50,18 @@ const (
 	noReplyLimit  = 3
 )
 
+var TunnelUnit = xflag.New[int]("t",
+	"Tunnel unit number, auto selected if negative.",
+	func() int {
+		return -1
+	})
+
+var GuestFlags = append(RestFlags,
+	TunnelUnit,
+	xlog.QuietFlag,
+	xlog.TraceFlag,
+	xlog.VerboseFlag)
+
 var guest struct {
 	addressed map[netip.Addr]*Subscriber
 	indexed   map[int]*Subscriber
@@ -89,11 +101,9 @@ Forward ciphered packets between exchange and tunnel interface.
 
 {{flags .}}`)
 
-	DefineRestFlags()
-	DefineTunnelFlag()
-	DefineQuietFlag()
-	DefineTraceFlag()
-	DefineVerboseFlag()
+	for _, f := range GuestFlags {
+		f.Define()
+	}
 
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
@@ -140,7 +150,7 @@ Forward ciphered packets between exchange and tunnel interface.
 		regaddr = regaddr.Unmap()
 	}
 	if x.Port == 0 {
-		x.Port = defaultExchangePort
+		x.Port = DefaultExchangePort
 	}
 	x.ap = netip.AddrPortFrom(regaddr, x.Port)
 	guest.exchanges[0] = x
@@ -160,7 +170,7 @@ Forward ciphered packets between exchange and tunnel interface.
 		}
 	}
 
-	vpnPrefix = guest.receipt.Prefix.Masked()
+	Prefix.Override(guest.receipt.Prefix.Masked())
 
 	ha := netif.NewHardwareAddr()
 	if err = ha.Rand(); err != nil {
@@ -175,8 +185,8 @@ Forward ciphered packets between exchange and tunnel interface.
 
 	guestHelloToAllExchanges(ctx, 0)
 
-	guest.tun, err = nettun.
-		New(vpnTunnel, IsTap, TunPersist, TunOwner, TunGroup, ha)
+	guest.tun, err = nettun.New(TunnelUnit.Value(), IsTap,
+		TunPersist, TunOwner, TunGroup, ha)
 	if err != nil {
 		return err
 	}
@@ -210,11 +220,11 @@ Forward ciphered packets between exchange and tunnel interface.
 	}
 	xlog.Info.Println(nif.Name, addr)
 
-	if err = routeAdd(ctx, vpnPrefix, nif); err != nil {
+	if err = routeAdd(ctx, Prefix.Value(), nif); err != nil {
 		return err
 	}
-	xlog.Info.Println(nif.Name, vpnPrefix)
-	defer routeDelete(ctx, vpnPrefix, nif)
+	xlog.Info.Println(nif.Name, Prefix)
+	defer routeDelete(ctx, Prefix.Value(), nif)
 
 	addrs, err := nif.Addrs()
 	if err != nil {
@@ -485,7 +495,7 @@ func guestFromTun(ctx context.Context, m *xnet.Msg) {
 	} else if guest.llu6.IsValid() && da.Compare(guest.llu6) == 0 {
 		xlog.Trace.Println("loopback", pdu)
 		mp.Queue(ctx, guest.toTunC, m)
-	} else if !vpnPrefix.Contains(da) {
+	} else if !Prefix.Value().Contains(da) {
 		xlog.Trace.Println("dropped", pdu)
 		mp.Put(m)
 	} else if to, ok := guest.addressed[da]; !ok {
@@ -520,7 +530,7 @@ func guestFromVpn(ctx context.Context, m *xnet.Msg) {
 			from.ap = unmap4in6(m.AddrPort)
 			if from.ap.Port() == 0 {
 				from.ap = netip.AddrPortFrom(from.ap.Addr(),
-					defaultExchangePort)
+					DefaultExchangePort)
 			}
 		}
 		mp.Put(m)
@@ -556,7 +566,7 @@ func guestHelloToAllExchanges(ctx context.Context, now int64) {
 		}
 		if x.ap.Port() == 0 {
 			x.ap = netip.AddrPortFrom(x.ap.Addr(),
-				defaultExchangePort)
+				DefaultExchangePort)
 		}
 		if hello := NewGreeting(now); hello != nil {
 			xlog.Trace.Println("hello to", x)

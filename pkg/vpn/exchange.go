@@ -25,6 +25,11 @@ var exchange struct {
 	toVpnC   chan<- *xnet.Msg
 }
 
+var ExchangeFlags = append(RestFlags,
+	xlog.QuietFlag,
+	xlog.TraceFlag,
+	xlog.VerboseFlag)
+
 // Exchange is a UDP server that forwards ciphered packets between guest's.
 func Exchange(ctx context.Context, args []string) error {
 	xflag.TemplateUsage(`
@@ -33,10 +38,9 @@ Exchange ciphered packets between guests.
 
 {{flags .}}`)
 
-	DefineRestFlags()
-	DefineTraceFlag()
-	DefineQuietFlag()
-	DefineVerboseFlag()
+	for _, f := range GuestFlags {
+		f.Define()
+	}
 
 	err := flag.CommandLine.Parse(args)
 	if err != nil {

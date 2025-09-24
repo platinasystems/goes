@@ -17,6 +17,7 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/goes"
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xflag"
+	"github.com/platinasystems/goes/v2/pkg/xmain"
 	"github.com/platinasystems/goes/v2/pkg/xos"
 	"github.com/platinasystems/goes/v2/pkg/xprogram"
 	"github.com/platinasystems/goes/v2/pkg/xsync"
@@ -55,7 +56,7 @@ Execute feature with output piped to syslog, or if GOOS == darwin, oslog.
 	defer outLog.Close()
 
 	cmd := exec.CommandContext(ctx, xprogram.Path(), args...)
-	cmd.Args[0] = xprogram.MainName()
+	cmd.Args[0] = xmain.PackageName()
 	cmd.Stdin = os.Stdin
 
 	errPipe, err := cmd.StderrPipe()

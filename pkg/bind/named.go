@@ -24,7 +24,6 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xlog"
 	"github.com/platinasystems/goes/v2/pkg/xnet/xdns/xdnsdb"
 	"github.com/platinasystems/goes/v2/pkg/xnet/xdns/xdnsmessage"
-	"github.com/platinasystems/goes/v2/pkg/xprogram"
 	"github.com/platinasystems/goes/v2/pkg/xsync"
 )
 
@@ -60,11 +59,7 @@ Mimic BIND9's Internet domain name daemon.
 	}
 
 	if named_V {
-		version := "(unavailable)"
-		if mm := xprogram.MainModule(); mm != nil {
-			version = mm.Version
-		}
-		fmt.Println(version)
+		fmt.Println(Version())
 		return nil
 	}
 

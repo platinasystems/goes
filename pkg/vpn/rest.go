@@ -32,8 +32,37 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xflag"
 	"github.com/platinasystems/goes/v2/pkg/xlog"
+	"github.com/platinasystems/goes/v2/pkg/xmain"
 	"github.com/platinasystems/goes/v2/pkg/xprogram"
 )
+
+var RegistryFile = xflag.New[string]("registry", `
+Registry certificate file w/in current or config directory.
+`[1:], func() string {
+	s, ok := xmain.LookupEnv("REGISTRY")
+	if !ok {
+		s = "registry.pem"
+	}
+	return s
+})
+
+func RegistryPath() string {
+	return xmain.Config.File(RegistryFile.Value())
+}
+
+var RestPort = xflag.New[int]("port", `
+REST listener.
+`[1:], func() int {
+	return 8003
+})
+
+var RestFlags = []xflag.Definer{
+	xmain.Config,
+	CertFile,
+	RestPort,
+	RegistryFile,
+	SigFile,
+}
 
 type RestError struct {
 	code int
@@ -127,14 +156,6 @@ var RestPaths = []string{
 
 var RestRestartRequiredErr error
 
-func DefineRestFlags() {
-	DefineConfigFlag()
-	DefineCertFlag()
-	DefinePortFlag()
-	DefineRegistryFlag()
-	DefineSigFlag()
-}
-
 var rest struct {
 	bufs sync.Pool
 	crt,
@@ -159,7 +180,7 @@ func restInit() error {
 	rest.whoisReqC = make(chan any, RestWhoisDepth)
 	rest.whoisRspC = make(chan *Subscriber, RestWhoisDepth)
 
-	rest.crt, err = readCertificateFile(vpnCertPath())
+	rest.crt, err = readCertificateFile(CertPath())
 	if err != nil {
 		return err
 	}
@@ -185,7 +206,7 @@ func restInit() error {
 	}
 
 	if cl := flag.CommandLine.Name(); !strings.HasSuffix(cl, "certify") {
-		rest.reg, err = readCertificateFile(vpnRegistryPath())
+		rest.reg, err = readCertificateFile(RegistryPath())
 		if err != nil {
 			if !errors.Is(err, fs.ErrNotExist) {
 				return err
@@ -216,7 +237,10 @@ RESTful registry administration.
 
 {{flags .}}`)
 
-	DefineRestFlags()
+	for _, f := range RestFlags {
+		f.Define()
+	}
+
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
 		return err
@@ -243,7 +267,18 @@ RESTful registry administration.
 	return err
 }
 
-// Rest.certify adds the peer certificate to [Reg].
+var RestCertifyYesFlag = xflag.New[bool]("y",
+	"Yes, to write remote certificate to registry file.", nil)
+
+var RestCertifyFlags = []xflag.Definer{
+	xmain.Config,
+	CertFile,
+	RegistryFile,
+	RestCertifyYesFlag,
+	SigFile,
+}
+
+// RestCertify writes the peer certificate to [RegistryFile].
 func RestCertify(ctx context.Context, args []string) error {
 	xflag.TemplateUsage(`
 usage: {{.Name}} [flags] https://<host>[:port]
@@ -251,14 +286,10 @@ Import registry certificate.
 
 {{flags .}}`)
 
-	DefineConfigFlag()
-	DefineCertFlag()
-	DefineRegistryFlag()
-	DefineSigFlag()
+	for _, f := range RestCertifyFlags {
+		f.Define()
+	}
 
-	yes := flag.CommandLine.Bool("y", false,
-		fmt.Sprint("Yes, write remote certificate to ",
-			VpnRegistryFile))
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
 		return err
@@ -302,9 +333,9 @@ Import registry certificate.
 		return err
 	}
 
-	if !*yes {
+	if !RestCertifyYesFlag.Value() {
 		fmt.Fprintf(w, `Enter "yes" to write above to %s: `,
-			VpnRegistryFile)
+			RegistryPath())
 		s, err := r.ReadString('\n')
 		if err != nil && strings.TrimSpace(s) != "yes" {
 			return err
@@ -315,7 +346,7 @@ Import registry certificate.
 		Type:  "CERTIFICATE",
 		Bytes: rsp.TLS.PeerCertificates[0].Raw,
 	}
-	wc, err := os.OpenFile(VpnRegistryFile, oCreate, 0644)
+	wc, err := os.OpenFile(RegistryPath(), oCreate, 0644)
 	if err != nil {
 		return err
 	}
@@ -330,7 +361,9 @@ Get or list registry file(s).
 
 {{flags .}}`)
 
-	DefineRestFlags()
+	for _, f := range RestFlags {
+		f.Define()
+	}
 
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
@@ -359,7 +392,10 @@ RESTful reload registry configuration.
 
 {{flags .}}`)
 
-	DefineRestFlags()
+	for _, f := range RestFlags {
+		f.Define()
+	}
+
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
 		return err
@@ -382,7 +418,10 @@ RESTful query and print registry object.
 func RestShow(ctx context.Context, args []string) error {
 	xflag.TemplateUsage(restShowUsageTemplate)
 
-	DefineRestFlags()
+	for _, f := range RestFlags {
+		f.Define()
+	}
+
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
 		return err
@@ -411,7 +450,10 @@ RESTful subscribe to VPN.
 
 {{flags .}}`)
 
-	DefineRestFlags()
+	for _, f := range RestFlags {
+		f.Define()
+	}
+
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
 		return err
@@ -439,7 +481,10 @@ Download and install program update from registry.
 
 {{flags .}}`)
 
-	DefineRestFlags()
+	for _, f := range RestFlags {
+		f.Define()
+	}
+
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
 		return err
@@ -553,7 +598,7 @@ func restExtractURL() error {
 	if len(rest.reg.DNSNames) == 0 {
 		return xerrors.Invalid("no registry URL or DNS")
 	}
-	s := fmt.Sprint("https://", rest.reg.DNSNames[0], ":", vpnPort)
+	s := fmt.Sprint("https://", rest.reg.DNSNames[0], ":", RestPort)
 	rest.url, err = url.Parse(s)
 	return err
 }
@@ -687,7 +732,7 @@ func restUpgrade(ctx context.Context) error {
 	xp := xprogram.Path()
 	xpSave := fmt.Sprint(xp, "~")
 	xpPlus := fmt.Sprint(xp, "+")
-	mainPlatform := fmt.Sprint(xprogram.MainName(),
+	mainPlatform := fmt.Sprint(xmain.PackageName(),
 		"-", runtime.GOOS,
 		"-", runtime.GOARCH)
 	fi, err := os.Stat(xp)
@@ -740,7 +785,7 @@ func RestValidateCheckinResponse(rsp *http.Response) error {
 	if err != nil {
 		return xerrors.Label(err, "registry start")
 	}
-	vpnStart = i
+	RegistryStart = i
 	return nil
 }
 

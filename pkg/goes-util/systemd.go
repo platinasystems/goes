@@ -15,6 +15,7 @@ import (
 	"os"
 
 	"github.com/platinasystems/goes/v2/pkg/xflag"
+	"github.com/platinasystems/goes/v2/pkg/xmain"
 	"github.com/platinasystems/goes/v2/pkg/xprogram"
 )
 
@@ -63,7 +64,7 @@ Generate systemd config for program's named service.
 		Args []string
 	}{
 		Program:     xprogram.Path(),
-		Description: fmt.Sprint(xprogram.MainName(), " service"),
+		Description: fmt.Sprint(xmain.PackageName(), " service"),
 		After:       "network-online.target",
 		Wants:       "network-online.target",
 		StdIn:       "null",

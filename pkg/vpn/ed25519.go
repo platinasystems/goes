@@ -16,6 +16,7 @@ import (
 
 	"github.com/platinasystems/goes/v2/pkg/xflag"
 	"github.com/platinasystems/goes/v2/pkg/xlog"
+	"github.com/platinasystems/goes/v2/pkg/xmain"
 )
 
 type pureEd25519 struct {
@@ -40,8 +41,8 @@ Create PEM encoded ed25519 signature key file.
 
 {{flags .}}`)
 
-	DefineConfigFlag()
-	DefineSigFlag()
+	xmain.Config.Define()
+	SigFile.Define()
 
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
@@ -61,7 +62,7 @@ Create PEM encoded ed25519 signature key file.
 		Headers: map[string]string{},
 		Bytes:   der,
 	}
-	sp := vpnSigPath()
+	sp := SigPath()
 	if sp == "-" {
 		return pem.Encode(os.Stdout, blk)
 	}

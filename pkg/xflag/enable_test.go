@@ -11,32 +11,40 @@ import (
 
 func TestEnabled(t *testing.T) {
 	var enabled bool
-	fs := flag.NewFlagSet("enabled", flag.ContinueOnError)
-	EnableIn(fs, "t", "enabled", func() error {
+	eflag := NewEnable("e", "enabled", func() error {
 		enabled = true
 		return nil
 	})
-	err := fs.Parse([]string{"-t"})
+	fs := flag.NewFlagSet("enabled", flag.ContinueOnError)
+	eflag.DefineIn(fs)
+	err := fs.Parse([]string{"-e"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !enabled {
 		t.Fail()
 	}
+	if !eflag.Value() {
+		t.Fail()
+	}
 }
 
 func TestNotEnabled(t *testing.T) {
 	var enabled bool
-	fs := flag.NewFlagSet("notenabled", flag.ContinueOnError)
-	EnableIn(fs, "t", "enabled", func() error {
+	eflag := NewEnable("e", "not-enabled", func() error {
 		enabled = true
 		return nil
 	})
+	fs := flag.NewFlagSet("notenabled", flag.ContinueOnError)
+	eflag.DefineIn(fs)
 	err := fs.Parse([]string{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if enabled {
+		t.Fail()
+	}
+	if eflag.Value() {
 		t.Fail()
 	}
 }

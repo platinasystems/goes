@@ -20,7 +20,6 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xnet/xdns"
 	"github.com/platinasystems/goes/v2/pkg/xnet/xdns/xdnsmessage"
 	"github.com/platinasystems/goes/v2/pkg/xnet/xdns/xdnspkt"
-	"github.com/platinasystems/goes/v2/pkg/xprogram"
 )
 
 func Dig(ctx context.Context, args []string) error {
@@ -190,12 +189,8 @@ func digLookup(
 			fmt.Print(xdnsmessage.TypeHelpTxt)
 			return nil
 		}
-		ver := "(unavailable)"
-		if mm := xprogram.MainModule(); mm != nil {
-			ver = mm.Version
-		}
 		if dig_v {
-			fmt.Println(ver)
+			fmt.Println(Version())
 			return nil
 		}
 		if strings.HasPrefix(svr, "https:") {
@@ -227,7 +222,7 @@ func digLookup(
 		if !digGlobalOptions.has(digBoolOptShort) &&
 			digGlobalOptions.has(digBoolOptCmd) {
 			fmt.Printf("; <<>> goes/pkg/bind/dig %s <<>> %s\n",
-				ver, cmd)
+				Version(), cmd)
 			fmt.Println()
 		}
 		if len(dig_f) > 0 {

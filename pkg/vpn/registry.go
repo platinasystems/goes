@@ -36,12 +36,89 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xflag"
 	"github.com/platinasystems/goes/v2/pkg/xlog"
+	"github.com/platinasystems/goes/v2/pkg/xmain"
 	"github.com/platinasystems/goes/v2/pkg/xmaps"
 	"github.com/platinasystems/goes/v2/pkg/xnet"
 	"github.com/platinasystems/goes/v2/pkg/xnet/xdns/xdnsmessage"
 	"github.com/platinasystems/goes/v2/pkg/xprogram"
 	"github.com/platinasystems/goes/v2/pkg/xsignal"
 )
+
+var AdminsFile = xflag.New[string]("admins", `
+An optional file w/in current or config directory containing a newline
+separated list of certificate common names that may administer subscriptions.
+`[1:], func() string {
+	s, ok := xmain.LookupEnv("ADMINS")
+	if !ok {
+		s = "admins"
+	}
+	return s
+})
+
+func AdminsPath() string {
+	return xmain.Config.File(AdminsFile.Value())
+}
+
+var Domain = xflag.New[string]("domain", `
+Search domain suffix.
+`[1:], func() string {
+	return ".example.platina.io."
+})
+
+var ExchangesFile = xflag.New[string]("exchanges", `
+An optional file w/in current or config directory containing a newline
+separated list of guest exhange assignment and exchange port numbers.
+`[1:], func() string {
+	s, ok := xmain.LookupEnv("EXCHANGES")
+	if !ok {
+		s = "exchanges"
+	}
+	return s
+})
+
+func ExchangesPath() string {
+	return xmain.Config.File(ExchangesFile.Value())
+}
+
+var HostsFile = xflag.New[string]("hosts", `
+An optional file w/in current or config directory containing a newline
+separated list of static address assignments in /ets/hosts format.
+`[1:], func() string {
+	s, ok := xmain.LookupEnv("HOSTS")
+	if !ok {
+		s = "hosts"
+	}
+	return s
+})
+
+func HostsPath() string {
+	return xmain.Config.File(HostsFile.Value())
+}
+
+var Prefix = xflag.New[netip.Prefix]("prefix", `
+Network prefix.
+`[1:], func() netip.Prefix {
+	return netip.MustParsePrefix("fc00:1234::/64")
+})
+
+var RegistryFlags = []xflag.Definer{
+	xmain.Config,
+	xmain.Data,
+	xmain.State,
+
+	AdminsFile,
+	CertFile,
+	ExchangesFile,
+	Domain,
+	HostsFile,
+	Prefix,
+	RestPort,
+	SigFile,
+
+	xlog.QuietFlag,
+	xlog.TraceFlag,
+	xlog.VerboseFlag,
+}
 
 type GuestReceipt struct {
 	Id     Id
@@ -91,8 +168,8 @@ type registry struct {
 func newRegistry() *registry {
 	reg := new(registry)
 
-	vpnStart = time.Now().UnixMicro()
-	reg.start = strconv.FormatInt(vpnStart, 10)
+	RegistryStart = time.Now().UnixMicro()
+	reg.start = strconv.FormatInt(RegistryStart, 10)
 
 	reg.vcsRev = xprogram.VcsRevision.String()
 
@@ -112,7 +189,7 @@ func newRegistry() *registry {
 
 // virtual-link, this program may be fetched as MAIN-GOOS-GOARCH
 var vlink = sync.OnceValue(func() string {
-	return fmt.Sprintf("%s-%s-%s", xprogram.MainName(),
+	return fmt.Sprintf("%s-%s-%s", xmain.PackageName(),
 		runtime.GOOS, runtime.GOARCH)
 })
 
@@ -127,37 +204,24 @@ A RESTful WWW server and packet exchange.
 
 {{flags .}}`)
 
-	DefineConfigFlag()
-	DefineDataFlag()
-	DefineStateFlag()
-
-	DefineAdminsFlag()
-	DefineCertFlag()
-	DefineExchangesFlag()
-	DefineDomainFlag()
-	DefineHostsFlag()
-	DefinePortFlag()
-	DefinePrefixFlag()
-	DefineSigFlag()
-
-	DefineQuietFlag()
-	DefineTraceFlag()
-	DefineVerboseFlag()
+	for _, f := range RegistryFlags {
+		f.Define()
+	}
 
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
 		return err
 	}
 
-	if len(vpnDomain) == 0 {
+	if len(Domain.Value()) == 0 {
 		return xerrors.Invalid("domain")
 	}
 
-	if !strings.HasSuffix(vpnDomain, ".") {
-		vpnDomain += "."
+	if !strings.HasSuffix(Domain.Value(), ".") {
+		Domain.Override(fmt.Sprint(Domain, "."))
 	}
-	if !strings.HasPrefix(vpnDomain, ".") {
-		vpnDomain = "." + vpnDomain
+	if !strings.HasPrefix(Domain.Value(), ".") {
+		Domain.Override(fmt.Sprint(".", Domain))
 	}
 	if err = signInit(); err != nil {
 		return err
@@ -197,7 +261,7 @@ A RESTful WWW server and packet exchange.
 	defer close(reg.toVpnC)
 
 	reg.http = &http.Server{
-		Addr:    fmt.Sprintf(":%d", vpnPort),
+		Addr:    fmt.Sprint(":", RestPort),
 		Handler: reg,
 		TLSConfig: &tls.Config{
 			MinVersion: tls.VersionTLS13,
@@ -293,10 +357,10 @@ func (reg *registry) approve(rsvp *rsvp) {
 		http.Error(rsvp, "incomplete subscriber", http.StatusBadRequest)
 		return
 	}
-	_, err := os.Stat(VpnStateDir)
+	_, err := os.Stat(xmain.State.Value())
 	if err != nil {
 		if os.IsNotExist(err) {
-			err = os.MkdirAll(VpnStateDir, 0755)
+			err = os.MkdirAll(xmain.State.Value(), 0755)
 		}
 		if err != nil {
 			http.Error(rsvp, err.Error(),
@@ -347,7 +411,7 @@ func (reg *registry) assignAddr(sub *Subscriber) error {
 		return nil
 	}
 	if !reg.topAddr.IsValid() {
-		reg.topAddr = vpnPrefix.Masked().Addr()
+		reg.topAddr = Prefix.Value().Masked().Addr()
 	}
 	reg.topAddr = reg.topAddr.Next()
 	for {
@@ -356,7 +420,7 @@ func (reg *registry) assignAddr(sub *Subscriber) error {
 		}
 		reg.topAddr = reg.topAddr.Next()
 	}
-	if !vpnPrefix.Contains(reg.topAddr) {
+	if !Prefix.Value().Contains(reg.topAddr) {
 		return xerrors.Unavailable("address")
 	}
 	sub.Addr = reg.topAddr
@@ -433,7 +497,7 @@ func (reg *registry) checkinGuest(rsvp *rsvp) {
 	}
 
 	rsvp.Header().Set("Content-Type", "application/json")
-	bits := vpnPrefix.Bits()
+	bits := Prefix.Value().Bits()
 	prefix := netip.PrefixFrom(sub.Addr, bits)
 	receipt := GuestReceipt{
 		Id:     sub.Id,
@@ -465,13 +529,14 @@ func (reg *registry) deny(rsvp *rsvp) {
 func (reg *registry) dir(w http.ResponseWriter) {
 	names := append([]string{}, RestPaths...)
 	names = append(names, "/"+vlink())
-	filepath.WalkDir(VpnDataDir,
+	dd := xmain.Data.Value()
+	filepath.WalkDir(dd,
 		func(path string, entry fs.DirEntry, err error) error {
-			if path == VpnDataDir || entry == nil || err != nil {
+			if path == dd || entry == nil || err != nil {
 				return err
 			}
 			if entry.Type().IsRegular() {
-				name := strings.TrimPrefix(path, VpnDataDir)
+				name := strings.TrimPrefix(path, dd)
 				names = append(names, name)
 			}
 			return nil
@@ -503,11 +568,11 @@ func (reg *registry) dnsAnswer(query *xdnsmessage.Message) *xdnsmessage.Message 
 		if !strings.HasSuffix(name, ".") {
 			name += "."
 		}
-		if !strings.HasSuffix(name, vpnDomain) {
-			xlog.Trace.Print("domain(", name, ") !=", vpnDomain)
+		if !strings.HasSuffix(name, Domain.Value()) {
+			xlog.Trace.Print("domain(", name, ") !=", Domain)
 			continue
 		}
-		name = strings.TrimSuffix(name, vpnDomain)
+		name = strings.TrimSuffix(name, Domain.Value())
 		sub, ok := reg.named[name]
 		if !ok {
 			xlog.Trace.Println(name, "not found")
@@ -637,7 +702,7 @@ func (reg *registry) file(w http.ResponseWriter, name string) {
 		return
 	}
 
-	name = filepath.Join(VpnDataDir, name)
+	name = xmain.Data.File(name)
 	if fi, err := os.Stat(name); err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
 			ecode = http.StatusNotFound
@@ -726,7 +791,7 @@ func (reg *registry) isSubscriber(rsvp *rsvp) bool {
 }
 
 func (reg *registry) loadAdminsFile() error {
-	err := kvc.RangeFile(vpnAdminsPath(), reg.loadAdminsKeyValues)
+	err := kvc.RangeFile(AdminsPath(), reg.loadAdminsKeyValues)
 	return xerrors.Suppress(err, fs.ErrNotExist)
 }
 
@@ -738,7 +803,7 @@ func (reg *registry) loadAdminsKeyValues(
 }
 
 func (reg *registry) loadExchangesFile() error {
-	err := kvc.RangeFile(vpnExchangesPath(), reg.loadExchangesKeyValues)
+	err := kvc.RangeFile(ExchangesPath(), reg.loadExchangesKeyValues)
 	return xerrors.Suppress(err, fs.ErrNotExist)
 }
 
@@ -753,7 +818,7 @@ func (reg *registry) loadExchangesKeyValues(
 }
 
 func (reg *registry) loadHostsFile() error {
-	err := kvc.RangeFile(vpnHostsPath(), reg.loadHostsKeyValues)
+	err := kvc.RangeFile(HostsPath(), reg.loadHostsKeyValues)
 	return xerrors.Suppress(err, fs.ErrNotExist)
 }
 
@@ -767,7 +832,7 @@ func (reg *registry) loadHostsKeyValues(
 	if err != nil {
 		return xerrors.Label(err, lno)
 	}
-	if !vpnPrefix.Contains(addr) {
+	if !Prefix.Value().Contains(addr) {
 		return xerrors.Range(lno)
 	}
 	reg.hosts.name[addr] = values[0]
@@ -780,7 +845,7 @@ func (reg *registry) loadHostsKeyValues(
 func (reg *registry) loadSubscribers() error {
 	var err error
 
-	cp := vpnCertPath()
+	cp := CertPath()
 	reg.cert, err = readCertificateFile(cp)
 	if err != nil {
 		return err
@@ -788,7 +853,7 @@ func (reg *registry) loadSubscribers() error {
 	cn := reg.cert.Subject.CommonName
 	sub := NewSubscriber(reg.cert)
 	sub.Id = 0
-	sub.Port = defaultExchangePort
+	sub.Port = DefaultExchangePort
 	if err = reg.assignAddr(sub); err != nil {
 		return err
 	}
@@ -796,7 +861,10 @@ func (reg *registry) loadSubscribers() error {
 	reg.named[cn] = sub
 
 	var fns []string
-	for _, dn := range []string{VpnConfigDir, VpnStateDir} {
+	for _, dn := range []string{
+		xmain.Config.Value(),
+		xmain.State.Value(),
+	} {
 		matches, err := filepath.Glob(filepath.Join(dn, "*.pem"))
 		if err != nil {
 			return err
@@ -901,10 +969,10 @@ func (reg *registry) rest(rsvp *rsvp) {
 			}
 		case path == RestPathShowPrefix:
 			if reg.isSubscriber(rsvp) {
-				fmt.Fprintln(rsvp, vpnPrefix)
+				fmt.Fprintln(rsvp, Prefix)
 			}
 		case path == RestPathShowStart:
-			fmt.Fprintln(rsvp, time.UnixMicro(vpnStart))
+			fmt.Fprintln(rsvp, time.UnixMicro(RegistryStart))
 		case path == RestPathShowStatus:
 			fmt.Fprintln(rsvp, "OK")
 		case strings.HasPrefix(path, RestPathShowSubscriber):
@@ -985,7 +1053,7 @@ func (reg *registry) rest(rsvp *rsvp) {
 
 func (reg *registry) restsvc() {
 	xlog.Trace.Println("start rest", reg.http.Addr)
-	err := reg.http.ListenAndServeTLS(vpnCertPath(), vpnSigPath())
+	err := reg.http.ListenAndServeTLS(CertPath(), SigPath())
 	err = xerrors.Suppress(err, http.ErrServerClosed)
 	if err == nil {
 		xlog.Trace.Println("stopped rest", reg.http.Addr)

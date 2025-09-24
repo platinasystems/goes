@@ -21,6 +21,7 @@ import (
 
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xflag"
+	"github.com/platinasystems/goes/v2/pkg/xmain"
 )
 
 var (
@@ -28,6 +29,20 @@ var (
 	signPriv crypto.PrivateKey
 	signPub  crypto.PublicKey
 )
+
+var SigFile = xflag.New[string]("sig", `
+Signature file w/in current or config directory.
+`[1:], func() string {
+	s, ok := xmain.LookupEnv("SIG")
+	if !ok {
+		s = "sig.pk8"
+	}
+	return s
+})
+
+func SigPath() string {
+	return xmain.Config.File(SigFile.Value())
+}
 
 // ShowSignature prints algorithm.
 func ShowSignature(ctx context.Context, args []string) error {
@@ -37,15 +52,15 @@ Print algorithm.
 
 {{flags .}}`)
 
-	DefineConfigFlag()
-	DefineSigFlag()
+	xmain.Config.Define()
+	SigFile.Define()
 
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
 		return err
 	}
 	if flag.CommandLine.NArg() > 0 {
-		VpnSigFile = flag.CommandLine.Arg(0)
+		SigFile.Override(flag.CommandLine.Arg(0))
 	}
 	if err = signInit(); err != nil {
 		return err
@@ -77,7 +92,7 @@ func signInit() error {
 	if signPriv != nil {
 		return err
 	}
-	input := vpnSigPath()
+	input := SigPath()
 	if input == "-" {
 		input = "input"
 		data, err = io.ReadAll(os.Stdin)

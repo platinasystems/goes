@@ -12,6 +12,7 @@ import (
 	"os/signal"
 
 	"github.com/platinasystems/goes/v2/pkg/xcontext"
+	"github.com/platinasystems/goes/v2/pkg/xflag"
 	"github.com/platinasystems/goes/v2/pkg/xsignal"
 )
 
@@ -22,6 +23,21 @@ var (
 	Info   = Mute(OutLog)
 	Trace  = Mute(OutLog)
 )
+
+var QuietFlag = xflag.NewEnable("q", "Quiet logging.", func() error {
+	Errata = Mute(Errata)
+	return nil
+})
+
+var TraceFlag = xflag.NewEnable("trace", "Very verbose logging.", func() error {
+	Trace = Unmute(Trace)
+	return nil
+})
+
+var VerboseFlag = xflag.NewEnable("v", "Verbose logging.", func() error {
+	Info = Unmute(Info)
+	return nil
+})
 
 func SetPrefixes(s string) {
 	ErrLog.SetPrefix(s)
@@ -120,7 +136,3 @@ func AlarmHandler(ctx context.Context) {
 		return true
 	})
 }
-
-func MuteErrata()  { Errata = Mute(Errata) }
-func UnmuteInfo()  { Info = Unmute(Info) }
-func UnmuteTrace() { Trace = Unmute(Trace) }

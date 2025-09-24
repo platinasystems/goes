@@ -8,11 +8,9 @@ import (
 	"golang/buildid"
 	"os"
 	"path/filepath"
-	"regexp"
 	"runtime"
 	"runtime/debug"
 	"strings"
-	"sync"
 )
 
 type BuildSetting string
@@ -33,7 +31,7 @@ const (
 	VcsType     = BuildSetting("type")
 )
 
-var Show = map[string]any{
+var Features = map[string]any{
 	"show": map[string]any{
 		"build": map[string]any{
 			"id":   BuildId,
@@ -51,11 +49,6 @@ var Show = map[string]any{
 			string(GoARCH):      GoARCH,
 			string(GoMicroARCH): GoMicroARCH,
 			string(GoOS):        GoOS,
-		},
-		"main": map[string]any{
-			"name":      MainName,
-			"reference": MainReference,
-			"version":   MainVersion,
 		},
 		"vcs": map[string]any{
 			string(VcsModified): VcsModified,
@@ -138,45 +131,4 @@ func IsOpt() bool {
 
 func IsUsrLocal() bool {
 	return strings.HasPrefix(Path(), filepath.FromSlash("/usr/local"))
-}
-
-func MainModule() *debug.Module {
-	bi := BuildInfo()
-	if bi == nil {
-		return nil
-	}
-	m := &bi.Main
-	if m.Replace != nil {
-		m = m.Replace
-	}
-	return m
-}
-
-var MainName = sync.OnceValue(func() string {
-	const major = "^v[1-9][0-9]*$"
-	bi := BuildInfo()
-	if bi == nil {
-		return filepath.Base(Path())
-	}
-	name := filepath.Base(bi.Path)
-	if t, err := regexp.MatchString(major, name); err != nil {
-		name = err.Error()
-	} else if t {
-		name = filepath.Base(filepath.Dir(bi.Path))
-	}
-	return name
-})
-
-func MainReference() string {
-	if mm := MainModule(); mm != nil {
-		return mm.Path + "@" + mm.Version
-	}
-	return ""
-}
-
-func MainVersion() string {
-	if mm := MainModule(); mm != nil {
-		return mm.Version
-	}
-	return ""
 }

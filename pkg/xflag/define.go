@@ -9,56 +9,103 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io/fs"
 	"net"
+	"os"
+	"path/filepath"
 	"strconv"
+	"strings"
+	"sync"
 	"time"
 )
 
-type IsBoolFlagger interface{ IsBoolFlag() bool }
+type Definer interface{ Define() }
+type DefineInner interface{ DefineIn(*flag.FlagSet) }
 
-// [DefineIn] [flag.CommandLine]
-func Define[T any](ptr *T, name, usage string) {
-	DefineIn(flag.CommandLine, ptr, name, usage)
+// Instantiate package scoped variables that are defined flags w/in mains.
+func New[T any](name, usage string, init func() T) *Generic[T] {
+	return &Generic[T]{
+		name:  name,
+		usage: usage,
+		init:  init,
+	}
 }
 
-// [flag.FlagSet.Var] with [Reference] wrap of generic pointer.
-func DefineIn[T any](fs *flag.FlagSet, p *T, name, usage string) {
-	r := Reference[T]{p}
-	fs.Var(r, name, usage)
+type Generic[T any] struct {
+	name,
+	usage string
+	init func() T
+	once struct {
+		init, define sync.Once
+	}
+	val T
 }
 
-// [DefineValIn] [flag.CommandLine]
-func DefineVal[T any](name string, val T, usage string) *T {
-	return DefineValIn(flag.CommandLine, name, val, usage)
+func (g *Generic[T]) Define() {
+	g.DefineIn(flag.CommandLine)
 }
 
-// [DefineIn] with clone.
-func DefineValIn[T any](fs *flag.FlagSet, name string, v T, usage string) *T {
-	p := new(T)
-	*p = v
-	DefineIn(fs, p, name, usage)
-	return p
+func (g *Generic[T]) DefineIn(fs *flag.FlagSet) {
+	g.once.init.Do(g.valInit)
+	g.once.define.Do(func() {
+		if !define(fs, &g.val, g.name, g.usage) {
+			r := reference[T]{&g.val}
+			fs.Var(r, g.name, g.usage)
+		}
+	})
 }
 
-// [DefineVarIn] [flag.CommandLine]
-func DefineVar[T any](p *T, name string, v T, usage string) {
-	DefineVarIn(flag.CommandLine, p, name, v, usage)
+func (g *Generic[T]) Override(v T) {
+	g.once.init.Do(func() {})
+	g.once.define.Do(func() {})
+	g.val = v
 }
 
-// Load value then [DefineIn].
-func DefineVarIn[T any](
-	fs *flag.FlagSet, p *T, name string, v T, usage string,
-) {
-	*p = v
-	DefineIn(fs, p, name, usage)
+func (g *Generic[T]) String() string {
+	return fmt.Sprint(g.Value())
 }
 
-// [Define] wraps its generic pointer arg with Reference to implement
-// [flag.Getter] and [IsBoolFlagger].
-type Reference[T any] struct{ p *T }
+func (g *Generic[T]) Value() T {
+	g.once.init.Do(g.valInit)
+	return g.val
+}
+
+func (g *Generic[T]) valInit() {
+	if g.init != nil {
+		g.val = g.init()
+	}
+}
+
+// Instantiate package scoped flag with [Dir.File] method.
+type Dir struct{ Generic[string] }
+
+func NewDir(name, usage string, init func() string) *Dir {
+	return &Dir{Generic[string]{
+		name:  name,
+		usage: usage,
+		init:  init,
+	}}
+}
+
+// If given string doesn't equal "-" or have a [filepath.Separator],
+// then [filepath.Join] it to [Dir.Value];
+// otherwise, return unchanged.
+func (gd *Dir) File(s string) string {
+	if s != "-" && strings.IndexRune(s, filepath.Separator) < 0 {
+		if _, err := os.Stat(s); errors.Is(err, fs.ErrNotExist) {
+			if val := gd.Value(); len(val) > 0 {
+				s = filepath.Join(val, s)
+			}
+		}
+	}
+	return s
+}
+
+// If the [flag] package doesn't provide a [flag.FlagSet] method for the [Generic] type, wrap it with this reference to implement [flag.Getter] and IsBoolFlag.
+type reference[T any] struct{ p *T }
 
 // If not nil, return the referenced value; otherwise returns its zero.
-func (r Reference[T]) Get() any {
+func (r reference[T]) Get() any {
 	if r.p == nil {
 		var z T
 		return z
@@ -67,7 +114,7 @@ func (r Reference[T]) Get() any {
 }
 
 // If reference to bool, returns true; otherwise false.
-func (r Reference[T]) IsBoolFlag() bool {
+func (r reference[T]) IsBoolFlag() bool {
 	_, ok := any(r.p).(*bool)
 	return ok
 }
@@ -78,7 +125,7 @@ func (r Reference[T]) IsBoolFlag() bool {
 // if to [net.HardwareAddr], assign with [net.ParseMAC] results;
 // if it's an [encoding.TextUnmarshaler], call its UnmarshalText() with arg;
 // otherwise, [fmt.Sscan] it from arg.
-func (r Reference[T]) Set(s string) error {
+func (r reference[T]) Set(s string) error {
 	return refset(r.p, s)
 }
 
@@ -105,7 +152,7 @@ func refset(p any, s string) (err error) {
 // if it's a string, return that value;
 // if it's a uint of any size, return its base 10 string format;
 // otherwise, return its [fmt.Sprint] results.
-func (r Reference[T]) String() string {
+func (r reference[T]) String() string {
 	if r.p == nil {
 		return ""
 	}
@@ -133,4 +180,66 @@ func refstring(v any) string {
 		return fmt.Sprint(t)
 	}
 	return ""
+}
+
+// If available, first try to define with the [flag] builit-in type functions.
+func define(fs *flag.FlagSet, v any, name, usage string) bool {
+	switch p := v.(type) {
+	case *bool:
+		fs.BoolVar(p, name, *p, usage)
+	case *time.Duration:
+		fs.DurationVar(p, name, *p, usage)
+	case *float64:
+		fs.Float64Var(p, name, *p, usage)
+	case *int:
+		fs.IntVar(p, name, *p, usage)
+	case *int64:
+		fs.Int64Var(p, name, *p, usage)
+	case *string:
+		fs.StringVar(p, name, *p, usage)
+	case *uint:
+		fs.UintVar(p, name, *p, usage)
+	case *uint64:
+		fs.Uint64Var(p, name, *p, usage)
+	default:
+		return false
+	}
+	return true
+}
+
+func Define[T any](ptr *T, name, usage string) {
+	DefineIn(flag.CommandLine, ptr, name, usage)
+}
+
+func DefineIn[T any](fs *flag.FlagSet, p *T, name, usage string) {
+	if !define(fs, p, name, usage) {
+		r := reference[T]{p}
+		fs.Var(r, name, usage)
+	}
+}
+
+// [DefineValIn] [flag.CommandLine]
+func DefineVal[T any](name string, val T, usage string) *T {
+	return DefineValIn(flag.CommandLine, name, val, usage)
+}
+
+// [DefineIn] with clone.
+func DefineValIn[T any](fs *flag.FlagSet, name string, v T, usage string) *T {
+	p := new(T)
+	*p = v
+	DefineIn(fs, p, name, usage)
+	return p
+}
+
+// [DefineVarIn] [flag.CommandLine]
+func DefineVar[T any](p *T, name string, v T, usage string) {
+	DefineVarIn(flag.CommandLine, p, name, v, usage)
+}
+
+// Load value then [DefineIn].
+func DefineVarIn[T any](
+	fs *flag.FlagSet, p *T, name string, v T, usage string,
+) {
+	*p = v
+	DefineIn(fs, p, name, usage)
 }

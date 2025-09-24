@@ -14,6 +14,7 @@ import (
 
 	"github.com/platinasystems/goes/v2/pkg/goes"
 	"github.com/platinasystems/goes/v2/pkg/xflag"
+	"github.com/platinasystems/goes/v2/pkg/xmain"
 	"github.com/platinasystems/goes/v2/pkg/xprogram"
 )
 
@@ -62,7 +63,7 @@ Set environment and perform named feature, or print environment.
 	}
 
 	cmd := exec.CommandContext(ctx, xprogram.Path(), args...)
-	cmd.Args[0] = xprogram.MainName()
+	cmd.Args[0] = xmain.PackageName()
 	cmd.Env = environ
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout

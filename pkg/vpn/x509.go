@@ -27,9 +27,100 @@ import (
 
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xflag"
+	"github.com/platinasystems/goes/v2/pkg/xmain"
 )
 
 const BlockTypeCertificate = "CERTIFICATE"
+
+const (
+	year    = 365 * 24 * time.Hour
+	longest = 10 * year
+)
+
+var CertFile = xflag.New[string]("cert", `
+Certificate file w/in current or config directory.
+`[1:], func() string {
+	s, ok := xmain.LookupEnv("CERT")
+	if ok {
+		return s
+	}
+	s = "cert.pem"
+	if _, err := os.Stat(s); err == nil {
+	} else if _, err = os.Stat(filepath.
+		Join(xmain.Config.Value(), s)); err == nil {
+	} else if h, err := os.Hostname(); err == nil {
+		if i := strings.Index(h, "."); i > 0 {
+			h = h[:i]
+		}
+		s = fmt.Sprint(h, ".pem")
+	}
+	return s
+})
+
+func CertPath() string {
+	return xmain.Config.File(CertFile.Value())
+}
+
+var CertDuration = xflag.New[time.Duration]("duration", `
+New certificate's life span, e.g. 360s, 60m, or 1h.
+`[1:], func() time.Duration {
+	return year
+})
+
+var CertSerialNumber = xflag.New[int64]("serial-number", `
+New certificate's identifier, random if zero.
+`[1:], func() int64 {
+	return 1
+})
+
+var CertCountry = xflag.New[string]("country", `
+New certificate's country code.`[1:], nil)
+
+var CertDNS = xflag.New[string]("dns", `
+Comma separated domain names.
+`[1:], func() string {
+	s, err := os.Hostname()
+	if err != nil {
+		s = err.Error()
+	}
+	return s
+})
+
+var CertEmail = xflag.New[string]("email", `
+New certificate's comma separated addresses.`[1:], nil)
+
+var CertLocality = xflag.New[string]("locality", `
+aka. city.`[1:], nil)
+
+var CertName = xflag.New[string]("name", `
+VPN identfier.
+`[1:], func() string {
+	s, err := os.Hostname()
+	if err != nil {
+		s = err.Error()
+	} else if i := strings.Index(s, "."); i > 0 {
+		s = s[:i]
+	}
+	return s
+})
+
+var CertOrganization = xflag.New[string]("organization", `
+aka. company.`[1:], nil)
+
+var CertOrganizationalUnit = xflag.New[string]("organizational-unit", `
+aka. department.`[1:], nil)
+
+var CertPostalCode = xflag.New[string]("postal-code", `
+aka. zip code.`[1:], nil)
+
+var CertProvince = xflag.New[string]("province", `
+aka. state.`[1:], nil)
+
+var CertStreet = xflag.New[string]("street", `
+e.g. "1313 Mockingbird Lane"`[1:], nil)
+
+var CertURI = xflag.New[string]("uri", `
+Comma separated URLs.`[1:], nil)
 
 var CertificatesTemplate = sync.OnceValues(func() (*template.Template, error) {
 	return template.New("certificates").Parse(`{{range .}}- {{/*
@@ -98,23 +189,23 @@ Create PEM encoded x509 certificate file.
 
 {{flags .}}`)
 
-	DefineConfigFlag()
+	xmain.Config.Define()
 
-	DefineCertFlag()
-	DefineCountryFlag()
-	DefineDNSFlag()
-	DefineDurationFlag()
-	DefineEmailFlag()
-	DefineLocalityFlag()
-	DefineNameFlag()
-	DefineOrganizationFlag()
-	DefineOrganizationalUnitFlag()
-	DefinePostalCodeFlag()
-	DefineProvinceFlag()
-	DefineSerialNumberFlag()
-	DefineSigFlag()
-	DefineStreetFlag()
-	DefineURIFlag()
+	CertFile.Define()
+	CertCountry.Define()
+	CertDNS.Define()
+	CertDuration.Define()
+	CertEmail.Define()
+	CertLocality.Define()
+	CertName.Define()
+	CertOrganization.Define()
+	CertOrganizationalUnit.Define()
+	CertPostalCode.Define()
+	CertProvince.Define()
+	CertSerialNumber.Define()
+	SigFile.Define()
+	CertStreet.Define()
+	CertURI.Define()
 
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
@@ -125,41 +216,41 @@ Create PEM encoded x509 certificate file.
 		return err
 	}
 
-	if vpnDuration > longest {
-		return xerrors.Invalid(vpnDuration.String())
+	if CertDuration.Value() > longest {
+		return xerrors.Invalid(CertDuration.Value().String())
 	}
 
 	now := time.Now()
-	expire := now.Add(vpnDuration)
+	expire := now.Add(CertDuration.Value())
 	t := x509.Certificate{
 		IsCA:               true,
-		SerialNumber:       big.NewInt(vpnSerialNumber),
+		SerialNumber:       big.NewInt(CertSerialNumber.Value()),
 		SignatureAlgorithm: x509.PureEd25519,
 		NotBefore:          now,
 		NotAfter:           expire,
 		KeyUsage: x509.KeyUsageDigitalSignature |
 			x509.KeyUsageCertSign,
 		Subject: pkix.Name{
-			CommonName:   vpnName,
-			SerialNumber: fmt.Sprint(vpnSerialNumber),
-			Organization: strings.Fields(vpnOrganization),
+			CommonName:   CertName.String(),
+			SerialNumber: CertSerialNumber.String(),
+			Organization: strings.Fields(CertOrganization.String()),
 			OrganizationalUnit: strings.
-				Fields(vpnOrganizationalUnit),
-			StreetAddress: strings.Fields(vpnStreet),
-			Locality:      strings.Fields(vpnLocality),
-			Province:      strings.Fields(vpnProvince),
-			Country:       strings.Fields(vpnCountry),
-			PostalCode:    strings.Fields(vpnPostalCode),
+				Fields(CertOrganizationalUnit.String()),
+			StreetAddress: strings.Fields(CertStreet.String()),
+			Locality:      strings.Fields(CertLocality.String()),
+			Province:      strings.Fields(CertProvince.String()),
+			Country:       strings.Fields(CertCountry.String()),
+			PostalCode:    strings.Fields(CertPostalCode.String()),
 		},
-		DNSNames: strings.Split(vpnDNS, ","),
+		DNSNames: strings.Split(CertDNS.Value(), ","),
 	}
 
-	if len(vpnEmail) > 0 {
-		t.EmailAddresses = strings.Split(vpnEmail, ",")
+	if s := CertEmail.Value(); len(s) > 0 {
+		t.EmailAddresses = strings.Split(s, ",")
 	}
 
-	if len(vpnURI) > 0 {
-		for _, s := range strings.Split(vpnURI, ",") {
+	if uri := CertURI.Value(); len(uri) > 0 {
+		for _, s := range strings.Split(uri, ",") {
 			u, err := url.Parse(s)
 			if err != nil {
 				return err
@@ -195,7 +286,7 @@ Create PEM encoded x509 certificate file.
 		Headers: map[string]string{},
 		Bytes:   der,
 	}
-	cp := vpnCertPath()
+	cp := CertPath()
 	if cp == "-" {
 		return pem.Encode(os.Stdout, blk)
 	}
@@ -220,16 +311,16 @@ Print parsed certificate.
 
 {{flags .}}`)
 
-	DefineConfigFlag()
-	DefineCertFlag()
-	DefineSigFlag()
+	xmain.Config.Define()
+	CertFile.Define()
+	SigFile.Define()
 
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
 		return err
 	}
 
-	c, err := readCertificateFile(vpnCertPath())
+	c, err := readCertificateFile(CertPath())
 	if err != nil {
 		return err
 	}

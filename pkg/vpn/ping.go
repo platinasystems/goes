@@ -16,6 +16,30 @@ import (
 	probing "github.com/prometheus-community/pro-bing"
 )
 
+var (
+	PingCountFlag    = xflag.New[int]("c", "Count.", nil)
+	PingIntervalFlag = xflag.New[time.Duration]("i", `
+Interval.`[1:], func() time.Duration {
+		return time.Second
+	})
+	PingTTLFlag     = xflag.New[int]("m", "Request Time To Live.", nil)
+	PingQuietFlag   = xflag.New[bool]("q", "Quiet.", nil)
+	PingTimeoutFlag = xflag.New[time.Duration]("t", `
+Timeout regardless of how many received packets.
+`[1:], func() time.Duration {
+		return 3 * time.Second
+	})
+	PingVerboseFlag = xflag.New[bool]("v", "Verbose.", nil)
+)
+
+var PingFlags = append(RestFlags,
+	PingCountFlag,
+	PingIntervalFlag,
+	PingTTLFlag,
+	PingQuietFlag,
+	PingTimeoutFlag,
+	PingVerboseFlag)
+
 func Ping(ctx context.Context, args []string) error {
 	xflag.TemplateUsage(`
 usage: {{.Name}} [flags] <guest>
@@ -23,22 +47,9 @@ ICMP with named guest.
 
 {{flags .}}`)
 
-	cFlag := 0
-	iFlag := time.Second
-	mFlag := 0
-	qFlag := false
-	tFlag := 3 * time.Second
-	vFlag := false
-
-	xflag.Define(&cFlag, "c", "Count.")
-	xflag.Define(&iFlag, "i", "Interval.")
-	xflag.Define(&mFlag, "m", "Request Time To Live.")
-	xflag.Define(&qFlag, "q", "Quiet.")
-	xflag.Define(&tFlag, "t",
-		"Timeout regardless of how many received packets.")
-	xflag.Define(&vFlag, "v", "Verbose.")
-
-	DefineRestFlags()
+	for _, f := range PingFlags {
+		f.Define()
+	}
 
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
@@ -63,15 +74,15 @@ ICMP with named guest.
 	pinger := probing.New(args[0])
 	pinger.SetIPAddr(ipaddr)
 
-	pinger.Count = cFlag
-	pinger.Interval = iFlag
-	if tFlag != 0 {
-		pinger.Timeout = tFlag
+	pinger.Count = PingCountFlag.Value()
+	pinger.Interval = PingIntervalFlag.Value()
+	if to := PingTimeoutFlag.Value(); to != 0 {
+		pinger.Timeout = to
 	}
-	if mFlag != 0 {
-		pinger.TTL = mFlag
+	if ttl := PingTTLFlag.Value(); ttl != 0 {
+		pinger.TTL = ttl
 	}
-	if vFlag {
+	if PingVerboseFlag.Value() {
 		pinger.OnSend = func(pkt *probing.Packet) {
 			fmt.Printf("%d bytes to %v; icmp_seq=%d\n",
 				pkt.Nbytes,
@@ -79,7 +90,7 @@ ICMP with named guest.
 				pkt.Seq)
 		}
 	}
-	if !qFlag {
+	if !PingQuietFlag.Value() {
 		pinger.OnRecv = func(pkt *probing.Packet) {
 			fmt.Printf("%d bytes from %v; "+
 				"icmp_seq=%d ttl=%d time=%v\n",
