@@ -20,6 +20,62 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xnet/xdns/xdnspkt"
 )
 
+var Host_4 = xflag.New[bool]("4", "Only use IPv4 query transport.", nil)
+var Host_6 = xflag.New[bool]("6", "Only use IPv6 query transport.", nil)
+var Host_A = xflag.New[bool]("A", "Like -a but omits RRSIG, NSEC, NSEC3.", nil)
+var Host_C = xflag.New[bool]("C", `
+Compare SOA records on authoritative servers.`[1:],
+	nil)
+var Host_N = xflag.New[int]("N", "Number of dots before root lookup is done.",
+	nil)
+var Host_R = xflag.New[int]("R", "UDP retries.",
+	func() int { return 3 })
+var Host_T = xflag.New[bool]("T", "TCP mode.", nil)
+var Host_U = xflag.New[bool]("U", "UDP mode.",
+	func() bool { return true })
+var Host_V = xflag.New[bool]("V", "Print version number and exit.", nil)
+var Host_W = xflag.New[time.Duration]("W", "Reply wait time.",
+	func() time.Duration { return 30 * time.Second })
+var Host_a = xflag.New[bool]("a", "Equivalent to -v -t ANY", nil)
+var Host_c = xflag.New[xdnsmessage.Class]("c", "Query class for non-IN data.",
+	func() xdnsmessage.Class { return xdnsmessage.ClassINET })
+var Host_i = xflag.New[bool]("i", "FIXME?", nil)
+var Host_l = xflag.New[bool]("l", `
+Using AXFR, lists all hosts in a domain.`[1:], nil)
+var Host_m = xflag.New[bool]("m", "Memory debugging.", nil)
+var Host_p = xflag.New[int]("p", "Server port.",
+	func() int { return 53 })
+var Host_r = xflag.New[bool]("r", "Disable recursive processing.", nil)
+var Host_s = xflag.New[bool]("s", "Stop query on SERVFAIL response.", nil)
+var Host_t = xflag.New[xdnsmessage.Type]("t", "Query type.",
+	func() xdnsmessage.Type { return xdnsmessage.TypeA })
+var Host_v = xflag.New[bool]("v", "Verbose output.", nil)
+var Host_w = xflag.New[bool]("w", "Wait forever for a reply.", nil)
+
+var HostFlags = []xflag.Definer{
+	Host_4,
+	Host_6,
+	Host_A,
+	Host_C,
+	Host_N,
+	Host_R,
+	Host_T,
+	Host_U,
+	Host_V,
+	Host_W,
+	Host_a,
+	Host_c,
+	Host_i,
+	Host_l,
+	Host_m,
+	Host_p,
+	Host_r,
+	Host_s,
+	Host_t,
+	Host_v,
+	Host_w,
+}
+
 func Host(ctx context.Context, args []string) error {
 	var name string
 
@@ -29,7 +85,9 @@ Mimic BIND9's DNS lookup utility.
 
 {{flags .}}`)
 
-	defineHostFlags()
+	for _, f := range HostFlags {
+		f.Define()
+	}
 
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
@@ -55,11 +113,11 @@ Mimic BIND9's DNS lookup utility.
 		xdnsmessage.TypeLOC:   "location",
 	}
 
-	if host_V {
+	if Host_V.Value() {
 		fmt.Println(Version())
 		return nil
 	}
-	if host_v {
+	if Host_v.Value() {
 		verbose = xlog.Unmute(verbose)
 	}
 	args = flag.CommandLine.Args()
@@ -94,14 +152,14 @@ Mimic BIND9's DNS lookup utility.
 		}
 	}
 
-	types := []xdnsmessage.Type{host_t}
-	if host_a || host_A {
+	types := []xdnsmessage.Type{Host_t.Value()}
+	if Host_a.Value() || Host_A.Value() {
 		types[0] = xdnsmessage.TypeANY
-	} else if host_t == xdnsmessage.TypeA {
+	} else if Host_t.Value() == xdnsmessage.TypeA {
 		types = append(types, xdnsmessage.TypeAAAA, xdnsmessage.TypeMX)
 	}
 	var hf xdnsmessage.HF
-	if !host_r {
+	if !Host_r.Value() {
 		hf |= xdnsmessage.HFRecursionDesired
 	}
 	for _, t := range types {
@@ -111,7 +169,7 @@ Mimic BIND9's DNS lookup utility.
 			OpCode: xdnsmessage.OpCodeQuery,
 			Questions: []xdnsmessage.WireQuestion{{
 				Name:  xdnsmessage.MakeUniqueString(name),
-				Class: host_c,
+				Class: Host_c.Value(),
 				Type:  t,
 			}},
 		}
@@ -137,56 +195,4 @@ Mimic BIND9's DNS lookup utility.
 		}
 	}
 	return nil
-}
-
-var (
-	// Host Flags
-	host_4 = false
-	host_6 = false
-	host_A = false
-	host_C = false
-	host_N = 0
-	host_R = 3
-	host_T = false
-	host_U = true
-	host_V = false
-	host_W = 30 * time.Second
-	host_a = false
-	host_c = xdnsmessage.ClassINET
-	host_i = false
-	host_l = false
-	host_m = false
-	host_p = 53
-	host_r = false
-	host_s = false
-	host_t = xdnsmessage.TypeA
-	host_v = false
-	host_w = false
-)
-
-func defineHostFlags() {
-	xflag.Define(&host_4, "4", "Only use IPv4 query transport.")
-	xflag.Define(&host_6, "6", "Only use IPv6 query transport.")
-	xflag.Define(&host_A, "A", "Like -a but omits RRSIG, NSEC, NSEC3")
-	xflag.Define(&host_C, "C",
-		"Compare SOA records on authoritative servers.")
-	xflag.Define(&host_N, "N",
-		"Number of dots before root lookup is done.")
-	xflag.Define(&host_R, "R", "UDP retries.")
-	xflag.Define(&host_T, "T", "TCP mode.")
-	xflag.Define(&host_U, "U", "UDP mode.")
-	xflag.Define(&host_V, "V", "Print version number and exit.")
-	xflag.Define(&host_W, "W", "Reply wait time.")
-	xflag.Define(&host_a, "a", "Equivalent to -v -t ANY")
-	xflag.Define(&host_c, "c", "Query class for non-IN data")
-	xflag.Define(&host_i, "i", "FIXME?")
-	xflag.Define(&host_l, "l", "Using AXFR, lists all hosts in a domain.")
-	xflag.Define(&host_m, "m", "Memory debugging (trace|record|usage).")
-	xflag.Define(&host_p, "p", "Server port.")
-	xflag.Define(&host_r, "r", "Disable recursive processing.")
-	xflag.Define(&host_s, "s", "A SERVFAIL response should stop query.")
-	xflag.Define(&host_t, "t", "Query type.")
-	xflag.Define(&host_v, "v", "Verbose output.")
-	xflag.Define(&host_v, "d", "Debug (aka. Verbose).")
-	xflag.Define(&host_w, "w", "Wait forever for a reply.")
 }
