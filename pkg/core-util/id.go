@@ -15,11 +15,34 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xflag"
 )
 
+var Id_A = xflag.New[bool]("A", "Print user process audit.", nil)
+var Id_G = xflag.New[bool]("G", "Print group IDs.", nil)
+var Id_M = xflag.New[bool]("M", "Print process MAC label.", nil)
+var Id_P = xflag.New[bool]("P", "Print password file entry.", nil)
+var Id_c = xflag.New[bool]("c", "Print login class.", nil)
+var Id_g = xflag.New[bool]("g", "Print effective group ID.", nil)
+var Id_n = xflag.New[bool]("n", "Print user or group name instead of number.",
+	nil)
+var Id_p = xflag.New[bool]("p", "Print human readable output.", nil)
+var Id_r = xflag.New[bool]("r", "Print real user ID.", nil)
+var Id_u = xflag.New[bool]("u", "Print effective user ID.", nil)
+
+var IdFlags = []xflag.Definer{
+	Id_A,
+	Id_G,
+	Id_M,
+	Id_P,
+	Id_c,
+	Id_g,
+	Id_n,
+	Id_p,
+	Id_r,
+	Id_u,
+}
+
 func Id(ctx context.Context, args []string) error {
 	var u *user.User
 	var gname, euname, egname, s, sep string
-	var id_A, id_G, id_M, id_P, id_c, id_g, id_n,
-		id_p, id_r, id_u bool
 
 	xflag.TemplateUsage(`
 usage: {{.Name}} [flags] [user]
@@ -27,16 +50,9 @@ Print “user” (or current user's) identity.
 
 {{flags .}}`)
 
-	xflag.Define(&id_A, "A", "Print user process audit.")
-	xflag.Define(&id_G, "G", "Print group IDs.")
-	xflag.Define(&id_M, "M", "Print process MAC label.")
-	xflag.Define(&id_P, "P", "Print password file entry.")
-	xflag.Define(&id_c, "c", "Print login class.")
-	xflag.Define(&id_g, "g", "Print effective group ID.")
-	xflag.Define(&id_n, "n", "Print user or group name instead of number.")
-	xflag.Define(&id_p, "p", "Print human readable output.")
-	xflag.Define(&id_r, "r", "Print real user ID.")
-	xflag.Define(&id_u, "u", "Print effective user ID.")
+	for _, f := range IdFlags {
+		f.Define()
+	}
 
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
@@ -82,45 +98,45 @@ Print “user” (or current user's) identity.
 	}
 
 	switch {
-	case id_A:
+	case Id_A.Value():
 		return xerrors.FIXME()
-	case id_c:
+	case Id_c.Value():
 		return xerrors.FIXME()
-	case id_g:
-		if len(args) == 0 && !id_r {
-			if id_n {
+	case Id_g.Value():
+		if len(args) == 0 && !Id_r.Value() {
+			if Id_n.Value() {
 				s = egname
 			} else {
 				s = segid
 			}
-		} else if id_n {
+		} else if Id_n.Value() {
 			s = gname
 		} else {
 			s = u.Gid
 		}
 		fmt.Println(s)
-	case id_u:
-		if len(args) == 0 && !id_r {
-			if id_n {
+	case Id_u.Value():
+		if len(args) == 0 && !Id_r.Value() {
+			if Id_n.Value() {
 				s = euname
 			} else {
 				s = seuid
 			}
-		} else if id_n {
+		} else if Id_n.Value() {
 			s = u.Username
 		} else {
 			s = u.Uid
 		}
 		fmt.Println(s)
-	case id_G:
+	case Id_G.Value():
 		for _, gid := range gids {
 			fmt.Print(sep, gid)
 			sep = " "
 		}
 		fmt.Println()
-	case id_M:
+	case Id_M.Value():
 		return xerrors.FIXME()
-	case id_P:
+	case Id_P.Value():
 		shell := os.Getenv("SHELL")
 		if len(shell) == 0 || len(args) > 0 {
 			shell = "SHELL"
@@ -134,7 +150,7 @@ Print “user” (or current user's) identity.
 			":", u.HomeDir,
 			":", shell,
 			"\n")
-	case id_p:
+	case Id_p.Value():
 		fmt.Print("uid\t", u.Username, "\n")
 		if len(args) == 0 {
 			if seuid != u.Uid {
