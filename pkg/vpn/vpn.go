@@ -7,9 +7,9 @@ package vpn
 import (
 	"errors"
 	"net/netip"
-	"os"
 	"time"
 
+	"github.com/platinasystems/goes/v2/pkg/sig"
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xlog"
 	"github.com/platinasystems/goes/v2/pkg/xnet"
@@ -19,9 +19,6 @@ import (
 )
 
 var Features = map[string]any{
-	"new": map[string]any{
-		"vpn": NewFeatures,
-	},
 	"show": map[string]any{
 		"vpn": ShowFeatures,
 	},
@@ -45,25 +42,16 @@ var MainFeatures = map[string]any{
 	"update":      RestUpdate,
 }
 
-var NewFeatures = map[string]any{
-	"certificate": CreateCertificate,
-	"signature":   NewEd25519,
-}
-
 var ShowFeatures = map[string]any{
-	"address":     RestShow,
-	"admins":      RestShow,
-	"certificate": ShowCertificate,
-	"exchanges":   RestShow,
-	"pending":     RestShow,
-	"prefix":      RestShow,
-	"registry": map[string]any{
-		"vcs": RestShow,
-	},
-	"signature":  ShowSignature,
+	"address":    RestShow,
+	"admins":     RestShow,
+	"exchanges":  RestShow,
+	"pending":    RestShow,
+	"prefix":     RestShow,
 	"start":      RestShow,
 	"status":     RestShow,
 	"subscriber": RestShow,
+	"vcs":        RestShow,
 }
 
 const (
@@ -76,12 +64,7 @@ const (
 	UpgradeExitCode = xos.EX_TEMPFAIL
 )
 
-const (
-	DefaultExchangePort = 8003
-
-	oAppend = os.O_WRONLY | os.O_CREATE | os.O_APPEND
-	oCreate = os.O_WRONLY | os.O_CREATE | os.O_TRUNC
-)
+const DefaultExchangePort = 8003
 
 var (
 	errEOC = errors.New("end of channel")
@@ -147,7 +130,7 @@ func NewGreeting(now int64) *xnet.Msg {
 		mp.Put(m)
 		return nil
 	}
-	sig := sign(m.Data)
+	sig := sig.Sign(m.Data)
 	m.Data = append(m.Data, sig...)
 	m.Data = append(m.Data, MyLabel...)
 	return m

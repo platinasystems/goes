@@ -8,6 +8,7 @@ package xos
 
 import (
 	"errors"
+	"os"
 	. "os"
 
 	"golang.org/x/sys/unix"
@@ -21,4 +22,12 @@ func IsBlocked(err error) bool {
 
 func SetNonblockFile(f *File, val bool) error {
 	return unix.SetNonblock(int(f.Fd()), val)
+}
+
+func AppendFile(name string, perm FileMode) (*File, error) {
+	return os.OpenFile(name, O_RDWR|O_CREATE|O_APPEND, perm)
+}
+
+func TruncFile(name string, perm FileMode) (*File, error) {
+	return os.OpenFile(name, O_RDWR|O_CREATE|O_TRUNC, perm)
 }

@@ -6,24 +6,27 @@
 package main
 
 import (
+	"github.com/platinasystems/goes/v2/pkg/cert"
 	"github.com/platinasystems/goes/v2/pkg/goes"
 	goes_util "github.com/platinasystems/goes/v2/pkg/goes-util"
+	"github.com/platinasystems/goes/v2/pkg/sig"
 	"github.com/platinasystems/goes/v2/pkg/vpn"
 	"github.com/platinasystems/goes/v2/pkg/xmain"
 	"github.com/platinasystems/goes/v2/pkg/xprogram"
 )
 
-var features = []map[string]any{
-	vpn.MainFeatures,
-	map[string]any{
-		"new":  vpn.NewFeatures,
-		"show": vpn.ShowFeatures,
-	},
-	goes_util.Features,
-	xmain.Features,
-	xprogram.Features,
+func init() {
+	goes.Install(
+		xmain.Features,
+		xprogram.Features,
+		goes_util.Features,
+		sig.Features,
+		cert.Features,
+		vpn.MainFeatures,
+		map[string]any{
+			"show": vpn.ShowFeatures,
+		},
+	)
 }
-
-func init() { goes.Install(features...) }
 
 func main() { goes.Main() }

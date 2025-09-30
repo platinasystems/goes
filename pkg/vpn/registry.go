@@ -32,7 +32,9 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/platinasystems/goes/v2/pkg/cert"
 	"github.com/platinasystems/goes/v2/pkg/kvc"
+	"github.com/platinasystems/goes/v2/pkg/sig"
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xflag"
 	"github.com/platinasystems/goes/v2/pkg/xlog"
@@ -197,7 +199,7 @@ A RESTful WWW server and packet exchange.
 	if !strings.HasPrefix(domain, ".") {
 		domain = fmt.Sprint(".", domain)
 	}
-	if err = signInit(); err != nil {
+	if err = sig.Init(); err != nil {
 		return err
 	}
 
@@ -349,7 +351,7 @@ func (reg *registry) approve(rsvp *rsvp) {
 	}
 	reg.pending = slices.Delete(reg.pending, i, i+1)
 	blk := pem.Block{
-		Type:  BlockTypeCertificate,
+		Type:  cert.BlockType,
 		Bytes: sub.CertDER,
 	}
 	if f, err := os.Create(sub.stateFileName()); err != nil {
@@ -819,8 +821,8 @@ func (reg *registry) loadHostsKeyValues(
 func (reg *registry) loadSubscribers() error {
 	var err error
 
-	cp := CertPath()
-	reg.cert, err = readCertificateFile(cp)
+	cp := cert.Path()
+	reg.cert, err = cert.ReadFile(cp)
 	if err != nil {
 		return err
 	}
@@ -846,7 +848,7 @@ func (reg *registry) loadSubscribers() error {
 		if fn == cp {
 			continue
 		}
-		c, err := readCertificateFile(fn)
+		c, err := cert.ReadFile(fn)
 		if err != nil {
 			return err
 		}
@@ -1024,7 +1026,7 @@ func (reg *registry) rest(rsvp *rsvp) {
 
 func (reg *registry) restsvc() {
 	xlog.Trace.Println("start rest", reg.http.Addr)
-	err := reg.http.ListenAndServeTLS(CertPath(), SigPath())
+	err := reg.http.ListenAndServeTLS(cert.Path(), sig.Path())
 	err = xerrors.Suppress(err, http.ErrServerClosed)
 	if err == nil {
 		xlog.Trace.Println("stopped rest", reg.http.Addr)
@@ -1055,7 +1057,7 @@ func (reg *registry) showAddress(rsvp *rsvp) {
 func (reg *registry) showPending(rsvp *rsvp) {
 	if len(reg.pending) == 0 {
 		http.Error(rsvp, "none", http.StatusNoContent)
-	} else if t, err := CertificatesTemplate(); err != nil {
+	} else if t, err := cert.NewTemplate(); err != nil {
 		http.Error(rsvp, err.Error(), http.StatusInternalServerError)
 	} else {
 		certs := make([]*x509.Certificate, len(reg.pending))

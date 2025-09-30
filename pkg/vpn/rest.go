@@ -28,6 +28,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/platinasystems/goes/v2/pkg/cert"
+	"github.com/platinasystems/goes/v2/pkg/sig"
 	"github.com/platinasystems/goes/v2/pkg/xcontext"
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xflag"
@@ -108,8 +110,8 @@ func RegistryPath() string { return xmain.ConfigFile(registryFile) }
 
 var restFlags = xflag.Labels{
 	xmain.ConfigFlag,
-	CertFlag,
-	SigFlag,
+	cert.Flag,
+	sig.Flag,
 	xflag.Label{"registry",
 		"Registry certificate file w/in current or config directory.",
 		func() any {
@@ -177,12 +179,12 @@ func restInit() error {
 	rest.whoisReqC = make(chan any, RestWhoisDepth)
 	rest.whoisRspC = make(chan *Subscriber, RestWhoisDepth)
 
-	rest.crt, err = readCertificateFile(CertPath())
+	rest.crt, err = cert.ReadFile(cert.Path())
 	if err != nil {
 		return err
 	}
 
-	if err = signInit(); err != nil {
+	if err = sig.Init(); err != nil {
 		return err
 	}
 
@@ -191,7 +193,7 @@ func restInit() error {
 		Certificates: []tls.Certificate{
 			{
 				Certificate: [][]byte{rest.crt.Raw},
-				PrivateKey:  signPriv,
+				PrivateKey:  sig.Priv,
 			},
 		},
 	}
@@ -203,7 +205,7 @@ func restInit() error {
 	}
 
 	if cl := flag.CommandLine.Name(); !strings.HasSuffix(cl, "certify") {
-		rest.reg, err = readCertificateFile(RegistryPath())
+		rest.reg, err = cert.ReadFile(RegistryPath())
 		if err != nil {
 			if !errors.Is(err, fs.ErrNotExist) {
 				return err
@@ -305,7 +307,7 @@ Import registry certificate.
 	r := bufio.NewReader(os.Stdin)
 	w := os.Stdout
 
-	if t, err := CertificatesTemplate(); err != nil {
+	if t, err := cert.NewTemplate(); err != nil {
 		return err
 	} else if err = t.Execute(w, rsp.TLS.PeerCertificates); err != nil {
 		return err
@@ -324,7 +326,7 @@ Import registry certificate.
 		Type:  "CERTIFICATE",
 		Bytes: rsp.TLS.PeerCertificates[0].Raw,
 	}
-	wc, err := os.OpenFile(RegistryPath(), oCreate, 0644)
+	wc, err := os.Create(RegistryPath())
 	if err != nil {
 		return err
 	}

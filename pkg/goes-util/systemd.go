@@ -16,6 +16,7 @@ import (
 
 	"github.com/platinasystems/goes/v2/pkg/xflag"
 	"github.com/platinasystems/goes/v2/pkg/xmain"
+	"github.com/platinasystems/goes/v2/pkg/xos"
 	"github.com/platinasystems/goes/v2/pkg/xprogram"
 )
 
@@ -43,7 +44,6 @@ WantedBy={{.WantedBy}}
 func init() { Shows["systemd"] = ShowSystemd }
 
 func ShowSystemd(ctx context.Context, args []string) error {
-	const oCreate = os.O_WRONLY | os.O_CREATE | os.O_TRUNC
 	var m xflag.FileMode = 0664
 	var w io.Writer
 
@@ -95,7 +95,7 @@ Writes config to the named file or standard output if "-".`[1:])
 
 	if *o == "-" {
 		w = os.Stdout
-	} else if f, err := os.OpenFile(*o, oCreate, m.Mode()); err != nil {
+	} else if f, err := xos.TruncFile(*o, m.Mode()); err != nil {
 		return err
 	} else {
 		defer f.Close()
