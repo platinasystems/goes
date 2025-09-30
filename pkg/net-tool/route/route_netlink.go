@@ -120,27 +120,29 @@ var types = map[string]uint8{
 	"cnt":         rtnetlink.RTN_CNT,
 }
 
-func (rt Route) defineGWFlags() {
+func (rt Route) defineGWFlags() error {
 	if rt == Delete || rt == Get {
-		return
+		return nil
 	}
-	xflag.Define(&routeExpire, "expire", "Seconds from now.")
-	xflag.Define(&routeHopCount, "hopcount", "FIXME")
-	xflag.Define(&routeIface, "iface",
-		"Inticates <gateway> is a point-to-point interface name.")
-	xflag.Define(&routeIface, "interface", "aka -iface")
-	xflag.Define(&routeMetric, "metric", "FIXME")
-	xflag.Define(&routeMTU, "mtu", "FIXME")
-	xflag.Define(&routeProtocol, "protocol",
-		"{boot, kernel, redirect, static}")
-	xflag.Define(&routeRTT, "rtt", "FIXME")
-	xflag.Define(&routeRTTVar, "rttvar", "FIXME")
-	xflag.Define(&routeScope, "scope",
-		"{global, nowhere, host, link, site}")
-	xflag.Define(&routeSSThresh, "ssthresh", "FIXME")
-	xflag.Define(&routeTable, "table", "{compat, default, main, local}")
-	xflag.Define(&routeTo, "to ", "{unicast, broadcast, blackhole, etc.}")
-	xflag.Define(&routeTOS, "tos", "Set type-of-service.")
+	return xflag.Labels{
+		{"expire", "Seconds from now.", &routeExpire},
+		{"hopcount", "FIXME", &routeHopCount},
+		{"iface",
+			"Inticates <gateway> is a point-to-point interface name.",
+			&routeIface,
+		},
+		{"interface", "aka -iface", &routeIface},
+		{"metric", "FIXME", &routeMetric},
+		{"mtu", "FIXME", &routeMTU},
+		{"protocol", "{boot, kernel, redirect, static}", &routeProtocol},
+		{"rtt", "FIXME", &routeRTT},
+		{"rttvar", "FIXME", &routeRTTVar},
+		{"scope", "{global, nowhere, host, link, site}", &routeScope},
+		{"ssthresh", "FIXME", &routeSSThresh},
+		{"table", "{compat, default, main, local}", &routeTable},
+		{"to ", "{unicast, broadcast, blackhole, etc.}", &routeTo},
+		{"tos", "Set type-of-service.", &routeTOS},
+	}.Define()
 }
 
 func (rt Route) req(

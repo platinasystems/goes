@@ -50,18 +50,6 @@ const (
 	noReplyLimit  = 3
 )
 
-var TunnelUnit = xflag.New[int]("t",
-	"Tunnel unit number, auto selected if negative.",
-	func() int {
-		return -1
-	})
-
-var GuestFlags = append(RestFlags,
-	TunnelUnit,
-	xlog.QuietFlag,
-	xlog.TraceFlag,
-	xlog.VerboseFlag)
-
 var guest struct {
 	addressed map[netip.Addr]*Subscriber
 	indexed   map[int]*Subscriber
@@ -101,12 +89,16 @@ Forward ciphered packets between exchange and tunnel interface.
 
 {{flags .}}`)
 
-	for _, f := range GuestFlags {
-		f.Define()
-	}
+	unit := -1
+	unitFlag := xflag.Label{"t",
+		"Tunnel unit number, auto selected if negative.", &unit}
 
-	err := flag.CommandLine.Parse(args)
+	err := append(append(xlog.Flags, restFlags...),
+		unitFlag,
+	).Define()
 	if err != nil {
+		return err
+	} else if err = flag.CommandLine.Parse(args); err != nil {
 		return err
 	}
 
@@ -170,7 +162,7 @@ Forward ciphered packets between exchange and tunnel interface.
 		}
 	}
 
-	Prefix.Override(guest.receipt.Prefix.Masked())
+	prefix = guest.receipt.Prefix.Masked()
 
 	ha := netif.NewHardwareAddr()
 	if err = ha.Rand(); err != nil {
@@ -185,8 +177,8 @@ Forward ciphered packets between exchange and tunnel interface.
 
 	guestHelloToAllExchanges(ctx, 0)
 
-	guest.tun, err = nettun.New(TunnelUnit.Value(), IsTap,
-		TunPersist, TunOwner, TunGroup, ha)
+	guest.tun, err = nettun.New(unit, IsTap, TunPersist, TunOwner,
+		TunGroup, ha)
 	if err != nil {
 		return err
 	}
@@ -220,11 +212,11 @@ Forward ciphered packets between exchange and tunnel interface.
 	}
 	xlog.Info.Println(nif.Name, addr)
 
-	if err = routeAdd(ctx, Prefix.Value(), nif); err != nil {
+	if err = routeAdd(ctx, prefix, nif); err != nil {
 		return err
 	}
-	xlog.Info.Println(nif.Name, Prefix)
-	defer routeDelete(ctx, Prefix.Value(), nif)
+	xlog.Info.Println(nif.Name, prefix)
+	defer routeDelete(ctx, prefix, nif)
 
 	addrs, err := nif.Addrs()
 	if err != nil {
@@ -495,7 +487,7 @@ func guestFromTun(ctx context.Context, m *xnet.Msg) {
 	} else if guest.llu6.IsValid() && da.Compare(guest.llu6) == 0 {
 		xlog.Trace.Println("loopback", pdu)
 		mp.Queue(ctx, guest.toTunC, m)
-	} else if !Prefix.Value().Contains(da) {
+	} else if !prefix.Contains(da) {
 		xlog.Trace.Println("dropped", pdu)
 		mp.Put(m)
 	} else if to, ok := guest.addressed[da]; !ok {

@@ -27,22 +27,27 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xsync"
 )
 
-const NamedDefaultConf = "/etc/named.conf"
+const namedDefaultConf = "/etc/named.conf"
 
-var Named_4 = xflag.New[bool]("4", `Only service IPv4 host addresses.`, nil)
-var Named_6 = xflag.New[bool]("6", `Only service IPv6 host addresses.`, nil)
-var Named_C = xflag.New[bool]("C", `Print configuration and exit.`, nil)
-var Named_T = xflag.New[string]("T", `
+var named_4, named_6, named_C, named_V, named_q, named_v bool
+var named_T, named_Z string
+var named_c = namedDefaultConf
+var named_p = "53"
+var named_z = "."
+
+var namedFlags = xflag.Labels{
+	{"4", `Only service IPv4 host addresses.`, &named_4},
+	{"6", `Only service IPv6 host addresses.`, &named_6},
+	{"C", `Print configuration and exit.`, &named_C},
+	{"T", `
 Commas separated “<key>[=<value>]” options.  e.g.
-    -T notcp,key=/etc/named.key,cert=/etc/named.crt`[1:], nil)
-var Named_V = xflag.New[bool]("V", `Print version and exit.`, nil)
-var Named_Z = xflag.New[string]("Z", `
-Comma separated zone files instead of or in addition to configuation.`[1:],
-	nil)
-var Named_c = xflag.New[string]("c", `
-Absolute path name of configuration file.`[1:],
-	func() string { return NamedDefaultConf })
-var Named_p = xflag.New[int]("p", `
+    -T notcp,key=/etc/named.key,cert=/etc/named.crt`[1:], &named_T},
+	{"V", `Print version and exit.`, &named_V},
+	{"Z", `
+Comma separated zone files instead of
+or in addition to configuation.`[1:], &named_Z},
+	{"c", "Absolute path name of configuration file.", &named_c},
+	{"p", `
 Comma separated ports on which the server will listen for queries.
 If value is of the form “<portnum> or “dns=<portnum>”, the server will
 listen for DNS queries on the numbered port. If value is of the form
@@ -50,25 +55,10 @@ listen for DNS queries on the numbered port. If value is of the form
 the default is 853.  If value is of the form “https=<portnum>”,
 the server will listen for HTTPS queries on portnum; the default is 443.
 If value is of the form “http=<portnum>”, the server will listen for
-HTTP queries on portnum; the default is 80.`[1:],
-	func() int { return 53 })
-var Named_q = xflag.New[bool]("q", `Quiet logging.`, nil)
-var Named_v = xflag.New[bool]("v", `Verbose logging.`, nil)
-var Named_z = xflag.New[string]("z", "Default zone.",
-	func() string { return "." })
-
-var NamedFlags = []xflag.Definer{
-	Named_4,
-	Named_6,
-	Named_C,
-	Named_T,
-	Named_V,
-	Named_Z,
-	Named_c,
-	Named_p,
-	Named_q,
-	Named_v,
-	Named_z,
+HTTP queries on portnum; the default is 80.`[1:], &named_p},
+	{"q", `Quiet logging.`, &named_q},
+	{"v", `Verbose logging.`, &named_v},
+	{"z", "Default zone.", &named_z},
 }
 
 type namedListener interface {
@@ -85,12 +75,10 @@ Mimic BIND9's Internet domain name daemon.
 
 {{flags .}}`)
 
-	for _, f := range NamedFlags {
-		f.Define()
-	}
-
-	err := flag.CommandLine.Parse(args)
+	err := namedFlags.Define()
 	if err != nil {
+		return err
+	} else if err := flag.CommandLine.Parse(args); err != nil {
 		return err
 	}
 
@@ -102,33 +90,33 @@ Mimic BIND9's Internet domain name daemon.
 		"endpoints": "/dns/query",
 	}
 
-	if Named_V.Value() {
+	if named_V {
 		fmt.Println(Version())
 		return nil
 	}
 
-	if Named_v.Value() {
+	if named_v {
 		verbose = xlog.Unmute(mutable)
 		verbose.Println("start named")
 		defer verbose.Println("stopped named")
-	} else if Named_q.Value() {
+	} else if named_q {
 		errata = xlog.Mute(mutable)
 	}
 
-	if s := Named_c.Value(); len(s) > 0 {
-		if conf, err = named_conf.NewConf(s); err != nil {
+	if len(named_c) > 0 {
+		if conf, err = named_conf.NewConf(named_c); err != nil {
 			if !os.IsNotExist(err) ||
-				Named_c.Value() != NamedDefaultConf {
+				named_c != namedDefaultConf {
 				return err
 			}
 		}
 	}
-	if Named_C.Value() {
+	if named_C {
 		fmt.Print(conf)
 		return nil
 	}
 
-	for _, s := range strings.Split(Named_T.String(), ",") {
+	for _, s := range strings.Split(named_T, ",") {
 		eq := strings.Index(s, "=")
 		if eq < 0 {
 			opt[s] = "true"
@@ -145,9 +133,9 @@ Mimic BIND9's Internet domain name daemon.
 
 	namedWG.Go(func() { xdnsdb.Server(ctx, verbose) })
 
-	if s := Named_Z.Value(); len(s) > 0 {
-		for _, fn := range strings.Split(s, ",") {
-			err = xdnsdb.Include(ctx, Named_z.Value(), fn)
+	if len(named_Z) > 0 {
+		for _, fn := range strings.Split(named_Z, ",") {
+			err = xdnsdb.Include(ctx, named_z, fn)
 			if err != nil {
 				cancel()
 				namedWG.Wait()
@@ -159,17 +147,17 @@ Mimic BIND9's Internet domain name daemon.
 	host := ":"
 	tcpNW := "tcp"
 	udpNW := "udp"
-	if Named_4.Value() {
+	if named_4 {
 		host = "0.0.0.0:"
 		tcpNW = "tcp4"
 		udpNW = "udp4"
-	} else if Named_6.Value() {
+	} else if named_6 {
 		host = "[::]:"
 		tcpNW = "tcp6"
 		udpNW = "udp6"
 	}
 
-	for _, s := range strings.Split(Named_p.String(), ",") {
+	for _, s := range strings.Split(named_p, ",") {
 		if strings.HasPrefix(s, "http=") {
 			laddr := host + strings.TrimPrefix(s, "http=")
 			srv := &http.Server{Addr: laddr}

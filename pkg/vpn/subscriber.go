@@ -144,7 +144,7 @@ func (sub *Subscriber) resolve(ctx context.Context) {
 
 func (sub *Subscriber) stateFileName() string {
 	fn := fmt.Sprint(sub.name(), ".pem")
-	return xmain.State.File(fn)
+	return xmain.StateFile(fn)
 }
 
 func (sub *Subscriber) ticks(now uint64) uint64 {

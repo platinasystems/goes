@@ -211,7 +211,7 @@ spec:
     args:
     - "start"
     - "registry"
-    - "-v"
+    - "-verbose"
     - "-trace"
     ports:
     - protocol: TCP
@@ -254,7 +254,7 @@ spec:
     args:
     - "start"
     - "exchange"
-    - "-v"
+    - "-verbose"
     - "-trace"
     ports:
     - protocol: UDP
@@ -292,7 +292,7 @@ spec:
     args:
     - "start"
     - "guest"
-    - "-v"
+    - "-verbose"
     - "-trace"
     securityContext:
       allowPrivilegeEscalation: true
@@ -333,7 +333,7 @@ spec:
     args:
     - "start"
     - "guest"
-    - "-v"
+    - "-verbose"
     - "-trace"
     securityContext:
       allowPrivilegeEscalation: true
@@ -374,7 +374,7 @@ spec:
     args:
     - "start"
     - "guest"
-    - "-v"
+    - "-verbose"
     - "-trace"
     securityContext:
       allowPrivilegeEscalation: true

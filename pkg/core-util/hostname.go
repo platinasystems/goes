@@ -14,17 +14,6 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xflag"
 )
 
-var Hostname_d = xflag.New[bool]("d", `Only print domain name.`, nil)
-var Hostname_f = xflag.New[bool]("f", `Print fully qualified domain name.`,
-	func() bool { return true })
-var Hostname_s = xflag.New[bool]("s", `Print name w/o domain.`, nil)
-
-var HostnameFlags = []xflag.Definer{
-	Hostname_d,
-	Hostname_f,
-	Hostname_s,
-}
-
 func Hostname(ctx context.Context, args []string) error {
 	xflag.TemplateUsage(`
 usage: {{.Name}} [flags] [name]
@@ -32,12 +21,16 @@ Set or print system host name.
 
 {{flags .}}`)
 
-	for _, f := range HostnameFlags {
-		f.Define()
-	}
-
-	err := flag.CommandLine.Parse(args)
+	var d, s bool
+	f := true
+	err := xflag.Labels{
+		{"d", "Only print domain name.", &d},
+		{"f", "Print fully qualified domain name.", &f},
+		{"s", "Print name w/o domain.", &s},
+	}.Define()
 	if err != nil {
+		return err
+	} else if err = flag.CommandLine.Parse(args); err != nil {
 		return err
 	} else if args = flag.Args(); len(args) > 0 {
 		return Sethostname(args[0])
@@ -48,12 +41,9 @@ Set or print system host name.
 		return err
 	}
 	if dot := strings.Index(hn, "."); dot > 0 {
-		switch {
-		case Hostname_d.Value():
+		if d {
 			hn = hn[dot+1:]
-		case Hostname_f.Value():
-			// default
-		case Hostname_s.Value():
+		} else if s {
 			hn = hn[:dot]
 		}
 	}

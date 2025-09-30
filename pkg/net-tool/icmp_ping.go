@@ -21,10 +21,23 @@ usage: {{.Name}} [flags] [host]
 Send ICMP ECHO_REQUEST packets to network “host”, default 127.0.0.1.
 {{flags .}}`)
 
-	defineICMPPingFlags()
+	var quiet, verbose bool
+	var count, ttl int
+	interval := time.Second
+	timeout := 3 * time.Second
 
-	err := flag.CommandLine.Parse(args)
+	err := xflag.Labels{
+		{"c", "Count.", &count},
+		{"i", "Interval.", &interval},
+		{"m", "Request Time To Live.", &ttl},
+		{"q", "Quiet.", &quiet},
+		{"t", "Timeout regardless of how many received packets.",
+			&timeout},
+		{"v", "Verbose.", &verbose},
+	}.Define()
 	if err != nil {
+		return err
+	} else if err = flag.CommandLine.Parse(args); err != nil {
 		return err
 	}
 
@@ -42,14 +55,14 @@ Send ICMP ECHO_REQUEST packets to network “host”, default 127.0.0.1.
 		return err
 	}
 
-	pinger.Count = icmpping_c
-	pinger.Interval = icmpping_i
+	pinger.Count = count
+	pinger.Interval = interval
 
-	if icmpping_t != 0 {
-		pinger.Timeout = icmpping_t
+	if timeout != 0 {
+		pinger.Timeout = timeout
 	}
-	if icmpping_m != 0 {
-		pinger.TTL = icmpping_m
+	if ttl != 0 {
+		pinger.TTL = ttl
 	}
 	if !isNumericHost {
 		if err = pinger.Resolve(); err != nil {
@@ -71,7 +84,7 @@ Send ICMP ECHO_REQUEST packets to network “host”, default 127.0.0.1.
 		fmt.Printf("PING %s (%v); %d data bytes\n",
 			pinger.Addr(), pinger.IPAddr(), pinger.Size)
 	}
-	if icmpping_v {
+	if verbose {
 		pinger.OnSend = func(pkt *probing.Packet) {
 			fmt.Printf("%d bytes to %v; icmp_seq=%d\n",
 				pkt.Nbytes,
@@ -79,7 +92,7 @@ Send ICMP ECHO_REQUEST packets to network “host”, default 127.0.0.1.
 				pkt.Seq)
 		}
 	}
-	if !icmpping_q {
+	if !quiet {
 		pinger.OnRecv = func(pkt *probing.Packet) {
 			fmt.Printf("%d bytes from %v; "+
 				"icmp_seq=%d ttl=%d time=%v\n",
@@ -106,24 +119,4 @@ Send ICMP ECHO_REQUEST packets to network “host”, default 127.0.0.1.
 		}
 	}
 	return pinger.RunWithContext(ctx)
-}
-
-var (
-	// ICMPPing Flags.
-	icmpping_c = 0
-	icmpping_i = time.Second
-	icmpping_m = 0
-	icmpping_q = false
-	icmpping_t = 3 * time.Second
-	icmpping_v = false
-)
-
-func defineICMPPingFlags() {
-	xflag.Define(&icmpping_c, "c", "Count.")
-	xflag.Define(&icmpping_i, "i", "Interval.")
-	xflag.Define(&icmpping_m, "m", "Request Time To Live.")
-	xflag.Define(&icmpping_q, "q", "Quiet.")
-	xflag.Define(&icmpping_t, "t",
-		"Timeout regardless of how many received packets.")
-	xflag.Define(&icmpping_v, "v", "Verbose.")
 }

@@ -19,16 +19,46 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xnet"
 )
 
+var (
+	ndp_A int
+
+	ndp_I, ndp_d, ndp_f, ndp_i string
+
+	ndp_H, ndp_P, ndp_R, ndp_a, ndp_c, ndp_l, ndp_n, ndp_p, ndp_r, ndp_s,
+	ndp_t, ndp_x, ndp_w bool
+)
+
 func NDP(ctx context.Context, args []string) error {
 	xflag.TemplateUsage(`
 usage: {{.Name}} [flags] [args]
 Control/diagnose IPv6 neighbor discovery protocol
 {{flags .}}`)
-
-	defineNDPFlags()
-
-	err := flag.CommandLine.Parse(args)
+	err := xflag.Labels{
+		{"A", "Repeat show interval (seconds).", &ndp_A},
+		{"H", "Harmonize routing and neighbor tables.", &ndp_H},
+		{"I", "Set, “show” or “delete” default interface.", &ndp_I},
+		{"P", "Flush all the entries in the prefix list.", &ndp_P},
+		{"R", "Flush all the entries in the default router list.",
+			&ndp_R},
+		{"a", "Show current entries.", &ndp_a},
+		{"c", "Erase all entries.", &ndp_c},
+		{"d", "Delete specified entry.", &ndp_d},
+		{"f", "Table configuration file.", &ndp_f},
+		{"i", "View information for the specified interface.", &ndp_i},
+		{"l", "Show link-layer reachability information.", &ndp_l},
+		{"n", "Don't resolve numeric addresses to hostnames.", &ndp_n},
+		{"p", "Show prefix list.", &ndp_p},
+		{"r", "Show default router list.", &ndp_r},
+		{"s", "Register an NDP entry for a node.", &ndp_s},
+		{"t", "Show timestamp for each entry.", &ndp_t},
+		{"x", "Show extended link-layer reachability information.",
+			&ndp_x},
+		{"w", "Show node's cryptographically generated address.",
+			&ndp_w},
+	}.Define()
 	if err != nil {
+		return err
+	} else if err = flag.CommandLine.Parse(args); err != nil {
 		return err
 	}
 
@@ -69,54 +99,6 @@ Control/diagnose IPv6 neighbor discovery protocol
 		}
 	}
 	return err
-}
-
-var (
-	// NDP Flags
-	ndp_A = 0
-	ndp_H = false
-	ndp_I = ""
-	ndp_P = false
-	ndp_R = false
-	ndp_a = false
-	ndp_c = false
-	ndp_d = ""
-	ndp_f = ""
-	ndp_i = ""
-	ndp_l = false
-	ndp_n = false
-	ndp_p = false
-	ndp_r = false
-	ndp_s = false
-	ndp_t = false
-	ndp_x = false
-	ndp_w = false
-)
-
-func defineNDPFlags() {
-	xflag.Define(&ndp_A, "A", "Repeat show interval (seconds).")
-	xflag.Define(&ndp_H, "H", "Harmonize routing and neighbor tables.")
-	xflag.Define(&ndp_I, "I", "Set, “show” or “delete” default interface.")
-	xflag.Define(&ndp_P, "P", "Flush all the entries in the prefix list.")
-	xflag.Define(&ndp_R, "R",
-		"Flush all the entries in the default router list.")
-	xflag.Define(&ndp_a, "a", "Show current entries.")
-	xflag.Define(&ndp_c, "c", "Erase all entries.")
-	xflag.Define(&ndp_d, "d", "Delete specified entry.")
-	xflag.Define(&ndp_f, "f", "Table configuration file.")
-	xflag.Define(&ndp_i, "i",
-		"View information for the specified interface.")
-	xflag.Define(&ndp_l, "l", "Show link-layer reachability information.")
-	xflag.Define(&ndp_n, "n",
-		"Don't resolve numeric addresses to hostnames.")
-	xflag.Define(&ndp_p, "p", "Show prefix list.")
-	xflag.Define(&ndp_r, "r", "Show default router list.")
-	xflag.Define(&ndp_s, "s", "Register an NDP entry for a node.")
-	xflag.Define(&ndp_t, "t", "Show timestamp for each entry.")
-	xflag.Define(&ndp_x, "x",
-		"Show extended link-layer reachability information.")
-	xflag.Define(&ndp_w, "w",
-		"Show node's cryptographically generated address.")
 }
 
 func dump(ctx context.Context, match ...netip.Addr) (int, error) {

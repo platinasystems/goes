@@ -16,30 +16,6 @@ import (
 	probing "github.com/prometheus-community/pro-bing"
 )
 
-var (
-	PingCountFlag    = xflag.New[int]("c", "Count.", nil)
-	PingIntervalFlag = xflag.New[time.Duration]("i", `
-Interval.`[1:], func() time.Duration {
-		return time.Second
-	})
-	PingTTLFlag     = xflag.New[int]("m", "Request Time To Live.", nil)
-	PingQuietFlag   = xflag.New[bool]("q", "Quiet.", nil)
-	PingTimeoutFlag = xflag.New[time.Duration]("t", `
-Timeout regardless of how many received packets.
-`[1:], func() time.Duration {
-		return 3 * time.Second
-	})
-	PingVerboseFlag = xflag.New[bool]("v", "Verbose.", nil)
-)
-
-var PingFlags = append(RestFlags,
-	PingCountFlag,
-	PingIntervalFlag,
-	PingTTLFlag,
-	PingQuietFlag,
-	PingTimeoutFlag,
-	PingVerboseFlag)
-
 func Ping(ctx context.Context, args []string) error {
 	xflag.TemplateUsage(`
 usage: {{.Name}} [flags] <guest>
@@ -47,22 +23,30 @@ ICMP with named guest.
 
 {{flags .}}`)
 
-	for _, f := range PingFlags {
-		f.Define()
-	}
+	var quiet, verbose bool
+	var count, ttl int
+	interval := time.Second
+	timeout := 3 * time.Second
 
-	err := flag.CommandLine.Parse(args)
+	err := append(restFlags, xflag.Labels{
+		{"c", "Count.", &count},
+		{"i", "Interval.", &interval},
+		{"m", "Request Time To Live.", &ttl},
+		{"q", "Quiet.", &quiet},
+		{"t", "Timeout regardless of how many received packets.",
+			&timeout},
+		{"v", "Verbose.", &verbose},
+	}...).Define()
 	if err != nil {
 		return err
-	}
-
-	if args = flag.Args(); len(args) == 0 {
+	} else if err = flag.CommandLine.Parse(args); err != nil {
+		return err
+	} else if args = flag.Args(); len(args) == 0 {
 		return xerrors.Incomplete("guest")
-	}
-
-	if err = restInit(); err != nil {
+	} else if err = restInit(); err != nil {
 		return err
 	}
+
 	sub, err := RestWhois(ctx, args[0])
 	if err != nil {
 		return xerrors.Label(err, "guest")
@@ -74,15 +58,17 @@ ICMP with named guest.
 	pinger := probing.New(args[0])
 	pinger.SetIPAddr(ipaddr)
 
-	pinger.Count = PingCountFlag.Value()
-	pinger.Interval = PingIntervalFlag.Value()
-	if to := PingTimeoutFlag.Value(); to != 0 {
-		pinger.Timeout = to
+	pinger.Count = count
+	pinger.Interval = interval
+
+	if timeout != 0 {
+		pinger.Timeout = timeout
 	}
-	if ttl := PingTTLFlag.Value(); ttl != 0 {
+	if ttl != 0 {
 		pinger.TTL = ttl
 	}
-	if PingVerboseFlag.Value() {
+
+	if verbose {
 		pinger.OnSend = func(pkt *probing.Packet) {
 			fmt.Printf("%d bytes to %v; icmp_seq=%d\n",
 				pkt.Nbytes,
@@ -90,7 +76,7 @@ ICMP with named guest.
 				pkt.Seq)
 		}
 	}
-	if !PingQuietFlag.Value() {
+	if !quiet {
 		pinger.OnRecv = func(pkt *probing.Packet) {
 			fmt.Printf("%d bytes from %v; "+
 				"icmp_seq=%d ttl=%d time=%v\n",

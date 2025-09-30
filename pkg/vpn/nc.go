@@ -23,24 +23,19 @@ Pipe stdin/out with TCP connection to numbered port of named guest.
 
 {{flags .}}`)
 
-	for _, f := range RestFlags {
-		f.Define()
-	}
-
-	err := flag.CommandLine.Parse(args)
+	err := restFlags.Define()
 	if err != nil {
 		return err
-	}
-
-	if args = flag.Args(); len(args) == 0 {
+	} else if err = flag.CommandLine.Parse(args); err != nil {
+		return err
+	} else if args = flag.Args(); len(args) == 0 {
 		return xerrors.Incomplete("guest")
 	} else if len(args) == 1 {
 		return xerrors.Incomplete("port")
-	}
-
-	if err = restInit(); err != nil {
+	} else if err = restInit(); err != nil {
 		return err
 	}
+
 	sub, err := RestWhois(ctx, args[0])
 	if err != nil {
 		return xerrors.Label(err, "guest")

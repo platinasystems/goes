@@ -107,6 +107,7 @@ var (
 type empty = struct{}
 
 var novalue, done empty
+var prefix netip.Prefix
 
 func noServiceError(args ...any) error {
 	return xerrors.Label(errNoService, args...)

@@ -19,25 +19,28 @@ import (
 var (
 	ErrLog = log.New(os.Stderr, "", log.Lshortfile)
 	OutLog = log.New(os.Stdout, "", log.Lshortfile)
+)
+
+var (
 	Errata = Unmute(ErrLog)
 	Info   = Mute(OutLog)
 	Trace  = Mute(OutLog)
 )
 
-var QuietFlag = xflag.NewEnable("q", "Quiet logging.", func() error {
-	Errata = Mute(Errata)
-	return nil
-})
-
-var TraceFlag = xflag.NewEnable("trace", "Very verbose logging.", func() error {
-	Trace = Unmute(Trace)
-	return nil
-})
-
-var VerboseFlag = xflag.NewEnable("v", "Verbose logging.", func() error {
-	Info = Unmute(Info)
-	return nil
-})
+var Flags = xflag.Labels{
+	{"quiet", "Log errata only.", func() error {
+		Errata = Mute(Errata)
+		return nil
+	}},
+	{"trace", "Very verbose logging.", func() error {
+		Trace = Unmute(Trace)
+		return nil
+	}},
+	{"verbose", "Log info.", func() error {
+		Info = Unmute(Info)
+		return nil
+	}},
+}
 
 func SetPrefixes(s string) {
 	ErrLog.SetPrefix(s)

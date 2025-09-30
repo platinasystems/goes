@@ -20,20 +20,22 @@ import (
 const ()
 
 func Command(ctx context.Context, complete bool, args []string) error {
-	var p, v, vv bool
-
 	xflag.TemplateUsage(`
 usage: {{.Name}} [flags] <external> [args]
 Execute “external” PATH command.
 
 {{flags .}}`)
 
-	xflag.Define(&p, "p", "Restricted path search.")
-	xflag.Define(&v, "v", "Report path found.")
-	xflag.Define(&vv, "V", "More verbose report.")
+	var p, v, vv bool
 
-	err := flag.CommandLine.Parse(args)
+	err := xflag.Labels{
+		{"p", "Restricted path search.", &p},
+		{"v", "Report path found.", &v},
+		{"V", "More verbose report.", &vv},
+	}.Define()
 	if err != nil {
+		return err
+	} else if err = flag.CommandLine.Parse(args); err != nil {
 		return err
 	} else if args = flag.Args(); complete {
 		if nargs := len(args); nargs < 2 {

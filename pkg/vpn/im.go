@@ -41,11 +41,12 @@ var im struct {
 	named     map[string]netip.AddrPort
 }
 
-var InstantMessagingPort = xflag.New[int]("imp", `
-Instant Messaging Port.
-`[1:], func() int { return 8004 })
+var (
+	imPort     = 8004
+	imPortFlag = xflag.Label{"imp", "Instant Messaging Port.", &imPort}
+)
 
-var InstantMessagingFlags = append(RestFlags, InstantMessagingPort)
+var imFlags = append(restFlags, imPortFlag)
 
 func InstantMessaging(ctx context.Context, args []string) error {
 	xflag.TemplateUsage(`
@@ -54,15 +55,12 @@ Instant Messaging over the named interface.
 
 {{flags .}}`)
 
-	for _, f := range InstantMessagingFlags {
-		f.Define()
-	}
-
-	err := flag.CommandLine.Parse(args)
+	err := imFlags.Define()
 	if err != nil {
 		return err
-	}
-	if args = flag.CommandLine.Args(); len(args) == 0 {
+	} else if err = flag.CommandLine.Parse(args); err != nil {
+		return err
+	} else if args = flag.CommandLine.Args(); len(args) == 0 {
 		return xerrors.Incomplete("tunnel-interface")
 	}
 	tun, err := net.InterfaceByName(args[0])
@@ -92,7 +90,7 @@ Instant Messaging over the named interface.
 	}
 	im.udp, err = net.ListenUDP("udp", &net.UDPAddr{
 		IP:   tunIPNet.IP,
-		Port: InstantMessagingPort.Value(),
+		Port: imPort,
 		Zone: zone,
 	})
 	if err != nil {
@@ -129,8 +127,8 @@ func imFrom(ctx context.Context, addr netip.Addr) string {
 	if err == nil {
 		name = sub.name()
 		im.addressed[sub.Addr] = name
-		im.named[sub.name()] = netip.AddrPortFrom(sub.Addr,
-			uint16(InstantMessagingPort.Value()))
+		im.named[sub.name()] = netip.
+			AddrPortFrom(sub.Addr, uint16(imPort))
 		return name
 	}
 	return addr.String()
@@ -209,8 +207,8 @@ func imTo(ctx context.Context, to []string) (aps []netip.AddrPort, err error) {
 		if ap, ok := im.named[s]; ok {
 			aps = append(aps, ap)
 		} else if sub, err = RestWhois(ctx, s); err == nil {
-			ap := netip.AddrPortFrom(sub.Addr,
-				uint16(InstantMessagingPort.Value()))
+			ap := netip.
+				AddrPortFrom(sub.Addr, uint16(imPort))
 			aps = append(aps, ap)
 			im.addressed[sub.Addr] = sub.name()
 			im.named[sub.name()] = ap

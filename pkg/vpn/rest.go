@@ -36,34 +36,6 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xprogram"
 )
 
-var RegistryFile = xflag.New[string]("registry", `
-Registry certificate file w/in current or config directory.
-`[1:], func() string {
-	s, ok := xmain.LookupEnv("REGISTRY")
-	if !ok {
-		s = "registry.pem"
-	}
-	return s
-})
-
-func RegistryPath() string {
-	return xmain.Config.File(RegistryFile.Value())
-}
-
-var RestPort = xflag.New[int]("port", `
-REST listener.
-`[1:], func() int {
-	return 8003
-})
-
-var RestFlags = []xflag.Definer{
-	xmain.Config,
-	CertFile,
-	RestPort,
-	RegistryFile,
-	SigFile,
-}
-
 type RestError struct {
 	code int
 	txt,
@@ -126,6 +98,31 @@ const RestWhoisDepth = 8
 var ErrKoApp = errors.New("ko app")
 var ErrRestartRequired = errors.New("restart required to complete upgrade")
 var ErrNilResponse = errors.New("rest: nil respone")
+
+var (
+	registryFile string
+	restPort     = 8003
+)
+
+func RegistryPath() string { return xmain.ConfigFile(registryFile) }
+
+var restFlags = xflag.Labels{
+	xmain.ConfigFlag,
+	CertFlag,
+	SigFlag,
+	xflag.Label{"registry",
+		"Registry certificate file w/in current or config directory.",
+		func() any {
+			var ok bool
+			registryFile, ok = xmain.LookupEnv("REGISTRY")
+			if !ok {
+				registryFile = "registry.pem"
+			}
+			return &registryFile
+		},
+	},
+	xflag.Label{"port", "REST listener.", &restPort},
+}
 
 var RestPaths = []string{
 	RestPathApprove,
@@ -237,19 +234,14 @@ RESTful registry administration.
 
 {{flags .}}`)
 
-	for _, f := range RestFlags {
-		f.Define()
-	}
-
-	err := flag.CommandLine.Parse(args)
+	err := restFlags.Define()
 	if err != nil {
 		return err
-	}
-	if args = flag.CommandLine.Args(); len(args) == 0 {
+	} else if err = flag.CommandLine.Parse(args); err != nil {
+		return err
+	} else if args = flag.CommandLine.Args(); len(args) == 0 {
 		return xerrors.Incomplete("subscriber")
-	}
-
-	if err = restInit(); err != nil {
+	} else if err = restInit(); err != nil {
 		return err
 	}
 	var path string
@@ -267,17 +259,6 @@ RESTful registry administration.
 	return err
 }
 
-var RestCertifyYesFlag = xflag.New[bool]("y",
-	"Yes, to write remote certificate to registry file.", nil)
-
-var RestCertifyFlags = []xflag.Definer{
-	xmain.Config,
-	CertFile,
-	RegistryFile,
-	RestCertifyYesFlag,
-	SigFile,
-}
-
 // RestCertify writes the peer certificate to [RegistryFile].
 func RestCertify(ctx context.Context, args []string) error {
 	xflag.TemplateUsage(`
@@ -286,23 +267,20 @@ Import registry certificate.
 
 {{flags .}}`)
 
-	for _, f := range RestCertifyFlags {
-		f.Define()
-	}
+	var yes bool
 
-	err := flag.CommandLine.Parse(args)
+	err := append(restFlags, xflag.Label{
+		"y", "Yes, to write remote certificate to registry file.", &yes,
+	}).Define()
 	if err != nil {
 		return err
-	}
-	if args = flag.CommandLine.Args(); len(args) == 0 {
-		return xerrors.Incomplete("registry")
-	}
-
-	if rest.url, err = url.Parse(args[0]); err != nil {
+	} else if err = flag.CommandLine.Parse(args); err != nil {
 		return err
-	}
-
-	if err = restInit(); err != nil {
+	} else if args = flag.CommandLine.Args(); len(args) == 0 {
+		return xerrors.Incomplete("registry")
+	} else if rest.url, err = url.Parse(args[0]); err != nil {
+		return err
+	} else if err = restInit(); err != nil {
 		return err
 	}
 
@@ -333,7 +311,7 @@ Import registry certificate.
 		return err
 	}
 
-	if !RestCertifyYesFlag.Value() {
+	if !yes {
 		fmt.Fprintf(w, `Enter "yes" to write above to %s: `,
 			RegistryPath())
 		s, err := r.ReadString('\n')
@@ -361,16 +339,12 @@ Get or list registry file(s).
 
 {{flags .}}`)
 
-	for _, f := range RestFlags {
-		f.Define()
-	}
-
-	err := flag.CommandLine.Parse(args)
+	err := restFlags.Define()
 	if err != nil {
 		return err
-	}
-
-	if err = restInit(); err != nil {
+	} else if err = flag.CommandLine.Parse(args); err != nil {
+		return err
+	} else if err = restInit(); err != nil {
 		return err
 	}
 
@@ -392,20 +366,13 @@ RESTful reload registry configuration.
 
 {{flags .}}`)
 
-	for _, f := range RestFlags {
-		f.Define()
-	}
-
-	err := flag.CommandLine.Parse(args)
+	err := restFlags.Define()
 	if err != nil {
-		return err
+	} else if err = flag.CommandLine.Parse(args); err != nil {
+	} else if err = restInit(); err != nil {
+	} else {
+		_, err = restPut(ctx, os.Stdout, "", nil, RestPathReload)
 	}
-
-	if err = restInit(); err != nil {
-		return err
-	}
-
-	_, err = restPut(ctx, os.Stdout, "", nil, RestPathReload)
 	return err
 }
 
@@ -418,24 +385,19 @@ RESTful query and print registry object.
 func RestShow(ctx context.Context, args []string) error {
 	xflag.TemplateUsage(restShowUsageTemplate)
 
-	for _, f := range RestFlags {
-		f.Define()
-	}
-
-	err := flag.CommandLine.Parse(args)
+	err := restFlags.Define()
 	if err != nil {
 		return err
-	}
-	args = flag.CommandLine.Args()
-
-	if err = restInit(); err != nil {
+	} else if err = flag.CommandLine.Parse(args); err != nil {
+		return err
+	} else if err = restInit(); err != nil {
 		return err
 	}
 
 	var path strings.Builder
 	path.WriteString("/show/")
 	path.WriteString(xflag.LastName(flag.CommandLine))
-	for _, s := range args {
+	for _, s := range flag.CommandLine.Args() {
 		path.WriteRune('/')
 		path.WriteString(s)
 	}
@@ -450,16 +412,12 @@ RESTful subscribe to VPN.
 
 {{flags .}}`)
 
-	for _, f := range RestFlags {
-		f.Define()
-	}
-
-	err := flag.CommandLine.Parse(args)
+	err := restFlags.Define()
 	if err != nil {
 		return err
-	}
-
-	if err = restInit(); err != nil {
+	} else if err = flag.CommandLine.Parse(args); err != nil {
+		return err
+	} else if err = restInit(); err != nil {
 		return err
 	}
 
@@ -481,25 +439,15 @@ Download and install program update from registry.
 
 {{flags .}}`)
 
-	for _, f := range RestFlags {
-		f.Define()
-	}
-
-	err := flag.CommandLine.Parse(args)
+	err := restFlags.Define()
 	if err != nil {
-		return err
+	} else if err = flag.CommandLine.Parse(args); err != nil {
+	} else if err = restInit(); err != nil {
+	} else if err = RestAssertVcsMatch(ctx); err != nil {
+	} else {
+		fmt.Println(xprogram.Path(), "is up to date.")
 	}
-
-	if err = restInit(); err != nil {
-		return err
-	}
-
-	if err = RestAssertVcsMatch(ctx); err != nil {
-		return err
-	}
-
-	fmt.Println(xprogram.Path(), "is up to date.")
-	return nil
+	return err
 }
 
 func (re *RestError) Code() int {
@@ -598,7 +546,7 @@ func restExtractURL() error {
 	if len(rest.reg.DNSNames) == 0 {
 		return xerrors.Invalid("no registry URL or DNS")
 	}
-	s := fmt.Sprint("https://", rest.reg.DNSNames[0], ":", RestPort)
+	s := fmt.Sprint("https://", rest.reg.DNSNames[0], ":", restPort)
 	rest.url, err = url.Parse(s)
 	return err
 }

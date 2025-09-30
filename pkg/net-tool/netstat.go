@@ -17,6 +17,15 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xnet"
 )
 
+var (
+	netstat_F, netstat_p, netstat_w int
+
+	netstat_I, netstat_f string
+
+	netstat_i, netstat_inet, netstat_inet6, netstat_m, netstat_mm,
+	netstat_n, netstat_r, netstat_s, netstat_ss bool
+)
+
 func Netstat(ctx context.Context, args []string) error {
 	xflag.TemplateUsage(`
 usage: {{.Name}} [flags]
@@ -36,10 +45,25 @@ Flags:
 
 {{flags .}}`)
 
-	defineNetstatFlags()
-
-	err := flag.CommandLine.Parse(args)
+	err := xflag.Labels{
+		{"F", "FIB number, -1 for current.", &netstat_F},
+		{"I", "Interface name.", &netstat_I},
+		{"f", "Address Family: inet, inet6, link.", &netstat_f},
+		{"i", "Show interface info.", &netstat_i},
+		{"inet", "Address filter.", &netstat_inet},
+		{"inet6", "Address filter.", &netstat_inet6},
+		{"m", "Show memory stats.", &netstat_m},
+		{"mm", "Show detailed memory stats.", &netstat_mm},
+		{"n", "Show numeric address instead of lookup.", &netstat_n},
+		{"p", "Protocol number.", &netstat_p},
+		{"r", "Show routing table.", &netstat_r},
+		{"s", "Show per-protocol stats.", &netstat_s},
+		{"ss", "Show per-protocol, non-zero stats.", &netstat_ss},
+		{"w", "Wait interval.", &netstat_w},
+	}.Define()
 	if err != nil {
+		return err
+	} else if err = flag.CommandLine.Parse(args); err != nil {
 		return err
 	}
 
@@ -54,41 +78,6 @@ Flags:
 		return xerrors.FIXME("show active sockets")
 	}
 	return nil
-}
-
-var (
-	// Netstat Flags.
-	netstat_F     = -1
-	netstat_I     = ""
-	netstat_f     = ""
-	netstat_i     = false
-	netstat_inet  = false
-	netstat_inet6 = false
-	netstat_m     = false
-	netstat_mm    = false
-	netstat_n     = false
-	netstat_p     = 0
-	netstat_r     = false
-	netstat_s     = false
-	netstat_ss    = false
-	netstat_w     = 0
-)
-
-func defineNetstatFlags() {
-	xflag.Define(&netstat_F, "F", "FIB number, -1 for current.")
-	xflag.Define(&netstat_I, "I", "Interface name.")
-	xflag.Define(&netstat_f, "f", "Address Family: inet, inet6, link.")
-	xflag.Define(&netstat_i, "i", "Show interface info.")
-	xflag.Define(&netstat_inet, "inet", "Address filter.")
-	xflag.Define(&netstat_inet6, "inet6", "Address filter.")
-	xflag.Define(&netstat_m, "m", "Show memory stats.")
-	xflag.Define(&netstat_mm, "mm", "Show detailed memory stats.")
-	xflag.Define(&netstat_n, "n", "Show numeric address instead of lookup.")
-	xflag.Define(&netstat_p, "p", "Protocol number.")
-	xflag.Define(&netstat_r, "r", "Show routing table.")
-	xflag.Define(&netstat_s, "s", "Show per-protocol stats.")
-	xflag.Define(&netstat_ss, "ss", "Show per-protocol, non-zero stats.")
-	xflag.Define(&netstat_w, "w", "Wait interval.")
 }
 
 func netstati(ctx context.Context) error {

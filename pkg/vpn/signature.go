@@ -30,19 +30,20 @@ var (
 	signPub  crypto.PublicKey
 )
 
-var SigFile = xflag.New[string]("sig", `
-Signature file w/in current or config directory.
-`[1:], func() string {
-	s, ok := xmain.LookupEnv("SIG")
-	if !ok {
-		s = "sig.pk8"
+var (
+	SigFile string
+	SigFlag = xflag.Label{"sig",
+		"Signature file w/in current or config directory.",
+		func() any {
+			var ok bool
+			if SigFile, ok = xmain.LookupEnv("SIG"); !ok {
+				SigFile = "sig.pk8"
+			}
+			return &SigFile
+		},
 	}
-	return s
-})
-
-func SigPath() string {
-	return xmain.Config.File(SigFile.Value())
-}
+	SigPath = func() string { return xmain.ConfigFile(SigFile) }
+)
 
 // ShowSignature prints algorithm.
 func ShowSignature(ctx context.Context, args []string) error {
@@ -51,16 +52,17 @@ usage: {{.Name}} [flags] [<filename> | -]
 Print algorithm.
 
 {{flags .}}`)
-
-	xmain.Config.Define()
-	SigFile.Define()
-
-	err := flag.CommandLine.Parse(args)
+	err := xflag.Labels{
+		xmain.ConfigFlag,
+		SigFlag,
+	}.Define()
 	if err != nil {
+		return err
+	} else if err = flag.CommandLine.Parse(args); err != nil {
 		return err
 	}
 	if flag.CommandLine.NArg() > 0 {
-		SigFile.Override(flag.CommandLine.Arg(0))
+		SigFile = flag.CommandLine.Arg(0)
 	}
 	if err = signInit(); err != nil {
 		return err

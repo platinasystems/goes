@@ -22,45 +22,43 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xnet/xdns/xdnspkt"
 )
 
-var Dig_4 = xflag.New[bool]("4", "Use IPv4 only.", nil)
-var Dig_6 = xflag.New[bool]("6", "Use IPv6 only.", nil)
-var Dig_O = xflag.New[bool]("O", `
-Print plus (+) prefaced options and exit.`[1:],
-	nil)
-var Dig_T = xflag.New[bool]("T", "Print types and exit.", nil)
-var Dig_b = xflag.New[string]("b", `
+var dig_4, dig_6, dig_O, dig_T, dig_m, dig_u, dig_v bool
+var dig_b, dig_f, dig_k, dig_y string
+var dig_p = 53
+
+var digFlags = xflag.Labels{
+	{"4", "Use IPv4 only.", &dig_4},
+	{"6", "Use IPv6 only.", &dig_6},
+	{"O", "Print plus (+) prefaced options and exit.", &dig_O},
+	{"T", "Print types and exit.", &dig_T},
+	{"b", `
 Set the source IP address of the query. The address must be a
 valid address on one of the host's network interfaces, or
 "0.0.0.0" or "::". An optional port may be specified by
-appending "#<port>"`[1:],
-	nil)
-var Dig_f = xflag.New[string]("f", `
+appending "#<port>"`[1:], &dig_b},
+	{"f", `
 Batch mode: dig reads a list of lookup requests to process from
 the given file. Each line in the file should be organized in the
 same way they would be presented as queries to dig using the
-command-line interface.`[1:],
-	nil)
-var Dig_k = xflag.New[string]("k", `
+command-line interface.`[1:], &dig_f},
+	{"k", `
 Sign queries using TSIG using a key read from the given file.
 Key files can be generated using tsig-keygen(8). When using TSIG
 authentication with dig, the name server that is queried needs
 to know the key and algorithm that is being used. In BIND, this
 is done by providing appropriate key and server statements in
-named.conf.`[1:],
-	nil)
-var Dig_m = xflag.New[bool]("m", "Enable memory usage debugging.", nil)
-var Dig_p = xflag.New[int]("p", `
+named.conf.`[1:], &dig_k},
+	{"m", "Enable memory usage debugging.", &dig_m},
+	{"p", `
 Send the query to a non-standard port on the server, instead
 of the defaut port 53. This option would be used to test a
 name server that has been configured to listen for queries
-on a non-standard port number.`[1:],
-	func() int { return 53 })
-var Dig_u = xflag.New[bool]("u", `
+on a non-standard port number.`[1:], &dig_p},
+	{"u", `
 This option indicates that print query times should be provided in microseconds
-instead of milliseconds.`[1:],
-	nil)
-var Dig_v = xflag.New[bool]("v", "Print the version number and exit.", nil)
-var Dig_y = xflag.New[string]("y", `
+instead of milliseconds.`[1:], &dig_u},
+	{"v", "Print the version number and exit.", &dig_v},
+	{"y", `
 Sign queries using TSIG with the given authentication key.
 keyname is the name of the key, and secret is the base64 encoded
 shared secret.  hmac is the name of the key algorithm; valid
@@ -71,22 +69,7 @@ default is hmac-md5 or if MD5 was disabled hmac-sha256.
 NOTE: You should use the -k option and avoid the -y option,
 because with -y the shared secret is supplied as a command line
 argument in clear text. This may be visible in the output from
-ps(1) or in a history file maintained by the user's shell.`[1:],
-	nil)
-
-var DigFlags = []xflag.Definer{
-	Dig_4,
-	Dig_6,
-	Dig_O,
-	Dig_T,
-	Dig_b,
-	Dig_f,
-	Dig_k,
-	Dig_m,
-	Dig_p,
-	Dig_u,
-	Dig_v,
-	Dig_y,
+ps(1) or in a history file maintained by the user's shell.`[1:], &dig_y},
 }
 
 func Dig(ctx context.Context, args []string) error {
@@ -96,30 +79,21 @@ Mimic BIND9's DNS lookup utility.
 
 {{flags .}}`)
 
-	for _, f := range DigFlags {
-		f.Define()
+	if err := digFlags.Define(); err != nil {
+		return err
 	}
-
 	return digLookup(ctx, flag.CommandLine, nil, args)
 }
 
 func DigPerLookupFlags(fs *flag.FlagSet) (perlu struct {
-	c       *xflag.Generic[xdnsmessage.Class]
-	t       *xflag.Generic[xdnsmessage.Type]
-	i, q, x *xflag.Generic[string]
-}) {
-	perlu.c = xflag.New[xdnsmessage.Class]("c", `
-Set query class: ANY, CH, CS, HS, or IN.`[1:],
-		func() xdnsmessage.Class { return xdnsmessage.Class0 })
-	perlu.i = xflag.New[string]("i", `
-Do reverse IPv6 lookups using the obsolete RFC1886 IP6.INT
-domain, which is no longer in use. Obsolete bit string label
-queries (RFC2874) are not attempted.`[1:],
-		nil)
-	perlu.q = xflag.New[string]("q", `
-Query the flagged name instead of positional argument.`[1:],
-		nil)
-	perlu.t = xflag.New[xdnsmessage.Type]("t", `
+	c       xdnsmessage.Class
+	t       xdnsmessage.Type
+	i, q, x string
+}, err error) {
+	err = xflag.Labels{
+		{"c", `
+Set query class: ANY, CH, CS, HS, or IN.`[1:], &perlu.c},
+		{"t", `
 The resource record type to query. It can be any valid query
 type which is supported in BIND 9. The default query type is
 "A", unless the -x option is supplied to indicate a reverse
@@ -127,9 +101,14 @@ lookup. A zone transfer can be requested by specifying a type of
 AXFR. When an incremental zone transfer (IXFR) is required, set
 the type to ixfr=N. The incremental zone transfer will contain
 the changes made to the zone since the serial number in the
-zone's SOA record was N.`[1:],
-		func() xdnsmessage.Type { return xdnsmessage.Type0 })
-	perlu.x = xflag.New[string]("x", `
+zone's SOA record was N.`[1:], &perlu.t},
+		{"i", `
+Do reverse IPv6 lookups using the obsolete RFC1886 IP6.INT
+domain, which is no longer in use. Obsolete bit string label
+queries (RFC2874) are not attempted.`[1:], &perlu.i},
+		{"q", `
+Query the flagged name instead of positional argument.`[1:], &perlu.q},
+		{"x", `
 Simplified reverse lookups, for mapping addresses to names. The
 addr is an IPv4 address in dotted-decimal notation, or a
 colon-delimited IPv6 address. When the -x is used, there is no
@@ -137,14 +116,8 @@ need to provide the name, class and type arguments.  dig
 automatically performs a lookup for a name like
 94.2.0.192.in-addr.arpa and sets the query type and class to PTR
 and IN respectively. IPv6 addresses are looked up using nibble
-format under the IP6.ARPA domain (but see also the -i option).`[1:],
-		nil)
-
-	perlu.c.DefineIn(fs)
-	perlu.i.DefineIn(fs)
-	perlu.q.DefineIn(fs)
-	perlu.t.DefineIn(fs)
-	perlu.x.DefineIn(fs)
+format under the IP6.ARPA domain (but see also the -i option).`[1:], &perlu.x},
+	}.DefineIn(fs)
 	return
 }
 
@@ -181,24 +154,25 @@ func digLookup(
 		return err
 	}
 
-	perlu := DigPerLookupFlags(fs)
-
-	if err = fs.Parse(args); err != nil {
+	perlu, err := DigPerLookupFlags(fs)
+	if err != nil {
+		return err
+	} else if err = fs.Parse(args); err != nil {
 		return err
 	}
 
 	args = fs.Args()
 
 	if fs == flag.CommandLine {
-		if Dig_O.Value() {
+		if dig_O {
 			fmt.Print(digOptionsTxt)
 			return nil
 		}
-		if Dig_T.Value() {
+		if dig_T {
 			fmt.Print(xdnsmessage.TypeHelpTxt)
 			return nil
 		}
-		if Dig_v.Value() {
+		if dig_v {
 			fmt.Println(Version())
 			return nil
 		}
@@ -210,9 +184,9 @@ func digLookup(
 			return xerrors.FIXME("DOH")
 		} else {
 			nw := "udp"
-			if Dig_4.Value() {
+			if dig_4 {
 				nw = "udp4"
-			} else if Dig_6.Value() {
+			} else if dig_6 {
 				nw = "udp6"
 			}
 			conn, err := xdns.DialContext(ctx, nw, svr)
@@ -234,44 +208,44 @@ func digLookup(
 				Version(), cmd)
 			fmt.Println()
 		}
-		if s := Dig_f.Value(); len(s) > 0 {
-			return digBatch(ctx, rsvp, s)
+		if len(dig_f) > 0 {
+			return digBatch(ctx, rsvp, dig_f)
 		}
 	}
-	if s := perlu.x.String(); len(s) > 0 {
-		addr, err := netip.ParseAddr(s)
+	if len(perlu.x) > 0 {
+		addr, err := netip.ParseAddr(perlu.x)
 		if err != nil {
 			return xerrors.Label(err, "x")
 		}
 		name = xdnsmessage.Reverse(addr)
-		perlu.t.Override(xdnsmessage.TypePTR)
-		perlu.c.Override(xdnsmessage.ClassINET)
+		perlu.t = xdnsmessage.TypePTR
+		perlu.c = xdnsmessage.ClassINET
 	} else {
-		if q := perlu.q.String(); len(q) > 0 {
-			name = q
+		if len(perlu.q) > 0 {
+			name = perlu.q
 		} else if len(args) == 0 {
 			return xerrors.Incomplete("name")
 		} else {
 			name = args[0]
 			args = args[1:]
 		}
-		if perlu.t.Value() != xdnsmessage.Type0 {
+		if perlu.t != xdnsmessage.Type0 {
 		} else if len(args) == 0 {
-			perlu.t.Override(xdnsmessage.TypeA)
+			perlu.t = xdnsmessage.TypeA
 		} else if t, err := xdnsmessage.TypeNamed(args[0]); err == nil {
-			perlu.t.Override(t)
+			perlu.t = t
 			args = args[1:]
 		} else {
-			perlu.t.Override(xdnsmessage.TypeA)
+			perlu.t = xdnsmessage.TypeA
 		}
-		if perlu.c.Value() != xdnsmessage.Class0 {
+		if perlu.c != xdnsmessage.Class0 {
 		} else if len(args) == 0 {
-			perlu.c.Override(xdnsmessage.ClassINET)
+			perlu.c = xdnsmessage.ClassINET
 		} else if c, err := xdnsmessage.ClassNamed(args[0]); err == nil {
-			perlu.c.Override(c)
+			perlu.c = c
 			args = args[1:]
 		} else {
-			perlu.c.Override(xdnsmessage.ClassINET)
+			perlu.c = xdnsmessage.ClassINET
 		}
 	}
 
@@ -285,8 +259,8 @@ func digLookup(
 		OpCode: xdnsmessage.OpCodeQuery,
 		Questions: []xdnsmessage.WireQuestion{{
 			Name:  xdnsmessage.MakeUniqueString(name),
-			Class: perlu.c.Value(),
-			Type:  perlu.t.Value(),
+			Class: perlu.c,
+			Type:  perlu.t,
 		}},
 	}
 	if *pkt, err = req.AppendTo((*pkt)[:0]); err != nil {
@@ -399,7 +373,7 @@ func digLookup(
 		ef := end.Format("Mon Jan 01 15:04:05 MST 2006")
 		fmt.Print(";; Query time: ")
 		dur := end.Sub(beg)
-		if Dig_u.Value() {
+		if dig_u {
 			fmt.Println(dur.Microseconds(), "µsec")
 		} else {
 			fmt.Println(dur.Milliseconds(), "msec")

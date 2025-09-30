@@ -37,90 +37,30 @@ const (
 	longest = 10 * year
 )
 
-var CertFile = xflag.New[string]("cert", `
-Certificate file w/in current or config directory.
-`[1:], func() string {
-	s, ok := xmain.LookupEnv("CERT")
-	if ok {
-		return s
-	}
-	s = "cert.pem"
-	if _, err := os.Stat(s); err == nil {
-	} else if _, err = os.Stat(filepath.
-		Join(xmain.Config.Value(), s)); err == nil {
-	} else if h, err := os.Hostname(); err == nil {
-		if i := strings.Index(h, "."); i > 0 {
-			h = h[:i]
-		}
-		s = fmt.Sprint(h, ".pem")
-	}
-	return s
-})
-
-func CertPath() string {
-	return xmain.Config.File(CertFile.Value())
-}
-
-var CertDuration = xflag.New[time.Duration]("duration", `
-New certificate's life span, e.g. 360s, 60m, or 1h.
-`[1:], func() time.Duration {
-	return year
-})
-
-var CertSerialNumber = xflag.New[int64]("serial-number", `
-New certificate's identifier, random if zero.
-`[1:], func() int64 {
-	return 1
-})
-
-var CertCountry = xflag.New[string]("country", `
-New certificate's country code.`[1:], nil)
-
-var CertDNS = xflag.New[string]("dns", `
-Comma separated domain names.
-`[1:], func() string {
-	s, err := os.Hostname()
-	if err != nil {
-		s = err.Error()
-	}
-	return s
-})
-
-var CertEmail = xflag.New[string]("email", `
-New certificate's comma separated addresses.`[1:], nil)
-
-var CertLocality = xflag.New[string]("locality", `
-aka. city.`[1:], nil)
-
-var CertName = xflag.New[string]("name", `
-VPN identfier.
-`[1:], func() string {
-	s, err := os.Hostname()
-	if err != nil {
-		s = err.Error()
-	} else if i := strings.Index(s, "."); i > 0 {
-		s = s[:i]
-	}
-	return s
-})
-
-var CertOrganization = xflag.New[string]("organization", `
-aka. company.`[1:], nil)
-
-var CertOrganizationalUnit = xflag.New[string]("organizational-unit", `
-aka. department.`[1:], nil)
-
-var CertPostalCode = xflag.New[string]("postal-code", `
-aka. zip code.`[1:], nil)
-
-var CertProvince = xflag.New[string]("province", `
-aka. state.`[1:], nil)
-
-var CertStreet = xflag.New[string]("street", `
-e.g. "1313 Mockingbird Lane"`[1:], nil)
-
-var CertURI = xflag.New[string]("uri", `
-Comma separated URLs.`[1:], nil)
+var (
+	CertFile string
+	CertFlag = xflag.Label{"cert",
+		"Certificate file w/in current or config directory.",
+		func() any {
+			var ok bool
+			if CertFile, ok = xmain.LookupEnv("CERT"); ok {
+				return &CertFile
+			}
+			CertFile = "cert.pem"
+			if _, err := os.Stat(CertFile); err == nil {
+			} else if _, err = os.Stat(filepath.
+				Join(xmain.ConfigDir,
+					CertFile)); err == nil {
+			} else if h, err := os.Hostname(); err == nil {
+				if i := strings.Index(h, "."); i > 0 {
+					h = h[:i]
+				}
+				CertFile = fmt.Sprint(h, ".pem")
+			}
+			return &CertFile
+		}}
+	CertPath = func() string { return xmain.ConfigFile(CertFile) }
+)
 
 var CertificatesTemplate = sync.OnceValues(func() (*template.Template, error) {
 	return template.New("certificates").Parse(`{{range .}}- {{/*
@@ -188,27 +128,58 @@ usage: {{.Name}} [flags]
 Create PEM encoded x509 certificate file.
 
 {{flags .}}`)
+	var name,
+		dns,
+		email,
+		org,
+		unit,
+		street,
+		city,
+		state,
+		country,
+		zip,
+		uri string
+	dur := year
+	sn := int64(1)
 
-	xmain.Config.Define()
-
-	CertFile.Define()
-	CertCountry.Define()
-	CertDNS.Define()
-	CertDuration.Define()
-	CertEmail.Define()
-	CertLocality.Define()
-	CertName.Define()
-	CertOrganization.Define()
-	CertOrganizationalUnit.Define()
-	CertPostalCode.Define()
-	CertProvince.Define()
-	CertSerialNumber.Define()
-	SigFile.Define()
-	CertStreet.Define()
-	CertURI.Define()
-
-	err := flag.CommandLine.Parse(args)
+	err := xflag.Labels{
+		xmain.ConfigFlag,
+		SigFlag,
+		CertFlag,
+		{"name", "VPN identfier.", func() any {
+			var err error
+			if name, err = os.Hostname(); err != nil {
+				return err
+			} else if i := strings.Index(name, "."); i > 0 {
+				name = name[:i]
+			}
+			return &name
+		}},
+		{"serial-number",
+			"New certificate's identifier, random if zero.", &sn},
+		{"dns", "Comma separated domain names.", func() any {
+			var err error
+			if dns, err = os.Hostname(); err != nil {
+				return err
+			}
+			return &dns
+		}},
+		{"email", "Comma separated addresses.", &email},
+		{"organization", "aka. company.", &org},
+		{"organizational-unit", "aka. department.", &unit},
+		{"street", `e.g. "1313 Mockingbird Lane"`, &street},
+		{"locality", "aka. city.", &city},
+		{"province", "aka. state.", &state},
+		{"country", "Country code.", &country},
+		{"postal-code", "aka. zip code.", &zip},
+		{"uri", "Comma separated URLs.", &uri},
+		{"duration",
+			"New certificate's life span, e.g. 360s, 60m, or 1h.",
+			&dur},
+	}.Define()
 	if err != nil {
+		return err
+	} else if err = flag.CommandLine.Parse(args); err != nil {
 		return err
 	}
 
@@ -216,40 +187,39 @@ Create PEM encoded x509 certificate file.
 		return err
 	}
 
-	if CertDuration.Value() > longest {
-		return xerrors.Invalid(CertDuration.Value().String())
+	if dur > longest {
+		return xerrors.Invalid(dur.String())
 	}
 
 	now := time.Now()
-	expire := now.Add(CertDuration.Value())
+	expire := now.Add(dur)
 	t := x509.Certificate{
 		IsCA:               true,
-		SerialNumber:       big.NewInt(CertSerialNumber.Value()),
+		SerialNumber:       big.NewInt(sn),
 		SignatureAlgorithm: x509.PureEd25519,
 		NotBefore:          now,
 		NotAfter:           expire,
 		KeyUsage: x509.KeyUsageDigitalSignature |
 			x509.KeyUsageCertSign,
 		Subject: pkix.Name{
-			CommonName:   CertName.String(),
-			SerialNumber: CertSerialNumber.String(),
-			Organization: strings.Fields(CertOrganization.String()),
-			OrganizationalUnit: strings.
-				Fields(CertOrganizationalUnit.String()),
-			StreetAddress: strings.Fields(CertStreet.String()),
-			Locality:      strings.Fields(CertLocality.String()),
-			Province:      strings.Fields(CertProvince.String()),
-			Country:       strings.Fields(CertCountry.String()),
-			PostalCode:    strings.Fields(CertPostalCode.String()),
+			CommonName:         name,
+			SerialNumber:       fmt.Sprint(sn),
+			Organization:       strings.Fields(org),
+			OrganizationalUnit: strings.Fields(unit),
+			StreetAddress:      strings.Fields(street),
+			Locality:           strings.Fields(city),
+			Province:           strings.Fields(state),
+			Country:            strings.Fields(country),
+			PostalCode:         strings.Fields(zip),
 		},
-		DNSNames: strings.Split(CertDNS.Value(), ","),
+		DNSNames: strings.Split(dns, ","),
 	}
 
-	if s := CertEmail.Value(); len(s) > 0 {
-		t.EmailAddresses = strings.Split(s, ",")
+	if len(email) > 0 {
+		t.EmailAddresses = strings.Split(email, ",")
 	}
 
-	if uri := CertURI.Value(); len(uri) > 0 {
+	if len(uri) > 0 {
 		for _, s := range strings.Split(uri, ",") {
 			u, err := url.Parse(s)
 			if err != nil {
@@ -310,13 +280,14 @@ usage: {{.Name}} [flags]
 Print parsed certificate.
 
 {{flags .}}`)
-
-	xmain.Config.Define()
-	CertFile.Define()
-	SigFile.Define()
-
-	err := flag.CommandLine.Parse(args)
+	err := xflag.Labels{
+		xmain.ConfigFlag,
+		SigFlag,
+		CertFlag,
+	}.Define()
 	if err != nil {
+		return err
+	} else if err = flag.CommandLine.Parse(args); err != nil {
 		return err
 	}
 

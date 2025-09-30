@@ -34,14 +34,70 @@ const (
 	Test    Route = "Test"
 )
 
+var (
+	routeExpire time.Duration
+
+	routeFib, routeFlags, routeIfa, routeIfp, routeJail, routeMetrics string
+
+	routeHopCount, routeMetric, routeMTU, routeRTT, routeRTTVar,
+	routeSSThresh, routeTOS uint
+
+	routeDebug, routeGenMask, routeHost, routeIface, routeInet, routeInet6,
+	routeNet, routeNumeric, routeQuiet, routeTestMode, routeVerbose bool
+
+	routePrefixlen = -1
+	routeProtocol  = "boot"
+	routeScope     = "global"
+	routeTable     = "main"
+	routeTo        = "unicast"
+)
+
 func (rt Route) op(ctx context.Context, args []string) error {
 	xflag.TemplateUsage(Usage[rt])
 
-	defineRouteOpFlags()
+	err := xflag.Labels{
+		{"d", "Debug mode.", &routeDebug},
+		{"host", "Host <destination>.", &routeHost},
+		{"inet", "Address hint or filter.", &routeInet},
+		{"4", "aka -inet", &routeInet},
+		{"inet6", "Address hint or filter.", &routeInet6},
+		{"6", "aka -inet6", &routeInet6},
+		{"net", "Network <destination>.", &routeNet},
+		{"n", "Numeric address output.", &routeNumeric},
+		{"prefixlen",
+			"If >= 0, use instead of 1st arg/<suffix> or 3rd arg.",
+			&routePrefixlen,
+		},
+		{"q", "Suppress most output.", &routeQuiet},
+		{"t", "Test mode.", &routeTestMode},
+		{"v", "Verbose output.", &routeVerbose},
+	}.Define()
+	if err != nil {
+		return err
+	}
+	if HaveFibs {
+		err = xflag.Labels{
+			{"fib",
+				"A comma separated list of FIB IDs != default.",
+				&routeFib,
+			},
+		}.Define()
+		if err != nil {
+			return err
+		}
+	}
+	if xexec.CanJail {
+		err = xflag.Labels{
+			{"j", "Run inside jail.", &routeJail},
+		}.Define()
+		if err != nil {
+			return err
+		}
+	}
+
 	rt.defineGWFlags()
 
-	err := flag.CommandLine.Parse(args)
-	if err != nil {
+	if err = flag.CommandLine.Parse(args); err != nil {
 		return err
 	}
 
@@ -77,63 +133,6 @@ func (rt Route) op(ctx context.Context, args []string) error {
 		}
 	}
 	return err
-}
-
-var (
-	// Route Flags.
-	routeDebug     = false
-	routeExpire    = time.Duration(0)
-	routeFib       = ""
-	routeFlags     = ""
-	routeGenMask   = false
-	routeHopCount  = uint(0)
-	routeHost      = false
-	routeIfa       = ""
-	routeIface     = false
-	routeIfp       = ""
-	routeInet      = false
-	routeInet6     = false
-	routeJail      = ""
-	routeMetric    = uint(0)
-	routeMetrics   = ""
-	routeMTU       = uint(0)
-	routeNet       = false
-	routeNumeric   = false
-	routePrefixlen = -1
-	routeProtocol  = "boot"
-	routeQuiet     = false
-	routeRTT       = uint(0)
-	routeRTTVar    = uint(0)
-	routeScope     = "global"
-	routeSSThresh  = uint(0)
-	routeTable     = "main"
-	routeTestMode  = false
-	routeTo        = "unicast"
-	routeTOS       = uint(0)
-	routeVerbose   = false
-)
-
-func defineRouteOpFlags() {
-	xflag.Define(&routeDebug, "d", "Debug mode.")
-	if HaveFibs {
-		xflag.Define(&routeFib, "fib",
-			"A comma separated list of FIB IDs other than default.")
-	}
-	xflag.Define(&routeHost, "host", "Host <destination>.")
-	xflag.Define(&routeInet, "inet", "Address hint or filter.")
-	xflag.Define(&routeInet, "4", "aka -inet")
-	xflag.Define(&routeInet6, "inet6", "Address hint or filter.")
-	xflag.Define(&routeInet6, "6", "aka -inet6")
-	if xexec.CanJail {
-		xflag.Define(&routeJail, "j", "Run inside jail.")
-	}
-	xflag.Define(&routeNet, "net", "Network <destination>.")
-	xflag.Define(&routeNumeric, "n", "Numeric address output.")
-	xflag.Define(&routePrefixlen, "prefixlen",
-		"If >= 0, use instead of 1st arg/<suffix> or 3rd arg.")
-	xflag.Define(&routeQuiet, "q", "Suppress most output.")
-	xflag.Define(&routeTestMode, "t", "Test mode.")
-	xflag.Define(&routeVerbose, "v", "Verbose output.")
 }
 
 func (rt Route) String() string { return string(rt) }

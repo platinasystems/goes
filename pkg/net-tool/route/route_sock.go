@@ -68,21 +68,21 @@ type gwmetric struct {
 	dsc  string
 }
 
-func (rt Route) defineGWFlags() {
+func (rt Route) defineGWFlags() error {
 	if rt == Get {
-		return
+		return nil
 	}
-	xflag.Define(&routeFlags, "flags", "A comma separated list."+gwFlags)
-	xflag.Define(&routeGenMask, "genmask", "Generate netmask.")
-	xflag.Define(&routeIfa, "ifa",
-		"A MAC address of a point-to-point peer?")
-	xflag.Define(&routeIface, "iface",
-		"Inticates <gateway> is a point-to-point interface name.")
-	xflag.Define(&routeIface, "interface", "aka -iface")
-	xflag.Define(&routeIfp, "ifp",
-		"A point-to-point peer interface and MAC.")
-	xflag.Define(&routeMetrics, "metrics",
-		"A comma separated NAME=VALUE."+gwMetrics)
+	return xflag.Labels{
+		{"flags", "A comma separated list." + gwFlags, &routeFlags},
+		{"genmask", "Generate netmask.", &routeGenMask},
+		{"ifa", "A MAC address of a point-to-point peer?", &routeIfa},
+		{"iface", "Inticates <gateway> is point-to-point interface.",
+			&routeIface},
+		{"interface", "aka -iface", &routeIface},
+		{"ifp", "A point-to-point peer interface and MAC.", &routeIfp},
+		{"metrics", "A comma separated NAME=VALUE." + gwMetrics,
+			&routeMetrics},
+	}.Define()
 }
 
 func (rt Route) req(

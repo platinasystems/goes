@@ -40,12 +40,13 @@ usage: {{.Name}} [flags]
 Create PEM encoded ed25519 signature key file.
 
 {{flags .}}`)
-
-	xmain.Config.Define()
-	SigFile.Define()
-
-	err := flag.CommandLine.Parse(args)
+	err := xflag.Labels{
+		xmain.ConfigFlag,
+		SigFlag,
+	}.Define()
 	if err != nil {
+		return err
+	} else if err = flag.CommandLine.Parse(args); err != nil {
 		return err
 	}
 

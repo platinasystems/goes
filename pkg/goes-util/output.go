@@ -19,23 +19,24 @@ import (
 )
 
 func Output(ctx context.Context, complete bool, args []string) error {
-	var a, e, t bool
-	var m uint
-
 	xflag.TemplateUsage(`
 usage: {{.Name}} [flags] <file> <feature> [args]
 Execute feature with output written to file.
 
 {{flags .}}`)
 
-	xflag.Define(&a, "a", "Append <file> instead of truncate.")
-	xflag.Define(&e, "e",
-		"Write or tee Stderr to <file> instead of Stdout.")
-	xflag.Define(&m, "m", "Output file mode (default 0666).")
-	xflag.Define(&t, "t", "Tee to <file> and stdout.")
+	var a, e, t bool
+	var m xflag.FileMode = 0664
 
-	err := flag.CommandLine.Parse(args)
+	err := xflag.Labels{
+		{"a", "Append <file> instead of truncate.", &a},
+		{"e", "Write or tee Stderr to <file> instead of Stdout.", &e},
+		{"m", "Output file mode", &m},
+		{"t", "Tee to <file> and stdout.", &t},
+	}.Define()
 	if err != nil {
+		return err
+	} else if err = flag.CommandLine.Parse(args); err != nil {
 		return err
 	} else if args = flag.Args(); complete {
 		if len(args) > 1 {
@@ -56,12 +57,7 @@ Execute feature with output written to file.
 		oflags |= os.O_TRUNC
 	}
 
-	mode := os.FileMode(0666)
-	if m != 0 {
-		mode = os.FileMode(m)
-	}
-
-	f, err := os.OpenFile(args[0], oflags, mode)
+	f, err := os.OpenFile(args[0], oflags, m.Mode())
 	if err != nil {
 		return err
 	}
