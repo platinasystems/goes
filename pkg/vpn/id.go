@@ -71,7 +71,7 @@ func (id Id) Index() int {
 }
 
 func (id Id) MarshalJSON() ([]byte, error) {
-	return []byte(strconv.FormatUint(uint64(id), 16)), nil
+	return []byte(strconv.FormatUint(uint64(id), 10)), nil
 }
 
 func (id *Id) Revise() {
@@ -83,7 +83,7 @@ func (id Id) String() string {
 }
 
 func (p *Id) UnmarshalJSON(data []byte) error {
-	u, err := strconv.ParseUint(string(data), 16, 32)
+	u, err := strconv.ParseUint(string(data), 10, 32)
 	if err == nil {
 		*p = Id(u)
 	}
