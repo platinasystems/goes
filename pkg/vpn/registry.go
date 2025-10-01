@@ -1038,8 +1038,7 @@ func (reg *registry) restsvc() {
 func (reg *registry) showAddress(rsvp *rsvp) {
 	s := rsvp.trimPrefix(RestPathShowAddress)
 	if len(s) > 0 {
-		sub, ok := reg.named[s]
-		if !ok {
+		if sub, ok := reg.named[s]; !ok {
 			http.Error(rsvp, s, http.StatusNotFound)
 		} else {
 			fmt.Fprintln(rsvp, sub.Addr)
@@ -1047,8 +1046,7 @@ func (reg *registry) showAddress(rsvp *rsvp) {
 	} else {
 		for _, sub := range reg.indexed {
 			if sub.Addr.IsValid() {
-				fmt.Fprintf(rsvp, "%s: %v\n",
-					sub.name(), sub.Addr)
+				fmt.Fprintln(rsvp, sub.Addr, sub.name())
 			}
 		}
 	}
