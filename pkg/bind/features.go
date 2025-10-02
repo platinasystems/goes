@@ -4,11 +4,21 @@
 
 package bind
 
+import (
+	"github.com/platinasystems/goes/v2/pkg/bind/dig"
+	"github.com/platinasystems/goes/v2/pkg/bind/host"
+	"github.com/platinasystems/goes/v2/pkg/bind/named"
+	"github.com/platinasystems/goes/v2/pkg/bind/ncz"
+	"github.com/platinasystems/goes/v2/pkg/bind/nslookup"
+)
+
 // Features map by name these emulated BIND9 tools.
 var Features = map[string]any{
-	"dig":   Dig,
-	"host":  Host,
-	"named": Named,
+	"dig":   dig.Dig,
+	"host":  host.Host,
+	"named": named.Named,
 
-	"named-checkzone": NCZ,
+	"named-checkzone": ncz.NamedCheckZone,
+
+	"nslookup": nslookup.Nslookup,
 }

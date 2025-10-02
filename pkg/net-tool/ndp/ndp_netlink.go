@@ -4,7 +4,7 @@
 
 //go:build netlink || linux
 
-package net_tool
+package ndp
 
 import "golang.org/x/sys/unix"
 

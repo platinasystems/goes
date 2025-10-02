@@ -2,15 +2,10 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-//go:build !linux
+package hostname
 
-package core_util
+import "golang.org/x/sys/unix"
 
-import (
-	"fmt"
-	"runtime"
-)
-
-func Sethostname(string) error {
-	return fmt.Errorf("can't set %s hostname", runtime.GOOS)
+func Sethostname(name string) error {
+	return unix.Sethostname([]byte(name))
 }

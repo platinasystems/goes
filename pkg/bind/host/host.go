@@ -2,7 +2,7 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-package bind
+package host
 
 import (
 	"context"
@@ -15,13 +15,14 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xflag"
 	"github.com/platinasystems/goes/v2/pkg/xlog"
+	"github.com/platinasystems/goes/v2/pkg/xmain"
 	"github.com/platinasystems/goes/v2/pkg/xnet/xdns"
 	"github.com/platinasystems/goes/v2/pkg/xnet/xdns/xdnsmessage"
 	"github.com/platinasystems/goes/v2/pkg/xnet/xdns/xdnspkt"
 )
 
 var host_4, host_6, host_A, host_C, host_T, host_V, host_a, host_i,
-	host_l, host_m, host_r, host_s, host_v, host_w bool
+	host_l, host_m, host_r, host_s, host_w bool
 var host_U = true
 var host_N int
 var host_R = 3
@@ -31,6 +32,7 @@ var host_p = 53
 var host_t = xdnsmessage.TypeA
 
 var hostFlags = xflag.Labels{
+	xlog.VerboseFlag,
 	{"4", "Only use IPv4 query transport.", &host_4},
 	{"6", "Only use IPv6 query transport.", &host_6},
 	{"A", "Like -a but omits RRSIG, NSEC, NSEC3.", &host_A},
@@ -50,7 +52,6 @@ var hostFlags = xflag.Labels{
 	{"r", "Disable recursive processing.", &host_r},
 	{"s", "Stop query on SERVFAIL response.", &host_s},
 	{"t", "Query type.", &host_t},
-	{"v", "Verbose output.", &host_v},
 	{"w", "Wait forever for a reply.", &host_w},
 }
 
@@ -90,11 +91,8 @@ Mimic BIND9's DNS lookup utility.
 	}
 
 	if host_V {
-		fmt.Println(Version())
+		fmt.Println(xmain.Version())
 		return nil
-	}
-	if host_v {
-		verbose = xlog.Unmute(verbose)
 	}
 	args = flag.CommandLine.Args()
 	if len(args) == 0 {

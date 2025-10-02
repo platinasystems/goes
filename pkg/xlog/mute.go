@@ -27,20 +27,21 @@ var (
 	Trace  = Mute(OutLog)
 )
 
-var Flags = xflag.Labels{
-	{"quiet", "Log errata only.", func() error {
+var (
+	QuietFlag = xflag.Label{"quiet", "Log errata only.", func() error {
 		Errata = Mute(Errata)
 		return nil
-	}},
-	{"trace", "Very verbose logging.", func() error {
+	}}
+	TraceFlag = xflag.Label{"trace", "Very verbose logging.", func() error {
 		Trace = Unmute(Trace)
 		return nil
-	}},
-	{"verbose", "Log info.", func() error {
+	}}
+	VerboseFlag = xflag.Label{"verbose", "Log info.", func() error {
 		Info = Unmute(Info)
 		return nil
-	}},
-}
+	}}
+	Flags = xflag.Labels{QuietFlag, TraceFlag, VerboseFlag}
+)
 
 func SetPrefixes(s string) {
 	ErrLog.SetPrefix(s)

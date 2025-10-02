@@ -2,7 +2,7 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-package net_tool
+package icmp
 
 import (
 	"context"
@@ -15,7 +15,7 @@ import (
 	probing "github.com/prometheus-community/pro-bing"
 )
 
-func ICMPPing(ctx context.Context, args []string) error {
+func Ping(ctx context.Context, args []string) error {
 	xflag.TemplateUsage(`
 usage: {{.Name}} [flags] [host]
 Send ICMP ECHO_REQUEST packets to network “host”, default 127.0.0.1.

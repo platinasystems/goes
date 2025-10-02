@@ -221,7 +221,7 @@ func Version() string {
 	if mm := Module(); mm != nil {
 		return mm.Version
 	}
-	return ""
+	return "(unavailable)"
 }
 
 // [filepath.Join] “dir” with [PackageName]

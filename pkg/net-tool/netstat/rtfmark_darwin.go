@@ -2,7 +2,7 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-package net_tool
+package netstat
 
 const rtfmark = "" +
 	"U" + // 0x00000001 RTF_UP
@@ -12,14 +12,14 @@ const rtfmark = "" +
 	"D" + // 0x00000010 RTF_DYNAMIC
 	"M" + // 0x00000020 RTF_MODIFIED
 	"." + // 0x00000040 RTF_DONE
-	"m" + // 0x00000080 RTF_MASK
+	"d" + // 0x00000080 RTF_DECLONE
 	"C" + // 0x00000100 RTF_CLONING
 	"X" + // 0x00000200 RTF_XRESOLVE
 	"L" + // 0x00000400 RTF_LLINFO
 	"S" + // 0x00000800 RTF_STATIC
 	"B" + // 0x00001000 RTF_BLACKHOLE
 	"A" + // 0x00002000 RTF_ANNOUNCE
-	"3" + // 0x00004000 RTF_PROTO2
+	"2" + // 0x00004000 RTF_PROTO2
 	"1" + // 0x00008000 RTF_PROTO1
 	"c" + // 0x00010000 RTF_PRCLONING
 	"W" + // 0x00020000 RTF_WASCLONED
@@ -33,8 +33,5 @@ const rtfmark = "" +
 	"*" + // 0x02000000 RTF_CONDEMNED
 	"i" + // 0x04000000 RTF_IFREF
 	"Y" + // 0x08000000 RTF_PROXY
-	"s" + // 0x10000000 RTF_STICKY
-	"_" + // 0x20000000 RTF_0x20000000
-	"x" + // 0x40000000 RTF_RNH_LOCKED
-	"g" + // 0x80000000 RTF_GWFLAG_COMPAT
+	"r" + //   0x10000000 RTF_ROUTER
 	""

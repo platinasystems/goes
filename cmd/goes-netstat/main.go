@@ -7,11 +7,11 @@ package main
 
 import (
 	"github.com/platinasystems/goes/v2/pkg/goes"
-	net_tool "github.com/platinasystems/goes/v2/pkg/net-tool"
+	"github.com/platinasystems/goes/v2/pkg/net-tool/netstat"
 )
 
 var features = map[string]any{
-	"go-netstat": net_tool.Netstat,
+	"goes-netstat": netstat.Netstat,
 }
 
 func init() { goes.Install(features) }

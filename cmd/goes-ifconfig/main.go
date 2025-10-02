@@ -7,11 +7,11 @@ package main
 
 import (
 	"github.com/platinasystems/goes/v2/pkg/goes"
-	net_tool "github.com/platinasystems/goes/v2/pkg/net-tool"
+	"github.com/platinasystems/goes/v2/pkg/net-tool/ifconfig"
 )
 
 var features = map[string]any{
-	"go-ifconfig": net_tool.Ifconfig,
+	"goes-ifconfig": ifconfig.Ifconfig,
 }
 
 func init() { goes.Install(features) }

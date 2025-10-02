@@ -11,7 +11,7 @@ import (
 )
 
 var features = map[string]any{
-	"go-route": route.Features,
+	"goes-route": route.Features,
 }
 
 func init() { goes.Install(features) }

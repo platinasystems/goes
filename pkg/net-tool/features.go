@@ -5,6 +5,10 @@
 package net_tool
 
 import (
+	"github.com/platinasystems/goes/v2/pkg/net-tool/icmp"
+	"github.com/platinasystems/goes/v2/pkg/net-tool/ifconfig"
+	"github.com/platinasystems/goes/v2/pkg/net-tool/ndp"
+	"github.com/platinasystems/goes/v2/pkg/net-tool/netstat"
 	"github.com/platinasystems/goes/v2/pkg/net-tool/route"
 	udp_echo "github.com/platinasystems/goes/v2/pkg/net-tool/udp-echo"
 	www_echo "github.com/platinasystems/goes/v2/pkg/net-tool/www-echo"
@@ -12,11 +16,10 @@ import (
 
 // Features mapped by name that emulate Unix net-tools.
 var Features = map[string]any{
-	"ifconfig": Ifconfig,
-	"ndp":      NDP,
-	"netstat":  Netstat,
-	"nslookup": Nslookup,
-	"ping":     ICMPPing,
+	"ifconfig": ifconfig.Ifconfig,
+	"ndp":      ndp.NDP,
+	"netstat":  netstat.Netstat,
+	"ping":     icmp.Ping,
 	"route":    route.Features,
 	"udp-echo": udp_echo.Features,
 	"www-echo": www_echo.Features,

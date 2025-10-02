@@ -2,7 +2,7 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-package bind
+package dig
 
 import (
 	"bufio"
@@ -17,6 +17,7 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/chunk"
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xflag"
+	"github.com/platinasystems/goes/v2/pkg/xmain"
 	"github.com/platinasystems/goes/v2/pkg/xnet/xdns"
 	"github.com/platinasystems/goes/v2/pkg/xnet/xdns/xdnsmessage"
 	"github.com/platinasystems/goes/v2/pkg/xnet/xdns/xdnspkt"
@@ -173,7 +174,7 @@ func digLookup(
 			return nil
 		}
 		if dig_v {
-			fmt.Println(Version())
+			fmt.Println(xmain.Version())
 			return nil
 		}
 		if strings.HasPrefix(svr, "https:") {
@@ -205,7 +206,7 @@ func digLookup(
 		if !digGlobalOptions.has(digBoolOptShort) &&
 			digGlobalOptions.has(digBoolOptCmd) {
 			fmt.Printf("; <<>> goes/pkg/bind/dig %s <<>> %s\n",
-				Version(), cmd)
+				xmain.Version(), cmd)
 			fmt.Println()
 		}
 		if len(dig_f) > 0 {

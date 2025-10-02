@@ -2,7 +2,7 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-package bind
+package named
 
 import (
 	"context"
@@ -22,6 +22,7 @@ import (
 	named_conf "github.com/platinasystems/goes/v2/pkg/bind/named-conf"
 	"github.com/platinasystems/goes/v2/pkg/xflag"
 	"github.com/platinasystems/goes/v2/pkg/xlog"
+	"github.com/platinasystems/goes/v2/pkg/xmain"
 	"github.com/platinasystems/goes/v2/pkg/xnet/xdns/xdnsdb"
 	"github.com/platinasystems/goes/v2/pkg/xnet/xdns/xdnsmessage"
 	"github.com/platinasystems/goes/v2/pkg/xsync"
@@ -29,13 +30,15 @@ import (
 
 const namedDefaultConf = "/etc/named.conf"
 
-var named_4, named_6, named_C, named_V, named_q, named_v bool
+var named_4, named_6, named_C, named_V, named_q bool
 var named_T, named_Z string
 var named_c = namedDefaultConf
 var named_p = "53"
 var named_z = "."
 
 var namedFlags = xflag.Labels{
+	xlog.QuietFlag,
+	xlog.VerboseFlag,
 	{"4", `Only service IPv4 host addresses.`, &named_4},
 	{"6", `Only service IPv6 host addresses.`, &named_6},
 	{"C", `Print configuration and exit.`, &named_C},
@@ -56,8 +59,6 @@ the default is 853.  If value is of the form “https=<portnum>”,
 the server will listen for HTTPS queries on portnum; the default is 443.
 If value is of the form “http=<portnum>”, the server will listen for
 HTTP queries on portnum; the default is 80.`[1:], &named_p},
-	{"q", `Quiet logging.`, &named_q},
-	{"v", `Verbose logging.`, &named_v},
 	{"z", "Default zone.", &named_z},
 }
 
@@ -91,17 +92,12 @@ Mimic BIND9's Internet domain name daemon.
 	}
 
 	if named_V {
-		fmt.Println(Version())
+		fmt.Println(xmain.Version())
 		return nil
 	}
 
-	if named_v {
-		verbose = xlog.Unmute(mutable)
-		verbose.Println("start named")
-		defer verbose.Println("stopped named")
-	} else if named_q {
-		errata = xlog.Mute(mutable)
-	}
+	xlog.ErrLog.SetFlags(0)
+	xlog.OutLog.SetFlags(0)
 
 	if len(named_c) > 0 {
 		if conf, err = named_conf.NewConf(named_c); err != nil {
@@ -131,7 +127,7 @@ Mimic BIND9's Internet domain name daemon.
 
 	ctx, cancel := context.WithCancel(ctx)
 
-	namedWG.Go(func() { xdnsdb.Server(ctx, verbose) })
+	namedWG.Go(func() { xdnsdb.Server(ctx, xlog.Info) })
 
 	if len(named_Z) > 0 {
 		for _, fn := range strings.Split(named_Z, ",") {
@@ -303,17 +299,17 @@ func namedHttpHandler(rsp http.ResponseWriter, req *http.Request) {
 	// FIXME Message needs a WriteTo
 	rspb, err := rspm.AppendTo(make([]byte, 0, 4<<10))
 	if err != nil {
-		errata.Print(err)
+		xlog.Errata.Print(err)
 		rsp.WriteHeader(http.StatusInternalServerError)
 	} else if _, err = rsp.Write(rspb); err != nil {
-		errata.Print(err)
+		xlog.Errata.Print(err)
 	}
 }
 
 func namedHttpListenAndServe(srv *http.Server, fns ...string) {
 	var err error
-	defer verbose.Println("stopped http", srv.Addr, "service:", err)
-	verbose.Println("start http", srv.Addr, "service")
+	defer xlog.Info.Println("stopped http", srv.Addr, "service:", err)
+	xlog.Info.Println("start http", srv.Addr, "service")
 	if len(fns) == 2 {
 		err = srv.ListenAndServeTLS(fns[0], fns[1])
 	} else {
@@ -323,19 +319,19 @@ func namedHttpListenAndServe(srv *http.Server, fns ...string) {
 
 func namedHttpShutdown(ctx context.Context, srv *http.Server) {
 	const timeout = 3 * time.Second
-	defer verbose.Print("http", srv.Addr, "done")
+	defer xlog.Info.Print("http", srv.Addr, "done")
 	<-ctx.Done()
 	cctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
-	verbose.Print("shutdown http", srv.Addr, "...")
+	xlog.Info.Print("shutdown http", srv.Addr, "...")
 	srv.Shutdown(cctx)
 }
 
 func namedTcpAccept(ctx context.Context, xln namedListener) {
 	var err error
 	la := xln.Addr()
-	defer verbose.Println("stopped tcp", la, "accept:", err)
-	verbose.Println("start tcp", la, "accept")
+	defer xlog.Info.Println("stopped tcp", la, "accept:", err)
+	xlog.Info.Println("start tcp", la, "accept")
 	for {
 		if err = ctx.Err(); err != nil {
 			break
@@ -357,12 +353,12 @@ func namedTcpAccept(ctx context.Context, xln namedListener) {
 
 func namedTcpService(ctx context.Context, conn net.Conn) {
 	ra := conn.RemoteAddr()
-	defer verbose.Println("stopped tcp", ra, "service")
+	defer xlog.Info.Println("stopped tcp", ra, "service")
 	defer conn.Close()
 	data := make([]byte, 4<<10, 4<<10)
 	req := xdnsmessage.NewMessage()
 	defer req.Free()
-	verbose.Println("start tcp", ra, "service")
+	xlog.Info.Println("start tcp", ra, "service")
 	for {
 		err := ctx.Err()
 		if err != nil {
@@ -370,7 +366,7 @@ func namedTcpService(ctx context.Context, conn net.Conn) {
 		}
 		err = conn.SetReadDeadline(time.Now().Add(time.Second))
 		if err != nil {
-			errata.Print(err)
+			xlog.Errata.Print(err)
 			break
 		}
 		n, err := conn.Read(data[:2])
@@ -378,40 +374,40 @@ func namedTcpService(ctx context.Context, conn net.Conn) {
 			if errors.Is(err, os.ErrDeadlineExceeded) {
 				continue
 			} else if !errors.Is(err, io.EOF) {
-				errata.Print(err)
+				xlog.Errata.Print(err)
 			}
 			break
 		}
 		if n != 2 {
-			errata.Print("underrun")
+			xlog.Errata.Print("underrun")
 			break
 		}
 		err = conn.SetReadDeadline(time.Time{})
 		if err != nil {
-			errata.Print(err)
+			xlog.Errata.Print(err)
 			break
 		}
 		n = int(binary.BigEndian.Uint16(data))
 		n, err = conn.Read(data[:n])
 		if err != nil {
-			errata.Print(err)
+			xlog.Errata.Print(err)
 			break
 		}
 		if err = req.UnmarshalBinary(data[:n]); err != nil {
-			errata.Print(err)
+			xlog.Errata.Print(err)
 			break
 		}
 		ans := namedAnswer(req)
 		b, err := ans.AppendTo(data[2:2])
 		if err != nil {
-			errata.Print(err)
+			xlog.Errata.Print(err)
 			ans.Free()
 			break
 		}
 		n = len(b)
 		binary.BigEndian.PutUint16(data, uint16(n))
 		if _, err = conn.Write(data[:2+n]); err != nil {
-			errata.Print(err)
+			xlog.Errata.Print(err)
 		}
 		ans.Free()
 	}
@@ -422,10 +418,10 @@ func namedUdpReceive(
 	conn net.PacketConn,
 	ch chan<- *xdnsmessage.Message,
 ) {
-	defer verbose.Println("stopped udp receiver")
+	defer xlog.Info.Println("stopped udp receiver")
 	defer close(ch)
 	data := make([]byte, 4<<10, 4<<10)
-	verbose.Println("start udp receiver")
+	xlog.Info.Println("start udp receiver")
 	for {
 		err := ctx.Err()
 		if err != nil {
@@ -433,7 +429,7 @@ func namedUdpReceive(
 		}
 		err = conn.SetReadDeadline(time.Now().Add(time.Second))
 		if err != nil {
-			errata.Print(err)
+			xlog.Errata.Print(err)
 			break
 		}
 		n, a, err := conn.ReadFrom(data)
@@ -441,12 +437,12 @@ func namedUdpReceive(
 			if errors.Is(err, os.ErrDeadlineExceeded) {
 				continue
 			}
-			errata.Print(err)
+			xlog.Errata.Print(err)
 			break
 		}
 		req := xdnsmessage.NewMessage()
 		if err = req.UnmarshalBinary(data[:n]); err != nil {
-			errata.Print(err)
+			xlog.Errata.Print(err)
 			req.Free()
 		} else {
 			req.Addr = a
@@ -460,8 +456,8 @@ func namedUdpService(
 	conn net.PacketConn,
 	ch <-chan *xdnsmessage.Message,
 ) {
-	defer verbose.Println("stopped udp message service")
-	verbose.Println("start udp message service")
+	defer xlog.Info.Println("stopped udp message service")
+	xlog.Info.Println("start udp message service")
 	data := make([]byte, 4<<10, 4<<10)
 	for {
 		select {
@@ -470,10 +466,10 @@ func namedUdpService(
 		case req := <-ch:
 			ans := namedAnswer(req)
 			if b, err := ans.AppendTo(data[:0]); err != nil {
-				errata.Print(err)
+				xlog.Errata.Print(err)
 			} else if _, err = conn.
 				WriteTo(b, ans.Addr); err != nil {
-				errata.Print(err)
+				xlog.Errata.Print(err)
 			}
 			req.Free()
 			ans.Free()

@@ -2,7 +2,7 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-package bind
+package ncz
 
 import (
 	"context"
@@ -13,12 +13,13 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xflag"
 	"github.com/platinasystems/goes/v2/pkg/xlog"
+	"github.com/platinasystems/goes/v2/pkg/xmain"
 	"github.com/platinasystems/goes/v2/pkg/xnet/xdns/xdnsdb"
 	"github.com/platinasystems/goes/v2/pkg/xnet/xdns/xdnsmessage"
 	"github.com/platinasystems/goes/v2/pkg/xsync"
 )
 
-var ncz_D, ncz_d, ncz_q, ncz_v bool
+var ncz_D, ncz_d, ncz_v bool
 var ncz_L, ncz_T, ncz_r, ncz_t, ncz_w string
 var ncz_C = "fail"
 var ncz_F = "text"
@@ -36,6 +37,7 @@ var ncz_o = "-"
 var ncz_s = "full"
 
 var nczFlags = xflag.Labels{
+	xlog.VerboseFlag,
 	{"C", "Check mode: fail, or ignore.", &ncz_C},
 	{"D", `Dump zone file in canonical format.`, &ncz_D},
 	{"F", "Output format: text, raw, or raw=N.", &ncz_F},
@@ -92,9 +94,6 @@ Print whether NS records are addresses:
 	{"o", `
 Writes the zone output to named file or
 standard output if "-".`[1:], &ncz_o},
-	{"q", `
-Quiet mode - only set an exit code to indicate
-successful or failed verification.`[1:], &ncz_q},
 	{"r", `
 Check for records that are treated as different by DNSSEC but are
 semantically equal in plain DNS:
@@ -111,7 +110,7 @@ If not empty, chdir to named directory for relative $INCLUDE directives.
 This is similar to the directory clause in named.conf.`[1:], &ncz_w},
 }
 
-func NCZ(ctx context.Context, args []string) error {
+func NamedCheckZone(ctx context.Context, args []string) error {
 	var wg xsync.WaitGroup
 
 	xflag.TemplateUsage(`
@@ -135,11 +134,8 @@ Mimic BIND9's config verification tool.
 	}()
 
 	if ncz_v {
-		fmt.Println(Version())
+		fmt.Println(xmain.Version())
 		return nil
-	}
-	if ncz_q {
-		verbose = xlog.Mute(verbose)
 	}
 	switch len(args) {
 	case 0:
@@ -150,7 +146,7 @@ Mimic BIND9's config verification tool.
 
 	zone, fn := args[0], args[1]
 
-	wg.Go(func() { xdnsdb.Server(ctx, verbose) })
+	wg.Go(func() { xdnsdb.Server(ctx, xlog.Info) })
 
 	if err = xdnsdb.Include(ctx, zone, fn); err != nil {
 		return err
