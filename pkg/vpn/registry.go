@@ -520,7 +520,9 @@ func (reg *registry) dir(w http.ResponseWriter) {
 	}
 }
 
-func (reg *registry) dnsAnswer(query *xdnsmessage.Message) *xdnsmessage.Message {
+func (reg *registry) dnsAnswer(
+	query *xdnsmessage.Message,
+) *xdnsmessage.Message {
 	reply := xdnsmessage.NewMessage()
 	reply.Addr = query.Addr
 	reply.ID = query.ID
@@ -549,6 +551,12 @@ func (reg *registry) dnsAnswer(query *xdnsmessage.Message) *xdnsmessage.Message 
 		sub, ok := reg.named[name]
 		if !ok {
 			xlog.Trace.Println(name, "not found")
+			continue
+		}
+		if sub.Addr.Is4() && q.Type != xdnsmessage.TypeA {
+			continue
+		}
+		if sub.Addr.Is6() && q.Type != xdnsmessage.TypeAAAA {
 			continue
 		}
 		reply.RCode = xdnsmessage.RCodeSuccess
