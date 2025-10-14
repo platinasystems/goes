@@ -48,6 +48,14 @@ type Resource interface {
 	construct(*dnsmessage.Builder, dnsmessage.ResourceHeader) error
 }
 
+func (wr WireResource) Format(w fmt.State, verb rune) {
+	fmt.Fprint(w, wr.Name,
+		", ", wr.Duration,
+		", ", wr.Class,
+		", ", wr.Type(),
+		", ", wr.Resource)
+}
+
 func (wr WireResource) Resource() Resource {
 	return wr.TypedResource
 }
