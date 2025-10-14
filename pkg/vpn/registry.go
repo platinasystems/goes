@@ -1199,6 +1199,18 @@ func (reg *registry) marshalSub(rsvp *rsvp, sub *Subscriber) {
 	}
 }
 
+func getRegistryStart(rsp *http.Response) (int64, error) {
+	s := rsp.Header.Get(RestUnixMicroStart)
+	if len(s) == 0 {
+		return 0, xerrors.Unavailable("registry start time")
+	}
+	i, err := strconv.ParseInt(s, 10, 64)
+	if err != nil {
+		return 0, xerrors.Label(err, "registry start")
+	}
+	return i, nil
+}
+
 func SplitConfLine(s string) []string {
 	s = strings.TrimSpace(s)
 	if len(s) == 0 || []rune(s)[0] == '#' {

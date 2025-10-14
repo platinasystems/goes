@@ -62,7 +62,7 @@ const (
 	ToTunCap = xnet.BatchCap + 4
 	ToVpnCap = xnet.BatchCap
 
-	UpgradeExitCode = xos.EX_TEMPFAIL
+	RestartExitCode = xos.EX_TEMPFAIL
 )
 
 const DefaultExchangePort = 8003

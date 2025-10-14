@@ -23,7 +23,6 @@ import (
 	"net/url"
 	"os"
 	"runtime"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -44,6 +43,10 @@ type RestError struct {
 	code int
 	txt,
 	body string
+}
+
+type RestartError struct {
+	err error
 }
 
 const contextApplicationPKCS8 = "application/pkcs8"
@@ -100,8 +103,22 @@ const RestOpCheckinExchangePort = "port"
 const RestWhoisDepth = 8
 
 var ErrKoApp = errors.New("ko app")
-var ErrRestartRequired = errors.New("restart required to complete upgrade")
 var ErrNilResponse = errors.New("rest: nil respone")
+
+var ErrCompleteUpgrade = errors.New("complete upgrade")
+var ErrRestartCompleteUpgrade = NewRestartError(ErrCompleteUpgrade)
+var ExitCompleteUpgrade = xerrors.
+	NewExitError(RestartExitCode, ErrRestartCompleteUpgrade)
+
+var ErrRecheckin = errors.New("re-checkin w/ registry")
+var ErrRestartRecheckin = NewRestartError(ErrRecheckin)
+var ExitRecheckin = xerrors.
+	NewExitError(RestartExitCode, ErrRestartRecheckin)
+
+func needsRestart(err error) bool {
+	return errors.Is(err, ErrCompleteUpgrade) ||
+		errors.Is(err, ErrRecheckin)
+}
 
 var (
 	registryFile string
@@ -518,6 +535,21 @@ func (re *RestError) Error() string {
 	return fmt.Sprint(re.txt, ", ", re.body)
 }
 
+func NewRestartError(err error) RestartError {
+	return RestartError{err}
+}
+
+func (x RestartError) Error() (s string) {
+	if x.err != nil {
+		s = fmt.Sprint("restart required: ", x.err)
+	}
+	return
+}
+
+func (x RestartError) Unwrap() error {
+	return x.err
+}
+
 func restAlloc() *bytes.Buffer {
 	return rest.bufs.Get().(*bytes.Buffer)
 }
@@ -768,30 +800,22 @@ func restUpgrade(ctx context.Context) error {
 	if err = os.Link(xpPlus, xp); err != nil {
 		return xerrors.Label(err, cantUpgrade)
 	}
-	return xerrors.NewExitError(UpgradeExitCode, ErrRestartRequired)
+	return ExitCompleteUpgrade
 }
 
-func RestValidateCheckinResponse(rsp *http.Response) error {
+func RestValidateCheckinResponse(rsp *http.Response) (err error) {
 	if rsp == nil {
-		return xerrors.Invalid("checkin response")
+		err = xerrors.Invalid("no checkin response")
+	} else {
+		vcsRev := xprogram.VcsRevision.String()
+		regVcsRev := rsp.Header.Get(RestVcsRevision)
+		if vcsRev != regVcsRev {
+			err = fmt.Errorf("upgrade to %s", regVcsRev)
+		} else {
+			RegistryStart, err = getRegistryStart(rsp)
+		}
 	}
-
-	vcsRev := xprogram.VcsRevision.String()
-	regVcsRev := rsp.Header.Get(RestVcsRevision)
-	if vcsRev != regVcsRev {
-		return fmt.Errorf("upgrade to %s", regVcsRev)
-	}
-
-	s := rsp.Header.Get(RestUnixMicroStart)
-	if len(s) == 0 {
-		return xerrors.Unavailable("registry start time")
-	}
-	i, err := strconv.ParseInt(s, 10, 64)
-	if err != nil {
-		return xerrors.Label(err, "registry start")
-	}
-	RegistryStart = i
-	return nil
+	return
 }
 
 func restWaitForResolution(ctx context.Context) error {
@@ -810,6 +834,7 @@ func RestQueueVcsCheck() {
 func RestWhois(ctx context.Context, v any) (*Subscriber, error) {
 	var path string
 	var sub *Subscriber
+	var start int64
 	buf := restAlloc()
 	defer restFree(buf)
 	switch t := v.(type) {
@@ -830,6 +855,11 @@ func RestWhois(ctx context.Context, v any) (*Subscriber, error) {
 	rsp, err := restGet(ctx, buf, path)
 	if rsp != nil && rsp.StatusCode == http.StatusUpgradeRequired {
 		err = restUpgrade(ctx)
+	} else if start, err = getRegistryStart(rsp); err != nil {
+		err = xerrors.NewExitError(RestartExitCode,
+			NewRestartError(err))
+	} else if RegistryStart != 0 && RegistryStart != start {
+		err = ExitRecheckin
 	} else if err == nil && v != nil {
 		sub = new(Subscriber)
 		err = json.Unmarshal(buf.Bytes(), sub)
@@ -858,7 +888,7 @@ func restWhoisService(ctx context.Context) {
 			sub, err := RestWhois(ctx, q)
 			if err == nil {
 				xcontext.Queue(ctx, rest.whoisRspC, sub)
-			} else if errors.Is(err, ErrRestartRequired) {
+			} else if needsRestart(err) {
 				RestRestartRequiredErr = err
 				return
 			} else {
