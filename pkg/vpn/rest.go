@@ -82,6 +82,7 @@ const (
 
 	RestPathShowAddress    = "/show/address"
 	RestPathShowAdmins     = "/show/admins"
+	RestPathShowDomain     = "/show/domain"
 	RestPathShowExchanges  = "/show/exchanges"
 	RestPathShowPending    = "/show/pending"
 	RestPathShowPrefix     = "/show/prefix"
@@ -158,6 +159,7 @@ var RestPaths = []string{
 	RestPathReload,
 	RestPathShowAddress,
 	RestPathShowAdmins,
+	RestPathShowDomain,
 	RestPathShowExchanges,
 	RestPathShowPending,
 	RestPathShowPrefix,

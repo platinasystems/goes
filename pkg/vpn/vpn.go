@@ -46,6 +46,7 @@ var MainFeatures = map[string]any{
 var ShowFeatures = map[string]any{
 	"address":    RestShow,
 	"admins":     RestShow,
+	"domain":     RestShow,
 	"exchanges":  RestShow,
 	"pending":    RestShow,
 	"prefix":     RestShow,

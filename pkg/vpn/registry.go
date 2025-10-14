@@ -929,6 +929,8 @@ func (reg *registry) rest(rsvp *rsvp) {
 					fmt.Fprintln(rsvp, "-", k)
 				}
 			}
+		case path == RestPathShowDomain:
+			fmt.Fprintln(rsvp, domain)
 		case path == RestPathShowExchanges:
 			if reg.isSubscriber(rsvp) {
 				for _, sub := range reg.indexed {
