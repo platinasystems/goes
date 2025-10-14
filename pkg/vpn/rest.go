@@ -35,6 +35,8 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xflag"
 	"github.com/platinasystems/goes/v2/pkg/xlog"
 	"github.com/platinasystems/goes/v2/pkg/xmain"
+	"github.com/platinasystems/goes/v2/pkg/xnet/xdns/xdnsdoh"
+	"github.com/platinasystems/goes/v2/pkg/xnet/xdns/xdnsmessage"
 	"github.com/platinasystems/goes/v2/pkg/xprogram"
 )
 
@@ -359,6 +361,59 @@ Get or list registry file(s).
 	}
 	_, err = restGet(ctx, os.Stdout, path.String())
 	return err
+}
+
+func RestLookup(ctx context.Context, args []string) error {
+	const class = xdnsmessage.ClassINET
+
+	xflag.TemplateUsage(`
+usage: {{.Name}} <address|name>
+Print name of addressed, or address of named subscriber.
+
+{{flags .}}`)
+
+	err := restFlags.Define()
+	if err != nil {
+		return err
+	} else if err = flag.CommandLine.Parse(args); err != nil {
+		return err
+	} else if args = flag.CommandLine.Args(); len(args) == 0 {
+		return err
+	} else if err = restInit(); err != nil {
+		return err
+	}
+	clone := *rest.url
+	clone.Path = RestPathDnsQuery
+	doh := xdnsdoh.Asker(&rest.Client, clone.String())
+	b := xdnsmessage.MakeBuffer()
+	name := args[0]
+	types := []xdnsmessage.Type{xdnsmessage.TypeA, xdnsmessage.TypeAAAA}
+	if addr, err := netip.ParseAddr(args[0]); err == nil {
+		name = xdnsmessage.Reverse(addr)
+		types[0] = xdnsmessage.TypePTR
+		types = types[:1]
+	}
+	us := xdnsmessage.MakeUniqueString(name)
+	for _, t := range types {
+		var rsp xdnsmessage.Message
+		q := xdnsmessage.NewQuery(true, us, class, t)
+		if b, err = q.AppendTo(b[:0]); err != nil {
+			return err
+		}
+		if b, err = doh.Ask(ctx, b); err != nil {
+			return err
+		}
+		if err = rsp.UnmarshalBinary(b); err != nil {
+			return err
+		}
+		if rsp.ID != q.ID {
+			return fmt.Errorf("id %d != %d", rsp.ID, q.ID)
+		}
+		for _, a := range rsp.Answers {
+			fmt.Println(name, a)
+		}
+	}
+	return nil
 }
 
 func RestReload(ctx context.Context, args []string) error {
