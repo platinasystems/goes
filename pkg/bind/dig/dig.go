@@ -7,6 +7,7 @@ package dig
 import (
 	"bufio"
 	"context"
+	_ "embed"
 	"flag"
 	"fmt"
 	"net/netip"
@@ -14,271 +15,281 @@ import (
 	"strings"
 	"time"
 
-	"github.com/platinasystems/goes/v2/pkg/chunk"
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xflag"
 	"github.com/platinasystems/goes/v2/pkg/xmain"
 	"github.com/platinasystems/goes/v2/pkg/xnet/xdns"
+	"github.com/platinasystems/goes/v2/pkg/xnet/xdns/xdnsdoh"
 	"github.com/platinasystems/goes/v2/pkg/xnet/xdns/xdnsmessage"
 	"github.com/platinasystems/goes/v2/pkg/xnet/xdns/xdnspkt"
+	"github.com/platinasystems/goes/v2/pkg/xnet/xresolv"
 )
 
-var dig_4, dig_6, dig_O, dig_T, dig_m, dig_u, dig_v bool
-var dig_b, dig_f, dig_k, dig_y string
-var dig_p = 53
+//go:embed usage.txt
+var usage string
 
-var digFlags = xflag.Labels{
-	{"4", "Use IPv4 only.", &dig_4},
-	{"6", "Use IPv6 only.", &dig_6},
-	{"O", "Print plus (+) prefaced options and exit.", &dig_O},
-	{"T", "Print types and exit.", &dig_T},
-	{"b", `
-Set the source IP address of the query. The address must be a
-valid address on one of the host's network interfaces, or
-"0.0.0.0" or "::". An optional port may be specified by
-appending "#<port>"`[1:], &dig_b},
-	{"f", `
-Batch mode: dig reads a list of lookup requests to process from
-the given file. Each line in the file should be organized in the
-same way they would be presented as queries to dig using the
-command-line interface.`[1:], &dig_f},
-	{"k", `
-Sign queries using TSIG using a key read from the given file.
-Key files can be generated using tsig-keygen(8). When using TSIG
-authentication with dig, the name server that is queried needs
-to know the key and algorithm that is being used. In BIND, this
-is done by providing appropriate key and server statements in
-named.conf.`[1:], &dig_k},
-	{"m", "Enable memory usage debugging.", &dig_m},
-	{"p", `
-Send the query to a non-standard port on the server, instead
-of the defaut port 53. This option would be used to test a
-name server that has been configured to listen for queries
-on a non-standard port number.`[1:], &dig_p},
-	{"u", `
-This option indicates that print query times should be provided in microseconds
-instead of milliseconds.`[1:], &dig_u},
-	{"v", "Print the version number and exit.", &dig_v},
-	{"y", `
-Sign queries using TSIG with the given authentication key.
-keyname is the name of the key, and secret is the base64 encoded
-shared secret.  hmac is the name of the key algorithm; valid
-choices are hmac-md5, hmac-sha1, hmac-sha224, hmac-sha256,
-hmac-sha384, or hmac-sha512. If hmac is not specified, the
-default is hmac-md5 or if MD5 was disabled hmac-sha256.
+var r *xresolv.Resolv
 
-NOTE: You should use the -k option and avoid the -y option,
-because with -y the shared secret is supplied as a command line
-argument in clear text. This may be visible in the output from
-ps(1) or in a history file maintained by the user's shell.`[1:], &dig_y},
+var allq = struct {
+	dns xdns.Asker
+	buf []byte
+
+	ip4, ip6, m, r, u bool
+
+	p uint16
+
+	svr, b, f, k, y string
+
+	o options
+}{
+	p: 53,
+	o: options{
+		additional: true,
+		answer:     true,
+		authority:  true,
+		cmd:        true,
+		ndots:      1,
+		question:   true,
+		recurse:    true,
+		stats:      true,
+	},
 }
 
 func Dig(ctx context.Context, args []string) error {
-	xflag.TemplateUsage(`
-usage: {{.Name}} [@server] [+global] [[-flags] [name [TYPE] [CLASS] [+options]]
-Mimic BIND9's DNS lookup utility.
-
-{{flags .}}`)
-
-	if err := digFlags.Define(); err != nil {
-		return err
+	var err error
+	xflag.TemplateUsage(usage)
+	if len(args) == 0 {
+		flag.CommandLine.Usage()
+		return xerrors.ErrIncomplete
 	}
-	return digLookup(ctx, flag.CommandLine, nil, args)
-}
-
-func DigPerLookupFlags(fs *flag.FlagSet) (perlu struct {
-	c       xdnsmessage.Class
-	t       xdnsmessage.Type
-	i, q, x string
-}, err error) {
-	err = xflag.Labels{
-		{"c", `
-Set query class: ANY, CH, CS, HS, or IN.`[1:], &perlu.c},
-		{"t", `
-The resource record type to query. It can be any valid query
-type which is supported in BIND 9. The default query type is
-"A", unless the -x option is supplied to indicate a reverse
-lookup. A zone transfer can be requested by specifying a type of
-AXFR. When an incremental zone transfer (IXFR) is required, set
-the type to ixfr=N. The incremental zone transfer will contain
-the changes made to the zone since the serial number in the
-zone's SOA record was N.`[1:], &perlu.t},
-		{"i", `
-Do reverse IPv6 lookups using the obsolete RFC1886 IP6.INT
-domain, which is no longer in use. Obsolete bit string label
-queries (RFC2874) are not attempted.`[1:], &perlu.i},
-		{"q", `
-Query the flagged name instead of positional argument.`[1:], &perlu.q},
-		{"x", `
-Simplified reverse lookups, for mapping addresses to names. The
-addr is an IPv4 address in dotted-decimal notation, or a
-colon-delimited IPv6 address. When the -x is used, there is no
-need to provide the name, class and type arguments.  dig
-automatically performs a lookup for a name like
-94.2.0.192.in-addr.arpa and sets the query type and class to PTR
-and IN respectively. IPv6 addresses are looked up using nibble
-format under the IP6.ARPA domain (but see also the -i option).`[1:], &perlu.x},
-	}.DefineIn(fs)
-	return
-}
-
-func digLookup(
-	ctx context.Context,
-	fs *flag.FlagSet,
-	rsvp func([]byte) ([]byte, error),
-	args []string,
-) error {
-	const hf = xdnsmessage.HFRecursionDesired
-	var (
-		cmd,
-		name,
-		ra,
-		svr string
-		rsp xdnsmessage.Message
-		err error
-	)
-
-	pkt := chunk.New(xdnspkt.Cap)
-	*pkt = (*pkt)[:0]
-	defer chunk.Discard(pkt)
-
-	if fs == flag.CommandLine {
-		cmd = strings.Join(args, " ")
-		svr = "localhost:domain"
-		if len(args) > 0 && strings.HasPrefix(args[0], "@") {
-			svr = strings.TrimPrefix(args[0], "@")
-			args = args[1:]
-		}
-	}
-	args, err = digGlobalOptions.parse(args)
-	if err != nil {
-		return err
+	switch args[0] {
+	case "-h", "help", "-help", "--help":
+		flag.CommandLine.Usage()
+		return nil
+	case "-v":
+		fmt.Println(xmain.Version())
+		return nil
 	}
 
-	perlu, err := DigPerLookupFlags(fs)
-	if err != nil {
-		return err
-	} else if err = fs.Parse(args); err != nil {
-		return err
-	}
+	allq.buf = xdnsmessage.MakeBuffer()
+	r = xresolv.New()
 
-	args = fs.Args()
-
-	if fs == flag.CommandLine {
-		if dig_O {
-			fmt.Print(digOptionsTxt)
-			return nil
+	cmd := strings.Join(args, " ")
+	if strings.HasPrefix(args[0], "@") {
+		allq.svr = strings.TrimPrefix(args[0], "@")
+		if args = args[1:]; len(args) == 0 {
+			return xerrors.ErrIncomplete
 		}
-		if dig_T {
-			fmt.Print(xdnsmessage.TypeHelpTxt)
-			return nil
-		}
-		if dig_v {
-			fmt.Println(xmain.Version())
-			return nil
-		}
-		if strings.HasPrefix(svr, "https:") {
-			rsvp = func(b []byte) ([]byte, error) {
-				return b[:0], xerrors.FIXME("DOH")
-			}
-			// FIXME defer cl.CloseIdleConnections()
-			return xerrors.FIXME("DOH")
-		} else {
-			nw := "udp"
-			if dig_4 {
-				nw = "udp4"
-			} else if dig_6 {
-				nw = "udp6"
-			}
-			conn, err := xdns.DialContext(ctx, nw, svr)
-			if err != nil {
-				return err
-			}
-			defer func() {
-				conn.Close()
-			}()
-			ra = conn.RemoteAddr().String()
-			rsvp = func(b []byte) ([]byte, error) {
-				const tl = 30 * time.Second
-				return xdnspkt.TimeLimitedAsk(ctx, conn, b, tl)
-			}
-		}
-		if !digGlobalOptions.has(digBoolOptShort) &&
-			digGlobalOptions.has(digBoolOptCmd) {
-			fmt.Printf("; <<>> goes/pkg/bind/dig %s <<>> %s\n",
-				xmain.Version(), cmd)
-			fmt.Println()
-		}
-		if len(dig_f) > 0 {
-			return digBatch(ctx, rsvp, dig_f)
-		}
-	}
-	if len(perlu.x) > 0 {
-		addr, err := netip.ParseAddr(perlu.x)
-		if err != nil {
-			return xerrors.Label(err, "x")
-		}
-		name = xdnsmessage.Reverse(addr)
-		perlu.t = xdnsmessage.TypePTR
-		perlu.c = xdnsmessage.ClassINET
 	} else {
-		if len(perlu.q) > 0 {
-			name = perlu.q
-		} else if len(args) == 0 {
-			return xerrors.Incomplete("name")
-		} else {
-			name = args[0]
-			args = args[1:]
-		}
-		if perlu.t != xdnsmessage.Type0 {
-		} else if len(args) == 0 {
-			perlu.t = xdnsmessage.TypeA
-		} else if t, err := xdnsmessage.TypeNamed(args[0]); err == nil {
-			perlu.t = t
-			args = args[1:]
-		} else {
-			perlu.t = xdnsmessage.TypeA
-		}
-		if perlu.c != xdnsmessage.Class0 {
-		} else if len(args) == 0 {
-			perlu.c = xdnsmessage.ClassINET
-		} else if c, err := xdnsmessage.ClassNamed(args[0]); err == nil {
-			perlu.c = c
-			args = args[1:]
-		} else {
-			perlu.c = xdnsmessage.ClassINET
-		}
+		allq.svr = r.Nameserver[0]
 	}
 
-	qopts := digGlobalOptions.clone()
-	if args, err = qopts.parse(args); err != nil {
-		return err
+	for {
+		if len(args) == 0 {
+			err = xerrors.ErrIncomplete
+		} else if args[0] == "-f" {
+			if len(args) > 1 {
+				allq.f = args[1]
+				args = args[2:]
+			} else {
+				err = xerrors.Incomplete("filename")
+			}
+		} else if args[0] == "-q" {
+			break
+		} else if args[0] == "-t" {
+			break
+		} else if args[0] == "-c" {
+			break
+		} else if args[0] == "-x" {
+			break
+		} else if args[0] == "-4" {
+			allq.ip4 = true
+			args = args[1:]
+		} else if args[0] == "-6" {
+			allq.ip6 = true
+			args = args[1:]
+		} else if args[0] == "-m" {
+			allq.m = true
+			args = args[1:]
+		} else if args[0] == "-p" {
+			if len(args) > 1 {
+				_, err = fmt.Sscan(args[1], &allq.p)
+				args = args[2:]
+			} else {
+				err = xerrors.Incomplete("port")
+			}
+		} else if args[0] == "-r" {
+			allq.r = true
+			args = args[1:]
+		} else if args[0] == "-u" {
+			allq.u = true
+			args = args[1:]
+		} else if strings.HasPrefix(args[0], "-") {
+			err = xerrors.Invalid(args[0])
+		} else if strings.HasPrefix(args[0], "+no") {
+			err = xerrors.Invalid(args[0])
+		} else if strings.HasPrefix(args[0], "+") {
+			err = allq.o.set(strings.TrimPrefix(args[0], "+"))
+		} else {
+			break
+		}
+		if err != nil {
+			return err
+		}
 	}
+	if len(allq.o.https) > 0 {
+		allq.dns = xdnsdoh.New(allq.o.httpsSkipVerify, allq.svr)
+	} else {
+		var a string
+		nw := "udp"
+		if allq.ip4 {
+			nw = "udp4"
+		} else if allq.ip6 {
+			nw = "udp6"
+		}
+		if strings.IndexRune(allq.svr, ':') >= 0 {
+			a = fmt.Sprint("[", allq.svr, "]:", allq.p)
+		} else {
+			a = fmt.Sprint(allq.svr, ":", allq.p)
+		}
+		udp, err := xdns.DialContext(ctx, nw, a)
+		if err != nil {
+			return err
+		}
+		defer udp.Close()
+		allq.svr += fmt.Sprint("(", udp.RemoteAddr(), ")")
+		allq.dns = xdnspkt.TimeLimitedAsker(udp, 30*time.Second)
+	}
+	if !allq.o.short && allq.o.cmd {
+		fmt.Printf("; <<>> goes/pkg/bind/dig %s <<>> %s\n",
+			xmain.Version(), cmd)
+		fmt.Println()
+	}
+	if len(allq.f) > 0 {
+		err = batch(ctx)
+	} else {
+		for err == nil && len(args) > 0 {
+			args, err = query(ctx, args)
+		}
+	}
+	return err
+}
 
-	req := xdnsmessage.Message{
-		HF:     hf,
-		OpCode: xdnsmessage.OpCodeQuery,
-		Questions: []xdnsmessage.WireQuestion{{
-			Name:  xdnsmessage.MakeUniqueString(name),
-			Class: perlu.c,
-			Type:  perlu.t,
-		}},
-	}
-	if *pkt, err = req.AppendTo((*pkt)[:0]); err != nil {
+func batch(ctx context.Context) error {
+	var err error
+	var sc *bufio.Scanner
+	if allq.f == "-" {
+		sc = bufio.NewScanner(os.Stdin)
+	} else if f, err := os.Open(allq.f); err != nil {
 		return err
+	} else {
+		defer f.Close()
+		sc = bufio.NewScanner(f)
+	}
+	for err == nil && sc.Scan() {
+		line := sc.Text()
+		if len(line) == 0 ||
+			strings.HasPrefix(line, "#") ||
+			strings.HasPrefix(line, ";") {
+			continue
+		}
+		args := strings.Fields(line)
+		for err == nil && len(args) > 0 {
+			args, err = query(ctx, args)
+		}
+	}
+	return err
+}
+
+// allq.dns.Ask with parsed args and return remainder
+func query(ctx context.Context, args []string) ([]string, error) {
+	var err error
+	var rsp xdnsmessage.Message
+	var s string
+	c := xdnsmessage.ClassINET
+	t := xdnsmessage.TypeA
+	o := allq.o
+	for len(args) > 0 && err == nil {
+		if args[0] == "--" || args[0] == "++" {
+			break
+		} else if args[0] == "-q" {
+			if len(args) < 2 {
+				err = xerrors.Incomplete("name")
+			} else {
+				s = o.expandedName(args[1])
+				args = args[2:]
+			}
+		} else if args[0] == "-c" {
+			if len(args) < 2 {
+				err = xerrors.Incomplete("class")
+			} else if c, err = xdnsmessage.
+				ClassNamed(args[0]); err == nil {
+				args = args[2:]
+			}
+		} else if args[0] == "-t" {
+			if len(args) < 2 {
+				err = xerrors.Incomplete("type")
+			} else if t, err = xdnsmessage.
+				TypeNamed(args[0]); err == nil {
+				args = args[2:]
+			}
+		} else if args[0] == "-x" {
+			var a netip.Addr
+			if len(args) < 2 {
+				err = xerrors.Incomplete("address")
+			} else if a, err = netip.
+				ParseAddr(args[1]); err == nil {
+				s = xdnsmessage.Reverse(a)
+				t = xdnsmessage.TypePTR
+				c = xdnsmessage.ClassINET
+				args = args[2:]
+			}
+		} else if strings.HasPrefix(args[0], "+no") {
+			name := strings.TrimPrefix(args[0], "+no")
+			if err = o.reset(name); err == nil {
+				args = args[1:]
+			}
+		} else if strings.HasPrefix(args[0], "+") {
+			name := strings.TrimPrefix(args[0], "+")
+			if err = o.set(name); err == nil {
+				args = args[1:]
+			}
+		} else if v, e := xdnsmessage.TypeNamed(args[0]); e == nil {
+			t = v
+			args = args[1:]
+		} else if v, e := xdnsmessage.ClassNamed(args[0]); e == nil {
+			c = v
+			args = args[1:]
+		} else if len(s) > 0 {
+			break
+		} else {
+			s = o.expandedName(args[0])
+			args = args[1:]
+		}
+	}
+	if err != nil {
+		return args, err
+	}
+	if len(s) == 0 {
+		return args, xerrors.Incomplete("name")
+	}
+	us := xdnsmessage.MakeUniqueString(s)
+	q := xdnsmessage.NewQuery(o.recurse, us, c, t)
+	if allq.buf, err = q.AppendTo(allq.buf[:0]); err != nil {
+		return args, err
 	}
 	beg := time.Now()
-	if *pkt, err = rsvp(*pkt); err != nil {
-		return err
+	if allq.buf, err = allq.dns.Ask(ctx, allq.buf); err != nil {
+		return args, err
 	}
 	end := time.Now()
-	if err = rsp.UnmarshalBinary(*pkt); err != nil {
-		return err
+	if err = rsp.UnmarshalBinary(allq.buf); err != nil {
+		return args, err
 	}
-	if rsp.ID != req.ID {
-		return fmt.Errorf("id %d != %d", rsp.ID, req.ID)
+	if rsp.ID != q.ID {
+		return args, fmt.Errorf("id %d != %d", rsp.ID, q.ID)
 	}
-	if !qopts.has(digBoolOptShort) && qopts.has(digBoolOptComments) {
+	if !o.short && o.comments {
 		fmt.Println(";; Got answer:")
 		fmt.Print(";; ->>HEADER<<- opcode: ", rsp.OpCode)
 		fmt.Print(", status: ", rsp.RCode)
@@ -292,10 +303,8 @@ func digLookup(
 		fmt.Println()
 		fmt.Println()
 	}
-	if !qopts.has(digBoolOptShort) &&
-		qopts.has(digBoolOptAdditional) &&
-		len(rsp.Additionals) > 0 {
-		if qopts.has(digBoolOptComments) {
+	if !o.short && o.additional && len(rsp.Additionals) > 0 {
+		if o.comments {
 			fmt.Println(";; OPT PSEUDOSECTION:")
 		}
 		for _, a := range rsp.Additionals {
@@ -314,10 +323,8 @@ func digLookup(
 			}
 		}
 	}
-	if !qopts.has(digBoolOptShort) &&
-		qopts.has(digBoolOptQuestion) &&
-		len(rsp.Questions) > 0 {
-		if qopts.has(digBoolOptComments) {
+	if !o.short && o.question && len(rsp.Questions) > 0 {
+		if o.comments {
 			fmt.Println(";; QUESTION SECTION:")
 		}
 		for _, q := range rsp.Questions {
@@ -325,17 +332,16 @@ func digLookup(
 			fmt.Printf("%-8s", q.Class)
 			fmt.Printf("%-s\n", q.Type)
 		}
-		if qopts.has(digBoolOptComments) {
+		if o.comments {
 			fmt.Println()
 		}
 	}
-	if qopts.has(digBoolOptAnswer) && len(rsp.Answers) > 0 {
-		if qopts.has(digBoolOptComments) &&
-			!qopts.has(digBoolOptShort) {
+	if o.answer && len(rsp.Answers) > 0 {
+		if !o.short && o.comments {
 			fmt.Println(";; ANSWER SECTION:")
 		}
 		for _, a := range rsp.Answers {
-			if qopts.has(digBoolOptShort) {
+			if o.short {
 				fmt.Print(a)
 				continue
 			}
@@ -345,18 +351,16 @@ func digLookup(
 			fmt.Printf("%-8s", a.Type())
 			xdnsmessage.LineWrap(os.Stdout, a.String(), 24+8+8+8)
 		}
-		if qopts.has(digBoolOptComments) {
+		if o.comments {
 			fmt.Println()
 		}
 	}
-	if !qopts.has(digBoolOptShort) &&
-		qopts.has(digBoolOptAuthority) &&
-		len(rsp.Authorities) > 0 {
-		if qopts.has(digBoolOptComments) {
+	if !o.short && o.authority && len(rsp.Authorities) > 0 {
+		if o.comments {
 			fmt.Println(";; AUTHORITY SECTION:")
 		}
 		for _, a := range rsp.Authorities {
-			if qopts.has(digBoolOptShort) {
+			if o.short {
 				fmt.Print(a)
 				continue
 			}
@@ -366,61 +370,22 @@ func digLookup(
 			fmt.Printf("%-8s", a.Type())
 			xdnsmessage.LineWrap(os.Stdout, a.String(), 24+8+8+8)
 		}
-		if qopts.has(digBoolOptComments) {
+		if o.comments {
 			fmt.Println()
 		}
 	}
-	if !qopts.has(digBoolOptShort) && qopts.has(digBoolOptStats) {
+	if !o.short && o.stats {
 		ef := end.Format("Mon Jan 01 15:04:05 MST 2006")
 		fmt.Print(";; Query time: ")
 		dur := end.Sub(beg)
-		if dig_u {
+		if allq.u {
 			fmt.Println(dur.Microseconds(), "µsec")
 		} else {
 			fmt.Println(dur.Milliseconds(), "msec")
 		}
-		if fs == flag.CommandLine {
-			fmt.Printf(";; SERVER: %s(%s)\n", svr, ra)
-		}
+		fmt.Println(";; SERVER: ", allq.svr)
 		fmt.Println(";; WHEN:", ef)
-		fmt.Println(";; MSG SIZE:", len(*pkt))
+		fmt.Println(";; MSG SIZE:", len(allq.buf))
 	}
-	if len(args) > 0 {
-		return digLookup(ctx, digNewFlagSet(), rsvp, args)
-	}
-	return nil
-}
-
-func digNewFlagSet() *flag.FlagSet {
-	fs := flag.NewFlagSet("dig", flag.ContinueOnError)
-	xflag.TemplateUsageIn(fs, "[-flags] [name [TYPE] [CLASS] [+options]]")
-	return fs
-}
-
-func digBatch(
-	ctx context.Context,
-	rsvp func([]byte) ([]byte, error),
-	fn string,
-) error {
-	var err error
-	var sc *bufio.Scanner
-	if fn == "-" {
-		sc = bufio.NewScanner(os.Stdin)
-	} else if f, err := os.Open(fn); err != nil {
-		return err
-	} else {
-		defer f.Close()
-		sc = bufio.NewScanner(f)
-	}
-	for err == nil && sc.Scan() {
-		line := sc.Text()
-		if len(line) == 0 ||
-			strings.HasPrefix(line, "#") ||
-			strings.HasPrefix(line, ";") {
-			continue
-		}
-		fields := strings.Fields(line)
-		err = digLookup(ctx, digNewFlagSet(), rsvp, fields)
-	}
-	return err
+	return args, nil
 }

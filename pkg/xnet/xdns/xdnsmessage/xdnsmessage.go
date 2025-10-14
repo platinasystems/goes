@@ -1,4 +1,4 @@
-// Copyright © 2024 Platina Systems, Inc. All rights reserved.
+// Copyright © 2024-2025 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -17,6 +17,8 @@ import (
 
 	"golang.org/x/net/dns/dnsmessage"
 )
+
+const Cap = 1232
 
 var (
 	ErrOverrun  = errors.New("overrun")
@@ -349,5 +351,30 @@ func LineWrap(w io.Writer, s string, indent int) {
 			fmt.Fprintf(w, "\n%*s%s", indent+1, "", ln)
 		}
 		fmt.Fprintln(w, ")")
+	}
+}
+
+func MakeBuffer() []byte { return make([]byte, Cap, Cap) }
+
+func NewQuery(recursive bool, name UniqueString, c Class, t Type) *Message {
+	var hf HF
+	if recursive {
+		hf |= HFRecursionDesired
+	}
+	if c == 0 {
+		c = ClassINET
+	}
+	if t == 0 {
+		t = TypeA
+	}
+	return &Message{
+		HF:     hf,
+		ID:     NewID(),
+		OpCode: OpCodeQuery,
+		Questions: []WireQuestion{{
+			Name:  name,
+			Class: c,
+			Type:  t,
+		}},
 	}
 }

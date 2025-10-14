@@ -1,4 +1,4 @@
-// Copyright © 2024 Platina Systems, Inc. All rights reserved.
+// Copyright © 2024-2025 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -12,17 +12,32 @@ import (
 	"time"
 
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
+	"github.com/platinasystems/goes/v2/pkg/xnet/xdns"
 )
 
-const Cap = 1232
+// When asked, resends the buffered query every 1 sec until response or context
+// is cancelled.
+func TenaciousAsker(udp net.Conn) xdns.Asker {
+	return tenacious{udp}
+}
 
-var ResetDeadline time.Time
+// When asked, resends the buffered query with deadlined context.
+func TimeLimitedAsker(udp net.Conn, limit time.Duration) xdns.Asker {
+	return timeLimited{tenacious{udp}, limit}
+}
 
-// TenaciousAsk resends the buffered query every 1 sec until it receives a
-// response or context is cancelled.
-// If successful, it returns the raw binary response within the same,
-// probably expanded buffer.
-func TenaciousAsk(ctx context.Context, conn net.Conn, buf []byte) (
+var zero time.Time
+
+type tenacious struct {
+	net.Conn
+}
+
+type timeLimited struct {
+	tenacious
+	time.Duration
+}
+
+func (t tenacious) Ask(ctx context.Context, buf []byte) (
 	[]byte, error,
 ) {
 	for {
@@ -30,19 +45,19 @@ func TenaciousAsk(ctx context.Context, conn net.Conn, buf []byte) (
 		if err != nil {
 			return buf[:0], err
 		}
-		n, err := conn.Write(buf)
+		n, err := t.Write(buf)
 		if err != nil {
 			return buf[:0], err
 		} else if n != len(buf) {
 			err = xerrors.Underrun("socket-write")
 			return buf[:0], err
 		}
-		err = conn.SetReadDeadline(time.Now().Add(time.Second))
+		err = t.SetReadDeadline(time.Now().Add(time.Second))
 		if err != nil {
 			return buf[:0], err
 		}
-		n, err = conn.Read(buf[:cap(buf)])
-		conn.SetReadDeadline(ResetDeadline)
+		n, err = t.Read(buf[:cap(buf)])
+		t.SetReadDeadline(zero)
 		if err == nil {
 			return buf[:n], err
 		} else if !errors.Is(err, os.ErrDeadlineExceeded) {
@@ -51,12 +66,9 @@ func TenaciousAsk(ctx context.Context, conn net.Conn, buf []byte) (
 	}
 }
 
-// TimeLimitedAsk is a `TenaciousAsk` with a deadlined context.
-func TimeLimitedAsk(
-	ctx context.Context, conn net.Conn, buf []byte, dur time.Duration,
-) ([]byte, error) {
-	dl := time.Now().Add(dur)
+func (t timeLimited) Ask(ctx context.Context, buf []byte) ([]byte, error) {
+	dl := time.Now().Add(t.Duration)
 	cctx, cancel := context.WithDeadline(ctx, dl)
 	defer cancel()
-	return TenaciousAsk(cctx, conn, buf)
+	return t.tenacious.Ask(cctx, buf)
 }

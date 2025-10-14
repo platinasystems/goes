@@ -11,17 +11,17 @@ import (
 	"strings"
 	"time"
 
-	"github.com/platinasystems/goes/v2/pkg/chunk"
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xflag"
 	"github.com/platinasystems/goes/v2/pkg/xlog"
 	"github.com/platinasystems/goes/v2/pkg/xmain"
 	"github.com/platinasystems/goes/v2/pkg/xnet/xdns"
+	"github.com/platinasystems/goes/v2/pkg/xnet/xdns/xdnsdoh"
 	"github.com/platinasystems/goes/v2/pkg/xnet/xdns/xdnsmessage"
 	"github.com/platinasystems/goes/v2/pkg/xnet/xdns/xdnspkt"
 )
 
-var host_4, host_6, host_A, host_C, host_T, host_V, host_a, host_i,
+var host_4, host_6, host_A, host_C, host_S, host_T, host_V, host_a, host_i,
 	host_l, host_m, host_r, host_s, host_w bool
 var host_U = true
 var host_N int
@@ -39,6 +39,7 @@ var hostFlags = xflag.Labels{
 	{"C", `Compare SOA records on authoritative servers.`[1:], &host_C},
 	{"N", "Number of dots before root lookup is done.", &host_N},
 	{"R", "UDP retries.", &host_R},
+	{"S", "Skip DOH server verification.", &host_S},
 	{"T", "TCP mode.", &host_T},
 	{"U", "UDP mode.", &host_U},
 	{"V", "Print version number and exit.", &host_V},
@@ -46,7 +47,7 @@ var hostFlags = xflag.Labels{
 	{"a", "Equivalent to -v -t ANY", &host_a},
 	{"c", "Query class for non-IN data.", &host_c},
 	{"i", "FIXME?", &host_i},
-	{"l", `Using AXFR, lists all hosts in a domain.`[1:], &host_l},
+	{"l", "Using AXFR, lists all hosts in a domain.", &host_l},
 	{"m", "Memory debugging.", &host_m},
 	{"p", "Server port.", &host_p},
 	{"r", "Disable recursive processing.", &host_r},
@@ -56,6 +57,8 @@ var hostFlags = xflag.Labels{
 }
 
 func Host(ctx context.Context, args []string) error {
+	const class = xdnsmessage.ClassINET
+
 	xflag.TemplateUsage(`
 usage: {{.Name}} [-flags] {name} [server]
 Mimic BIND9's DNS lookup utility.
@@ -63,6 +66,8 @@ Mimic BIND9's DNS lookup utility.
 {{flags .}}`)
 
 	var name string
+	var dns xdns.Asker
+	var rsp xdnsmessage.Message
 
 	err := hostFlags.Define()
 	if err != nil {
@@ -105,25 +110,22 @@ Mimic BIND9's DNS lookup utility.
 		svr = args[0]
 	}
 
-	pkt := chunk.New(xdnspkt.Cap)
-	*pkt = (*pkt)[:0]
-	defer chunk.Discard(pkt)
-
-	rsvp := func(data []byte) ([]byte, error) {
-		return data, xerrors.Incomplete("requester")
-	}
+	b := xdnsmessage.MakeBuffer()
 	if strings.HasPrefix(svr, "https:") {
-		return xerrors.FIXME("DOH")
+		dns = xdnsdoh.New(host_S, svr)
 	} else {
-		udp, err := xdns.DialContext(ctx, "udp", svr)
+		nw := "udp"
+		if host_4 {
+			nw = "udp4"
+		} else if host_6 {
+			nw = "udp6"
+		}
+		udp, err := xdns.DialContext(ctx, nw, svr)
 		if err != nil {
 			return err
 		}
 		defer udp.Close()
-		rsvp = func(b []byte) ([]byte, error) {
-			const tl = 30 * time.Second
-			return xdnspkt.TimeLimitedAsk(ctx, udp, b, tl)
-		}
+		dns = xdnspkt.TimeLimitedAsker(udp, 30*time.Second)
 	}
 
 	types := []xdnsmessage.Type{host_t}
@@ -132,32 +134,21 @@ Mimic BIND9's DNS lookup utility.
 	} else if host_t == xdnsmessage.TypeA {
 		types = append(types, xdnsmessage.TypeAAAA, xdnsmessage.TypeMX)
 	}
-	var hf xdnsmessage.HF
-	if !host_r {
-		hf |= xdnsmessage.HFRecursionDesired
-	}
+	us := xdnsmessage.MakeUniqueString(name)
 	for _, t := range types {
-		var rsp xdnsmessage.Message
-		req := xdnsmessage.Message{
-			HF:     hf,
-			OpCode: xdnsmessage.OpCodeQuery,
-			Questions: []xdnsmessage.WireQuestion{{
-				Name:  xdnsmessage.MakeUniqueString(name),
-				Class: host_c,
-				Type:  t,
-			}},
-		}
-		if *pkt, err = req.AppendTo((*pkt)[:0]); err != nil {
+		q := xdnsmessage.NewQuery(!host_r, us, class, t)
+		b, err = q.AppendTo(b[:0])
+		if err != nil {
 			return err
 		}
-		if *pkt, err = rsvp(*pkt); err != nil {
+		if b, err = dns.Ask(ctx, b); err != nil {
 			return err
 		}
-		if err = rsp.UnmarshalBinary(*pkt); err != nil {
+		if err = rsp.UnmarshalBinary(b); err != nil {
 			return err
 		}
-		if rsp.ID != req.ID {
-			return fmt.Errorf("id %d != %d", rsp.ID, req.ID)
+		if rsp.ID != q.ID {
+			return fmt.Errorf("id %d != %d", rsp.ID, q.ID)
 		}
 		for _, a := range rsp.Answers {
 			fmt.Print(name, " ")

@@ -4,7 +4,10 @@
 
 package xdns
 
-import "net"
+import (
+	"context"
+	"net"
+)
 
 var Resolver = &net.Resolver{
 	PreferGo:     true,
@@ -16,3 +19,10 @@ var Dialer = &net.Dialer{
 }
 
 var DialContext = Dialer.DialContext
+
+// An Asker sends a buffered query through an associated connection.
+// If sucessful, it returns the raw binary response within the same,
+// probably expanded buffer.
+type Asker interface {
+	Ask(context.Context, []byte) ([]byte, error)
+}
