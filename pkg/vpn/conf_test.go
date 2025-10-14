@@ -6,19 +6,18 @@ package vpn
 
 import (
 	"net/netip"
-	"strings"
 	"testing"
 
 	"github.com/platinasystems/goes/v2/pkg/kvc"
 )
 
 func TestAdmins(t *testing.T) {
-	input := strings.NewReader(`
+	const input = `
 admin1	# tab comment
 admin2  # space comment
-`)
+`
 	reg := newRegistry()
-	err := kvc.Range(input, reg.loadAdminsKeyValues)
+	err := kvc.RangeString(input, SplitConfLine, reg.loadAdminsKeyValues)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -30,15 +29,15 @@ admin2  # space comment
 }
 
 func TestHosts(t *testing.T) {
-	input := strings.NewReader(`
+	const input = `
 fc00:1234::a hosta
 fc00:1234::b hostb
 fc00:1234::c hostc
-`)
-	Prefix.Value = netip.MustParsePrefix("fc00:1234::/64")
-	HostsFile.Value = "TestHost"
+`
+	hostsFile = "test_hosts"
+	prefix = netip.MustParsePrefix("fc00:1234::/64")
 	reg := newRegistry()
-	err := kvc.Range(input, reg.loadHostsKeyValues)
+	err := kvc.RangeString(input, SplitConfLine, reg.loadHostsKeyValues)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -52,13 +51,11 @@ fc00:1234::c hostc
 }
 
 func TestHostsBadIP4(t *testing.T) {
-	input := strings.NewReader(`
-1.2.3.4.5 hosta
-`)
-	Prefix.Value = netip.MustParsePrefix("1.2.3.4/32")
-	HostsFile.Value = "TestHostBadIP4"
+	const input = "1.2.3.4.5 hosta"
+	hostsFile = "test_hosts_invalid_ip4"
+	prefix = netip.MustParsePrefix("1.2.3.4/32")
 	reg := newRegistry()
-	err := kvc.Range(input, reg.loadHostsKeyValues)
+	err := kvc.RangeString(input, SplitConfLine, reg.loadHostsKeyValues)
 	if err == nil {
 		t.Fatal("uncaught bad address")
 	} else {
@@ -67,13 +64,11 @@ func TestHostsBadIP4(t *testing.T) {
 }
 
 func TestHostsBadIP6(t *testing.T) {
-	input := strings.NewReader(`
-fc00:1234::x hosta
-`)
-	Prefix.Value = netip.MustParsePrefix("fc00:1234::/64")
-	HostsFile.Value = "TestHostBadIP6"
+	const input = "fc00:1234::x hosta"
+	hostsFile = "test_hosts_invalid_ip6"
+	prefix = netip.MustParsePrefix("fc00:1234::/64")
 	reg := newRegistry()
-	err := kvc.Range(input, reg.loadHostsKeyValues)
+	err := kvc.RangeString(input, SplitConfLine, reg.loadHostsKeyValues)
 	if err == nil {
 		t.Fatal("uncaught bad address")
 	} else {
@@ -82,13 +77,11 @@ fc00:1234::x hosta
 }
 
 func TestHostsRangeIP6(t *testing.T) {
-	input := strings.NewReader(`
-fc00:5678::a hosta
-`)
-	Prefix.Value = netip.MustParsePrefix("fc00:1234::/64")
-	HostsFile.Value = "TestHostRangeIP6"
+	const input = "fc00:5678::a hosta"
+	hostsFile = "test_hosts_range_ip6"
+	prefix = netip.MustParsePrefix("fc00:1234::/64")
 	reg := newRegistry()
-	err := kvc.Range(input, reg.loadHostsKeyValues)
+	err := kvc.RangeString(input, SplitConfLine, reg.loadHostsKeyValues)
 	if err == nil {
 		t.Fatal("uncaught bad address")
 	} else {

@@ -765,7 +765,7 @@ func (reg *registry) isSubscriber(rsvp *rsvp) bool {
 
 func (reg *registry) loadAdminsFile() error {
 	path := xmain.ConfigFile(adminsFile)
-	err := kvc.RangeFile(path, reg.loadAdminsKeyValues)
+	err := kvc.RangeFile(path, SplitConfLine, reg.loadAdminsKeyValues)
 	return xerrors.Suppress(err, fs.ErrNotExist)
 }
 
@@ -778,7 +778,7 @@ func (reg *registry) loadAdminsKeyValues(
 
 func (reg *registry) loadExchangesFile() error {
 	path := xmain.ConfigFile(exchangesFile)
-	err := kvc.RangeFile(path, reg.loadExchangesKeyValues)
+	err := kvc.RangeFile(path, SplitConfLine, reg.loadExchangesKeyValues)
 	return xerrors.Suppress(err, fs.ErrNotExist)
 }
 
@@ -794,7 +794,7 @@ func (reg *registry) loadExchangesKeyValues(
 
 func (reg *registry) loadHostsFile() error {
 	path := xmain.ConfigFile(hostsFile)
-	err := kvc.RangeFile(path, reg.loadHostsKeyValues)
+	err := kvc.RangeFile(path, SplitConfLine, reg.loadHostsKeyValues)
 	return xerrors.Suppress(err, fs.ErrNotExist)
 }
 
@@ -802,14 +802,15 @@ func (reg *registry) loadHostsKeyValues(
 	lno int, key string, values []string,
 ) error {
 	if len(values) < 0 {
-		return xerrors.Incomplete(lno)
+		return xerrors.Label(xerrors.Incomplete(lno), hostsFile)
 	}
 	addr, err := netip.ParseAddr(key)
 	if err != nil {
-		return xerrors.Label(err, lno)
+		return xerrors.Label(err, hostsFile, lno)
 	}
 	if !prefix.Contains(addr) {
-		return xerrors.Range(lno)
+		return xerrors.Label(xerrors.Range(lno, "prefix", prefix),
+			hostsFile)
 	}
 	reg.hosts.name[addr] = values[0]
 	for _, hn := range values {
@@ -1196,4 +1197,19 @@ func (reg *registry) marshalSub(rsvp *rsvp, sub *Subscriber) {
 	} else {
 		rsvp.Write(b)
 	}
+}
+
+func SplitConfLine(s string) []string {
+	s = strings.TrimSpace(s)
+	if len(s) == 0 || []rune(s)[0] == '#' {
+		return nil
+	}
+	args := strings.Fields(s)
+	for i, arg := range args {
+		if len(arg) == 0 || []rune(arg)[0] == '#' {
+			args = args[:i]
+			break
+		}
+	}
+	return args
 }
