@@ -25,6 +25,18 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xnet/xresolv"
 )
 
+const (
+	DefaultAdditional = true
+	DefaultAnswer     = true
+	DefaultAuthority  = true
+	DefaultCmd        = true
+	DefaultComments   = true
+	DefaultNdots      = 1
+	DefaultQuestion   = true
+	DefaultRecurse    = true
+	DefaultStats      = true
+)
+
 //go:embed usage.txt
 var usage string
 
@@ -44,14 +56,15 @@ var allq = struct {
 }{
 	p: 53,
 	o: options{
-		additional: true,
-		answer:     true,
-		authority:  true,
-		cmd:        true,
-		ndots:      1,
-		question:   true,
-		recurse:    true,
-		stats:      true,
+		additional: DefaultAdditional,
+		answer:     DefaultAnswer,
+		authority:  DefaultAuthority,
+		cmd:        DefaultCmd,
+		comments:   DefaultComments,
+		ndots:      DefaultNdots,
+		question:   DefaultQuestion,
+		recurse:    DefaultRecurse,
+		stats:      DefaultStats,
 	},
 }
 
@@ -161,9 +174,9 @@ func Dig(ctx context.Context, args []string) error {
 		allq.dns = xdnspkt.TimeLimitedAsker(udp, 30*time.Second)
 	}
 	if !allq.o.short && allq.o.cmd {
-		fmt.Printf("; <<>> goes/pkg/bind/dig %s <<>> %s\n",
-			xmain.Version(), cmd)
+		fmt.Println("; <<>> goes-dig", xmain.Version(), "<<>>", cmd)
 		fmt.Println()
+		fmt.Println(";; global options:", &allq.o)
 	}
 	if len(allq.f) > 0 {
 		err = batch(ctx)

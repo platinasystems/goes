@@ -94,6 +94,241 @@ type options struct {
 	zflag           bool
 }
 
+func (o *options) Format(w fmt.State, verb rune) {
+	if o.aaonly {
+		fmt.Fprint(w, " +aaonly")
+	}
+	if o.additional {
+		fmt.Fprint(w, " +additional")
+	}
+	if o.adflag {
+		fmt.Fprint(w, " +adflag")
+	}
+	if o.all {
+		fmt.Fprint(w, " +all")
+	}
+	if o.answer {
+		fmt.Fprint(w, " +answer")
+	}
+	if o.authority {
+		fmt.Fprint(w, " +authority")
+	}
+	if o.badcookie {
+		fmt.Fprint(w, " +badcookie")
+	}
+	if o.besteffort {
+		fmt.Fprint(w, " +besteffort")
+	}
+	if o.bufsize != 0 {
+		fmt.Fprintf(w, " +bufsize:%d", o.bufsize)
+	}
+	if o.cd {
+		fmt.Fprint(w, " +cd")
+	}
+	if o.class {
+		fmt.Fprint(w, " +class")
+	}
+	if o.cmd {
+		fmt.Fprint(w, " +cmd")
+	}
+	if o.co {
+		fmt.Fprint(w, " +co")
+	}
+	if o.comments {
+		fmt.Fprint(w, " +comments")
+	}
+	if len(o.cookie) != 0 {
+		fmt.Fprintf(w, " +cookie:%s", o.cookie)
+	}
+	if o.crypto {
+		fmt.Fprint(w, " +crypto")
+	}
+	if o.defname {
+		fmt.Fprint(w, " +defname")
+	}
+	if o.dns64prefix {
+		fmt.Fprint(w, " +dns64prefix")
+	}
+	if o.dnssec {
+		fmt.Fprint(w, " +dnssec")
+	}
+	if len(o.domain) != 0 {
+		fmt.Fprintf(w, " +domain:%s", o.domain)
+	}
+	if o.edns != 0 {
+		fmt.Fprintf(w, " +edns:%d", o.edns)
+	}
+	if o.ednsflags != 0 {
+		fmt.Fprintf(w, " +ednsflags:%d", o.ednsflags)
+	}
+	if o.ednsnegotiation {
+		fmt.Fprint(w, " +ednsnegotiation")
+	}
+	if len(o.ednsopt) != 0 {
+		fmt.Fprintf(w, " +ednsopt:%s", o.ednsopt)
+	}
+	if o.expire {
+		fmt.Fprint(w, " +expire")
+	}
+	if o.fail {
+		fmt.Fprint(w, " +fail")
+	}
+	// FIXME fuzztime        time.Time
+	if o.headerOnly {
+		fmt.Fprint(w, " +header-only")
+	}
+	if len(o.httpPlain) != 0 {
+		fmt.Fprintf(w, " +http-plain:%s", o.httpPlain)
+	}
+	if len(o.httpPlainGet) != 0 {
+		fmt.Fprintf(w, " +http-plain-get:%s", o.httpPlainGet)
+	}
+	if len(o.https) != 0 {
+		fmt.Fprintf(w, " +https:%s", o.https)
+	}
+	if len(o.httpsGet) != 0 {
+		fmt.Fprintf(w, " +https-get:%s", o.httpsGet)
+	}
+	if o.httpsSkipVerify {
+		fmt.Fprint(w, " +https-skip-verify")
+	}
+	if o.identify {
+		fmt.Fprint(w, " +identify")
+	}
+	if o.idn {
+		fmt.Fprint(w, " +idn")
+	}
+	if o.ignore {
+		fmt.Fprint(w, " +ignore")
+	}
+	if o.keepalive {
+		fmt.Fprint(w, " +keepalive")
+	}
+	if o.keepopen {
+		fmt.Fprint(w, " +keepopen")
+	}
+	if o.multiline {
+		fmt.Fprint(w, " +multiline")
+	}
+	if o.ndots != DefaultNdots {
+		fmt.Fprintf(w, " +ndots:%d", o.ndots)
+	}
+	if o.nsid {
+		fmt.Fprint(w, " +nsid")
+	}
+	if o.nssearch {
+		fmt.Fprint(w, " +nssearch")
+	}
+	if o.onesoa {
+		fmt.Fprint(w, " +onesoa")
+	}
+	if o.opcode != 0 {
+		fmt.Fprintf(w, " +opcode:%d", o.opcode)
+	}
+	if o.padding != 0 {
+		fmt.Fprintf(w, " +padding:%d", o.padding)
+	}
+	if len(o.proxy) != 0 {
+		fmt.Fprintf(w, " +proxy:%s", o.proxy)
+	}
+	if len(o.proxyPlain) != 0 {
+		fmt.Fprintf(w, " +proxy-plain:%s", o.proxyPlain)
+	}
+	if o.qid != 0 {
+		fmt.Fprintf(w, " +qid:%d", o.qid)
+	}
+	if o.qr {
+		fmt.Fprint(w, " +qr")
+	}
+	if o.question {
+		fmt.Fprint(w, " +question")
+	}
+	if o.raflag {
+		fmt.Fprint(w, " +raflag")
+	}
+	if o.recurse {
+		fmt.Fprint(w, " +recurse")
+	}
+	if o.retry != 0 {
+		fmt.Fprintf(w, " +retry:%d", o.retry)
+	}
+	if o.rrcomments {
+		fmt.Fprint(w, " +rrcomments")
+	}
+	if o.search {
+		fmt.Fprint(w, " +search")
+	}
+	if o.short {
+		fmt.Fprint(w, " +short")
+	}
+	if o.showbadcookie {
+		fmt.Fprint(w, " +showbadcookie")
+	}
+	if o.showbadvers {
+		fmt.Fprint(w, " +showbadvers")
+	}
+	if o.showsearch {
+		fmt.Fprint(w, " +showsearch")
+	}
+	if o.split != 0 {
+		fmt.Fprintf(w, " +split:%d", o.split)
+	}
+	if o.stats {
+		fmt.Fprint(w, " +stats")
+	}
+	if len(o.subnet) != 0 {
+		fmt.Fprintf(w, " +subnet:%s", o.subnet)
+	}
+	if o.tcflag {
+		fmt.Fprint(w, " +tcflag")
+	}
+	if o.tcp {
+		fmt.Fprint(w, " +tcp")
+	}
+	if o.timeout != 0 {
+		fmt.Fprintf(w, " +timeout:%d", o.timeout)
+	}
+	if o.tls {
+		fmt.Fprint(w, " +tls")
+	}
+	if len(o.tlsCA) != 0 {
+		fmt.Fprintf(w, " +tls-ca:%s", o.tlsCA)
+	}
+	if len(o.tlsCertFile) != 0 {
+		fmt.Fprintf(w, " +tls-certfile:%s", o.tlsCertFile)
+	}
+	if len(o.tlsHostname) != 0 {
+		fmt.Fprintf(w, " +tls-hostname:%s", o.tlsHostname)
+	}
+	if len(o.tlsKeyFile) != 0 {
+		fmt.Fprintf(w, " +tls-keyfile:%s", o.tlsKeyFile)
+	}
+	if o.trace {
+		fmt.Fprint(w, " +trace")
+	}
+	if o.tries != 0 {
+		fmt.Fprintf(w, " +tries:%d", o.tries)
+	}
+	if o.ttlid {
+		fmt.Fprint(w, " +ttlid")
+	}
+	if o.ttlunits {
+		fmt.Fprint(w, " +ttlunits")
+	}
+	if o.unknownformat {
+		fmt.Fprint(w, " +unknownformat")
+	}
+	if o.vc {
+		fmt.Fprint(w, " +vc")
+	}
+	if o.yaml {
+		fmt.Fprint(w, " +yaml")
+	}
+	if o.zflag {
+		fmt.Fprint(w, " +zflag")
+	}
+}
+
 func (o *options) reset(name string) error {
 	var err error
 	switch name {
