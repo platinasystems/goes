@@ -121,7 +121,7 @@ throughput.
 	goes start vpn exchange [flags]		# or,
 	goes-vpn start exchange [flags]
 
-This will use [RestExchangeCheckin] to register it's own certificate with
+This will use [CheckinExchange] to register it's own certificate with
 contained public signature.
 It will then [RestValidateCheckinResponse] the registry response before parsing
 the assigned VPN [Id] and service port number from the response body.
@@ -143,7 +143,7 @@ To start a guest,
 
 This generates a new [mlkem.DecapsulationKey768] and then extracts and forwards
 its public [mlkem.EncapsulationKey768] as raw bytes w/in the body of a
-[RestGuestCheckin].
+[CheckinGuest].
 After [RestValidateCheckinResponse] this [json.Unmarshal] the [GuestReceipt]
 containing the assigned [Id], VPN prefix, and exchane precedence.
 The daemon then creates a tunnel interface with the assigned prefix before
@@ -153,7 +153,7 @@ the tunnel interface.
 # Auto-upgrade
 
 Before respective checkin, each guest and alt-exchange uses
-[RestAssertVcsMatch] to validate its [debug.BuildInfo]["vcs.revision"].
+[AssertVcsMatch] to validate its [debug.BuildInfo]["vcs.revision"].
 If the registry returns [http.StatusUpgradeRequired], the respective daemon
 will try to download and overwrite itself and exit with [xos.EX_TEMPFAIL].
 The service wrapper (e.g. systemd) should then restart the respective daemon.

@@ -36,7 +36,7 @@ Pipe stdin/out with TCP connection to numbered port of named guest.
 		return err
 	}
 
-	sub, err := RestWhois(ctx, args[0])
+	sub, err := Whois(ctx, args[0])
 	if err != nil {
 		return xerrors.Label(err, "guest")
 	}

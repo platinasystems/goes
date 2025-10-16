@@ -300,39 +300,23 @@ func (reg *registry) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	for _, rp := range RestPaths {
-		if strings.HasPrefix(req.URL.Path, rp) {
-			if rp != RestPathDnsQuery {
-				sl, ok := req.Header[RestVcsRevision]
-				if !ok || len(sl) == 0 {
-					http.Error(w, "no vcs",
-						http.StatusUpgradeRequired)
-					return
-				}
-				if sl[0] != reg.vcsRev {
-					http.Error(w, "mismatched vcs",
-						http.StatusUpgradeRequired)
-					return
-				}
-			}
-			reg.queueRestReq(w, req)
-			return
-		}
-	}
-
-	if req.Method != http.MethodGet {
-		http.Error(w, req.Method, http.StatusMethodNotAllowed)
+	if strings.HasPrefix(req.URL.Path, Rest) ||
+		strings.HasPrefix(req.URL.Path, DnsQuery) {
+		reg.queueReq(w, req)
+	} else if req.Method == http.MethodGet {
+		reg.file(w, req.URL.Path)
 	} else {
-		reg.file(w, strings.TrimPrefix(req.URL.Path, "/"))
+		http.Error(w, req.Method, http.StatusMethodNotAllowed)
 	}
 }
 
 func (reg *registry) approve(rsvp *rsvp) {
-	name := rsvp.trimPrefix(RestPathApprove)
-	if len(name) == 0 {
+	args := rsvp.reqargs(RestApprove)
+	if len(args) == 0 {
 		http.Error(rsvp, "incomplete subscriber", http.StatusBadRequest)
 		return
 	}
+	name := args[0]
 	_, err := os.Stat(xmain.StateDir)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -404,8 +388,19 @@ func (reg *registry) assignAddr(sub *Subscriber) error {
 	return nil
 }
 
-// single threaded REST operations
-func (reg *registry) queueRestReq(w http.ResponseWriter, req *http.Request) {
+func (reg *registry) atVcsRevision(rsvp *rsvp) bool {
+	if sl, ok := rsvp.req.Header[RestVcsRevision]; !ok || len(sl) == 0 {
+		http.Error(rsvp, "no vcs", http.StatusUpgradeRequired)
+		return false
+	} else if sl[0] != reg.vcsRev {
+		http.Error(rsvp, "mismatched vcs", http.StatusUpgradeRequired)
+		return false
+	}
+	return true
+}
+
+// single threaded operations
+func (reg *registry) queueReq(w http.ResponseWriter, req *http.Request) {
 	w.Header().Add(RestUnixMicroStart, reg.start)
 	w.Header().Add(RestVcsRevision, reg.vcsRev)
 
@@ -488,21 +483,21 @@ func (reg *registry) checkinGuest(rsvp *rsvp) {
 }
 
 func (reg *registry) deny(rsvp *rsvp) {
-	cn := rsvp.trimPrefix(RestPathDeny)
-	if len(cn) == 0 {
+	args := rsvp.reqargs(RestDeny)
+	if len(args) == 0 {
 		http.Error(rsvp, "incomplete subscriber", http.StatusBadRequest)
 	}
-	i, sub := reg.lookupPending(cn)
+	name := args[0]
+	i, sub := reg.lookupPending(name)
 	if i < 0 || sub == nil {
-		http.Error(rsvp, cn, http.StatusNotFound)
+		http.Error(rsvp, name, http.StatusNotFound)
 		return
 	}
 	reg.pending = slices.Delete(reg.pending, i, i+1)
 }
 
 func (reg *registry) dir(w http.ResponseWriter) {
-	names := append([]string{}, RestPaths...)
-	names = append(names, "/"+vlink())
+	names := []string{vlink()}
 	filepath.WalkDir(xmain.DataDir,
 		func(path string, entry fs.DirEntry, err error) error {
 			if path == xmain.DataDir || entry == nil || err != nil {
@@ -721,10 +716,11 @@ func (reg *registry) invite(rsvp *rsvp) {
 	if err != nil {
 		http.Error(rsvp, err.Error(), http.StatusBadRequest)
 	}
-	s := rsvp.trimPrefix(RestPathInvite)
-	if len(s) == 0 {
+	args := rsvp.reqargs(RestInvite)
+	if len(args) == 0 {
 		http.Error(rsvp, "incomplete subscriber", http.StatusBadRequest)
 	}
+	s := args[0]
 	to, ok := reg.named[s]
 	if !ok {
 		xlog.Errata.Println(s, "not found in", xmaps.Keys(reg.named))
@@ -915,123 +911,123 @@ func (reg *registry) reload(rsvp *rsvp) {
 
 func (reg *registry) rest(rsvp *rsvp) {
 	defer rsvp.done()
-	method, path := rsvp.req.Method, rsvp.req.URL.Path
-	xlog.Trace.Println(method, path)
-	switch method {
+	xlog.Trace.Println(rsvp.req.Method, rsvp.req.URL.Path)
+	switch rsvp.req.Method {
 	case http.MethodGet:
 		switch {
-		case path == RestPathCertify:
+		case rsvp.req.URL.Path == DnsQuery:
+			reg.dnsQuery(rsvp)
+		case rsvp.req.URL.Path == RestCertify:
+			reg.atVcsRevision(rsvp)
 			// empty response so that client may retrieve this
 			// certificate from TLS negotiation.
-		case path == RestPathDnsQuery:
-			reg.dnsQuery(rsvp)
-		case strings.HasPrefix(path, RestPathShowAddress):
-			if reg.isSubscriber(rsvp) {
+		case strings.HasPrefix(rsvp.req.URL.Path, RestShowAddress):
+			if reg.atVcsRevision(rsvp) && reg.isSubscriber(rsvp) {
 				reg.showAddress(rsvp)
 			}
-		case strings.HasPrefix(path, RestPathShowAdmins):
-			if reg.isSubscriber(rsvp) {
+		case strings.HasPrefix(rsvp.req.URL.Path, RestShowAdmins):
+			if reg.atVcsRevision(rsvp) && reg.isSubscriber(rsvp) {
 				keys := xmaps.Keys(reg.admin)
 				slices.Sort(keys)
 				for _, k := range keys {
 					fmt.Fprintln(rsvp, "-", k)
 				}
 			}
-		case path == RestPathShowDomain:
+		case rsvp.req.URL.Path == RestShowDomain:
 			fmt.Fprintln(rsvp, domain)
-		case path == RestPathShowExchanges:
-			if reg.isSubscriber(rsvp) {
+		case rsvp.req.URL.Path == RestShowExchanges:
+			if reg.atVcsRevision(rsvp) && reg.isSubscriber(rsvp) {
 				for _, sub := range reg.indexed {
 					if sub.Port != 0 {
 						fmt.Fprintln(rsvp, sub)
 					}
 				}
 			}
-		case path == RestPathShowPending:
-			if reg.isSubscriber(rsvp) {
+		case rsvp.req.URL.Path == RestShowPending:
+			if reg.atVcsRevision(rsvp) && reg.isSubscriber(rsvp) {
 				reg.showPending(rsvp)
 			}
-		case path == RestPathShowPrefix:
-			if reg.isSubscriber(rsvp) {
-				fmt.Fprintln(rsvp, prefix)
-			}
-		case path == RestPathShowStart:
+		case rsvp.req.URL.Path == RestShowPrefix:
+			fmt.Fprintln(rsvp, prefix)
+		case rsvp.req.URL.Path == RestShowStart:
 			fmt.Fprintln(rsvp, time.UnixMicro(RegistryStart))
-		case path == RestPathShowStatus:
+		case rsvp.req.URL.Path == RestShowStatus:
 			fmt.Fprintln(rsvp, "OK")
-		case strings.HasPrefix(path, RestPathShowSubscriber):
-			if reg.isSubscriber(rsvp) {
+		case strings.HasPrefix(rsvp.req.URL.Path, RestShowSubscriber):
+			if reg.atVcsRevision(rsvp) && reg.isSubscriber(rsvp) {
 				reg.showSubscriber(rsvp)
 			}
-		case path == RestPathShowVCS:
+		case rsvp.req.URL.Path == RestShowVCS:
 			fmt.Fprint(rsvp, xprogram.VcsRevision)
 			if xprogram.VcsModified.String() == "true" {
 				fmt.Fprint(rsvp, "*")
 			}
 			fmt.Fprintln(rsvp)
-		case strings.HasPrefix(path, RestPathWhoisAddressed):
-			if reg.isSubscriber(rsvp) {
+		case strings.HasPrefix(rsvp.req.URL.Path, RestWhoisAddressed):
+			if reg.atVcsRevision(rsvp) && reg.isSubscriber(rsvp) {
 				reg.whoisAddressed(rsvp)
 			}
-		case strings.HasPrefix(path, RestPathWhoisId):
-			if reg.isSubscriber(rsvp) {
+		case strings.HasPrefix(rsvp.req.URL.Path, RestWhoisId):
+			if reg.atVcsRevision(rsvp) && reg.isSubscriber(rsvp) {
 				reg.whoisId(rsvp)
 			}
-		case strings.HasPrefix(path, RestPathWhoisNamed):
-			if reg.isSubscriber(rsvp) {
+		case strings.HasPrefix(rsvp.req.URL.Path, RestWhoisNamed):
+			if reg.atVcsRevision(rsvp) && reg.isSubscriber(rsvp) {
 				reg.whoisNamed(rsvp)
 			}
 		default:
-			http.Error(rsvp, path, http.StatusNotFound)
+			http.Error(rsvp, rsvp.req.URL.Path, http.StatusNotFound)
 		}
 	case http.MethodPost:
 		switch {
-		case path == RestPathDnsQuery:
+		case rsvp.req.URL.Path == DnsQuery:
 			reg.dnsQuery(rsvp)
 		default:
-			http.Error(rsvp, path, http.StatusNotFound)
+			http.Error(rsvp, rsvp.req.URL.Path, http.StatusNotFound)
 		}
 	case http.MethodPut:
 		switch {
-		case strings.HasPrefix(path, RestPathApprove):
-			if reg.isAdmin(rsvp) {
+		case strings.HasPrefix(rsvp.req.URL.Path, RestApprove):
+			if reg.atVcsRevision(rsvp) && reg.isAdmin(rsvp) {
 				reg.approve(rsvp)
 			}
-		case strings.HasPrefix(path, RestPathCheckinExchange):
-			if reg.isSubscriber(rsvp) {
+		case strings.HasPrefix(rsvp.req.URL.Path, RestCheckinExchange):
+			if reg.atVcsRevision(rsvp) && reg.isSubscriber(rsvp) {
 				reg.checkinExchange(rsvp)
 			}
-		case path == RestPathCheckinGuest:
-			if reg.isSubscriber(rsvp) {
+		case rsvp.req.URL.Path == RestCheckinGuest:
+			if reg.atVcsRevision(rsvp) && reg.isSubscriber(rsvp) {
 				reg.checkinGuest(rsvp)
 			}
-		case strings.HasPrefix(path, RestPathDeny):
-			if reg.isAdmin(rsvp) {
+		case strings.HasPrefix(rsvp.req.URL.Path, RestDeny):
+			if reg.atVcsRevision(rsvp) && reg.isAdmin(rsvp) {
 				reg.deny(rsvp)
 			}
-		case path == RestPathDumpSubscribers:
-			if reg.isSubscriber(rsvp) {
+		case rsvp.req.URL.Path == RestDumpSubscribers:
+			if reg.atVcsRevision(rsvp) && reg.isSubscriber(rsvp) {
 				reg.dumpSubscribers(rsvp)
 			}
-		case strings.HasPrefix(path, RestPathInvite):
-			if reg.isSubscriber(rsvp) {
+		case strings.HasPrefix(rsvp.req.URL.Path, RestInvite):
+			if reg.atVcsRevision(rsvp) && reg.isSubscriber(rsvp) {
 				reg.invite(rsvp)
 			}
-		case path == RestPathReload:
-			if reg.isAdmin(rsvp) {
+		case rsvp.req.URL.Path == RestReload:
+			if reg.atVcsRevision(rsvp) && reg.isAdmin(rsvp) {
 				reg.reload(rsvp)
 			}
-		case path == RestPathSubscribe:
-			reg.subscribe(rsvp)
-		case strings.HasPrefix(path, RestPathUnsubscribe):
-			if reg.isSubscriber(rsvp) {
+		case rsvp.req.URL.Path == RestSubscribe:
+			if reg.atVcsRevision(rsvp) {
+				reg.subscribe(rsvp)
+			}
+		case strings.HasPrefix(rsvp.req.URL.Path, RestUnsubscribe):
+			if reg.atVcsRevision(rsvp) && reg.isSubscriber(rsvp) {
 				reg.unsubscribe(rsvp)
 			}
 		default:
-			http.Error(rsvp, path, http.StatusNotFound)
+			http.Error(rsvp, rsvp.req.URL.Path, http.StatusNotFound)
 		}
 	default:
-		http.Error(rsvp, method, http.StatusMethodNotAllowed)
+		http.Error(rsvp, rsvp.req.Method, http.StatusMethodNotAllowed)
 	}
 }
 
@@ -1047,12 +1043,12 @@ func (reg *registry) restsvc() {
 }
 
 func (reg *registry) showAddress(rsvp *rsvp) {
-	s := rsvp.trimPrefix(RestPathShowAddress)
-	if len(s) > 0 {
-		if sub, ok := reg.named[s]; !ok {
-			http.Error(rsvp, s, http.StatusNotFound)
-		} else {
+	args := rsvp.reqargs(RestShowAddress)
+	if len(args) > 0 {
+		if sub, ok := reg.named[args[0]]; ok {
 			fmt.Fprintln(rsvp, sub.Addr)
+		} else {
+			http.Error(rsvp, args[0], http.StatusNotFound)
 		}
 	} else {
 		for _, sub := range reg.indexed {
@@ -1078,8 +1074,8 @@ func (reg *registry) showPending(rsvp *rsvp) {
 }
 
 func (reg *registry) showSubscriber(rsvp *rsvp) {
-	s := rsvp.trimPrefix(RestPathShowSubscriber)
-	if len(s) == 0 {
+	args := rsvp.reqargs(RestShowSubscriber)
+	if len(args) == 0 {
 		names := xmaps.Keys(reg.named)
 		slices.Sort(names)
 		for _, name := range names {
@@ -1087,6 +1083,7 @@ func (reg *registry) showSubscriber(rsvp *rsvp) {
 		}
 		return
 	}
+	s := args[0]
 	if s == "self" {
 		s = rsvp.req.TLS.PeerCertificates[0].Subject.CommonName
 	}
@@ -1150,9 +1147,12 @@ func (reg *registry) unsubscribe(rsvp *rsvp) {
 		return
 	}
 	peer0 := rsvp.req.TLS.PeerCertificates[0]
-	name := rsvp.trimPrefix(RestPathUnsubscribe)
-	if len(name) == 0 {
+	args := rsvp.reqargs(RestUnsubscribe)
+	var name string
+	if len(args) == 0 {
 		name = peer0.Subject.CommonName
+	} else {
+		name = args[0]
 	}
 	if sub, found := reg.named[name]; !found {
 		http.Error(rsvp, name, http.StatusNotFound)
@@ -1169,33 +1169,37 @@ func (reg *registry) unsubscribe(rsvp *rsvp) {
 }
 
 func (reg *registry) whoisAddressed(rsvp *rsvp) {
-	s := rsvp.trimPrefix(RestPathWhoisAddressed)
-	if addr, err := netip.ParseAddr(s); err != nil {
+	args := rsvp.reqargs(RestWhoisAddressed)
+	if len(args) == 0 {
+		http.Error(rsvp, "incomplete address", http.StatusBadRequest)
+	} else if addr, err := netip.ParseAddr(args[0]); err != nil {
 		http.Error(rsvp, err.Error(), http.StatusBadRequest)
 	} else if sub, ok := reg.addressed[addr]; !ok || sub == nil {
-		http.Error(rsvp, s, http.StatusNotFound)
+		http.Error(rsvp, args[0], http.StatusNotFound)
 	} else {
 		reg.marshalSub(rsvp, sub)
 	}
 }
 
 func (reg *registry) whoisId(rsvp *rsvp) {
-	s := rsvp.trimPrefix(RestPathWhoisId)
-	id, err := ParseId(s)
-	if err != nil {
+	args := rsvp.reqargs(RestWhoisId)
+	if len(args) == 0 {
+		http.Error(rsvp, "incomplete id", http.StatusBadRequest)
+	} else if id, err := ParseId(args[0]); err != nil {
 		http.Error(rsvp, err.Error(), http.StatusBadRequest)
 	} else if i := id.Index(); i >= len(reg.indexed) {
-		http.Error(rsvp, s, http.StatusNotFound)
+		http.Error(rsvp, args[0], http.StatusNotFound)
 	} else {
 		reg.marshalSub(rsvp, reg.indexed[i])
 	}
 }
 
 func (reg *registry) whoisNamed(rsvp *rsvp) {
-	s := rsvp.trimPrefix(RestPathWhoisNamed)
-	sub, ok := reg.named[s]
-	if !ok || sub == nil {
-		http.Error(rsvp, s, http.StatusNotFound)
+	args := rsvp.reqargs(RestWhoisNamed)
+	if len(args) == 0 {
+		http.Error(rsvp, "incomplete name", http.StatusBadRequest)
+	} else if sub, ok := reg.named[args[0]]; !ok || sub == nil {
+		http.Error(rsvp, args[0], http.StatusNotFound)
 	} else {
 		reg.marshalSub(rsvp, sub)
 	}

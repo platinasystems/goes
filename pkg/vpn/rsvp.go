@@ -26,7 +26,11 @@ var rsvpPool = &sync.Pool{
 
 func (rsvp *rsvp) done() { rsvp.doneC <- done }
 
-func (rsvp *rsvp) trimPrefix(prefix string) string {
-	s := strings.TrimPrefix(rsvp.req.URL.Path, prefix)
-	return strings.TrimPrefix(s, "/")
+func (rsvp *rsvp) reqargs(cmd string) []string {
+	s := strings.TrimPrefix(rsvp.req.URL.Path, cmd)
+	s = strings.TrimPrefix(s, "/")
+	if len(s) == 0 {
+		return nil
+	}
+	return strings.Split(s, "/")
 }

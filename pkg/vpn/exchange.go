@@ -54,11 +54,11 @@ Exchange ciphered packets between guests.
 
 	exchange.sub = make(map[int]*Subscriber)
 
-	if err = RestAssertVcsMatch(ctx); err != nil {
+	if err = AssertVcsMatch(ctx); err != nil {
 		return err
 	}
 
-	port, err := RestExchangeCheckin(ctx)
+	port, err := CheckinExchange(ctx)
 	if err != nil {
 		return err
 	} else if port == 0 {
@@ -89,7 +89,7 @@ selection:
 			xlog.Info = xlog.ToggleMute(xlog.Info)
 			xlog.Trace = xlog.Mute(xlog.Trace)
 		case <-vcsChkTkr.C:
-			RestQueueVcsCheck()
+			QueueVcsCheck()
 		case err = <-rest.fault:
 		case sub, ok := <-rest.whoisRspC:
 			if !ok {

@@ -114,7 +114,7 @@ Forward ciphered packets between exchange and tunnel interface.
 	guest.addressed = make(map[netip.Addr]*Subscriber)
 	guest.indexed = make(map[int]*Subscriber)
 
-	if err = RestAssertVcsMatch(ctx); err != nil {
+	if err = AssertVcsMatch(ctx); err != nil {
 		return err
 	}
 
@@ -123,7 +123,7 @@ Forward ciphered packets between exchange and tunnel interface.
 		return err
 	}
 	encapKey := guest.decapKey.EncapsulationKey()
-	guest.receipt, err = RestGuestCheckin(ctx, encapKey.Bytes())
+	guest.receipt, err = CheckinGuest(ctx, encapKey.Bytes())
 	if err != nil {
 		return err
 	}
@@ -132,7 +132,7 @@ Forward ciphered packets between exchange and tunnel interface.
 	regname := rest.reg.Subject.CommonName
 	guest.exchanges =
 		make([]*Subscriber, 1+len(guest.receipt.ExchangePrecedence))
-	x, err := RestWhois(ctx, regname)
+	x, err := Whois(ctx, regname)
 	if err != nil {
 		return fmt.Errorf("%s: %w", regname, err)
 	}
@@ -150,7 +150,7 @@ Forward ciphered packets between exchange and tunnel interface.
 	guest.indexed[x.Id.Index()] = x
 
 	for i, name := range guest.receipt.ExchangePrecedence {
-		if x, err = RestWhois(ctx, name); err != nil {
+		if x, err = Whois(ctx, name); err != nil {
 			xlog.Errata.Printf("%s: %w", name, err)
 		} else {
 			guest.exchanges[1+i] = x
@@ -267,7 +267,7 @@ selection:
 			xlog.Info = xlog.ToggleMute(xlog.Info)
 			xlog.Trace = xlog.Mute(xlog.Trace)
 		case <-vcsChkTkr.C:
-			RestQueueVcsCheck()
+			QueueVcsCheck()
 		case err = <-rest.fault:
 		case t := <-helloTkr.C:
 			guest.tick += 1
@@ -435,7 +435,7 @@ func guestFound(ctx context.Context, sub *Subscriber) {
 	xlog.Trace.Println(name, "via", guest.exchanges[sub.gxi])
 
 	wg.Go(func() {
-		invite, err := RestInvite(ctx, name, cipherText)
+		invite, err := Invite(ctx, name, cipherText)
 		if err != nil {
 			xlog.Errata.Println(name, "invite:", err)
 			guestDiscardPending(sub)
