@@ -5,9 +5,7 @@
 package xmain
 
 import (
-	"errors"
 	"fmt"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -155,21 +153,19 @@ var EnvPrefix = sync.OnceValue(func() string {
 	return ToUnderscoredUpper(PackageName()) + "_"
 })
 
-// If “name” doesn't equal "-" or have a [filepath.Separator],
-// then [filepath.Join] it to “dir”;
+// If “name” doesn't equal "-" and doesn't have a [filepath.Separator],
+// [filepath.Join] it to “dir”;
 // otherwise, return unchanged.
 func File(dir, name string) string {
-	if name != "-" && strings.IndexRune(name, filepath.Separator) < 0 {
-		if _, err := os.Stat(name); errors.Is(err, fs.ErrNotExist) {
-			if len(dir) > 0 {
-				name = filepath.Join(dir, name)
-			}
-		}
+	if name != "-" &&
+		strings.IndexRune(name, filepath.Separator) < 0 &&
+		len(dir) > 0 {
+		name = filepath.Join(dir, name)
 	}
 	return name
 }
 
-// [os.LookupEnv] of keyword with [EnvPreifx] and given “suffix”.
+// [os.LookupEnv] of keyword with [EnvPrefix] and given “suffix”.
 func LookupEnv(suffix string) (string, bool) {
 	suffix = ToUnderscoredUpper(suffix)
 	return os.LookupEnv(fmt.Sprint(EnvPrefix(), suffix))

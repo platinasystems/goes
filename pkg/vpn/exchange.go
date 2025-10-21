@@ -32,7 +32,7 @@ usage: {{.Name}} [flags]
 Exchange ciphered packets between guests.
 
 {{flags .}}`)
-	err := append(xlog.Flags, restFlags...).Define()
+	err := append(xlog.Flags, RestFlags...).Define()
 	if err != nil {
 		return err
 	} else if err = flag.CommandLine.Parse(args); err != nil {

@@ -41,12 +41,7 @@ var im struct {
 	named     map[string]netip.AddrPort
 }
 
-var (
-	imPort     = 8004
-	imPortFlag = xflag.Label{"imp", "Instant Messaging Port.", &imPort}
-)
-
-var imFlags = append(restFlags, imPortFlag)
+var imPort = 8004
 
 func InstantMessaging(ctx context.Context, args []string) error {
 	xflag.TemplateUsage(`
@@ -55,7 +50,9 @@ Instant Messaging over the named interface.
 
 {{flags .}}`)
 
-	err := imFlags.Define()
+	err := append(RestFlags, xflag.Label{
+		"imp", "Instant Messaging Port.", &imPort,
+	}).Define()
 	if err != nil {
 		return err
 	} else if err = flag.CommandLine.Parse(args); err != nil {

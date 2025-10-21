@@ -12,6 +12,7 @@ import (
 	"unicode"
 
 	"github.com/platinasystems/goes/v2/pkg/xflag"
+	"github.com/platinasystems/goes/v2/pkg/xnet/xdns/xdnsdoh"
 	probing "github.com/prometheus-community/pro-bing"
 )
 
@@ -27,6 +28,7 @@ Send ICMP ECHO_REQUEST packets to network “host”, default 127.0.0.1.
 	timeout := 3 * time.Second
 
 	err := xflag.Labels{
+		xdnsdoh.URLFlag,
 		{"c", "Count.", &count},
 		{"i", "Interval.", &interval},
 		{"m", "Request Time To Live.", &ttl},

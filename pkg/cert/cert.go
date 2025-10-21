@@ -15,6 +15,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"io/fs"
 	"math"
 	"math/big"
 	"net/url"
@@ -33,6 +34,7 @@ import (
 )
 
 const BlockType = "CERTIFICATE"
+const Ext = ".pem"
 
 const (
 	Year    = 365 * 24 * time.Hour
@@ -40,39 +42,74 @@ const (
 )
 
 var (
-	File string
-	Flag = xflag.Label{"cert",
-		"Certificate file w/in current or config directory.",
-		func() any {
-			var ok bool
-			if File, ok = xmain.LookupEnv("CERT"); ok {
-				return &File
+	Client      = "cert.pem"
+	ClientCerts = sync.OnceValues(func() ([]*x509.Certificate, error) {
+		return namedCerts(Client)
+	})
+	ClientFlag = xflag.Label{"ssl-client-cn", `
+The file or common name (CN) of the client certificate.
+(or $<main>_CLIENT_CN, $SSL_CLIENT_CN)`[1:], func() any {
+		if s, ok := xmain.LookupEnv("CLIENT_CN"); ok {
+			Client = s
+		} else if s, ok = os.LookupEnv("SSL_CLIENT_CN"); ok {
+			Client = s
+		} else if s, err := os.Hostname(); err == nil {
+			if i := strings.Index(s, "."); i > 0 {
+				s = s[:i]
 			}
-			File = "cert.pem"
-			if _, err := os.Stat(File); err == nil {
-			} else if _, err = os.Stat(filepath.
-				Join(xmain.ConfigDir, File)); err == nil {
-			} else if h, err := os.Hostname(); err == nil {
-				if i := strings.Index(h, "."); i > 0 {
-					h = h[:i]
-				}
-				File = fmt.Sprint(h, ".pem")
-			}
-			return &File
-		}}
-	Path     = func() string { return xmain.ConfigFile(File) }
-	Features = map[string]any{
-		"new": map[string]any{
-			"certificate": New,
-		},
-		"show": map[string]any{
-			"certificate": Show,
-		},
-	}
+			Client = s
+		}
+		return &Client
+	}}
 )
 
+var ConfigAndStateCerts = sync.OnceValues(func() (
+	[]*x509.Certificate, error,
+) {
+	cs, err := parse(xmain.ConfigDir)
+	if xmain.StateDir != xmain.ConfigDir {
+		if state, err := parse(xmain.StateDir); err == nil {
+			cs = append(cs, state...)
+		}
+	}
+	return cs, err
+})
+
+var (
+	Server      string
+	ServerCerts = sync.OnceValues(func() ([]*x509.Certificate, error) {
+		return namedCerts(Server)
+	})
+	ServerFlag = xflag.Label{"ssl-server-dn", `
+The file or distinguished name (DN) of the server certificate.
+(or $<main>_SERVER_DN, $SSL_SERVER_DN)`[1:], func() any {
+		if s, ok := xmain.LookupEnv("SERVER_DN"); ok {
+			Server = s
+		} else if s, ok = os.LookupEnv("SSL_SERVER_DN"); ok {
+			Server = s
+		}
+		return &Server
+	}}
+)
+
+var (
+	Verify     = true
+	VerifyFlag = xflag.Label{"ssl-verify", `
+Verify server certificate.
+(or $SSL_VERIFY)`[1:], &Verify}
+)
+
+var Features = map[string]any{
+	"new": map[string]any{
+		"certificate": New,
+	},
+	"show": map[string]any{
+		"certificate": Show,
+	},
+}
+
 var NewTemplate = sync.OnceValues(func() (*template.Template, error) {
-	return template.New("certificates").Parse(`{{range .}}- {{/*
+	return template.New("certs").Parse(`{{range .}}- {{/*
 */}}dns_names:{{range .DNSNames}}
   - {{.}}{{end}}
   email_addresses:{{range .EmailAddresses}}
@@ -133,20 +170,11 @@ var NewTemplate = sync.OnceValues(func() (*template.Template, error) {
 // Create PEM encoded x509 certificate file.
 func New(ctx context.Context, args []string) error {
 	xflag.TemplateUsage(`
-usage: {{.Name}} [flags]
+usage: {{.Name}} [flags] [- | <filename>]
 Create PEM encoded x509 certificate file.
 
 {{flags .}}`)
-	var name,
-		dns,
-		email,
-		org,
-		unit,
-		street,
-		city,
-		state,
-		country,
-		zip,
+	var dns, email, org, unit, street, city, state, country, zip,
 		uri string
 	dur := Year
 	sn := int64(1)
@@ -154,16 +182,7 @@ Create PEM encoded x509 certificate file.
 	err := xflag.Labels{
 		xmain.ConfigFlag,
 		sig.Flag,
-		Flag,
-		{"name", "VPN identfier.", func() any {
-			var err error
-			if name, err = os.Hostname(); err != nil {
-				return err
-			} else if i := strings.Index(name, "."); i > 0 {
-				name = name[:i]
-			}
-			return &name
-		}},
+		ClientFlag,
 		{"serial-number",
 			"New certificate's identifier, random if zero.", &sn},
 		{"dns", "Comma separated domain names.", func() any {
@@ -191,6 +210,7 @@ Create PEM encoded x509 certificate file.
 	} else if err = flag.CommandLine.Parse(args); err != nil {
 		return err
 	}
+	args = flag.CommandLine.Args()
 
 	if err = sig.Init(); err != nil {
 		return err
@@ -211,7 +231,7 @@ Create PEM encoded x509 certificate file.
 		KeyUsage: x509.KeyUsageDigitalSignature |
 			x509.KeyUsageCertSign,
 		Subject: pkix.Name{
-			CommonName:         name,
+			CommonName:         Client,
 			SerialNumber:       fmt.Sprint(sn),
 			Organization:       strings.Fields(org),
 			OrganizationalUnit: strings.Fields(unit),
@@ -265,16 +285,20 @@ Create PEM encoded x509 certificate file.
 		Headers: map[string]string{},
 		Bytes:   der,
 	}
-	cp := Path()
-	if cp == "-" {
-		return pem.Encode(os.Stdout, blk)
+	var fn string
+	if len(args) > 0 {
+		fn = args[0]
+	} else {
+		fn = xmain.ConfigFile(fmt.Sprint(Client, Ext))
 	}
-	if _, err = os.Stat(cp); err == nil {
-		return fmt.Errorf("%s: exists", cp)
-	} else if !os.IsNotExist(err) {
+	if fn == "-" {
+		return pem.Encode(os.Stdout, blk)
+	} else if _, err = os.Stat(fn); err == nil {
+		return fmt.Errorf("%s: exists", fn)
+	} else if !errors.Is(err, fs.ErrNotExist) {
 		return err
 	}
-	w, err := os.Create(cp)
+	w, err := os.Create(fn)
 	if err != nil {
 		return err
 	}
@@ -285,118 +309,43 @@ Create PEM encoded x509 certificate file.
 // Print parsed certificate(s).
 func Show(ctx context.Context, args []string) error {
 	xflag.TemplateUsage(`
-usage: {{.Name}} [flags]
+usage: {{.Name}} [flags] [-|<file>|<dir>]...
 Print parsed certificate.
 
 {{flags .}}`)
 	err := xflag.Labels{
 		xmain.ConfigFlag,
+		xmain.StateFlag,
 		sig.Flag,
-		Flag,
+		ClientFlag,
 	}.Define()
 	if err != nil {
 		return err
 	} else if err = flag.CommandLine.Parse(args); err != nil {
 		return err
 	}
-
-	c, err := ReadFile(Path())
-	if err != nil {
-		return err
-	}
+	args = flag.CommandLine.Args()
 
 	t, err := NewTemplate()
 	if err != nil {
 		return err
 	}
-	return t.Execute(os.Stdout, []*x509.Certificate{c})
-}
 
-// This parses all of the PEM encoded [x509.Certificate](s) from
-// the named directory, file, or, if named “-”, stdin.
-func certificates(dfn string) (cs []*x509.Certificate, err error) {
-	var fns []string
-	var rc io.ReadCloser
-	var cś []*x509.Certificate
-	if dfn == "-" {
-		cs, err = readCertificates(os.Stdin)
-		return
-	}
-	fi, err := os.Stat(dfn)
-	if err != nil {
-		return
-	}
-	if fi.IsDir() {
-		fns, err = filepath.Glob(filepath.Join(dfn, "*.pem"))
-		if err != nil {
-			return
+	var match []*x509.Certificate
+	if len(args) == 0 {
+		if match, err = ClientCerts(); err != nil {
+			return err
 		}
 	} else {
-		fns = append(fns, dfn)
-	}
-	for _, fn := range fns {
-		if rc, err = os.Open(fn); err != nil {
-			return
-		} else {
-			cś, err = readCertificates(rc)
-			rc.Close()
-			if err != nil {
-				return
-			}
-			cs = append(cs, cś...)
-		}
-	}
-	return
-}
-
-func readCertificates(r io.Reader) (cs []*x509.Certificate, err error) {
-	var eof bool
-
-	ŕ := bufio.NewReaderSize(r, 64<<10)
-	b := make([]byte, 0, 4<<10)
-
-	for {
-		if !eof {
-			n, erŕ := ŕ.Read(b[len(b):cap(b)])
-			if n > 0 {
-				b = b[:len(b)+n]
+		for _, arg := range args {
+			if cs, err := namedCerts(arg); err != nil {
+				return err
 			} else {
-				eof = errors.Is(erŕ, io.EOF)
-				if !eof {
-					err = erŕ
-					break
-				}
+				match = append(match, cs...)
 			}
 		}
-		blk, rem := pem.Decode(b)
-		if blk == nil {
-			break
-		}
-		b = b[:len(rem)]
-		copy(b, rem)
-		if !strings.HasSuffix(blk.Type, BlockType) {
-			continue
-		}
-		c, erŕ := x509.ParseCertificate(blk.Bytes)
-		if erŕ != nil {
-			err = erŕ
-			break
-		}
-		cs = append(cs, c)
 	}
-	return
-}
-
-func ReadFile(fn string) (*x509.Certificate, error) {
-	b, err := os.ReadFile(fn)
-	if err != nil {
-		return nil, err
-	}
-	blk, _ := pem.Decode(b)
-	if blk == nil {
-		return nil, xerrors.Invalid(fn)
-	}
-	return x509.ParseCertificate(blk.Bytes)
+	return t.Execute(os.Stdout, match)
 }
 
 func addCertificate(dfn string, c *x509.Certificate) error {
@@ -422,7 +371,41 @@ func addCertificate(dfn string, c *x509.Certificate) error {
 	return pem.Encode(wc, &blk)
 }
 
-func dumpCertificates(w io.Writer, cs []*x509.Certificate) (err error) {
+func decode(r io.Reader) ([]*x509.Certificate, error) {
+	var cs []*x509.Certificate
+	var eof bool
+
+	br := bufio.NewReaderSize(r, 64<<10)
+	b := make([]byte, 0, 4<<10)
+
+	for {
+		if !eof {
+			n, err := br.Read(b[len(b):cap(b)])
+			if n > 0 {
+				b = b[:len(b)+n]
+			} else if eof = errors.Is(err, io.EOF); !eof {
+				return cs, err
+			}
+		}
+		blk, rem := pem.Decode(b)
+		if blk == nil {
+			break
+		}
+		b = b[:len(rem)]
+		copy(b, rem)
+		if !strings.HasSuffix(blk.Type, BlockType) {
+			continue
+		}
+		if c, err := x509.ParseCertificate(blk.Bytes); err != nil {
+			return cs, err
+		} else {
+			cs = append(cs, c)
+		}
+	}
+	return cs, nil
+}
+
+func dumpCerts(w io.Writer, cs []*x509.Certificate) (err error) {
 	blk := pem.Block{
 		Type: BlockType,
 	}
@@ -433,6 +416,64 @@ func dumpCertificates(w io.Writer, cs []*x509.Certificate) (err error) {
 		}
 	}
 	return nil
+}
+
+func namedCerts(name string) ([]*x509.Certificate, error) {
+	var match []*x509.Certificate
+	if strings.HasSuffix(name, Ext) {
+		if r, err := tryOpen(name); err != nil {
+			return nil, err
+		} else {
+			defer r.Close()
+			return decode(r)
+		}
+	}
+	certs, err := ConfigAndStateCerts()
+	if err == nil {
+		for _, c := range certs {
+			if c.Subject.CommonName == name {
+				match = append(match, c)
+			}
+		}
+		if len(match) == 0 {
+			err = xerrors.NotFound(name)
+		}
+	}
+	return match, err
+}
+
+// Parse all of the PEM encoded [x509.Certificate](s) within
+// dir, file, or, if named “-”, stdin.
+func parse(dfn string) ([]*x509.Certificate, error) {
+	var fns []string
+	var cs []*x509.Certificate
+	if dfn == "-" {
+		return xerrors.MarkResult(decode(os.Stdin))
+	}
+	if strings.HasSuffix(dfn, Ext) {
+		fns = append(fns, dfn)
+	} else if _, err := os.Stat(dfn); err != nil {
+		// ignore missing directory
+		return nil, nil
+	} else {
+		pat := filepath.Join(dfn, "*"+Ext)
+		if fns, err = filepath.Glob(pat); err != nil {
+			return nil, xerrors.Mark(err)
+		}
+	}
+	for _, fn := range fns {
+		if rc, err := os.Open(fn); err != nil {
+			return cs, err
+		} else {
+			more, err := decode(rc)
+			rc.Close()
+			if err != nil {
+				return cs, xerrors.Mark(err)
+			}
+			cs = append(cs, more...)
+		}
+	}
+	return cs, nil
 }
 
 func removeCertificate(dfn, cn string, cs []*x509.Certificate) error {
@@ -461,4 +502,14 @@ func removeCertificate(dfn, cn string, cs []*x509.Certificate) error {
 		}
 	}
 	return nil
+}
+
+func tryOpen(name string) (io.ReadCloser, error) {
+	r, err := os.Open(name)
+	if err == nil {
+		return r, err
+	} else if !errors.Is(err, fs.ErrNotExist) {
+		return nil, err
+	}
+	return os.Open(filepath.Join(xmain.ConfigDir, name))
 }

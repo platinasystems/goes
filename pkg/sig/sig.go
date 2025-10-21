@@ -33,17 +33,17 @@ var (
 )
 
 var (
-	File string
-	Flag = xflag.Label{"sig",
-		"Signature file w/in current or config directory.",
-		func() any {
-			var ok bool
-			if File, ok = xmain.LookupEnv("SIG"); !ok {
-				File = "sig.pk8"
-			}
-			return &File
-		},
-	}
+	File = "sig.pk8"
+	Flag = xflag.Label{"sig", `
+Signature file w/in current or config directory.
+(or $<main>_KEY_FILE, $SSL_KEY_FILE)`[1:], func() any {
+		if s, ok := xmain.LookupEnv("KEY_FILE"); ok {
+			File = s
+		} else if s, ok = os.LookupEnv("SSL_KEY_FILE"); ok {
+			File = s
+		}
+		return &File
+	}}
 	Path     = func() string { return xmain.ConfigFile(File) }
 	Features = map[string]any{
 		"new": map[string]any{

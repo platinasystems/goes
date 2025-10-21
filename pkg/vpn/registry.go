@@ -119,9 +119,11 @@ var (
 	domain = ".example.platina.io."
 )
 
-var registryFlags = xflag.Labels{
+var RegistryFlags = xflag.Labels{
 	xmain.DataFlag,
+	xmain.ConfigFlag,
 	xmain.StateFlag,
+	cert.ClientFlag,
 	{"admins", `
 An optional file w/in the current or config directory containing
 a newline separated list of certificate common names that may
@@ -133,6 +135,7 @@ administer subscriptions.`[1:], func() any {
 		}
 		return &adminsFile
 	}},
+	RestCertAkaFlag,
 	{"domain", "Search domain suffix.", &domain},
 	{"exchanges", `
 An optional file w/in the current or config directory containing
@@ -156,6 +159,7 @@ a newline separated list of static address assignments in
 		}
 		return &hostsFile
 	}},
+	RestPortFlag,
 	{"prefix", "Network prefix.", func() any {
 		v, err := netip.ParsePrefix("fc00:1234::/64")
 		if err != nil {
@@ -183,8 +187,7 @@ A RESTful WWW server and packet exchange.
 
 	xlog.SetPrefixes("registry/")
 
-	err := append(append(xlog.Flags, restFlags...),
-		registryFlags...).Define()
+	err := append(xlog.Flags, RegistryFlags...).Define()
 	if err != nil {
 		return err
 	} else if err = flag.CommandLine.Parse(args); err != nil {
@@ -200,7 +203,7 @@ A RESTful WWW server and packet exchange.
 		domain = fmt.Sprint(".", domain)
 	}
 	if err = sig.Init(); err != nil {
-		return err
+		return xerrors.Mark(err)
 	}
 
 	MyId = Id(0)
@@ -209,16 +212,16 @@ A RESTful WWW server and packet exchange.
 	reg := newRegistry()
 
 	if err = reg.loadAdminsFile(); err != nil {
-		return err
+		return xerrors.Mark(err)
 	}
 	if err = reg.loadHostsFile(); err != nil {
-		return err
+		return xerrors.Mark(err)
 	}
 	if err = reg.loadExchangesFile(); err != nil {
-		return err
+		return xerrors.Mark(err)
 	}
 	if err = reg.loadSubscribers(); err != nil {
-		return err
+		return xerrors.Mark(err)
 	}
 
 	alarm := make(chan os.Signal, 2)
@@ -237,7 +240,7 @@ A RESTful WWW server and packet exchange.
 	defer close(reg.toVpnC)
 
 	reg.http = &http.Server{
-		Addr:    fmt.Sprint(":", restPort),
+		Addr:    fmt.Sprint(":", rest.port),
 		Handler: reg,
 		TLSConfig: &tls.Config{
 			MinVersion: tls.VersionTLS13,
@@ -824,14 +827,12 @@ func (reg *registry) loadHostsKeyValues(
 }
 
 func (reg *registry) loadSubscribers() error {
-	var err error
-
-	cp := cert.Path()
-	reg.cert, err = cert.ReadFile(cp)
+	cs, err := cert.ClientCerts()
 	if err != nil {
 		return err
 	}
-	cn := reg.cert.Subject.CommonName
+	reg.cert = cs[0]
+	regcn := reg.cert.Subject.CommonName
 	sub := NewSubscriber(reg.cert)
 	sub.Id = 0
 	sub.Port = DefaultExchangePort
@@ -839,25 +840,16 @@ func (reg *registry) loadSubscribers() error {
 		return err
 	}
 	reg.indexed = []*Subscriber{sub}
-	reg.named[cn] = sub
+	reg.named[regcn] = sub
 
-	var fns []string
-	for _, dn := range []string{xmain.ConfigDir, xmain.StateDir} {
-		matches, err := filepath.Glob(filepath.Join(dn, "*.pem"))
-		if err != nil {
-			return err
-		}
-		fns = append(fns, matches...)
+	if cs, err = cert.ConfigAndStateCerts(); err != nil {
+		return err
 	}
-	for _, fn := range fns {
-		if fn == cp {
+	for _, c := range cs {
+		if c.Subject.CommonName == regcn {
 			continue
 		}
-		c, err := cert.ReadFile(fn)
-		if err != nil {
-			return err
-		}
-		cn = c.Subject.CommonName
+		cn := c.Subject.CommonName
 		if _, exists := reg.named[cn]; exists {
 			return fmt.Errorf("%s: duplicate", cn)
 		}
@@ -1032,8 +1024,13 @@ func (reg *registry) rest(rsvp *rsvp) {
 }
 
 func (reg *registry) restsvc() {
-	xlog.Trace.Println("start rest", reg.http.Addr)
-	err := reg.http.ListenAndServeTLS(cert.Path(), sig.Path())
+	cfn := cert.Client
+	if !strings.HasSuffix(cfn, cert.Ext) {
+		cfn = fmt.Sprint(cfn, cert.Ext)
+	}
+	cfn = xmain.ConfigFile(cfn)
+	xlog.Trace.Println("start rest", reg.http.Addr, "with", cfn)
+	err := reg.http.ListenAndServeTLS(cfn, sig.Path())
 	err = xerrors.Suppress(err, http.ErrServerClosed)
 	if err == nil {
 		xlog.Trace.Println("stopped rest", reg.http.Addr)

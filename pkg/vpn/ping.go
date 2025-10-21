@@ -28,7 +28,7 @@ ICMP with named guest.
 	interval := time.Second
 	timeout := 3 * time.Second
 
-	err := append(restFlags, xflag.Labels{
+	err := append(RestFlags, xflag.Labels{
 		{"c", "Count.", &count},
 		{"i", "Interval.", &interval},
 		{"m", "Request Time To Live.", &ttl},

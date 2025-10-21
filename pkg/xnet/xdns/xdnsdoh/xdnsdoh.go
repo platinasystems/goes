@@ -14,9 +14,28 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 
+	"github.com/platinasystems/goes/v2/pkg/xflag"
+	"github.com/platinasystems/goes/v2/pkg/xmain"
 	"github.com/platinasystems/goes/v2/pkg/xnet/xdns"
+)
+
+var (
+	URL     string
+	URLFlag = xflag.Label{"doh-url", `
+DNS Over HTTPS server URL.
+(or $<main>_DOH_URL, $DOH_URL, $CF_DNS_RESOLVER_URL)`[1:], func() any {
+		if s, ok := xmain.LookupEnv("DOH_URL"); ok {
+			URL = s
+		} else if s, ok = os.LookupEnv("DOH_URL"); ok {
+			URL = s
+		} else if s, ok = os.LookupEnv("CF_DNS_RESOLVER_URL"); ok {
+			URL = s
+		}
+		return &URL
+	}}
 )
 
 // From [x509.SystemCertPool]:

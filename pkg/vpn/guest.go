@@ -90,12 +90,12 @@ Forward ciphered packets between exchange and tunnel interface.
 {{flags .}}`)
 
 	unit := -1
-	unitFlag := xflag.Label{"t",
-		"Tunnel unit number, auto selected if negative.", &unit}
 
-	err := append(append(xlog.Flags, restFlags...),
-		unitFlag,
-	).Define()
+	err := append(xlog.Flags, append(RestFlags, xflag.Label{
+		"t",
+		"Tunnel unit number, auto selected if negative.",
+		&unit,
+	})...).Define()
 	if err != nil {
 		return err
 	} else if err = flag.CommandLine.Parse(args); err != nil {
