@@ -589,7 +589,10 @@ func Whois(ctx context.Context, v any) (*Subscriber, error) {
 		return nil, err
 	}
 	rsp, err := restGet(ctx, buf, p)
-	if rsp != nil && rsp.StatusCode == http.StatusUpgradeRequired {
+	if err != nil {
+	} else if rsp == nil {
+		err = xerrors.Incomplete("response")
+	} else if rsp.StatusCode == http.StatusUpgradeRequired {
 		err = restUpgrade(ctx)
 	} else if start, err = getRegistryStart(rsp); err != nil {
 		err = xerrors.NewExitError(RestartExitCode,
