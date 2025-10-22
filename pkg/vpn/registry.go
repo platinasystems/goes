@@ -205,6 +205,13 @@ A RESTful WWW server and packet exchange.
 	if err = sig.Init(); err != nil {
 		return xerrors.Mark(err)
 	}
+	ccs, err := cert.ClientCerts()
+	if err != nil {
+		return err
+	}
+	if !sig.Same(ccs[0]) {
+		return xerrors.Invalid(cert.Client, "signature")
+	}
 
 	MyId = Id(0)
 	MyLabel = MakeLabel(MyId, MyId)
@@ -224,6 +231,27 @@ A RESTful WWW server and packet exchange.
 		return xerrors.Mark(err)
 	}
 
+	reg.http = &http.Server{
+		Addr:    fmt.Sprint(":", rest.port),
+		Handler: reg,
+		TLSConfig: &tls.Config{
+			MinVersion: tls.VersionTLS13,
+			ClientAuth: tls.RequestClientCert,
+			Certificates: []tls.Certificate{{
+				Certificate: [][]byte{ccs[0].Raw},
+
+				PrivateKey: sig.Priv,
+
+				SupportedSignatureAlgorithms: sig.Schemes,
+
+				Leaf: ccs[0],
+			}},
+		},
+		BaseContext: func(net.Listener) context.Context {
+			return ctx
+		},
+	}
+
 	alarm := make(chan os.Signal, 2)
 	signal.Notify(alarm, xsignal.Alarm)
 	defer signal.Stop(alarm)
@@ -238,18 +266,6 @@ A RESTful WWW server and packet exchange.
 		return err
 	}
 	defer close(reg.toVpnC)
-
-	reg.http = &http.Server{
-		Addr:    fmt.Sprint(":", rest.port),
-		Handler: reg,
-		TLSConfig: &tls.Config{
-			MinVersion: tls.VersionTLS13,
-			ClientAuth: tls.RequestClientCert,
-		},
-		BaseContext: func(net.Listener) context.Context {
-			return ctx
-		},
-	}
 
 	wg.Go(func() { reg.shutdown(ctx) })
 	wg.Go(reg.restsvc)
@@ -1024,14 +1040,9 @@ func (reg *registry) rest(rsvp *rsvp) {
 }
 
 func (reg *registry) restsvc() {
-	cfn := cert.Client
-	if !strings.HasSuffix(cfn, cert.Ext) {
-		cfn = fmt.Sprint(cfn, cert.Ext)
-	}
-	cfn = xmain.ConfigFile(cfn)
-	xlog.Trace.Println("start rest", reg.http.Addr, "with", cfn)
-	err := reg.http.ListenAndServeTLS(cfn, sig.Path())
-	err = xerrors.Suppress(err, http.ErrServerClosed)
+	xlog.Trace.Println("start rest", reg.http.Addr)
+	err := xerrors.Suppress(reg.http.ListenAndServeTLS("", ""),
+		http.ErrServerClosed)
 	if err == nil {
 		xlog.Trace.Println("stopped rest", reg.http.Addr)
 	} else {

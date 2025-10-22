@@ -11,6 +11,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/ed25519"
 	"crypto/rsa"
+	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
 	"flag"
@@ -27,9 +28,15 @@ import (
 )
 
 var (
-	Sign func([]byte) []byte
 	Priv crypto.PrivateKey
 	Pub  crypto.PublicKey
+
+	Same func(cert *x509.Certificate) bool
+	Sign func([]byte) []byte
+
+	Schemes = []tls.SignatureScheme{
+		tls.Ed25519,
+	}
 )
 
 var (
@@ -85,8 +92,9 @@ func Init() error {
 	// case *rsa.PrivateKey:
 	// case *ecdsa.PrivateKey:
 	case ed25519.PrivateKey:
-		Sign = signEd25519
 		Pub = t.Public()
+		Same = sameEd25519
+		Sign = signEd25519
 	// case *ecdh.PrivateKey:
 	default:
 		return fmt.Errorf("%T: %w", t, xerrors.ErrUnsupported)
