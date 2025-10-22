@@ -15,7 +15,6 @@ import (
 	"net/netip"
 	"os"
 	"os/signal"
-	"slices"
 	"time"
 
 	"github.com/platinasystems/goes/v2/pkg/netif"
@@ -59,8 +58,8 @@ var guest struct {
 
 	llu6 netip.Addr
 
-	// msgs pending whois response
-	pending struct{ rx, tx []*xnet.Msg }
+	// msg pending whois response
+	pending struct{ rx, tx *xnet.Msg }
 
 	decapKey *mlkem.DecapsulationKey768
 
@@ -293,26 +292,18 @@ selection:
 			if !ok {
 				break selection
 			}
-			for i := 0; i < len(guest.pending.tx); {
-				m := guest.pending.tx[i]
+			if m := guest.pending.tx; m != nil {
 				da, err := netpdu.TunPI(m.Data).ToWhom()
 				if err == nil && da.Compare(sub.Addr) == 0 {
-					guest.pending.tx = slices.
-						Delete(guest.pending.tx, i, i+1)
+					guest.pending.tx = nil
 					guestFromTun(ctx, m)
-				} else {
-					i += 1
 				}
 			}
-			for i := 0; i < len(guest.pending.rx); {
-				m := guest.pending.rx[i]
+			if m := guest.pending.rx; m != nil {
 				_, from := ScanLabel(m.Data)
 				if sub.Id.Index() == from.Index() {
-					guest.pending.rx = slices.
-						Delete(guest.pending.rx, i, i+1)
+					guest.pending.rx = nil
 					guestFromVpn(ctx, m)
-				} else {
-					i += 1
 				}
 			}
 		}
@@ -321,26 +312,18 @@ selection:
 }
 
 func guestDiscardPending(sub *Subscriber) {
-	for i := 0; i < len(guest.pending.rx); {
-		m := guest.pending.rx[i]
+	if m := guest.pending.rx; m != nil {
 		_, from := ScanLabel(m.Data)
 		if sub.Id.Index() == from.Index() {
-			guest.pending.rx = slices.
-				Delete(guest.pending.rx, i, i+1)
+			guest.pending.rx = nil
 			mp.Put(m)
-		} else {
-			i += 1
 		}
 	}
-	for i := 0; i < len(guest.pending.tx); {
-		m := guest.pending.tx[i]
+	if m := guest.pending.tx; m != nil {
 		da, err := netpdu.TunPI(m.Data).ToWhom()
 		if err == nil && da.Compare(sub.Addr) == 0 {
-			guest.pending.tx = slices.
-				Delete(guest.pending.tx, i, i+1)
+			guest.pending.tx = nil
 			mp.Put(m)
-		} else {
-			i += 1
 		}
 	}
 }
@@ -493,10 +476,16 @@ func guestFromTun(ctx context.Context, m *xnet.Msg) {
 	} else if to, ok := guest.addressed[da]; !ok {
 		xlog.Trace.Println("queue whois", da)
 		restQueueWhois(ctx, da)
-		guest.pending.tx = append(guest.pending.tx, m)
+		if cur := guest.pending.tx; cur != nil {
+			mp.Put(cur)
+		}
+		guest.pending.tx = m
 	} else if to.gcm == nil {
 		xlog.Trace.Println("pending invite", da)
-		guest.pending.tx = append(guest.pending.tx, m)
+		if cur := guest.pending.tx; cur != nil {
+			mp.Put(cur)
+		}
+		guest.pending.tx = m
 	} else {
 		m.AddrPort = guestExchange(to.gxi).ap
 		xlog.Trace.Print("tx ", to.name(), " via ", m.AddrPort,
@@ -513,7 +502,10 @@ func guestFromVpn(ctx context.Context, m *xnet.Msg) {
 	fi := fid.Index()
 	from, ok := guest.indexed[fi]
 	if !ok || from.Id.Version() != fid.Version() {
-		guest.pending.rx = append(guest.pending.rx, m)
+		if cur := guest.pending.rx; cur != nil {
+			mp.Put(cur)
+		}
+		guest.pending.rx = m
 		xlog.Trace.Println("queue whois", fid)
 		restQueueWhois(ctx, fid)
 	} else if tid == fid {
