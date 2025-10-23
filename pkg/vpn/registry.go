@@ -319,11 +319,14 @@ func (reg *registry) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	if strings.HasPrefix(req.URL.Path, Rest) ||
-		strings.HasPrefix(req.URL.Path, DnsQuery) {
-		reg.queueReq(w, req)
-	} else if req.Method == http.MethodGet {
-		reg.file(w, req.URL.Path)
+	for _, prefix := range RestPrefixes {
+		if strings.HasPrefix(req.URL.Path, prefix) {
+			reg.queueReq(w, req)
+			return
+		}
+	}
+	if req.Method == http.MethodGet {
+		reg.file(w, strings.TrimPrefix(req.URL.Path, "/"))
 	} else {
 		http.Error(w, req.Method, http.StatusMethodNotAllowed)
 	}

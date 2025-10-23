@@ -64,34 +64,49 @@ const (
 const (
 	DnsQuery = "/dns-query"
 
-	Rest                = "/rest"
-	RestApprove         = "/rest/approve"
-	RestCertify         = "/rest/certify"
-	RestCheckin         = "/rest/checkin"
-	RestCheckinExchange = "/rest/checkin/exchange"
-	RestCheckinGuest    = "/rest/checkin/guest"
-	RestDeny            = "/rest/deny"
-	RestDumpSubscribers = "/rest/dump/subscribers"
-	RestInvite          = "/rest/invite"
-	RestReload          = "/rest/reload"
-	RestShow            = "/rest/show"
-	RestShowAddress     = "/rest/show/address"
-	RestShowAdmins      = "/rest/show/admins"
-	RestShowDomain      = "/rest/show/domain"
-	RestShowExchanges   = "/rest/show/exchanges"
-	RestShowPending     = "/rest/show/pending"
-	RestShowPrefix      = "/rest/show/prefix"
-	RestShowStart       = "/rest/show/start"
-	RestShowStatus      = "/rest/show/status"
-	RestShowSubscriber  = "/rest/show/subscriber"
-	RestShowVCS         = "/rest/show/vcs"
-	RestSubscribe       = "/rest/subscribe"
-	RestUnsubscribe     = "/rest/unsubscribe"
-	RestWhois           = "/rest/whois"
-	RestWhoisAddressed  = "/rest/whois/addressed"
-	RestWhoisId         = "/rest/whois/id"
-	RestWhoisNamed      = "/rest/whois/named"
+	RestApprove         = "/approve"
+	RestCertify         = "/certify"
+	RestCheckin         = "/checkin"
+	RestCheckinExchange = "/checkin/exchange"
+	RestCheckinGuest    = "/checkin/guest"
+	RestDeny            = "/deny"
+	RestDump            = "/dump"
+	RestDumpSubscribers = "/dump/subscribers"
+	RestInvite          = "/invite"
+	RestReload          = "/reload"
+	RestShow            = "/show"
+	RestShowAddress     = "/show/address"
+	RestShowAdmins      = "/show/admins"
+	RestShowDomain      = "/show/domain"
+	RestShowExchanges   = "/show/exchanges"
+	RestShowPending     = "/show/pending"
+	RestShowPrefix      = "/show/prefix"
+	RestShowStart       = "/show/start"
+	RestShowStatus      = "/show/status"
+	RestShowSubscriber  = "/show/subscriber"
+	RestShowVCS         = "/show/vcs"
+	RestSubscribe       = "/subscribe"
+	RestUnsubscribe     = "/unsubscribe"
+	RestWhois           = "/whois"
+	RestWhoisAddressed  = "/whois/addressed"
+	RestWhoisId         = "/whois/id"
+	RestWhoisNamed      = "/whois/named"
 )
+
+var RestPrefixes = []string{
+	DnsQuery,
+	RestApprove,
+	RestCertify,
+	RestCheckin,
+	RestDeny,
+	RestDump,
+	RestInvite,
+	RestReload,
+	RestShow,
+	RestSubscribe,
+	RestUnsubscribe,
+	RestWhois,
+}
 
 const RestOpCheckinExchangePort = "port"
 
