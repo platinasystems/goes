@@ -163,15 +163,15 @@ var RestFlags = xflag.Labels{
 	sig.Flag,
 	RestCertAkaFlag,
 	RestPortFlag,
-	xflag.Label{"registry", "aka. -ssl-server-dn", func() any {
-		if len(cert.Server) == 0 {
-			cert.Server = "registry"
-		}
-		return &cert.Server
-	}},
+	xflag.Label{"registry", "aka. -ssl-server-dn", &cert.Server},
 }
 
 func restInit() error {
+	if len(cert.Server) == 0 {
+		return errors.New("no -registry, -ssl-server-dn" +
+			", $" + xmain.EnvPrefix() + "SERVER_DN" +
+			", or $SSL_SERVER_DN")
+	}
 	rest.bufs.New = func() any { return new(bytes.Buffer) }
 	rest.vcsrev = xprogram.VcsRevision.String()
 	rest.fault = make(chan error, 1)

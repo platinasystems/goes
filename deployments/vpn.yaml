@@ -251,6 +251,9 @@ spec:
   - name: vpn
     imagePullPolicy: IfNotPresent
     image: ko://github.com/platinasystems/goes/v2/cmd/goes-vpn
+    env:
+    - name: GOES_VPN_SERVER_DN
+      value: "registry"
     args:
     - "start"
     - "exchange"
@@ -289,6 +292,9 @@ spec:
   - name: vpn
     imagePullPolicy: IfNotPresent
     image: ko://github.com/platinasystems/goes/v2/cmd/goes-vpn
+    env:
+    - name: GOES_VPN_SERVER_DN
+      value: "registry"
     args:
     - "start"
     - "guest"
@@ -330,6 +336,9 @@ spec:
   - name: vpn
     imagePullPolicy: IfNotPresent
     image: ko://github.com/platinasystems/goes/v2/cmd/goes-vpn
+    env:
+    - name: GOES_VPN_SERVER_DN
+      value: "registry"
     args:
     - "start"
     - "guest"
@@ -371,6 +380,9 @@ spec:
   - name: vpn
     imagePullPolicy: IfNotPresent
     image: ko://github.com/platinasystems/goes/v2/cmd/goes-vpn
+    env:
+    - name: GOES_VPN_SERVER_DN
+      value: "registry"
     args:
     - "start"
     - "guest"
