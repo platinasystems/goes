@@ -46,7 +46,8 @@ type Subscriber struct {
 	// A guest only sets “ap” of its exchange(s).
 	ap netip.AddrPort `json:"-"`
 
-	// Last hello reply Tick
+	// Last Tick of Exchange hello reply or
+	// Whois reply of unchecked in Subscriber
 	lt uint64
 
 	// Guest eXchange Index
@@ -148,6 +149,9 @@ func (sub *Subscriber) stateFileName() string {
 }
 
 func (sub *Subscriber) ticks(now uint64) uint64 {
+	if sub.lt == 0 {
+		return 0
+	}
 	if now < sub.lt {
 		// wrap
 		return now + ((1<<64 - 1) - sub.lt)

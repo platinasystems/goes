@@ -47,6 +47,8 @@ const (
 
 	helloInterval = 10 * time.Second
 	noReplyLimit  = 3
+
+	minWhoisRetryTicks = 6
 )
 
 var guest struct {
@@ -328,6 +330,13 @@ func guestDiscardPending(sub *Subscriber) {
 	}
 }
 
+func guestNewPendingTx(m *xnet.Msg) {
+	if x := guest.pending.tx; x != nil {
+		mp.Put(x)
+	}
+	guest.pending.tx = m
+}
+
 // returns non-zero indexed exchange or the registry if the indexed exchange
 // hasn't replied w/in the noReplyLimit
 func guestExchange(i int) *Subscriber {
@@ -395,8 +404,18 @@ func guestFound(ctx context.Context, sub *Subscriber) {
 		}
 	}
 
+	guestExchangeMatch(sub)
+
+	sub.label.fromMe = MakeLabel(MyId, sub.Id)
+	sub.label.toMe = MakeLabel(sub.Id, MyId)
+	guest.indexed[sub.Id.Index()] = sub
+	guest.addressed[sub.Addr] = sub
+
+	xlog.Trace.Println(name, "via", guest.exchanges[sub.gxi])
+
 	if len(sub.EncapKey) == 0 {
-		xlog.Errata.Println(name, "missing cipher key")
+		xlog.Errata.Println(name, "unregistered")
+		sub.lt = guest.tick
 		guestDiscardPending(sub)
 		return
 	}
@@ -407,15 +426,6 @@ func guestFound(ctx context.Context, sub *Subscriber) {
 		return
 	}
 	sub.sharedKey, cipherText = encap.Encapsulate()
-
-	guestExchangeMatch(sub)
-
-	sub.label.fromMe = MakeLabel(MyId, sub.Id)
-	sub.label.toMe = MakeLabel(sub.Id, MyId)
-	guest.indexed[sub.Id.Index()] = sub
-	guest.addressed[sub.Addr] = sub
-
-	xlog.Trace.Println(name, "via", guest.exchanges[sub.gxi])
 
 	wg.Go(func() {
 		invite, err := Invite(ctx, name, cipherText)
@@ -475,17 +485,20 @@ func guestFromTun(ctx context.Context, m *xnet.Msg) {
 		mp.Put(m)
 	} else if to, ok := guest.addressed[da]; !ok {
 		xlog.Trace.Println("queue whois", da)
+		guestNewPendingTx(m)
 		restQueueWhois(ctx, da)
-		if cur := guest.pending.tx; cur != nil {
-			mp.Put(cur)
+	} else if len(to.EncapKey) == 0 {
+		if to.lt == 0 || to.ticks(guest.tick) > minWhoisRetryTicks {
+			to.lt = guest.tick
+			xlog.Trace.Println("re-queue whois", da)
+			guestNewPendingTx(m)
+			restQueueWhois(ctx, da)
+		} else {
+			mp.Put(m)
 		}
-		guest.pending.tx = m
 	} else if to.gcm == nil {
 		xlog.Trace.Println("pending invite", da)
-		if cur := guest.pending.tx; cur != nil {
-			mp.Put(cur)
-		}
-		guest.pending.tx = m
+		guestNewPendingTx(m)
 	} else {
 		m.AddrPort = guestExchange(to.gxi).ap
 		xlog.Trace.Print("tx ", to.name(), " via ", m.AddrPort,
