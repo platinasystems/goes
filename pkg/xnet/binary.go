@@ -13,6 +13,11 @@ func ByteOrderAppend(buf []byte, val any) ([]byte, error) {
 	return binary.Append(buf, ByteOrder, val)
 }
 
+// [binary.Decode] [ByteOrder] from beginning of buf.
+func ByteOrderDecode(buf []byte, ptr any) (int, error) {
+	return binary.Decode(buf, ByteOrder, ptr)
+}
+
 // [binary.Encode] [ByteOrder] to beginning of buf.
 func ByteOrderEncode(buf []byte, val any) (int, error) {
 	return binary.Encode(buf, ByteOrder, val)
