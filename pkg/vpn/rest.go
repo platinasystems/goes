@@ -141,6 +141,7 @@ var rest struct {
 	vcsrev string
 	ips    []net.IP
 	port   uint
+	start  int64
 
 	fault chan error
 
@@ -264,10 +265,11 @@ RESTful registry administration.
 // to force [os.Exit] with [xos.EX_TEMPFAIL].
 func AssertVcsMatch(ctx context.Context) error {
 	rsp, err := restGet(ctx, io.Discard, RestShowStatus)
-	if err == nil {
-		return nil
-	}
-	if rsp != nil && rsp.StatusCode == http.StatusUpgradeRequired {
+	if rsp == nil {
+		if err == nil {
+			err = ErrNilResponse
+		}
+	} else if rsp.Header.Get(RestVcsRevision) != rest.vcsrev {
 		err = restUpgrade(ctx)
 	}
 	return err
@@ -284,7 +286,7 @@ func CheckinExchange(ctx context.Context) (uint16, error) {
 	if err != nil {
 		return 0, err
 	}
-	if err = RestValidateCheckinResponse(rsp); err != nil {
+	if rest.start, err = registryStart(rsp); err != nil {
 		return 0, err
 	}
 	if _, err = fmt.Fscan(buf, &id, &port); err != nil {
@@ -308,7 +310,7 @@ func CheckinGuest(ctx context.Context, encap []byte) (
 	if err != nil {
 		return receipt, err
 	}
-	if err = RestValidateCheckinResponse(rsp); err != nil {
+	if rest.start, err = registryStart(rsp); err != nil {
 		return receipt, err
 	}
 	if err = json.Unmarshal(buf.Bytes(), &receipt); err != nil {
@@ -605,14 +607,12 @@ func Whois(ctx context.Context, v any) (*Subscriber, error) {
 	}
 	rsp, err := restGet(ctx, buf, p)
 	if err != nil {
-	} else if rsp == nil {
-		err = xerrors.Incomplete("response")
 	} else if rsp.StatusCode == http.StatusUpgradeRequired {
 		err = restUpgrade(ctx)
-	} else if start, err = getRegistryStart(rsp); err != nil {
+	} else if start, err = registryStart(rsp); err != nil {
 		err = xerrors.NewExitError(RestartExitCode,
 			NewRestartError(err))
-	} else if RegistryStart != 0 && RegistryStart != start {
+	} else if rest.start != 0 && rest.start != start {
 		err = ExitRecheckin
 	} else if err == nil && v != nil {
 		sub = new(Subscriber)
@@ -813,21 +813,6 @@ func restUpgrade(ctx context.Context) error {
 		return xerrors.Label(err, cantUpgrade)
 	}
 	return ExitCompleteUpgrade
-}
-
-func RestValidateCheckinResponse(rsp *http.Response) (err error) {
-	if rsp == nil {
-		err = xerrors.Invalid("no checkin response")
-	} else {
-		vcsRev := xprogram.VcsRevision.String()
-		regVcsRev := rsp.Header.Get(RestVcsRevision)
-		if vcsRev != regVcsRev {
-			err = fmt.Errorf("upgrade to %s", regVcsRev)
-		} else {
-			RegistryStart, err = getRegistryStart(rsp)
-		}
-	}
-	return
 }
 
 func restWaitForResolution(ctx context.Context) error {

@@ -1224,16 +1224,14 @@ func (reg *registry) marshalSub(rsvp *rsvp, sub *Subscriber) {
 	}
 }
 
-func getRegistryStart(rsp *http.Response) (int64, error) {
+func registryStart(rsp *http.Response) (i int64, err error) {
 	s := rsp.Header.Get(RestUnixMicroStart)
 	if len(s) == 0 {
-		return 0, xerrors.Unavailable("registry start time")
+		err = xerrors.Unavailable("registry start time")
+	} else if i, err = strconv.ParseInt(s, 10, 64); err != nil {
+		err = xerrors.Label(err, "registry start")
 	}
-	i, err := strconv.ParseInt(s, 10, 64)
-	if err != nil {
-		return 0, xerrors.Label(err, "registry start")
-	}
-	return i, nil
+	return
 }
 
 func SplitConfLine(s string) []string {
