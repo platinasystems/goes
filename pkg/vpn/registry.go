@@ -280,8 +280,8 @@ selection:
 		case <-ctx.Done():
 			break selection
 		case <-alarm:
-			xlog.Info = xlog.ToggleMute(xlog.Info)
-			xlog.Trace = xlog.Mute(xlog.Trace)
+			xlog.Info.Toggle()
+			xlog.Trace.Mute()
 		case rsvp, ok := <-reg.rsvpC:
 			if !ok {
 				break selection

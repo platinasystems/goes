@@ -5,138 +5,93 @@
 package xlog
 
 import (
-	"context"
 	"io"
 	"log"
 	"os"
-	"os/signal"
+	"sync"
 
-	"github.com/platinasystems/goes/v2/pkg/xcontext"
 	"github.com/platinasystems/goes/v2/pkg/xflag"
-	"github.com/platinasystems/goes/v2/pkg/xsignal"
 )
 
 var (
-	ErrLog = log.New(os.Stderr, "", log.Lshortfile)
-	OutLog = log.New(os.Stdout, "", log.Lshortfile)
-)
-
-var (
-	Errata = Unmute(ErrLog)
-	Info   = Mute(OutLog)
-	Trace  = Mute(OutLog)
+	Errata = NewUnmutedLogger(os.Stderr)
+	Info   = NewMutedLogger(os.Stderr)
+	Trace  = NewMutedLogger(os.Stderr)
 )
 
 var (
 	QuietFlag = xflag.Label{"quiet", "Log errata only.", func() error {
-		Errata = Mute(Errata)
+		Errata.Mute()
 		return nil
 	}}
 	TraceFlag = xflag.Label{"trace", "Very verbose logging.", func() error {
-		Trace = Unmute(Trace)
+		Trace.Unmute()
 		return nil
 	}}
 	VerboseFlag = xflag.Label{"verbose", "Log info.", func() error {
-		Info = Unmute(Info)
+		Info.Unmute()
 		return nil
 	}}
 	Flags = xflag.Labels{QuietFlag, TraceFlag, VerboseFlag}
 )
 
+// SetFlags of [Errata], [Info], and [Trace].
+// (default [log.Lshortfile])
+func SetFlags(i int) {
+	Errata.SetFlags(i)
+	Info.SetFlags(i)
+	Trace.SetFlags(i)
+}
+
+// SetPrefix of [Errata], [Info], and [Trace]
 func SetPrefixes(s string) {
-	ErrLog.SetPrefix(s)
-	OutLog.SetPrefix(s)
+	Errata.SetPrefix(s)
+	Info.SetPrefix(s)
+	Trace.SetPrefix(s)
 }
 
-func IsMuted(printer Printer) bool {
-	_, ok := printer.(Muted)
-	return ok
+type Mutable struct {
+	*log.Logger
+	w     io.Writer
+	mutex sync.Mutex
 }
 
-type Mutable interface {
-	Writer() io.Writer
-	Printer
-}
-
-// Muted [Logger] encapsulation with no-op Print and Write methods.
-type Muted struct{ printer Printer }
-
-func (Muted) Print(v ...any)                 {}
-func (Muted) Printf(format string, v ...any) {}
-func (Muted) Println(v ...any)               {}
-func (Muted) Write(b []byte) (int, error)    { return len(b), nil }
-
-type Printer interface {
-	Print(v ...any)
-	Printf(format string, v ...any)
-	Println(v ...any)
-}
-
-// Unmuted [Logger] encapsulation with an additional Write method.
-type Unmuted struct{ Mutable }
-
-func (um Unmuted) Write(b []byte) (int, error) { return um.Writer().Write(b) }
-
-// either Muted or Unmuted
-type WritePrinter interface {
-	io.Writer
-	Printer
-}
-
-// Mute encapsulates an [Unmuted] [Printer] or [Logger] with no-op methods.
-func Mute(printer Printer) WritePrinter {
-	if m, ok := printer.(Muted); ok {
-		return m
+func NewMutedLogger(w io.Writer) *Mutable {
+	return &Mutable{
+		Logger: log.New(io.Discard, "", log.Lshortfile),
+		w:      w,
 	}
-	if um, ok := printer.(Unmuted); ok {
-		return Mute(um.Mutable)
-	}
-	return Muted{printer}
 }
 
-// Toggle a [Printer]'s [Mute]/[Unmute].
-func ToggleMute(printer Printer) WritePrinter {
-	if m, ok := printer.(Muted); ok {
-		return Unmute(m.printer)
+func NewUnmutedLogger(w io.Writer) *Mutable {
+	return &Mutable{
+		Logger: log.New(w, "", log.Lshortfile),
+		w:      w,
 	}
-	if um, ok := printer.(Unmuted); ok {
-		return Mute(um.Mutable)
-	}
-	return Unmuted{printer.(Mutable)}
 }
 
-// Unmute either de-encapsulates a [Muted] [Printer] or encapsulates a [Logger]
-// with a Write method.
-func Unmute(printer Printer) WritePrinter {
-	if um, ok := printer.(Unmuted); ok {
-		return um
-	}
-	if m, ok := printer.(Muted); ok {
-		return Unmute(m.printer)
-	}
-	return Unmuted{printer.(Mutable)}
+func (m *Mutable) Mute() {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.SetOutput(io.Discard)
 }
 
-// Toggle [Info] [Mute] on recept of [xsignal.Alarm].
-func AlarmHandler(ctx context.Context) {
-	ch := make(chan os.Signal, 2)
-	signal.Notify(ch, xsignal.Alarm)
-	xcontext.Range(ctx, ch, func(sig os.Signal) bool {
-		if sig != xsignal.Alarm {
-			Errata.Println("unexpected", sig)
-			return false
-		}
-		if m, ok := Info.(Muted); ok {
-			Info = Unmute(m)
-			Info.Println("enable info")
-		} else if um, ok := Info.(Unmuted); ok {
-			Info.Println("disable info")
-			Info = Mute(um.Mutable)
-		}
-		if um, ok := Trace.(Unmuted); ok {
-			Trace.Println("disable trace")
-			Trace = Mute(um.Mutable)
-		}
-		return true
-	})
+func (m *Mutable) Toggle() {
+	var w io.Writer = io.Discard
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	if w == m.Writer() {
+		w = m.w
+	}
+	m.SetOutput(w)
+}
+
+func (m *Mutable) Unmute() {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.SetOutput(m.w)
+}
+
+func (m *Mutable) Write(b []byte) (int, error) {
+	return m.Writer().Write(b)
 }

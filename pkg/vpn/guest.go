@@ -265,8 +265,8 @@ selection:
 		case <-ctx.Done():
 			err = ctx.Err()
 		case <-alarm:
-			xlog.Info = xlog.ToggleMute(xlog.Info)
-			xlog.Trace = xlog.Mute(xlog.Trace)
+			xlog.Info.Toggle()
+			xlog.Trace.Mute()
 		case <-vcsChkTkr.C:
 			QueueVcsCheck()
 		case err = <-rest.fault:

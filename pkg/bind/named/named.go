@@ -96,8 +96,7 @@ Mimic BIND9's Internet domain name daemon.
 		return nil
 	}
 
-	xlog.ErrLog.SetFlags(0)
-	xlog.OutLog.SetFlags(0)
+	xlog.SetFlags(0)
 
 	if len(named_c) > 0 {
 		if conf, err = named_conf.NewConf(named_c); err != nil {
