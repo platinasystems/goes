@@ -74,17 +74,14 @@ func (sub *Subscriber) Format(w fmt.State, verb rune) {
 	}
 }
 
-func (sub *Subscriber) helloIsOK(m *xnet.Msg) bool {
+func (sub *Subscriber) helloCheck(m *xnet.Msg) (err error) {
 	m.Data = TruncLabel(m.Data)
 	if len(m.Data) < 2*8 {
-		xlog.Errata.Println("incomplete hello from", sub)
+		err = xerrors.Incomplete("hello from", sub)
 	} else if !sub.verify(m.Data) {
-		xlog.Errata.Println("invalid hello from", sub)
-	} else {
-		xlog.Trace.Println("hello from", sub)
-		return true
+		err = xerrors.Invalid("hello from", sub)
 	}
-	return false
+	return
 }
 
 func (sub *Subscriber) name() string {

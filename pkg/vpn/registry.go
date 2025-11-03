@@ -658,13 +658,15 @@ func (reg *registry) fromVpn(ctx context.Context, m *xnet.Msg) {
 		xlog.Trace.Print("dropped ", from.name(),
 			", version ", from.Id.Version(), " != ", fid.Version())
 	} else if fid == tid {
-		if from.helloIsOK(m) {
+		if err := from.helloCheck(m); err == nil {
 			from.ap = unmap4in6(m.AddrPort)
 			if hello := NewGreeting(0); hello != nil {
 				xlog.Trace.Println("hello reply", from)
 				hello.AddrPort = from.ap
 				mp.Queue(ctx, reg.toVpnC, hello)
 			}
+		} else {
+			xlog.Errata.Println(err)
 		}
 	} else if ti := tid.Index(); ti >= len(reg.indexed) {
 		xlog.Trace.Println("dropped", from.name(), "-> unknown")
@@ -922,7 +924,8 @@ func (reg *registry) reload(rsvp *rsvp) {
 
 func (reg *registry) rest(rsvp *rsvp) {
 	defer rsvp.done()
-	xlog.Trace.Println(rsvp.req.Method, rsvp.req.URL.Path)
+	xlog.Trace.
+		Println(rsvp.req.RemoteAddr, rsvp.req.Method, rsvp.req.URL.Path)
 	switch rsvp.req.Method {
 	case http.MethodGet:
 		switch {
@@ -1026,6 +1029,10 @@ func (reg *registry) rest(rsvp *rsvp) {
 			if reg.atVcsRevision(rsvp) && reg.isAdmin(rsvp) {
 				reg.reload(rsvp)
 			}
+		case rsvp.req.URL.Path == RestReviseIds:
+			if reg.atVcsRevision(rsvp) {
+				reg.reviseIds(rsvp)
+			}
 		case rsvp.req.URL.Path == RestSubscribe:
 			if reg.atVcsRevision(rsvp) {
 				reg.subscribe(rsvp)
@@ -1051,6 +1058,40 @@ func (reg *registry) restsvc() {
 	} else {
 		xlog.Errata.Println("quit rest", reg.http.Addr, err)
 	}
+}
+
+func (reg *registry) reviseIds(rsvp *rsvp) {
+	data, err := io.ReadAll(rsvp.req.Body)
+	if err != nil {
+		http.Error(rsvp, err.Error(), http.StatusBadRequest)
+		return
+	}
+	for i, n := 0, 0; i < len(data); i += n {
+		var id Id
+		n, err = xnet.ByteOrderDecode(data[i:], &id)
+		if err != nil {
+			http.Error(rsvp, err.Error(), http.StatusBadRequest)
+			return
+		}
+		idi := id.Index()
+		if idi >= len(reg.indexed) {
+			http.Error(rsvp, id.String(), http.StatusNotFound)
+			return
+		}
+		sub := reg.indexed[idi]
+		if sub == nil {
+			http.Error(rsvp, "nil subcriber",
+				http.StatusInternalServerError)
+			return
+		}
+		n, err = xnet.ByteOrderEncode(data[i:], sub.Id)
+		if err != nil {
+			http.Error(rsvp, err.Error(),
+				http.StatusInternalServerError)
+			return
+		}
+	}
+	rsvp.Write(data)
 }
 
 func (reg *registry) showAddress(rsvp *rsvp) {

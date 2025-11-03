@@ -50,7 +50,7 @@ Exchange ciphered packets between guests.
 	if err = restInit(); err != nil {
 		return err
 	}
-	defer close(rest.whoisReqC)
+	defer close(rest.reqC)
 
 	exchange.sub = make(map[int]*Subscriber)
 
@@ -58,7 +58,7 @@ Exchange ciphered packets between guests.
 		return err
 	}
 
-	port, err := CheckinExchange(ctx)
+	port, err := RestCheckinExchangeReq(ctx)
 	if err != nil {
 		return err
 	} else if port == 0 {
@@ -71,14 +71,14 @@ Exchange ciphered packets between guests.
 	}
 	defer close(exchange.toVpnC)
 
-	wg.Go(func() { restWhoisService(ctx) })
+	wg.Go(func() { restReqService(ctx) })
 
 	xlog.Trace.Println("start exchange", MyId)
 	defer cancel()
 	defer xlog.Trace.Println("stopping exchange", MyId, "...")
 
-	vcsChkTkr := time.NewTicker(RestVcsCheckInterval)
-	defer vcsChkTkr.Stop()
+	tkr := time.NewTicker(30 * time.Second)
+	defer tkr.Stop()
 
 selection:
 	for err == nil {
@@ -88,14 +88,22 @@ selection:
 		case <-alarm:
 			xlog.Info.Toggle()
 			xlog.Trace.Mute()
-		case <-vcsChkTkr.C:
-			QueueVcsCheck()
+		case <-tkr.C:
+			restQueueVcsCheck(ctx)
 		case err = <-rest.fault:
-		case sub, ok := <-rest.whoisRspC:
+		case v, ok := <-rest.rspC:
 			if !ok {
-				err = RestRestartRequiredErr
 				break selection
-			} else if sub != nil {
+			} else if err, ok = v.(error); ok {
+				xlog.Errata.Print(err)
+				if !needsRestart(err) {
+					err = nil
+				}
+			} else if sub, ok := v.(*Subscriber); !ok {
+				xlog.Errata.Printf("invalid response: %T", v)
+			} else if sub == nil {
+				xlog.Errata.Println("nil subscriber")
+			} else {
 				exchange.sub[sub.Id.Index()] = sub
 				xlog.Trace.Println("guest", sub)
 			}
@@ -123,13 +131,15 @@ func exchangeFromVpn(ctx context.Context, m *xnet.Msg) {
 		restQueueWhois(ctx, fi)
 		xlog.Trace.Println("whois from", fi)
 	} else if fid == tid {
-		if from.helloIsOK(m) {
+		if err := from.helloCheck(m); err == nil {
 			from.ap = unmap4in6(m.AddrPort)
 			if hello := NewGreeting(0); hello != nil {
 				xlog.Trace.Println("hello reply", from)
 				hello.AddrPort = from.ap
 				mp.Queue(ctx, exchange.toVpnC, hello)
 			}
+		} else {
+			xlog.Errata.Println(err)
 		}
 	} else if to, tok := exchange.sub[ti]; !tok ||
 		to.Id.Version() != tid.Version() {

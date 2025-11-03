@@ -30,7 +30,6 @@ import (
 
 	"github.com/platinasystems/goes/v2/pkg/cert"
 	"github.com/platinasystems/goes/v2/pkg/sig"
-	"github.com/platinasystems/goes/v2/pkg/xcontext"
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xflag"
 	"github.com/platinasystems/goes/v2/pkg/xlog"
@@ -57,8 +56,6 @@ const (
 	RestUnixMicroStart = "X-Unix-Micro-Start"
 
 	RestVcsRevision = "X-Vcs-Revision"
-
-	RestVcsCheckInterval = 30 * time.Second
 )
 
 const (
@@ -67,30 +64,32 @@ const (
 	RestApprove         = "/approve"
 	RestCertify         = "/certify"
 	RestCheckin         = "/checkin"
-	RestCheckinExchange = "/checkin/exchange"
-	RestCheckinGuest    = "/checkin/guest"
+	RestCheckinExchange = RestCheckin + "/exchange"
+	RestCheckinGuest    = RestCheckin + "/guest"
 	RestDeny            = "/deny"
 	RestDump            = "/dump"
-	RestDumpSubscribers = "/dump/subscribers"
+	RestDumpSubscribers = RestDump + "/subscribers"
 	RestInvite          = "/invite"
 	RestReload          = "/reload"
+	RestRevise          = "/revise"
+	RestReviseIds       = RestRevise + "/ids"
 	RestShow            = "/show"
-	RestShowAddress     = "/show/address"
-	RestShowAdmins      = "/show/admins"
-	RestShowDomain      = "/show/domain"
-	RestShowExchanges   = "/show/exchanges"
-	RestShowPending     = "/show/pending"
-	RestShowPrefix      = "/show/prefix"
-	RestShowStart       = "/show/start"
-	RestShowStatus      = "/show/status"
-	RestShowSubscriber  = "/show/subscriber"
-	RestShowVCS         = "/show/vcs"
+	RestShowAddress     = RestShow + "/address"
+	RestShowAdmins      = RestShow + "/admins"
+	RestShowDomain      = RestShow + "/domain"
+	RestShowExchanges   = RestShow + "/exchanges"
+	RestShowPending     = RestShow + "/pending"
+	RestShowPrefix      = RestShow + "/prefix"
+	RestShowStart       = RestShow + "/start"
+	RestShowStatus      = RestShow + "/status"
+	RestShowSubscriber  = RestShow + "/subscriber"
+	RestShowVCS         = RestShow + "/vcs"
 	RestSubscribe       = "/subscribe"
 	RestUnsubscribe     = "/unsubscribe"
 	RestWhois           = "/whois"
-	RestWhoisAddressed  = "/whois/addressed"
-	RestWhoisId         = "/whois/id"
-	RestWhoisNamed      = "/whois/named"
+	RestWhoisAddressed  = RestWhois + "/addressed"
+	RestWhoisId         = RestWhois + "/id"
+	RestWhoisNamed      = RestWhois + "/named"
 )
 
 var RestPrefixes = []string{
@@ -102,18 +101,24 @@ var RestPrefixes = []string{
 	RestDump,
 	RestInvite,
 	RestReload,
+	RestRevise,
 	RestShow,
 	RestSubscribe,
 	RestUnsubscribe,
 	RestWhois,
 }
 
+type RestVcsCheck struct{}
+
 const RestOpCheckinExchangePort = "port"
 
-const RestWhoisDepth = 8
+const (
+	RestReqDepth = 8
+	RestRspDepth = 8
+)
 
 var ErrKoApp = errors.New("ko app")
-var ErrNilResponse = errors.New("rest: nil respone")
+var ErrNilResponse = errors.New("rest: nil response")
 
 var ErrCompleteUpgrade = errors.New("complete upgrade")
 var ErrRestartCompleteUpgrade = NewRestartError(ErrCompleteUpgrade)
@@ -130,8 +135,6 @@ func needsRestart(err error) bool {
 		errors.Is(err, ErrRecheckin)
 }
 
-var RestRestartRequiredErr error
-
 var rest struct {
 	bufs sync.Pool
 	crt,
@@ -145,8 +148,10 @@ var rest struct {
 
 	fault chan error
 
-	whoisReqC chan any // name, [Id], or [netip.Addr]
-	whoisRspC chan *Subscriber
+	// name, [Id], [netip.Addr], or []byte encoded [Id]'s
+	reqC chan any
+	// error, *Subscriber, or []byte encoded revised [Id]'s
+	rspC chan any
 }
 
 var RestCertAkaFlag = xflag.Label{"cert", "aka. -ssl-client-cn", &cert.Client}
@@ -175,8 +180,8 @@ func restInit() error {
 	rest.bufs.New = func() any { return new(bytes.Buffer) }
 	rest.vcsrev = xprogram.VcsRevision.String()
 	rest.fault = make(chan error, 1)
-	rest.whoisReqC = make(chan any, RestWhoisDepth)
-	rest.whoisRspC = make(chan *Subscriber, RestWhoisDepth)
+	rest.reqC = make(chan any, RestReqDepth)
+	rest.rspC = make(chan any, RestRspDepth)
 
 	if cs, err := cert.ClientCerts(); err != nil {
 		return err
@@ -227,7 +232,7 @@ func restInit() error {
 	return nil
 }
 
-func Admin(ctx context.Context, args []string) error {
+func RestAdminReq(ctx context.Context, args []string) error {
 	xflag.TemplateUsage(`
 usage: {{.Name}} [flags] <subscriber>
 RESTful registry administration.
@@ -275,7 +280,7 @@ func AssertVcsMatch(ctx context.Context) error {
 	return err
 }
 
-func CheckinExchange(ctx context.Context) (uint16, error) {
+func RestCheckinExchangeReq(ctx context.Context) (uint16, error) {
 	var id uint
 	var port uint16
 
@@ -297,7 +302,7 @@ func CheckinExchange(ctx context.Context) (uint16, error) {
 	return port, nil
 }
 
-func CheckinGuest(ctx context.Context, encap []byte) (
+func RestCheckinGuestReq(ctx context.Context, encap []byte) (
 	*GuestReceipt, error,
 ) {
 	buf := restAlloc()
@@ -322,7 +327,7 @@ func CheckinGuest(ctx context.Context, encap []byte) (
 }
 
 // Certify writes the peer certificate to [RegistryFile].
-func Certify(ctx context.Context, args []string) error {
+func RestCertifyReq(ctx context.Context, args []string) error {
 	xflag.TemplateUsage(`
 usage: {{.Name}} [flags] https://<host>[:port]
 Import registry certificate.
@@ -399,7 +404,7 @@ Import registry certificate.
 	return pem.Encode(wc, &blk)
 }
 
-func Get(ctx context.Context, args []string) error {
+func RestGetReq(ctx context.Context, args []string) error {
 	xflag.TemplateUsage(`
 usage: {{.Name}} [filename]
 Get or list registry file(s).
@@ -426,7 +431,7 @@ Get or list registry file(s).
 	return err
 }
 
-func Invite(ctx context.Context, name string, cipherText []byte) (
+func RestInviteReq(ctx context.Context, name string, cipherText []byte) (
 	[]byte, error,
 ) {
 	buf := restAlloc()
@@ -441,7 +446,7 @@ func Invite(ctx context.Context, name string, cipherText []byte) (
 	return bytes.Clone(buf.Bytes()), nil
 }
 
-func Lookup(ctx context.Context, args []string) error {
+func RestLookupReq(ctx context.Context, args []string) error {
 	const class = xdnsmessage.ClassINET
 
 	xflag.TemplateUsage(`
@@ -494,11 +499,7 @@ Print name of addressed, or address of named subscriber.
 	return nil
 }
 
-func QueueVcsCheck() {
-	rest.whoisReqC <- nil
-}
-
-func Reload(ctx context.Context, args []string) error {
+func RestReloadReq(ctx context.Context, args []string) error {
 	xflag.TemplateUsage(`
 usage: {{.Name}} [flags] [args]
 RESTful reload registry configuration.
@@ -515,7 +516,7 @@ RESTful reload registry configuration.
 	return err
 }
 
-func Show(ctx context.Context, args []string) error {
+func RestShowReq(ctx context.Context, args []string) error {
 	xflag.TemplateUsage(`
 usage: {{.Name}} [flags] [args]
 RESTful query and print registry object.
@@ -539,7 +540,7 @@ RESTful query and print registry object.
 	return err
 }
 
-func Subscribe(ctx context.Context, args []string) error {
+func RestSubscribeReq(ctx context.Context, args []string) error {
 	xflag.TemplateUsage(`
 usage: {{.Name}} [flags]
 RESTful subscribe to VPN.
@@ -566,7 +567,7 @@ RESTful subscribe to VPN.
 	return err
 }
 
-func Update(ctx context.Context, args []string) error {
+func RestUpdateReq(ctx context.Context, args []string) error {
 	xflag.TemplateUsage(`
 usage: {{.Name}} [flags]
 Download and install program update from registry.
@@ -584,15 +585,11 @@ Download and install program update from registry.
 	return err
 }
 
-func Whois(ctx context.Context, v any) (*Subscriber, error) {
+func RestWhoisReq(ctx context.Context, v any) (*Subscriber, error) {
 	var p string
-	var sub *Subscriber
-	var start int64
 	buf := restAlloc()
 	defer restFree(buf)
 	switch t := v.(type) {
-	case nil:
-		p = RestShowStatus
 	case Id:
 		p = path.Join(RestWhoisId, fmt.Sprint(t.Index()))
 	case int:
@@ -602,24 +599,15 @@ func Whois(ctx context.Context, v any) (*Subscriber, error) {
 	case netip.Addr:
 		p = path.Join(RestWhoisAddressed, t.String())
 	default:
-		err := xerrors.Unsupported(fmt.Sprintf("%T", t))
+		return nil, fmt.Errorf("unsupported %T", v)
+	}
+	if _, err := restGet(ctx, buf, p); err != nil {
 		return nil, err
 	}
-	rsp, err := restGet(ctx, buf, p)
-	if err != nil {
-	} else if rsp.StatusCode == http.StatusUpgradeRequired {
-		err = restUpgrade(ctx)
-	} else if start, err = registryStart(rsp); err != nil {
-		err = xerrors.NewExitError(RestartExitCode,
-			NewRestartError(err))
-	} else if rest.start != 0 && rest.start != start {
-		err = ExitRecheckin
-	} else if err == nil && v != nil {
-		sub = new(Subscriber)
-		err = json.Unmarshal(buf.Bytes(), sub)
-		if err == nil {
-			err = sub.validate()
-		}
+	sub := new(Subscriber)
+	err := json.Unmarshal(buf.Bytes(), sub)
+	if err == nil {
+		err = sub.validate()
 	}
 	return sub, err
 }
@@ -711,7 +699,20 @@ func restGet(
 	// optional query {key, value} pairs
 	kv ...string,
 ) (*http.Response, error) {
-	return restRequest(ctx, http.MethodGet, w, "", nil, path, kv...)
+	var start int64
+
+	rsp, err := restRequest(ctx, http.MethodGet, w, "", nil, path, kv...)
+	if rsp.StatusCode == http.StatusUpgradeRequired {
+		err = restUpgrade(ctx)
+	} else if err != nil {
+		// skip to common return
+	} else if start, err = registryStart(rsp); err != nil {
+		err = NewRestartError(err)
+		err = xerrors.NewExitError(RestartExitCode, err)
+	} else if rest.start != 0 && rest.start != start {
+		err = ExitRecheckin
+	}
+	return rsp, err
 }
 
 func restPut(
@@ -727,8 +728,42 @@ func restPut(
 	return restRequest(ctx, http.MethodPut, w, ct, r, path, kv...)
 }
 
-func restQueueWhois(ctx context.Context, v any) bool {
-	return xcontext.Queue(ctx, rest.whoisReqC, v)
+func restQueueReq(ctx context.Context, v any) (ok bool) {
+	select {
+	case <-ctx.Done():
+	case rest.reqC <- v:
+		ok = true
+	default:
+		xlog.Errata.Println("can't queue req:", v)
+	}
+	return
+}
+
+func restQueueReviseIds(ctx context.Context, b []byte) bool {
+	var ok bool
+	if n := len(b) / SizeofId; n > 0 {
+		ok = restQueueReq(ctx, b)
+	}
+	return ok
+}
+
+func restQueueVcsCheck(ctx context.Context) bool {
+	return restQueueReq(ctx, RestVcsCheck{})
+}
+
+func restQueueWhois(ctx context.Context, subref any) bool {
+	return restQueueReq(ctx, subref)
+}
+
+func restQueueRsp(ctx context.Context, v any) (ok bool) {
+	select {
+	case <-ctx.Done():
+	case rest.rspC <- v:
+		ok = true
+	default:
+		xlog.Errata.Println("can't queue rsp:", v)
+	}
+	return
 }
 
 func restRequest(
@@ -768,6 +803,19 @@ func restRequest(
 		req.Header.Set("Content-Type", ct)
 	}
 	return restDo(w, req)
+}
+
+func restReviseIds(ctx context.Context, b []byte) error {
+	buf := restAlloc()
+	defer restFree(buf)
+	_, err := restPut(ctx, buf,
+		"application/octet-stream; big-endian=true",
+		bytes.NewReader(b),
+		RestReviseIds)
+	if err == nil {
+		copy(b, buf.Bytes())
+	}
+	return err
 }
 
 // Fetch and install upgrade then return [xerrors.ExitError]
@@ -815,6 +863,13 @@ func restUpgrade(ctx context.Context) error {
 	return ExitCompleteUpgrade
 }
 
+func restVcsCheck(ctx context.Context) error {
+	buf := restAlloc()
+	defer restFree(buf)
+	_, err := restGet(ctx, buf, RestShowStatus)
+	return err
+}
+
 func restWaitForResolution(ctx context.Context) error {
 	const timeout = time.Minute
 	var err error
@@ -824,29 +879,37 @@ func restWaitForResolution(ctx context.Context) error {
 	return err
 }
 
-func restWhoisService(ctx context.Context) {
+func restReqService(ctx context.Context) {
 	cn := rest.crt.Subject.CommonName
 
 	xlog.Trace.Println("start", cn, "whois request service")
 	defer xlog.Trace.Println("stopped", cn, "whois request service")
-	defer close(rest.whoisRspC)
+	defer close(rest.rspC)
 
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case q, ok := <-rest.whoisReqC:
+		case v, ok := <-rest.reqC:
 			if !ok {
 				return
 			}
-			sub, err := Whois(ctx, q)
-			if err == nil {
-				xcontext.Queue(ctx, rest.whoisRspC, sub)
-			} else if needsRestart(err) {
-				RestRestartRequiredErr = err
-				return
+			if b, ok := v.([]byte); ok {
+				if err := restReviseIds(ctx, b); err != nil {
+					restQueueRsp(ctx, err)
+				} else {
+					restQueueRsp(ctx, b)
+				}
+			} else if _, ok := v.(RestVcsCheck); ok {
+				if err := restVcsCheck(ctx); err != nil {
+					restQueueRsp(ctx, err)
+				}
+			} else if sub, err := RestWhoisReq(ctx, v); err != nil {
+				restQueueRsp(ctx, err)
+			} else if sub == nil {
+				restQueueRsp(ctx, errors.New("nil sub"))
 			} else {
-				xlog.Errata.Print(err)
+				restQueueRsp(ctx, sub)
 			}
 		}
 	}

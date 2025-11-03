@@ -26,34 +26,34 @@ var Features = map[string]any{
 }
 
 var MainFeatures = map[string]any{
-	"approve":     Admin,
-	"certify":     Certify,
-	"deny":        Admin,
+	"approve":     RestAdminReq,
+	"certify":     RestCertifyReq,
+	"deny":        RestAdminReq,
 	"exchange":    Exchange,
-	"get":         Get,
+	"get":         RestGetReq,
 	"guest":       Guest,
 	"im":          InstantMessaging,
-	"lookup":      Lookup,
+	"lookup":      RestLookupReq,
 	"nc":          NetCat,
 	"ping":        Ping,
-	"reload":      Reload,
+	"reload":      RestReloadReq,
 	"registry":    Registry,
-	"subscribe":   Subscribe,
-	"unsubscribe": Admin,
-	"update":      Update,
+	"subscribe":   RestSubscribeReq,
+	"unsubscribe": RestAdminReq,
+	"update":      RestUpdateReq,
 }
 
 var ShowFeatures = map[string]any{
-	"address":    Show,
-	"admins":     Show,
-	"domain":     Show,
-	"exchanges":  Show,
-	"pending":    Show,
-	"prefix":     Show,
-	"start":      Show,
-	"status":     Show,
-	"subscriber": Show,
-	"vcs":        Show,
+	"address":    RestShowReq,
+	"admins":     RestShowReq,
+	"domain":     RestShowReq,
+	"exchanges":  RestShowReq,
+	"pending":    RestShowReq,
+	"prefix":     RestShowReq,
+	"start":      RestShowReq,
+	"status":     RestShowReq,
+	"subscriber": RestShowReq,
+	"vcs":        RestShowReq,
 }
 
 const (

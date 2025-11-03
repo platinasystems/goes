@@ -45,8 +45,7 @@ const (
 
 	TunPersist = false
 
-	helloInterval = 10 * time.Second
-	noReplyLimit  = 3
+	noReplyLimit = 3
 
 	minWhoisRetryTicks = 6
 )
@@ -55,6 +54,9 @@ var guest struct {
 	addressed map[netip.Addr]*Subscriber
 	indexed   map[int]*Subscriber
 	exchanges []*Subscriber
+
+	//xnet.ByteOrder
+	revbuf []byte
 
 	tick uint64
 
@@ -110,7 +112,7 @@ Forward ciphered packets between exchange and tunnel interface.
 	if err = restInit(); err != nil {
 		return err
 	}
-	defer close(rest.whoisReqC)
+	defer close(rest.reqC)
 
 	guest.addressed = make(map[netip.Addr]*Subscriber)
 	guest.indexed = make(map[int]*Subscriber)
@@ -124,7 +126,7 @@ Forward ciphered packets between exchange and tunnel interface.
 		return err
 	}
 	encapKey := guest.decapKey.EncapsulationKey()
-	guest.receipt, err = CheckinGuest(ctx, encapKey.Bytes())
+	guest.receipt, err = RestCheckinGuestReq(ctx, encapKey.Bytes())
 	if err != nil {
 		return err
 	}
@@ -133,7 +135,7 @@ Forward ciphered packets between exchange and tunnel interface.
 	regname := rest.reg.Subject.CommonName
 	guest.exchanges =
 		make([]*Subscriber, 1+len(guest.receipt.ExchangePrecedence))
-	x, err := Whois(ctx, regname)
+	x, err := RestWhoisReq(ctx, regname)
 	if err != nil {
 		return fmt.Errorf("%s: %w", regname, err)
 	}
@@ -151,7 +153,7 @@ Forward ciphered packets between exchange and tunnel interface.
 	guest.indexed[x.Id.Index()] = x
 
 	for i, name := range guest.receipt.ExchangePrecedence {
-		if x, err = Whois(ctx, name); err != nil {
+		if x, err = RestWhoisReq(ctx, name); err != nil {
 			xlog.Errata.Printf("%s: %w", name, err)
 		} else {
 			guest.exchanges[1+i] = x
@@ -240,17 +242,14 @@ Forward ciphered packets between exchange and tunnel interface.
 		}
 	}
 
-	helloTkr := time.NewTicker(helloInterval)
-	defer helloTkr.Stop()
-
-	vcsChkTkr := time.NewTicker(RestVcsCheckInterval)
-	defer vcsChkTkr.Stop()
+	tkr := time.NewTicker(10 * time.Second)
+	defer tkr.Stop()
 
 	alarm := make(chan os.Signal, 2)
 	signal.Notify(alarm, xsignal.Alarm)
 	defer signal.Stop(alarm)
 
-	wg.Go(func() { restWhoisService(ctx) })
+	wg.Go(func() { restReqService(ctx) })
 
 	guestStartTunneling(ctx)
 	defer close(guest.toTunC)
@@ -267,18 +266,32 @@ selection:
 		case <-alarm:
 			xlog.Info.Toggle()
 			xlog.Trace.Mute()
-		case <-vcsChkTkr.C:
-			QueueVcsCheck()
 		case err = <-rest.fault:
-		case t := <-helloTkr.C:
+		case t := <-tkr.C:
 			guest.tick += 1
-			guestHelloToAllExchanges(ctx, t.UnixMicro())
-		case sub, ok := <-rest.whoisRspC:
+			if (guest.tick & 1) == 1 {
+				guestHelloToAllExchanges(ctx, t.UnixMicro())
+			}
+			switch guest.tick & 7 {
+			case 4:
+				restQueueVcsCheck(ctx)
+			case 6:
+				guestReqIdRev(ctx)
+			}
+		case v, ok := <-rest.rspC:
 			if !ok {
-				err = RestRestartRequiredErr
 				break selection
-			} else if sub != nil {
+			} else if err, ok = v.(error); ok {
+				xlog.Errata.Print(err)
+				if !needsRestart(err) {
+					err = nil
+				}
+			} else if b, ok := v.([]byte); ok {
+				guestRevIds(b)
+			} else if sub, ok := v.(*Subscriber); ok {
 				guestFound(ctx, sub)
+			} else {
+				xlog.Errata.Printf("invalid response: %T", v)
 			}
 		case m, ok := <-guest.fromTunC:
 			if !ok {
@@ -294,6 +307,7 @@ selection:
 			if !ok {
 				break selection
 			}
+			xlog.Trace.Println("peered w/", sub)
 			if m := guest.pending.tx; m != nil {
 				da, err := netpdu.TunPI(m.Data).ToWhom()
 				if err == nil && da.Compare(sub.Addr) == 0 {
@@ -391,6 +405,11 @@ func guestExchangeWith(ctx context.Context, x *Subscriber) {
 func guestFound(ctx context.Context, sub *Subscriber) {
 	var cipherText []byte
 
+	if sub == nil {
+		xlog.Errata.Print("nil subscriber")
+		return
+	}
+
 	name := sub.name()
 
 	if name == rest.reg.Subject.CommonName {
@@ -428,7 +447,7 @@ func guestFound(ctx context.Context, sub *Subscriber) {
 	sub.sharedKey, cipherText = encap.Encapsulate()
 
 	wg.Go(func() {
-		invite, err := Invite(ctx, name, cipherText)
+		invite, err := RestInviteReq(ctx, name, cipherText)
 		if err != nil {
 			xlog.Errata.Println(name, "invite:", err)
 			guestDiscardPending(sub)
@@ -484,13 +503,11 @@ func guestFromTun(ctx context.Context, m *xnet.Msg) {
 		xlog.Trace.Println("dropped", pdu)
 		mp.Put(m)
 	} else if to, ok := guest.addressed[da]; !ok {
-		xlog.Trace.Println("queue whois", da)
 		guestNewPendingTx(m)
 		restQueueWhois(ctx, da)
 	} else if len(to.EncapKey) == 0 {
 		if to.lt == 0 || to.ticks(guest.tick) > minWhoisRetryTicks {
 			to.lt = guest.tick
-			xlog.Trace.Println("re-queue whois", da)
 			guestNewPendingTx(m)
 			restQueueWhois(ctx, da)
 		} else {
@@ -522,13 +539,16 @@ func guestFromVpn(ctx context.Context, m *xnet.Msg) {
 		xlog.Trace.Println("queue whois", fid)
 		restQueueWhois(ctx, fid)
 	} else if tid == fid {
-		if from.helloIsOK(m) {
+		if err := from.helloCheck(m); err == nil {
+			xlog.Trace.Println("hello from", from)
 			from.lt = guest.tick
 			from.ap = unmap4in6(m.AddrPort)
 			if from.ap.Port() == 0 {
 				from.ap = netip.AddrPortFrom(from.ap.Addr(),
 					DefaultExchangePort)
 			}
+		} else {
+			xlog.Errata.Println(err)
 		}
 		mp.Put(m)
 	} else if tid != MyId {
@@ -573,6 +593,55 @@ func guestHelloToAllExchanges(ctx context.Context, now int64) {
 			}
 		}
 	}
+}
+
+func guestReqIdRev(ctx context.Context) {
+	var err error
+	n := len(guest.indexed)
+	if n == 0 {
+		return
+	}
+	if len(guest.revbuf) == 0 {
+		guest.revbuf = make([]byte, 0, n*SizeofId)
+	} else {
+		guest.revbuf = guest.revbuf[:0]
+	}
+	for _, sub := range guest.indexed {
+		guest.revbuf, err = xnet.ByteOrderAppend(guest.revbuf, sub.Id)
+		if err != nil {
+			xlog.Errata.Print(err)
+		}
+	}
+	xlog.Trace.Println("req revision of", n, "peer(s)")
+	restQueueReviseIds(ctx, guest.revbuf)
+}
+
+func guestRevIds(b []byte) {
+	n := len(b) / SizeofId
+	if n == 0 {
+		xlog.Trace.Print("no revised peers")
+		return
+	}
+	for len(b) >= SizeofId {
+		var id Id
+		var err error
+		b, err = xnet.ByteOrderRemove(b, &id)
+		if err != nil {
+			xlog.Errata.Print(err)
+			break
+		}
+		if sub, ok := guest.indexed[id.Index()]; !ok {
+			xlog.Errata.Println(id, xerrors.ErrNotFound)
+		} else if sub.Id.Version() != id.Version() {
+			xlog.Trace.Println("must update", sub.name())
+			sub.EncapKey = sub.EncapKey[:0]
+			sub.sharedKey = sub.sharedKey[:0]
+			sub.cb = nil
+			sub.gcm = nil
+			sub.lt = guest.tick
+		}
+	}
+	xlog.Trace.Println("revised", n, "peer(s)")
 }
 
 func guestRx(ctx context.Context, from *Subscriber, m *xnet.Msg) {

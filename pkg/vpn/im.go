@@ -120,7 +120,7 @@ func imFrom(ctx context.Context, addr netip.Addr) string {
 	if ok {
 		return name
 	}
-	sub, err := Whois(ctx, addr)
+	sub, err := RestWhoisReq(ctx, addr)
 	if err == nil {
 		name = sub.name()
 		im.addressed[sub.Addr] = name
@@ -203,7 +203,7 @@ func imTo(ctx context.Context, to []string) (aps []netip.AddrPort, err error) {
 	for _, s := range to {
 		if ap, ok := im.named[s]; ok {
 			aps = append(aps, ap)
-		} else if sub, err = Whois(ctx, s); err == nil {
+		} else if sub, err = RestWhoisReq(ctx, s); err == nil {
 			ap := netip.
 				AddrPortFrom(sub.Addr, uint16(imPort))
 			aps = append(aps, ap)
