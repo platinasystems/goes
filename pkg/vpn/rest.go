@@ -549,21 +549,11 @@ RESTful subscribe to VPN.
 
 	err := RestFlags.Define()
 	if err != nil {
-		return err
 	} else if err = flag.CommandLine.Parse(args); err != nil {
-		return err
 	} else if err = restInit(); err != nil {
-		return err
+	} else {
+		_, err = restPut(ctx, os.Stdout, "", nil, RestSubscribe)
 	}
-
-	clone := *rest.url
-	clone.Path = RestSubscribe
-	req, err := http.
-		NewRequestWithContext(ctx, http.MethodPut, clone.String(), nil)
-	if err != nil {
-		return xerrors.Mark(err)
-	}
-	_, err = restDo(os.Stdout, req)
 	return err
 }
 
