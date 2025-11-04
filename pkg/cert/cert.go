@@ -87,6 +87,8 @@ The file or distinguished name (DN) of the server certificate.
 			Server = s
 		} else if s, ok = os.LookupEnv("SSL_SERVER_DN"); ok {
 			Server = s
+		} else {
+			Server = Client
 		}
 		return &Server
 	}}
