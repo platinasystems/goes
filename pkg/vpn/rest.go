@@ -465,38 +465,27 @@ Print name of addressed, or address of named subscriber.
 	} else if err = restInit(); err != nil {
 		return err
 	}
+
 	clone := *rest.url
 	clone.Path = DnsQuery
-	doh := xdnsdoh.Asker(&rest.Client, clone.String())
-	b := xdnsmessage.MakeBuffer()
-	name := args[0]
-	types := []xdnsmessage.Type{xdnsmessage.TypeA, xdnsmessage.TypeAAAA}
-	if addr, err := netip.ParseAddr(args[0]); err == nil {
-		name = xdnsmessage.Reverse(addr)
-		types[0] = xdnsmessage.TypePTR
-		types = types[:1]
-	}
-	us := xdnsmessage.MakeUniqueString(name)
-	for _, t := range types {
-		var rsp xdnsmessage.Message
-		q := xdnsmessage.NewQuery(true, us, class, t)
-		if b, err = q.AppendTo(b[:0]); err != nil {
-			return err
+	doh := xdnsdoh.NewClient(&rest.Client, clone.String(), "")
+
+	if addr, pe := netip.ParseAddr(args[0]); pe == nil {
+		var names []string
+		if names, err = doh.LookupName(ctx, addr); err == nil {
+			for _, name := range names {
+				fmt.Println(name)
+			}
 		}
-		if b, err = doh.Ask(ctx, b); err != nil {
-			return err
-		}
-		if err = rsp.UnmarshalBinary(b); err != nil {
-			return err
-		}
-		if rsp.ID != q.ID {
-			return fmt.Errorf("id %d != %d", rsp.ID, q.ID)
-		}
-		for _, a := range rsp.Answers {
-			fmt.Println(name, a)
+	} else {
+		var addrs []netip.Addr
+		if addrs, err = doh.LookupNetIP(ctx, args[0]); err == nil {
+			for _, addr := range addrs {
+				fmt.Println(addr)
+			}
 		}
 	}
-	return nil
+	return err
 }
 
 func RestReloadReq(ctx context.Context, args []string) error {

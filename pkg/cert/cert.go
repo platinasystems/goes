@@ -8,6 +8,7 @@ import (
 	"bufio"
 	"context"
 	"crypto/rand"
+	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
@@ -18,6 +19,7 @@ import (
 	"io/fs"
 	"math"
 	"math/big"
+	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -63,16 +65,49 @@ The file or common name (CN) of the client certificate.
 	}}
 )
 
-var ConfigAndStateCerts = sync.OnceValues(func() (
+// Parse *.pem files w/in [xmain.ConfigDir] for [BlockType] certificates.
+var MainConfigDirCerts = sync.OnceValues(func() (
 	[]*x509.Certificate, error,
 ) {
-	cs, err := parse(xmain.ConfigDir)
-	if xmain.StateDir != xmain.ConfigDir {
-		if state, err := parse(xmain.StateDir); err == nil {
-			cs = append(cs, state...)
+	return parse(xmain.ConfigDir)
+})
+
+// [MainConfigCerts] added to [x509.SystemCertPool].
+func MainConfigDirPlusSystemCertPool() (*x509.CertPool, error) {
+	pool, err := x509.SystemCertPool()
+	if err == nil {
+		var cs []*x509.Certificate
+		if cs, err = MainConfigDirCerts(); err == nil {
+			for _, c := range cs {
+				pool.AddCert(c)
+			}
 		}
 	}
-	return cs, err
+	return pool, err
+}
+
+var MainConfigAndStateDirCerts = sync.OnceValues(func() (
+	certs []*x509.Certificate, err error,
+) {
+	certs, err = MainConfigDirCerts()
+	if err == nil {
+		var state []*x509.Certificate
+		if state, err = MainStateDirCerts(); err == nil {
+			certs = append(certs, state...)
+		}
+	}
+	return
+})
+
+// If [xmain.StateDir] doesn't equal [xmain.ConfigDir],
+// parse all of its *.pem files for [BlockType] certificates.
+var MainStateDirCerts = sync.OnceValues(func() (
+	state []*x509.Certificate, err error,
+) {
+	if xmain.StateDir != xmain.ConfigDir {
+		state, err = parse(xmain.StateDir)
+	}
+	return
 })
 
 var (
@@ -308,6 +343,22 @@ Create PEM encoded x509 certificate file.
 	return pem.Encode(w, blk)
 }
 
+func NewHTTPClient() (*http.Client, error) {
+	rootCAs, err := MainConfigDirPlusSystemCertPool()
+	if err != nil {
+		return nil, err
+	}
+	tp := http.DefaultTransport.(*http.Transport).Clone()
+	tp.TLSClientConfig = &tls.Config{
+		MinVersion:         tls.VersionTLS13,
+		InsecureSkipVerify: !Verify,
+		RootCAs:            rootCAs,
+	}
+	return &http.Client{
+		Transport: tp,
+	}, nil
+}
+
 // Print parsed certificate(s).
 func Show(ctx context.Context, args []string) error {
 	xflag.TemplateUsage(`
@@ -430,7 +481,7 @@ func namedCerts(name string) ([]*x509.Certificate, error) {
 			return decode(r)
 		}
 	}
-	certs, err := ConfigAndStateCerts()
+	certs, err := MainConfigAndStateDirCerts()
 	if err == nil {
 		for _, c := range certs {
 			if c.Subject.CommonName == name {

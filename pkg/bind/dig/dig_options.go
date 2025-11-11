@@ -568,6 +568,8 @@ func (o *options) set(name string) error {
 	case "https", "https-post":
 		if o.https = val; len(o.https) == 0 {
 			o.https = "/dns-query"
+		} else if !strings.HasPrefix(o.https, "/") {
+			o.https = fmt.Sprint("/", o.https)
 		}
 	case "https-get":
 		err = xerrors.Unsupported(name)

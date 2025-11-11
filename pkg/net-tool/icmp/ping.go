@@ -8,10 +8,11 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"net"
 	"time"
-	"unicode"
 
 	"github.com/platinasystems/goes/v2/pkg/xflag"
+	"github.com/platinasystems/goes/v2/pkg/xmain"
 	"github.com/platinasystems/goes/v2/pkg/xnet/xdns/xdnsdoh"
 	probing "github.com/prometheus-community/pro-bing"
 )
@@ -28,7 +29,7 @@ Send ICMP ECHO_REQUEST packets to network “host”, default 127.0.0.1.
 	timeout := 3 * time.Second
 
 	err := xflag.Labels{
-		xdnsdoh.URLFlag,
+		xmain.ConfigFlag,
 		{"c", "Count.", &count},
 		{"i", "Interval.", &interval},
 		{"m", "Request Time To Live.", &ttl},
@@ -50,27 +51,31 @@ Send ICMP ECHO_REQUEST packets to network “host”, default 127.0.0.1.
 		host = args[0]
 	}
 
-	isNumericHost := unicode.IsLetter(rune(host[0]))
-
-	pinger, err := probing.NewPinger(host)
+	addrs, err := xdnsdoh.LookupNetIP(ctx, host)
 	if err != nil {
 		return err
 	}
+	ipaddr := &net.IPAddr{
+		IP: net.IP(addrs[0].AsSlice()),
+	}
+	nw := "ip"
+	if addrs[0].Is4() {
+		nw = "ip4"
+	} else if addrs[0].Is6() {
+		nw = "ip6"
+	}
 
+	pinger := probing.New(host)
 	pinger.Count = count
 	pinger.Interval = interval
-
 	if timeout != 0 {
 		pinger.Timeout = timeout
 	}
 	if ttl != 0 {
 		pinger.TTL = ttl
 	}
-	if !isNumericHost {
-		if err = pinger.Resolve(); err != nil {
-			return err
-		}
-	}
+	pinger.SetNetwork(nw)
+	pinger.SetIPAddr(ipaddr)
 
 	/* e.g.
 	PING localhost (127.0.0.1): 56 data bytes

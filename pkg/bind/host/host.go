@@ -6,11 +6,13 @@ package host
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
-	"strings"
+	"io/fs"
 	"time"
 
+	"github.com/platinasystems/goes/v2/pkg/cert"
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xflag"
 	"github.com/platinasystems/goes/v2/pkg/xlog"
@@ -33,13 +35,16 @@ var host_t = xdnsmessage.TypeA
 
 var hostFlags = xflag.Labels{
 	xlog.VerboseFlag,
+	xmain.ConfigFlag,
+	xmain.StateFlag,
+	cert.VerifyFlag,
 	{"4", "Only use IPv4 query transport.", &host_4},
 	{"6", "Only use IPv6 query transport.", &host_6},
 	{"A", "Like -a but omits RRSIG, NSEC, NSEC3.", &host_A},
 	{"C", `Compare SOA records on authoritative servers.`[1:], &host_C},
 	{"N", "Number of dots before root lookup is done.", &host_N},
 	{"R", "UDP retries.", &host_R},
-	{"S", "Skip DOH server verification.", &host_S},
+	{"S", "Skip DOH server verification. (or. -ssl-verify=false)", &host_S},
 	{"T", "TCP mode.", &host_T},
 	{"U", "UDP mode.", &host_U},
 	{"V", "Print version number and exit.", &host_V},
@@ -76,7 +81,12 @@ Mimic BIND9's DNS lookup utility.
 		return err
 	}
 
-	svr := "localhost:domain"
+	if host_V {
+		fmt.Println(xmain.Version())
+		return nil
+	}
+
+	svr := "localhost"
 
 	explanations := map[xdnsmessage.Type]string{
 		xdnsmessage.TypeA:     "has address",
@@ -95,10 +105,6 @@ Mimic BIND9's DNS lookup utility.
 		xdnsmessage.TypeLOC:   "location",
 	}
 
-	if host_V {
-		fmt.Println(xmain.Version())
-		return nil
-	}
 	args = flag.CommandLine.Args()
 	if len(args) == 0 {
 		return xerrors.Incomplete("name")
@@ -106,13 +112,16 @@ Mimic BIND9's DNS lookup utility.
 		name = args[0]
 		args = args[1:]
 	}
+
 	if len(args) > 0 {
 		svr = args[0]
 	}
 
 	b := xdnsmessage.MakeBuffer()
-	if strings.HasPrefix(svr, "https:") {
-		dns = xdnsdoh.New(host_S, svr)
+
+	if dns, err = xdnsdoh.New(); err == nil {
+	} else if !errors.Is(err, fs.ErrNotExist) {
+		return err
 	} else {
 		nw := "udp"
 		if host_4 {

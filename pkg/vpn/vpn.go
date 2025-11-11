@@ -35,7 +35,6 @@ var MainFeatures = map[string]any{
 	"im":          InstantMessaging,
 	"lookup":      RestLookupReq,
 	"nc":          NetCat,
-	"ping":        Ping,
 	"reload":      RestReloadReq,
 	"registry":    Registry,
 	"subscribe":   RestSubscribeReq,

@@ -8,70 +8,117 @@ package xdnsdoh
 import (
 	"bytes"
 	"context"
-	"crypto/tls"
-	"crypto/x509"
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
+	"net"
 	"net/http"
-	"os"
+	"net/netip"
 	"strings"
+	"sync"
 
-	"github.com/platinasystems/goes/v2/pkg/xflag"
+	"github.com/platinasystems/goes/v2/pkg/cert"
+	"github.com/platinasystems/goes/v2/pkg/kvc"
+	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xmain"
-	"github.com/platinasystems/goes/v2/pkg/xnet/xdns"
+	"github.com/platinasystems/goes/v2/pkg/xnet/xdns/xdnsmessage"
 )
 
-var (
-	URL     string
-	URLFlag = xflag.Label{"doh-url", `
-DNS Over HTTPS server URL.
-(or $<main>_DOH_URL, $DOH_URL, $CF_DNS_RESOLVER_URL)`[1:], func() any {
-		if s, ok := xmain.LookupEnv("DOH_URL"); ok {
-			URL = s
-		} else if s, ok = os.LookupEnv("DOH_URL"); ok {
-			URL = s
-		} else if s, ok = os.LookupEnv("CF_DNS_RESOLVER_URL"); ok {
-			URL = s
+type Config struct {
+	URL, Search string
+}
+
+var GetConfig = sync.OnceValues(func() (cfg Config, err error) {
+	fn := xmain.ConfigFile("doh")
+	err = kvc.RangeFile(fn, func(s string) []string {
+		s = strings.TrimSpace(s)
+		if len(s) == 0 || []rune(s)[0] == '#' {
+			return nil
 		}
-		return &URL
-	}}
-)
+		args := strings.Fields(s)
+		for i, arg := range args {
+			if len(arg) == 0 || []rune(arg)[0] == '#' {
+				args = args[:i]
+				break
+			}
+		}
+		return args
+	}, func(lno int, key string, values []string) error {
+		if len(values) < 0 {
+			return xerrors.Label(xerrors.Incomplete(lno), fn)
+		}
+		switch key {
+		case "search":
+			cfg.Search = values[0]
+		case "url":
+			cfg.URL = values[0]
+		default:
+			return xerrors.Label(xerrors.Invalid(lno), fn)
+		}
+		return nil
+	})
+	return
+})
 
-// From [x509.SystemCertPool]:
-//
-//	On Unix systems other than macOS the environment variables
-//	SSL_CERT_FILE and SSL_CERT_DIR can be used to override the system
-//	default locations for the SSL certificate file and SSL certificate
-//	files directory, respectively.  The latter can be a colon-separated
-//	list.
-//
-// Or enable “insecureSkipVerify”.
-func New(insecureSkipVerify bool, url string) xdns.Asker {
-	cfg := &tls.Config{
-		MinVersion:         tls.VersionTLS13,
-		InsecureSkipVerify: insecureSkipVerify,
+// Return successful [netip.ParseAddr];
+// or the returned lookup on non-empty the configured URL
+// or [net.DefaultResolver].
+// A nil-error result will always return at least one [netip.Addr].
+func LookupNetIP(ctx context.Context, s string) ([]netip.Addr, error) {
+	var (
+		addr  netip.Addr
+		addrs []netip.Addr
+		doh   *DOH
+		err   error
+	)
+	if addr, err = netip.ParseAddr(s); err == nil {
+		if addr.Is4In6() {
+			addr = addr.Unmap()
+		}
+		addrs = []netip.Addr{addr}
+	} else if doh, err = New(); err == nil {
+		addrs, err = doh.LookupNetIP(ctx, s)
+	} else if errors.Is(err, fs.ErrNotExist) {
+		addrs, err = net.DefaultResolver.LookupNetIP(ctx, "ip", s)
 	}
-	if rcas, err := x509.SystemCertPool(); err != nil {
-		cfg.RootCAs = x509.NewCertPool()
-	} else {
-		cfg.RootCAs = rcas
+	if err == nil && len(addrs) == 0 {
+		err = xerrors.NotFound(s)
 	}
-	tp := http.DefaultTransport.(*http.Transport).Clone()
-	tp.TLSClientConfig = cfg
-	return doh{&http.Client{Transport: tp}, url}
+	return addrs, err
 }
 
-func Asker(cl *http.Client, url string) xdns.Asker {
-	return doh{cl, url}
-}
-
-type doh struct {
+type DOH struct {
 	*http.Client
-	url string
+	buf []byte
+	url,
+	search string
 }
 
-func (doh doh) Ask(ctx context.Context, b []byte) ([]byte, error) {
+// Create [http.Client] of [URL] to ask DOH queries.
+func New() (*DOH, error) {
+	cfg, err := GetConfig()
+	if err != nil {
+		return nil, err
+	}
+	httpc, err := cert.NewHTTPClient()
+	if err != nil {
+		return nil, err
+	}
+	return NewClient(httpc, cfg.URL, cfg.Search), nil
+}
+
+// Use [http.Client] to ask DOH queries from “url”.
+func NewClient(cl *http.Client, url, search string) *DOH {
+	return &DOH{
+		Client: cl,
+		buf:    xdnsmessage.MakeBuffer(),
+		url:    url,
+		search: search,
+	}
+}
+
+func (doh *DOH) Ask(ctx context.Context, b []byte) ([]byte, error) {
 	r := bytes.NewReader(b)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, doh.url, r)
 	if err != nil {
@@ -86,15 +133,105 @@ func (doh doh) Ask(ctx context.Context, b []byte) ([]byte, error) {
 		return b[:0], errors.New("nil")
 	}
 	defer rsp.Body.Close()
-	if rsp.StatusCode != http.StatusOK {
-		sb := new(strings.Builder)
-		io.Copy(sb, rsp.Body)
-		if sb.Len() == 0 {
-			return b[:0], errors.New(rsp.Status)
-		}
-		return b[:0], fmt.Errorf("%s, %s", rsp.Status, sb.String())
+	if rsp.StatusCode == http.StatusOK {
+		buf := new(bytes.Buffer)
+		io.Copy(buf, rsp.Body)
+		return buf.Bytes(), nil
 	}
-	buf := new(bytes.Buffer)
-	io.Copy(buf, rsp.Body)
-	return buf.Bytes(), nil
+	sb := new(strings.Builder)
+	io.Copy(sb, rsp.Body)
+	if sb.Len() == 0 {
+		return b[:0], errors.New(rsp.Status)
+	}
+	return b[:0], fmt.Errorf("%s, %s", rsp.Status, sb.String())
+}
+
+func (doh *DOH) RecursiveLookup(
+	ctx context.Context,
+	us xdnsmessage.UniqueString,
+	c xdnsmessage.Class,
+	t xdnsmessage.Type,
+) (answers []xdnsmessage.WireResource, err error) {
+	var rsp xdnsmessage.Message
+	q := xdnsmessage.NewQuery(true, us, c, t)
+	doh.buf, err = q.AppendTo(doh.buf[:0])
+	if err == nil {
+		if doh.buf, err = doh.Ask(ctx, doh.buf); err == nil {
+			if err = rsp.UnmarshalBinary(doh.buf); err == nil {
+				if rsp.ID == q.ID {
+					answers = rsp.Answers
+				} else {
+					err = fmt.Errorf("rsp id %d != req %d",
+						rsp.ID, q.ID)
+				}
+			}
+		}
+	}
+	return
+}
+
+// Like [net.Resolver.LookupAddr] but with [netip.Addr]
+// instead of string parameter.
+func (doh *DOH) LookupName(ctx context.Context, addr netip.Addr) (
+	names []string, err error,
+) {
+	const (
+		class   = xdnsmessage.ClassINET
+		typePTR = xdnsmessage.TypePTR
+	)
+	name := xdnsmessage.Reverse(addr)
+	us := xdnsmessage.MakeUniqueString(name)
+	ans, err := doh.RecursiveLookup(ctx, us, class, typePTR)
+	if err != nil {
+		return
+	}
+	for _, a := range ans {
+		names = append(names, a.String())
+	}
+	return
+}
+
+// Like [net.Resolver.LookupNetIP] w/o the “network” parameter.
+func (doh *DOH) LookupNetIP(ctx context.Context, name string) (
+	addr []netip.Addr, err error,
+) {
+	const (
+		class    = xdnsmessage.ClassINET
+		typeA    = xdnsmessage.TypeA
+		typeAAAA = xdnsmessage.TypeAAAA
+	)
+	if !strings.Contains(name, ".") {
+		if len(doh.search) == 0 {
+			err = xerrors.Incomplete(name)
+			return
+		}
+		if !strings.HasPrefix(doh.search, ".") {
+			name += "."
+		}
+		name += doh.search
+	}
+	if !strings.HasSuffix(name, ".") {
+		name += "."
+	}
+	us := xdnsmessage.MakeUniqueString(name)
+	ans, err := doh.RecursiveLookup(ctx, us, class, typeA)
+	if err != nil {
+		return
+	}
+	for _, a := range ans {
+		if a.Type() == typeA {
+			res := a.Resource().(xdnsmessage.TypeAResource)
+			addr = append(addr, res.Addr)
+		}
+	}
+	ans, err = doh.RecursiveLookup(ctx, us, class, typeAAAA)
+	if err == nil {
+		for _, a := range ans {
+			if a.Type() == typeAAAA {
+				x := a.Resource().(xdnsmessage.TypeAAAAResource)
+				addr = append(addr, x.Addr)
+			}
+		}
+	}
+	return
 }

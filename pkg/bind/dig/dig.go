@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/platinasystems/goes/v2/pkg/cert"
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xflag"
 	"github.com/platinasystems/goes/v2/pkg/xmain"
@@ -151,7 +152,16 @@ func Dig(ctx context.Context, args []string) error {
 		}
 	}
 	if len(allq.o.https) > 0 {
-		allq.dns = xdnsdoh.New(allq.o.httpsSkipVerify, allq.svr)
+		if allq.o.httpsSkipVerify {
+			cert.Verify = false
+		}
+		httpc, err := cert.NewHTTPClient()
+		if err != nil {
+			return err
+		}
+		url := fmt.Sprint("https://", allq.svr, ":", allq.p,
+			allq.o.https)
+		allq.dns = xdnsdoh.NewClient(httpc, url, "")
 	} else {
 		var a string
 		nw := "udp"

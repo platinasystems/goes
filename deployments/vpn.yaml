@@ -97,6 +97,9 @@ kind: ConfigMap
 metadata:
   name: vpn
 data:
+  doh: |
+    url     https://registry.vpn.default.svc.cluster.local:8003/dns-query
+    search  example.platina.io
   exchanges: |
     exchange0 8030
     hosta exchange0

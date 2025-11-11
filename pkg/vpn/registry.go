@@ -192,18 +192,20 @@ A RESTful WWW server and packet exchange.
 		return err
 	} else if err = flag.CommandLine.Parse(args); err != nil {
 		return err
-	} else if len(domain) == 0 {
-		return xerrors.Invalid("domain")
 	}
 
+	if len(domain) == 0 {
+		return xerrors.Incomplete("domain")
+	}
 	if !strings.HasSuffix(domain, ".") {
 		domain = fmt.Sprint(domain, ".")
 	}
 	if !strings.HasPrefix(domain, ".") {
 		domain = fmt.Sprint(".", domain)
 	}
+
 	if err = sig.Init(); err != nil {
-		return xerrors.Mark(err)
+		return err
 	}
 	ccs, err := cert.ClientCerts()
 	if err != nil {
@@ -219,16 +221,16 @@ A RESTful WWW server and packet exchange.
 	reg := newRegistry()
 
 	if err = reg.loadAdminsFile(); err != nil {
-		return xerrors.Mark(err)
+		return err
 	}
 	if err = reg.loadHostsFile(); err != nil {
-		return xerrors.Mark(err)
+		return err
 	}
 	if err = reg.loadExchangesFile(); err != nil {
-		return xerrors.Mark(err)
+		return err
 	}
 	if err = reg.loadSubscribers(); err != nil {
-		return xerrors.Mark(err)
+		return err
 	}
 
 	reg.http = &http.Server{
@@ -539,8 +541,8 @@ func (reg *registry) dir(w http.ResponseWriter) {
 
 func (reg *registry) dnsAnswer(
 	query *xdnsmessage.Message,
-) *xdnsmessage.Message {
-	reply := xdnsmessage.NewMessage()
+) (reply *xdnsmessage.Message) {
+	reply = xdnsmessage.NewMessage()
 	reply.Addr = query.Addr
 	reply.ID = query.ID
 	reply.HF = xdnsmessage.HFResponse
@@ -548,53 +550,99 @@ func (reg *registry) dnsAnswer(
 	reply.Questions = query.Questions
 	if len(query.Questions) == 0 {
 		reply.RCode = xdnsmessage.RCodeFormatError
-		return reply
+		return
 	}
 	if query.OpCode != xdnsmessage.OpCodeQuery {
 		reply.RCode = xdnsmessage.RCodeNotImplemented
-		return reply
+		return
 	}
+	reply.RCode = xdnsmessage.RCodeSuccess
 	for _, q := range query.Questions {
-		uniqueName := q.Name
-		name := uniqueName.String()
-		if !strings.HasSuffix(name, ".") {
-			name += "."
+		switch q.Type {
+		case xdnsmessage.TypeA, xdnsmessage.TypeAAAA:
+			reg.dnsAnswerAddr(q, reply)
+		case xdnsmessage.TypePTR:
+			reg.dnsAnswerName(q, reply)
+		default:
+			xlog.Errata.Println("unsupported query:", q.Type)
+			reply.RCode = xdnsmessage.RCodeNotImplemented
 		}
-		if !strings.HasSuffix(name, domain) {
-			xlog.Trace.Print("domain(", name, ") !=", domain)
-			continue
-		}
-		name = strings.TrimSuffix(name, domain)
-		sub, ok := reg.named[name]
-		if !ok {
-			xlog.Trace.Println(name, "not found")
-			continue
-		}
-		if sub.Addr.Is4() && q.Type != xdnsmessage.TypeA {
-			continue
-		}
-		if sub.Addr.Is6() && q.Type != xdnsmessage.TypeAAAA {
-			continue
-		}
-		reply.RCode = xdnsmessage.RCodeSuccess
-		var resource xdnsmessage.TypedResource
-		if sub.Addr.Is4() {
-			resource = xdnsmessage.TypeAResource{sub.Addr}
-		} else if sub.Addr.Is6() {
-			resource = xdnsmessage.TypeAAAAResource{sub.Addr}
-		}
-		if resource != nil {
-			xlog.Trace.Println(name, sub.Addr)
-			reply.Answers = append(reply.Answers,
-				xdnsmessage.WireResource{
-					Name:          uniqueName,
-					Duration:      3600 * time.Second,
-					Class:         xdnsmessage.ClassINET,
-					TypedResource: resource,
-				})
+		if reply.RCode != xdnsmessage.RCodeSuccess {
+			break
 		}
 	}
-	return reply
+	return
+}
+
+func (reg *registry) dnsAnswerAddr(
+	q xdnsmessage.WireQuestion,
+	r *xdnsmessage.Message,
+) {
+	name := q.Name.String()
+	if !strings.HasSuffix(name, domain) {
+		xlog.Trace.Print("domain(", name, ") !=", domain)
+		return
+	}
+	name = strings.TrimSuffix(name, domain)
+	sub, ok := reg.named[name]
+	if !ok {
+		xlog.Trace.Println(name, "not found")
+		return
+	}
+	if sub.Addr.Is4() && q.Type != xdnsmessage.TypeA {
+		return
+	}
+	if sub.Addr.Is6() && q.Type != xdnsmessage.TypeAAAA {
+		return
+	}
+	var resource xdnsmessage.TypedResource
+	if sub.Addr.Is4() {
+		resource = xdnsmessage.TypeAResource{sub.Addr}
+	} else if sub.Addr.Is6() {
+		resource = xdnsmessage.TypeAAAAResource{sub.Addr}
+	}
+	if resource != nil {
+		xlog.Trace.Println(name, sub.Addr)
+		r.Answers = append(r.Answers,
+			xdnsmessage.WireResource{
+				Name:          q.Name,
+				Duration:      3600 * time.Second,
+				Class:         xdnsmessage.ClassINET,
+				TypedResource: resource,
+			})
+	}
+}
+
+func (reg *registry) dnsAnswerName(
+	q xdnsmessage.WireQuestion,
+	r *xdnsmessage.Message,
+) {
+	addr := xdnsmessage.ParsePTR(q.Name.String())
+	if !addr.IsValid() {
+		r.RCode = xdnsmessage.RCodeFormatError
+		return
+	}
+	sub, ok := reg.addressed[addr]
+	if !ok {
+		xlog.Trace.Println(addr, "not found")
+		return
+	}
+	name := sub.name()
+	if !strings.HasPrefix(domain, ".") {
+		name += "."
+	}
+	name += domain
+	if !strings.HasSuffix(name, ".") {
+		name += "."
+	}
+	r.Answers = append(r.Answers, xdnsmessage.WireResource{
+		Name:     q.Name,
+		Duration: 3600 * time.Second,
+		Class:    xdnsmessage.ClassINET,
+		TypedResource: xdnsmessage.TypeCNAMEResource{
+			xdnsmessage.MakeUniqueString(name),
+		},
+	})
 }
 
 func (reg *registry) dnsQuery(rsvp *rsvp) {
@@ -863,7 +911,7 @@ func (reg *registry) loadSubscribers() error {
 	reg.indexed = []*Subscriber{sub}
 	reg.named[regcn] = sub
 
-	if cs, err = cert.ConfigAndStateCerts(); err != nil {
+	if cs, err = cert.MainConfigAndStateDirCerts(); err != nil {
 		return err
 	}
 	for _, c := range cs {
