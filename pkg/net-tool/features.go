@@ -8,6 +8,7 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/net-tool/icmp"
 	"github.com/platinasystems/goes/v2/pkg/net-tool/ifconfig"
 	"github.com/platinasystems/goes/v2/pkg/net-tool/ndp"
+	"github.com/platinasystems/goes/v2/pkg/net-tool/netcat"
 	"github.com/platinasystems/goes/v2/pkg/net-tool/netstat"
 	"github.com/platinasystems/goes/v2/pkg/net-tool/route"
 	udp_echo "github.com/platinasystems/goes/v2/pkg/net-tool/udp-echo"
@@ -18,6 +19,8 @@ import (
 var Features = map[string]any{
 	"ifconfig": ifconfig.Ifconfig,
 	"ndp":      ndp.NDP,
+	"nc":       netcat.NetCat,
+	"netcat":   netcat.NetCat,
 	"netstat":  netstat.Netstat,
 	"ping":     icmp.Ping,
 	"route":    route.Features,
