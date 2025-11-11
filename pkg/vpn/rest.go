@@ -678,16 +678,13 @@ func restGet(
 	// optional query {key, value} pairs
 	kv ...string,
 ) (*http.Response, error) {
-	var start int64
-
 	rsp, err := restRequest(ctx, http.MethodGet, w, "", nil, path, kv...)
 	if rsp.StatusCode == http.StatusUpgradeRequired {
 		err = restUpgrade(ctx)
 	} else if err != nil {
 		// skip to common return
-	} else if start, err = registryStart(rsp); err != nil {
-		err = NewRestartError(err)
-		err = xerrors.NewExitError(RestartExitCode, err)
+	} else if start, e := registryStart(rsp); e != nil {
+		err = xerrors.NewExitError(RestartExitCode, NewRestartError(e))
 	} else if rest.start != 0 && rest.start != start {
 		err = ExitRecheckin
 	}
