@@ -90,7 +90,6 @@ selection:
 			xlog.Trace.Mute()
 		case <-tkr.C:
 			restQueueVcsCheck(ctx)
-		case err = <-rest.fault:
 		case v, ok := <-rest.rspC:
 			if !ok {
 				break selection

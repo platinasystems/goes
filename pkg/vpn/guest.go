@@ -266,7 +266,6 @@ selection:
 		case <-alarm:
 			xlog.Info.Toggle()
 			xlog.Trace.Mute()
-		case err = <-rest.fault:
 		case t := <-tkr.C:
 			guest.tick += 1
 			if (guest.tick & 1) == 1 {

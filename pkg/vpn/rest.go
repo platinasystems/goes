@@ -146,8 +146,6 @@ var rest struct {
 	port   uint
 	start  int64
 
-	fault chan error
-
 	// name, [Id], [netip.Addr], or []byte encoded [Id]'s
 	reqC chan any
 	// error, *Subscriber, or []byte encoded revised [Id]'s
@@ -179,7 +177,6 @@ func restInit() error {
 	}
 	rest.bufs.New = func() any { return new(bytes.Buffer) }
 	rest.vcsrev = xprogram.VcsRevision.String()
-	rest.fault = make(chan error, 1)
 	rest.reqC = make(chan any, RestReqDepth)
 	rest.rspC = make(chan any, RestRspDepth)
 
