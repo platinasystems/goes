@@ -521,6 +521,8 @@ func (reg *registry) deny(rsvp *rsvp) {
 }
 
 func (reg *registry) dir(w http.ResponseWriter) {
+	w.Header().Add(RestUnixMicroStart, reg.start)
+	w.Header().Add(RestVcsRevision, reg.vcsRev)
 	names := []string{vlink()}
 	filepath.WalkDir(xmain.DataDir,
 		func(path string, entry fs.DirEntry, err error) error {
@@ -735,6 +737,10 @@ func (reg *registry) fromVpn(ctx context.Context, m *xnet.Msg) {
 
 func (reg *registry) file(w http.ResponseWriter, name string) {
 	xlog.Trace.Println(http.MethodGet, name)
+
+	w.Header().Add(RestUnixMicroStart, reg.start)
+	w.Header().Add(RestVcsRevision, reg.vcsRev)
+
 	ecode := http.StatusInternalServerError
 	if name == vlink() {
 		f, err := os.Open(xprogram.Path())
@@ -1313,16 +1319,6 @@ func (reg *registry) marshalSub(rsvp *rsvp, sub *Subscriber) {
 	} else {
 		rsvp.Write(b)
 	}
-}
-
-func registryStart(rsp *http.Response) (i int64, err error) {
-	s := rsp.Header.Get(RestUnixMicroStart)
-	if len(s) == 0 {
-		err = xerrors.Unavailable("registry start time")
-	} else if i, err = strconv.ParseInt(s, 10, 64); err != nil {
-		err = xerrors.Label(err, "registry start")
-	}
-	return
 }
 
 func SplitConfLine(s string) []string {

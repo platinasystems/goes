@@ -117,7 +117,7 @@ Forward ciphered packets between exchange and tunnel interface.
 	guest.addressed = make(map[netip.Addr]*Subscriber)
 	guest.indexed = make(map[int]*Subscriber)
 
-	if err = AssertVcsMatch(ctx); err != nil {
+	if err = restVcsCheck(ctx); err != nil {
 		return err
 	}
 

@@ -24,6 +24,7 @@ import (
 	"os"
 	"path"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -289,22 +290,6 @@ RESTful registry administration.
 	return err
 }
 
-// REST get registry status to validate version.
-// If [http.Response.StatusCode] == [http.StatusUpgradeRequired],
-// fetch and install upgrade then return [xerrors.ExitError]
-// to force [os.Exit] with [xos.EX_TEMPFAIL].
-func AssertVcsMatch(ctx context.Context) error {
-	rsp, err := restGet(ctx, io.Discard, RestShowStatus)
-	if rsp == nil {
-		if err == nil {
-			err = ErrNilResponse
-		}
-	} else if rsp.Header.Get(RestVcsRevision) != rest.vcsrev {
-		err = restUpgrade(ctx)
-	}
-	return err
-}
-
 func RestCheckinExchangeReq(ctx context.Context) (uint16, error) {
 	var id uint
 	var port uint16
@@ -312,11 +297,8 @@ func RestCheckinExchangeReq(ctx context.Context) (uint16, error) {
 	buf := restAlloc()
 	defer restFree(buf)
 
-	rsp, err := restPut(ctx, buf, "", nil, RestCheckinExchange)
+	_, err := restPut(ctx, buf, "", nil, RestCheckinExchange)
 	if err != nil {
-		return 0, err
-	}
-	if rest.start, err = registryStart(rsp); err != nil {
 		return 0, err
 	}
 	if _, err = fmt.Fscan(buf, &id, &port); err != nil {
@@ -334,13 +316,10 @@ func RestCheckinGuestReq(ctx context.Context, encap []byte) (
 	defer restFree(buf)
 
 	receipt := new(GuestReceipt)
-	rsp, err := restPut(ctx, buf,
+	_, err := restPut(ctx, buf,
 		"application/octet-stream", bytes.NewReader(encap),
 		RestCheckinGuest)
 	if err != nil {
-		return receipt, err
-	}
-	if rest.start, err = registryStart(rsp); err != nil {
 		return receipt, err
 	}
 	if err = json.Unmarshal(buf.Bytes(), &receipt); err != nil {
@@ -574,7 +553,7 @@ Download and install program update from registry.
 	if err != nil {
 	} else if err = flag.CommandLine.Parse(args); err != nil {
 	} else if err = restInit(); err != nil {
-	} else if err = AssertVcsMatch(ctx); err != nil {
+	} else if err = restVcsCheck(ctx); err != nil {
 	} else {
 		fmt.Println(xprogram.Path(), "is up to date.")
 	}
@@ -695,17 +674,7 @@ func restGet(
 	// optional query {key, value} pairs
 	kv ...string,
 ) (*http.Response, error) {
-	rsp, err := restRequest(ctx, http.MethodGet, w, "", nil, path, kv...)
-	if rsp.StatusCode == http.StatusUpgradeRequired {
-		err = restUpgrade(ctx)
-	} else if err != nil {
-		// skip to common return
-	} else if start, e := registryStart(rsp); e != nil {
-		err = xerrors.NewExitError(RestartExitCode, NewRestartError(e))
-	} else if rest.start != 0 && rest.start != start {
-		err = ExitRecheckin
-	}
-	return rsp, err
+	return restRequest(ctx, http.MethodGet, w, "", nil, path, kv...)
 }
 
 func restPut(
@@ -811,6 +780,16 @@ func restReviseIds(ctx context.Context, b []byte) error {
 	return err
 }
 
+func restUnixMicroStart(rsp *http.Response) (i int64, err error) {
+	s := rsp.Header.Get(RestUnixMicroStart)
+	if len(s) == 0 {
+		err = xerrors.Unavailable("registry start time")
+	} else if i, err = strconv.ParseInt(s, 10, 64); err != nil {
+		err = xerrors.Label(err, "registry start")
+	}
+	return
+}
+
 // Fetch and install upgrade then return [xerrors.ExitError]
 // to force [os.Exit] with [xos.EX_TEMPFAIL].
 func restUpgrade(ctx context.Context) error {
@@ -856,10 +835,32 @@ func restUpgrade(ctx context.Context) error {
 	return ExitCompleteUpgrade
 }
 
+// REST get registry status to validate version.
+// If [http.Response.StatusCode] == [http.StatusUpgradeRequired],
+// or the VCS header field doesn't match the client version,
+// fetch and install upgrade then return [xerrors.ExitError]
+// to force [os.Exit] with [xos.EX_TEMPFAIL].
+// Also, validate the registry start header to return [ExitRecheckin]
+// on non-zero mismatch.
 func restVcsCheck(ctx context.Context) error {
-	buf := restAlloc()
-	defer restFree(buf)
-	_, err := restGet(ctx, buf, RestShowStatus)
+	rsp, err := restGet(ctx, io.Discard, RestShowStatus)
+	if rsp == nil {
+		if err == nil {
+			err = ErrNilResponse
+		}
+	} else if rsp.StatusCode == http.StatusUpgradeRequired {
+		err = restUpgrade(ctx)
+	} else if err != nil {
+	} else if rsp.Header.Get(RestVcsRevision) != rest.vcsrev {
+		err = restUpgrade(ctx)
+	} else if start, e := restUnixMicroStart(rsp); e != nil {
+		err = xerrors.NewExitError(RestartExitCode,
+			NewRestartError(e))
+	} else if rest.start == 0 {
+		rest.start = start
+	} else if rest.start != start {
+		err = ExitRecheckin
+	}
 	return err
 }
 

@@ -54,7 +54,7 @@ Exchange ciphered packets between guests.
 
 	exchange.sub = make(map[int]*Subscriber)
 
-	if err = AssertVcsMatch(ctx); err != nil {
+	if err = restVcsCheck(ctx); err != nil {
 		return err
 	}
 
