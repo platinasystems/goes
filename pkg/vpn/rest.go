@@ -377,13 +377,8 @@ Import registry certificate.
 		return err
 	}
 
-	fn := cert.Server
-	if !strings.HasSuffix(fn, cert.Ext) {
-		fn = fmt.Sprint(fn, cert.Ext)
-	}
-	if strings.IndexRune(fn, os.PathSeparator) < 0 {
-		fn = xmain.ConfigFile(fn)
-	}
+	cn := rsp.TLS.PeerCertificates[0].Subject.CommonName
+	fn := xmain.ConfigFile(cn + cert.Ext)
 	if !yes {
 		fmt.Fprint(w, `Enter "yes" to write above to `, fn, ": ")
 		s, err := r.ReadString('\n')
