@@ -209,16 +209,14 @@ func restInit() error {
 		cfg.RootCAs = rcas
 	}
 
-	if cl := flag.CommandLine.Name(); !strings.HasSuffix(cl, "certify") {
-		if cs, err := cert.ServerCerts(); err != nil {
+	if cs, err := cert.ServerCerts(); err != nil {
+		return err
+	} else {
+		rest.reg = cs[0]
+		if err = restExtractURL(); err != nil {
 			return err
-		} else {
-			rest.reg = cs[0]
-			if err = restExtractURL(); err != nil {
-				return err
-			}
-			cfg.RootCAs.AddCert(rest.reg)
 		}
+		cfg.RootCAs.AddCert(rest.reg)
 	}
 
 	tp := http.DefaultTransport.(*http.Transport).Clone()
@@ -229,6 +227,36 @@ func restInit() error {
 	}
 	rest.Client.Transport = tp
 
+	return nil
+}
+
+func restCertifyInit() error {
+	rest.bufs.New = func() any { return new(bytes.Buffer) }
+	rest.vcsrev = xprogram.VcsRevision.String()
+
+	if cs, err := cert.ClientCerts(); err != nil {
+		return err
+	} else {
+		rest.crt = cs[0]
+	}
+
+	if err := sig.Init(); err != nil {
+		return err
+	}
+
+	cfg := &tls.Config{
+		MinVersion:         tls.VersionTLS13,
+		InsecureSkipVerify: true,
+		Certificates: []tls.Certificate{
+			{
+				Certificate: [][]byte{rest.crt.Raw},
+				PrivateKey:  sig.Priv,
+			},
+		},
+	}
+	tp := http.DefaultTransport.(*http.Transport).Clone()
+	tp.TLSClientConfig = cfg
+	rest.Client.Transport = tp
 	return nil
 }
 
@@ -335,9 +363,13 @@ Import registry certificate.
 {{flags .}}`)
 
 	var yes bool
-	err := append(RestFlags, xflag.Label{
-		"y", "Yes, to write remote certificate.", &yes,
-	}).Define()
+	err := xflag.Labels{
+		xmain.ConfigFlag,
+		cert.ClientFlag,
+		sig.Flag,
+		RestCertAkaFlag,
+		xflag.Label{"y", "Yes, to write remote certificate.", &yes},
+	}.Define()
 	if err != nil {
 		return err
 	} else if err = flag.CommandLine.Parse(args); err != nil {
@@ -346,16 +378,9 @@ Import registry certificate.
 		return xerrors.Incomplete("registry")
 	} else if rest.url, err = url.Parse(args[0]); err != nil {
 		return err
-	} else if err = restInit(); err != nil {
+	} else if err = restCertifyInit(); err != nil {
 		return err
 	}
-
-	tp := rest.Client.Transport.(*http.Transport)
-	sv := tp.TLSClientConfig.InsecureSkipVerify
-	defer func() {
-		tp.TLSClientConfig.InsecureSkipVerify = sv
-	}()
-	tp.TLSClientConfig.InsecureSkipVerify = true
 
 	rsp, err := restGet(ctx, os.Stdout, RestCertify)
 	if err != nil {
