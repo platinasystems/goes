@@ -1263,7 +1263,9 @@ func (reg *registry) unsubscribe(rsvp *rsvp) {
 		delete(reg.addressed, sub.Addr)
 		delete(reg.admin, name)
 		delete(reg.named, name)
-		reg.indexed[int(sub.Id)] = nil
+		if i := sub.Id.Index(); i < len(reg.indexed) {
+			reg.indexed[i] = nil
+		}
 		os.Remove(sub.stateFileName())
 	}
 }
