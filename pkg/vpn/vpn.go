@@ -32,7 +32,6 @@ var MainFeatures = map[string]any{
 	"exchange":    Exchange,
 	"get":         RestGetReq,
 	"guest":       Guest,
-	"im":          InstantMessaging,
 	"lookup":      RestLookupReq,
 	"reload":      RestReloadReq,
 	"registry":    Registry,

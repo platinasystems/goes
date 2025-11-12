@@ -10,6 +10,7 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/goes"
 	goes_util "github.com/platinasystems/goes/v2/pkg/goes-util"
 	"github.com/platinasystems/goes/v2/pkg/net-tool/icmp"
+	"github.com/platinasystems/goes/v2/pkg/net-tool/im"
 	"github.com/platinasystems/goes/v2/pkg/net-tool/netcat"
 	"github.com/platinasystems/goes/v2/pkg/sig"
 	"github.com/platinasystems/goes/v2/pkg/vpn"
@@ -26,6 +27,7 @@ func init() {
 		cert.Features,
 		vpn.MainFeatures,
 		map[string]any{
+			"im":     im.InstantMessaging,
 			"nc":     netcat.NetCat,
 			"netcat": netcat.NetCat,
 			"ping":   icmp.Ping,

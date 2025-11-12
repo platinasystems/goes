@@ -61,6 +61,22 @@ var GetConfig = sync.OnceValues(func() (cfg Config, err error) {
 	return
 })
 
+// Like [net.Resolver.LookupAddr] but with [netip.Addr]
+// instead of string parameter.
+func LookupName(ctx context.Context, addr netip.Addr) ([]string, error) {
+	var names []string
+	doh, err := New()
+	if err == nil {
+		names, err = doh.LookupName(ctx, addr)
+	} else if errors.Is(err, fs.ErrNotExist) {
+		names, err = net.DefaultResolver.LookupAddr(ctx, addr.String())
+	}
+	if err == nil && len(names) == 0 {
+		err = xerrors.NotFound(addr)
+	}
+	return names, err
+}
+
 // Return successful [netip.ParseAddr];
 // or the returned lookup on non-empty the configured URL
 // or [net.DefaultResolver].
@@ -96,7 +112,7 @@ type DOH struct {
 }
 
 // Create [http.Client] of [URL] to ask DOH queries.
-func New() (*DOH, error) {
+var New = sync.OnceValues(func() (*DOH, error) {
 	cfg, err := GetConfig()
 	if err != nil {
 		return nil, err
@@ -106,7 +122,7 @@ func New() (*DOH, error) {
 		return nil, err
 	}
 	return NewClient(httpc, cfg.URL, cfg.Search), nil
-}
+})
 
 // Use [http.Client] to ask DOH queries from “url”.
 func NewClient(cl *http.Client, url, search string) *DOH {

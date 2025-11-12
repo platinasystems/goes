@@ -7,6 +7,7 @@ package net_tool
 import (
 	"github.com/platinasystems/goes/v2/pkg/net-tool/icmp"
 	"github.com/platinasystems/goes/v2/pkg/net-tool/ifconfig"
+	"github.com/platinasystems/goes/v2/pkg/net-tool/im"
 	"github.com/platinasystems/goes/v2/pkg/net-tool/ndp"
 	"github.com/platinasystems/goes/v2/pkg/net-tool/netcat"
 	"github.com/platinasystems/goes/v2/pkg/net-tool/netstat"
@@ -18,6 +19,7 @@ import (
 // Features mapped by name that emulate Unix net-tools.
 var Features = map[string]any{
 	"ifconfig": ifconfig.Ifconfig,
+	"im":       im.InstantMessaging,
 	"ndp":      ndp.NDP,
 	"nc":       netcat.NetCat,
 	"netcat":   netcat.NetCat,
