@@ -18,6 +18,8 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xnet"
 )
 
+const AllZones = 255
+
 type Subscriber struct {
 	Id   Id
 	Addr netip.Addr
@@ -48,10 +50,12 @@ type Subscriber struct {
 
 	// Last Tick of Exchange hello reply or
 	// Whois reply of unchecked in Subscriber
-	lt uint64
+	lt uint64 `json:"-"`
 
 	// Guest eXchange Index
-	gxi int
+	gxi int `json:"-"`
+
+	zones uint8 `json:"-"`
 }
 
 func NewSubscriber(c *x509.Certificate) *Subscriber {
@@ -69,7 +73,7 @@ func (sub *Subscriber) Format(w fmt.State, verb rune) {
 	if sub.ap.IsValid() {
 		fmt.Fprint(w, ",", sub.ap)
 	}
-	if len(sub.EncapKey) > 0 {
+	if sub.isGuest() {
 		fmt.Fprint(w, ",guest")
 	}
 }
@@ -82,6 +86,10 @@ func (sub *Subscriber) helloCheck(m *xnet.Msg) (err error) {
 		err = xerrors.Invalid("hello from", sub)
 	}
 	return
+}
+
+func (sub *Subscriber) isGuest() bool {
+	return len(sub.EncapKey) > 0
 }
 
 func (sub *Subscriber) name() string {

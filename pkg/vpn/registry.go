@@ -89,6 +89,8 @@ type registry struct {
 	url  *url.URL
 
 	topAddr netip.Addr
+
+	zoneBitByName map[string]uint8
 }
 
 func newRegistry() *registry {
@@ -110,11 +112,13 @@ func newRegistry() *registry {
 	reg.hosts.addr = make(map[string]netip.Addr)
 	reg.hosts.name = make(map[netip.Addr]string)
 
+	reg.zoneBitByName = make(map[string]uint8)
+
 	return reg
 }
 
 var (
-	adminsFile, exchangesFile, hostsFile string
+	adminsFile, exchangesFile, hostsFile, zonesFile string
 
 	domain = ".example.platina.io."
 )
@@ -167,6 +171,17 @@ a newline separated list of static address assignments in
 		}
 		prefix = v
 		return &prefix
+	}},
+	{"zones", `
+An optional file w/in the current or config directory containing
+a newline separated list of subscriber zone assignments.
+An asterisk permits the named subscriber in all zones.`[1:], func() any {
+		if v, ok := xmain.LookupEnv("ZONES"); ok {
+			zonesFile = v
+		} else {
+			zonesFile = "zones"
+		}
+		return &zonesFile
 	}},
 }
 
@@ -230,6 +245,9 @@ A RESTful WWW server and packet exchange.
 		return err
 	}
 	if err = reg.loadSubscribers(); err != nil {
+		return err
+	}
+	if err = reg.loadZonesFile(); err != nil {
 		return err
 	}
 
@@ -466,14 +484,15 @@ func (reg *registry) checkin(rsvp *rsvp) *Subscriber {
 }
 
 func (reg *registry) checkinExchange(rsvp *rsvp) {
-	x := reg.checkin(rsvp)
-	if x == nil {
+	sub := reg.checkin(rsvp)
+	if sub == nil {
 		return
 	}
-	if x.Port == 0 {
+	sub.zones = AllZones
+	if sub.Port == 0 {
 		http.Error(rsvp, "unassigned port", http.StatusBadRequest)
 	} else {
-		fmt.Fprint(rsvp, uint(x.Id), " ", x.Port)
+		fmt.Fprint(rsvp, uint(sub.Id), " ", sub.Port)
 	}
 }
 
@@ -818,6 +837,28 @@ func (reg *registry) invite(rsvp *rsvp) {
 	})
 }
 
+func (reg *registry) inZone(rsvp *rsvp, sub *Subscriber) bool {
+	if !reg.hasCertificate(rsvp) || sub == nil {
+		return false
+	}
+	peer0 := rsvp.req.TLS.PeerCertificates[0]
+	if peer0 == nil {
+		return false
+	}
+	peer, ok := reg.named[peer0.Subject.CommonName]
+	if !ok || peer == nil || !peer0.Equal(peer.cert) {
+		return false
+	}
+	bothZones := sub.zones | peer.zones
+	eitherZones := sub.zones & peer.zones
+	t := bothZones == 0 || bothZones == AllZones || eitherZones != 0
+	if !t {
+		xlog.Trace.Printf("%s isn't in %s's zone (%#b, %#b)",
+			peer.name(), sub.name(), peer.zones, sub.zones)
+	}
+	return t
+}
+
 func (reg *registry) isMember(
 	rsvp *rsvp, club map[string]*Subscriber,
 ) bool {
@@ -867,8 +908,9 @@ func (reg *registry) loadExchangesFile() error {
 func (reg *registry) loadExchangesKeyValues(
 	lno int, key string, values []string,
 ) error {
+	path := xmain.ConfigFile(exchangesFile)
 	if len(values) < 0 {
-		return xerrors.Incomplete(lno)
+		return xerrors.Label(xerrors.Incomplete(lno), path)
 	}
 	reg.exchangeAssignment[key] = values
 	return nil
@@ -883,16 +925,16 @@ func (reg *registry) loadHostsFile() error {
 func (reg *registry) loadHostsKeyValues(
 	lno int, key string, values []string,
 ) error {
+	path := xmain.ConfigFile(hostsFile)
 	if len(values) < 0 {
-		return xerrors.Label(xerrors.Incomplete(lno), hostsFile)
+		return xerrors.Label(xerrors.Incomplete(lno), path)
 	}
 	addr, err := netip.ParseAddr(key)
 	if err != nil {
-		return xerrors.Label(err, hostsFile, lno)
+		return xerrors.Label(err, path, lno)
 	}
 	if !prefix.Contains(addr) {
-		return xerrors.Label(xerrors.Range(lno, "prefix", prefix),
-			hostsFile)
+		return xerrors.Label(xerrors.Range(lno, "prefix", prefix), path)
 	}
 	reg.hosts.name[addr] = values[0]
 	for _, hn := range values {
@@ -911,6 +953,7 @@ func (reg *registry) loadSubscribers() error {
 	sub := NewSubscriber(reg.cert)
 	sub.Id = 0
 	sub.Port = DefaultExchangePort
+	sub.zones = AllZones
 	if err = reg.assignAddr(sub); err != nil {
 		return err
 	}
@@ -952,6 +995,43 @@ func (reg *registry) loadSubscribers() error {
 		}
 	}
 
+	return nil
+}
+
+func (reg *registry) loadZonesFile() error {
+	path := xmain.ConfigFile(zonesFile)
+	err := kvc.RangeFile(path, SplitConfLine, reg.loadZonesKeyValues)
+	return xerrors.Suppress(err, fs.ErrNotExist)
+}
+
+func (reg *registry) loadZonesKeyValues(
+	lno int, key string, values []string,
+) error {
+	path := xmain.ConfigFile(zonesFile)
+	if len(values) < 0 {
+		return xerrors.Label(xerrors.Incomplete(lno), path)
+	}
+	sub, ok := reg.named[key]
+	if !ok {
+		return xerrors.Label(xerrors.NotFound(lno), path)
+	}
+	if values[0] == "*" {
+		sub.zones = AllZones
+		return nil
+	}
+	for _, name := range values {
+		bit, ok := reg.zoneBitByName[name]
+		if !ok {
+			if n := len(reg.zoneBitByName); n >= 8 {
+				return xerrors.Label(xerrors.Range(lno), path)
+			} else {
+				bit = uint8(n)
+				reg.zoneBitByName[name] = bit
+				xlog.Trace.Println("zone", name, "bit", bit)
+			}
+		}
+		sub.zones |= 1 << bit
+	}
 	return nil
 }
 
@@ -1282,7 +1362,8 @@ func (reg *registry) whoisAddressed(rsvp *rsvp) {
 		http.Error(rsvp, "incomplete address", http.StatusBadRequest)
 	} else if addr, err := netip.ParseAddr(args[0]); err != nil {
 		http.Error(rsvp, err.Error(), http.StatusBadRequest)
-	} else if sub, ok := reg.addressed[addr]; !ok || sub == nil {
+	} else if sub, ok := reg.addressed[addr]; !ok || sub == nil ||
+		!reg.inZone(rsvp, sub) {
 		http.Error(rsvp, args[0], http.StatusNotFound)
 	} else {
 		reg.marshalSub(rsvp, sub)
@@ -1295,7 +1376,8 @@ func (reg *registry) whoisId(rsvp *rsvp) {
 		http.Error(rsvp, "incomplete id", http.StatusBadRequest)
 	} else if id, err := ParseId(args[0]); err != nil {
 		http.Error(rsvp, err.Error(), http.StatusBadRequest)
-	} else if i := id.Index(); i >= len(reg.indexed) {
+	} else if i := id.Index(); i >= len(reg.indexed) ||
+		!reg.inZone(rsvp, reg.indexed[i]) {
 		http.Error(rsvp, args[0], http.StatusNotFound)
 	} else {
 		reg.marshalSub(rsvp, reg.indexed[i])
@@ -1306,7 +1388,8 @@ func (reg *registry) whoisNamed(rsvp *rsvp) {
 	args := rsvp.reqargs(RestWhoisNamed)
 	if len(args) == 0 {
 		http.Error(rsvp, "incomplete name", http.StatusBadRequest)
-	} else if sub, ok := reg.named[args[0]]; !ok || sub == nil {
+	} else if sub, ok := reg.named[args[0]]; !ok || sub == nil ||
+		!reg.inZone(rsvp, sub) {
 		http.Error(rsvp, args[0], http.StatusNotFound)
 	} else {
 		reg.marshalSub(rsvp, sub)

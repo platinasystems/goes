@@ -108,6 +108,9 @@ data:
     fc00:1234::a hosta
     fc00:1234::b hostb
     fc00:1234::c hostc
+  zones: |
+    hosta *
+    hostb backend
   registry.pem: |
     -----BEGIN CERTIFICATE-----
     MIIBszCCAWWgAwIBAgIBATAFBgMrZXAwQTEgMA4GA1UEChMHUGxhdGluYTAOBgNV
