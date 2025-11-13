@@ -37,15 +37,30 @@ import (
 
 const BlockType = "CERTIFICATE"
 const Ext = ".pem"
+const CertFile = "cert.pem"
 
 const (
 	Year    = 365 * 24 * time.Hour
 	Longest = 10 * Year
 )
 
+var ClientCommonName = sync.OnceValue(func() string {
+	s, err := os.Hostname()
+	if err != nil {
+		s = "localhost"
+	} else if i := strings.Index(s, "."); i > 0 {
+		s = s[:i]
+	}
+	return s
+})
+
 var (
-	Client      = "cert.pem"
+	Client      string
 	ClientCerts = sync.OnceValues(func() ([]*x509.Certificate, error) {
+		if len(Client) == 0 {
+			env := fmt.Sprint("$", xmain.EnvPrefix(), "CLIENT_CN")
+			return nil, xerrors.Incomplete(env)
+		}
 		return namedCerts(Client)
 	})
 	ClientFlag = xflag.Label{"ssl-client-cn", `
@@ -55,15 +70,25 @@ The file or common name (CN) of the client certificate.
 			Client = s
 		} else if s, ok = os.LookupEnv("SSL_CLIENT_CN"); ok {
 			Client = s
-		} else if s, err := os.Hostname(); err == nil {
-			if i := strings.Index(s, "."); i > 0 {
-				s = s[:i]
-			}
-			Client = s
+		} else {
+			Client = ClientCommonName()
 		}
 		return &Client
 	}}
 )
+
+var MainConfigAndStateDirCerts = sync.OnceValues(func() (
+	certs []*x509.Certificate, err error,
+) {
+	certs, err = MainConfigDirCerts()
+	if err == nil {
+		var state []*x509.Certificate
+		if state, err = MainStateDirCerts(); err == nil {
+			certs = append(certs, state...)
+		}
+	}
+	return
+})
 
 // Parse *.pem files w/in [xmain.ConfigDir] for [BlockType] certificates.
 var MainConfigDirCerts = sync.OnceValues(func() (
@@ -85,19 +110,6 @@ func MainConfigDirPlusSystemCertPool() (*x509.CertPool, error) {
 	}
 	return pool, err
 }
-
-var MainConfigAndStateDirCerts = sync.OnceValues(func() (
-	certs []*x509.Certificate, err error,
-) {
-	certs, err = MainConfigDirCerts()
-	if err == nil {
-		var state []*x509.Certificate
-		if state, err = MainStateDirCerts(); err == nil {
-			certs = append(certs, state...)
-		}
-	}
-	return
-})
 
 // If [xmain.StateDir] doesn't equal [xmain.ConfigDir],
 // parse all of its *.pem files for [BlockType] certificates.
@@ -209,6 +221,7 @@ func New(ctx context.Context, args []string) error {
 	xflag.TemplateUsage(`
 usage: {{.Name}} [flags] [- | <filename>]
 Create PEM encoded x509 certificate file.
+The default filename is “` + CertFile + `” w/in the “-config” directory.
 
 {{flags .}}`)
 	var dns, email, org, unit, street, city, state, country, zip,
@@ -219,7 +232,6 @@ Create PEM encoded x509 certificate file.
 	err := xflag.Labels{
 		xmain.ConfigFlag,
 		sig.Flag,
-		ClientFlag,
 		{"serial-number",
 			"New certificate's identifier, random if zero.", &sn},
 		{"dns", "Comma separated domain names.", func() any {
@@ -268,7 +280,7 @@ Create PEM encoded x509 certificate file.
 		KeyUsage: x509.KeyUsageDigitalSignature |
 			x509.KeyUsageCertSign,
 		Subject: pkix.Name{
-			CommonName:         Client,
+			CommonName:         ClientCommonName(),
 			SerialNumber:       fmt.Sprint(sn),
 			Organization:       strings.Fields(org),
 			OrganizationalUnit: strings.Fields(unit),
@@ -326,7 +338,7 @@ Create PEM encoded x509 certificate file.
 	if len(args) > 0 {
 		fn = args[0]
 	} else {
-		fn = xmain.ConfigFile(fmt.Sprint(Client, Ext))
+		fn = xmain.ConfigFile(CertFile)
 	}
 	if fn == "-" {
 		return pem.Encode(os.Stdout, blk)
