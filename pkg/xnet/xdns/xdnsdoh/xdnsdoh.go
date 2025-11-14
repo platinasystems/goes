@@ -61,6 +61,52 @@ var GetConfig = sync.OnceValues(func() (cfg Config, err error) {
 	return
 })
 
+// Return successful [netip.ParseAddrPort];
+// otherwise, [LookupNetIP] and [net.DefaultResolver.LookupPort]
+// the respective host and port segments returned from [net.SplitHostPort](s);
+// then recombine as [netip.AddrPort] list.
+// The returned ports are zero if (s) didn't have a “:<port>” suffix.
+func LookupAddrPort(ctx context.Context, nw, s string) (
+	aps []netip.AddrPort, err error,
+) {
+	is4nw := strings.HasSuffix(nw, "4")
+	is6nw := strings.HasSuffix(nw, "6")
+	ap, err := netip.ParseAddrPort(s)
+	if err == nil {
+		aps = append(aps, ap)
+		return
+	}
+
+	var hs, ps string
+	if strings.Count(s, ":") != 1 && strings.Count(s, "]:") != 1 {
+		hs = s
+	} else if hs, ps, err = net.SplitHostPort(s); err != nil {
+		return
+	}
+
+	var port int
+	if len(ps) > 0 {
+		port, err = net.DefaultResolver.LookupPort(ctx, nw, ps)
+		if err != nil {
+			return
+		}
+	}
+	addrs, err := LookupNetIP(ctx, hs)
+	if err != nil {
+		return
+	}
+	for _, addr := range addrs {
+		if (is4nw && addr.Is6()) || (is6nw && addr.Is4()) {
+			continue
+		}
+		aps = append(aps, netip.AddrPortFrom(addr, uint16(port)))
+	}
+	if len(aps) == 0 {
+		err = xerrors.NotFound(s)
+	}
+	return
+}
+
 // Like [net.Resolver.LookupAddr] but with [netip.Addr]
 // instead of string parameter.
 func LookupName(ctx context.Context, addr netip.Addr) ([]string, error) {
@@ -78,8 +124,9 @@ func LookupName(ctx context.Context, addr netip.Addr) ([]string, error) {
 }
 
 // Return successful [netip.ParseAddr];
-// or the returned lookup on non-empty the configured URL
-// or [net.DefaultResolver].
+// otherwise, returned lookup of the configured URL,
+// or if that's unconfigured,
+// the result of [net.DefaultResolver.LookupNetIP].
 // A nil-error result will always return at least one [netip.Addr].
 func LookupNetIP(ctx context.Context, s string) ([]netip.Addr, error) {
 	var (
@@ -100,6 +147,12 @@ func LookupNetIP(ctx context.Context, s string) ([]netip.Addr, error) {
 	}
 	if err == nil && len(addrs) == 0 {
 		err = xerrors.NotFound(s)
+	} else {
+		for i, addr := range addrs {
+			if addr.Is4In6() {
+				addrs[i] = addr.Unmap()
+			}
+		}
 	}
 	return addrs, err
 }
