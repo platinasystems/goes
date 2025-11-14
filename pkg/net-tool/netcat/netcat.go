@@ -9,8 +9,8 @@ import (
 	"flag"
 	"io"
 	"net"
+	"net/netip"
 	"os"
-	"strconv"
 	"sync"
 
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
@@ -22,7 +22,7 @@ import (
 func NetCat(ctx context.Context, args []string) error {
 	xflag.TemplateUsage(`
 usage: {{.Name}} [flags] <host> <port>
-Pipe stdin/out with TCP connection to numbered port of named or addressed host.
+Pipe stdin/out with TCP connection to the named or numbered host/port.
 
 {{flags .}}`)
 
@@ -43,15 +43,23 @@ Pipe stdin/out with TCP connection to numbered port of named or addressed host.
 	if err != nil {
 		return err
 	}
-	port64, err := strconv.ParseInt(args[1], 10, 16)
-	if err != nil {
-		return xerrors.Label(err, "port")
+
+	nw := "tcp"
+	if addrs[0].Is4() {
+		nw = "tcp4"
+	} else if addrs[0].Is6() {
+		nw = "tcp6"
 	}
 
-	conn, err := net.DialTCP("tcp", nil, &net.TCPAddr{
-		IP:   net.IP(addrs[0].AsSlice()),
-		Port: int(port64),
-	})
+	port, err := net.DefaultResolver.LookupPort(ctx, nw, args[1])
+	if err != nil {
+		return err
+	}
+
+	ap := netip.AddrPortFrom(addrs[0], uint16(port))
+
+	var d net.Dialer
+	conn, err := d.DialContext(ctx, nw, ap.String())
 	if err != nil {
 		return err
 	}
