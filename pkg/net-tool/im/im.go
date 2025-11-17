@@ -23,14 +23,19 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xnet/xdns/xdnsdoh"
 )
 
+// “Foo”
 const Help = `
-Enter:
-  e[xit]
-	Or EOF to quit.
+Type EOF to quit or enter the following to send a message to the
+last origin or the comma separated destinations;
+or without argument(s), send subsequent, non-blank entries.
 
-  t[ext] host[:port] ...
-	Change prompt; then forward the following lines to the named or
-	numbered host/port(s).
+	im> r[eply] MESSAGE...
+	im> HOST[:PORT][,...] MESSAGE...
+	im> HOST
+	HOST> MESSAGE
+	HOST> ...
+	HOST> <enter>
+	im>
 `
 
 const Port = 8004
@@ -41,6 +46,11 @@ var im struct {
 	clio *clio.CLIO
 	port uint16
 	udp  *net.UDPConn
+
+	last struct {
+		name string
+		ap   netip.AddrPort
+	}
 
 	name  map[netip.AddrPort]string
 	named map[string]netip.AddrPort
@@ -94,6 +104,7 @@ Instant Messaging over named or all interface(s).
 		im.udp.Close()
 		return err
 	}
+	im.clio.SetPrompt(Prompt)
 	defer fmt.Println()
 
 	var wg sync.WaitGroup
@@ -110,61 +121,54 @@ Instant Messaging over named or all interface(s).
 
 	wg.Go(func() { imRx(ctx) })
 
+	var aps []netip.AddrPort
 	for err == nil && ctx.Err() == nil {
 		var s string
 		if s, err = im.clio.ReadLine(); err != nil {
-			break
-		}
-		if args = strings.Fields(s); len(args) == 0 {
-			imHelp()
-			continue
-		}
-		switch args[0] {
-		case "?", "h", "help":
-			imHelp()
-		case "e", "exit":
-			return nil
-		case "t", "text":
-			if len(args) < 2 {
-				fmt.Fprintln(im.clio, "incomplete")
-			} else if err = imText(ctx, args[1:]); err == nil {
-			} else if errors.Is(err, xerrors.ErrNotFound) {
-				fmt.Fprintln(im.clio, err)
-				err = nil
+		} else if len(s) == 0 {
+			if len(aps) == 0 {
+				fmt.Fprint(im.clio, Help[1:])
+			} else {
+				im.clio.SetPrompt(Prompt)
+				aps = aps[:0]
 			}
-		default:
-			fmt.Fprintf(im.clio, "invalid: %q, see help.\n", args[0])
+		} else if s == "?" || s == "h" || s == "help" {
+			fmt.Fprint(im.clio, Help[1:])
+		} else if len(aps) > 0 {
+			err = imTx(s, aps)
+		} else if aps, s, err = imTo(ctx, s); err != nil {
+			fmt.Fprintln(im.clio, err)
+			err = nil
+		} else if len(s) > 0 {
+			err = imTx(s, aps)
+			aps = aps[:0]
+			im.clio.SetPrompt(Prompt)
 		}
 	}
 	return xerrors.Suppress(err, io.EOF)
 }
 
-func imFrom(ctx context.Context, ap netip.AddrPort) string {
+func imName(ctx context.Context, ap netip.AddrPort) string {
 	im.Lock()
 	defer im.Unlock()
 	if name, ok := im.name[ap]; ok {
 		return name
 	}
-	if names, err := xdnsdoh.LookupName(ctx, ap.Addr()); err == nil {
-		return imName(ap, names[0])
+	names, err := xdnsdoh.LookupName(ctx, ap.Addr())
+	if err != nil {
+		return ap.String()
 	}
-	return ap.String()
-}
-
-func imHelp() { fmt.Fprint(im.clio, Help[1:]) }
-
-func imName(ap netip.AddrPort, name string) string {
-	if i := strings.Index(name, "."); i > 0 {
-		name = name[:i]
-	}
-	im.name[ap] = name
-	im.named[name] = ap
-	return name
+	s := imShortName(names[0])
+	im.name[ap] = s
+	im.named[s] = ap
+	im.last.name = s
+	im.last.ap = ap
+	return s
 }
 
 func imRx(ctx context.Context) {
 	b := make([]byte, 4<<10)
-	for {
+	for ctx.Err() == nil {
 		n, ap, err := im.udp.ReadFromUDPAddrPort(b)
 		if err != nil {
 			if !errors.Is(err, net.ErrClosed) {
@@ -172,46 +176,58 @@ func imRx(ctx context.Context) {
 			}
 			break
 		}
-		im.clio.Interject(imFrom(ctx, ap), ": ", b[:n])
+		im.clio.Interject(imName(ctx, ap), ": ", b[:n])
 	}
 }
 
-func imText(ctx context.Context, to []string) error {
-	aps, err := imTo(ctx, to)
-	if err != nil {
-		return err
+func imShortName(name string) string {
+	if i := strings.Index(name, "."); i > 0 {
+		name = name[:i]
 	}
-	prompt := to[0]
-	if len(to) > 1 {
-		prompt += "+"
-	}
-	im.clio.SetPrompt(fmt.Sprint(prompt, ", "))
-	defer im.clio.SetPrompt(Prompt)
-	for err == nil {
-		var s string
-		if s, err = im.clio.ReadLine(); err != nil || len(s) == 0 {
-			break
-		}
-		for _, ap := range aps {
-			_, err = im.udp.WriteToUDPAddrPort([]byte(s), ap)
-			if err != nil {
-				break
-			}
-		}
-	}
-	return err
+	return name
 }
 
-func imTo(ctx context.Context, to []string) (aps []netip.AddrPort, err error) {
+func imTo(ctx context.Context, s string) (
+	aps []netip.AddrPort, rem string, err error,
+) {
+	var prompt strings.Builder
 	im.Lock()
 	defer im.Unlock()
-	for _, s := range to {
-		var found []netip.AddrPort
-		if ap, ok := im.named[s]; ok {
+
+	if len(s) == 0 {
+		err = xerrors.Incomplete("destination")
+		return
+	}
+
+	for _, prefix := range []string{"r ", "reply "} {
+		if strings.HasPrefix(s, prefix) {
+			rem = strings.TrimSpace(strings.TrimPrefix(s, prefix))
+			if len(im.last.name) > 0 && im.last.ap.IsValid() {
+				aps = append(aps, im.last.ap)
+				im.clio.SetPrompt(im.last.name + ", ")
+			} else {
+				err = xerrors.NotFound("conversation")
+			}
+			return
+		}
+	}
+
+	if i := strings.IndexAny(s, " \t"); i > 0 {
+		rem = strings.TrimSpace(s[i+1:])
+		s = s[:i]
+	}
+
+	for i, dst := range strings.Split(s, ",") {
+		if i > 0 {
+			fmt.Fprint(&prompt, ",")
+		}
+		if ap, ok := im.named[dst]; ok {
 			aps = append(aps, ap)
+			fmt.Fprint(&prompt, dst)
 			continue
 		}
-		found, err = xdnsdoh.LookupAddrPort(ctx, "udp", s)
+		var found []netip.AddrPort
+		found, err = xdnsdoh.LookupAddrPort(ctx, "udp", dst)
 		if err != nil {
 			return
 		}
@@ -220,12 +236,27 @@ func imTo(ctx context.Context, to []string) (aps []netip.AddrPort, err error) {
 			ap = netip.AddrPortFrom(ap.Addr(), im.port)
 		}
 		aps = append(aps, ap)
-		if n := strings.Count(s, ":"); n > 1 {
-			continue
-		} else if n == 1 {
-			s = s[:strings.Index(s, ":")]
+		if strings.Index(dst, ":") > 0 {
+			if h, _, e := net.SplitHostPort(dst); e == nil {
+				dst = h
+			}
 		}
-		imName(ap, s)
+		dst = imShortName(dst)
+		im.name[ap] = dst
+		im.named[dst] = ap
+		fmt.Fprint(&prompt, dst)
 	}
+	fmt.Fprint(&prompt, ", ")
+	im.clio.SetPrompt(prompt.String())
 	return
+}
+
+func imTx(s string, aps []netip.AddrPort) error {
+	for _, ap := range aps {
+		_, err := im.udp.WriteToUDPAddrPort([]byte(s), ap)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
