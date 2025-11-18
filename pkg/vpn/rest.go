@@ -258,10 +258,10 @@ func restCertifyInit() error {
 	return nil
 }
 
-func RestAdminReq(ctx context.Context, args []string) error {
+func RestApproveReq(ctx context.Context, args []string) error {
 	xflag.TemplateUsage(`
-usage: {{.Name}} [flags] <subscriber>
-RESTful registry administration.
+usage: {{.Name}} [flags] <subscriber> [zone]...
+Approve pending subscription to the default, specified, or with “*”, all zones.
 
 {{flags .}}`)
 
@@ -275,18 +275,12 @@ RESTful registry administration.
 	} else if err = restInit(); err != nil {
 		return err
 	}
-	var p string
-	switch op := xflag.LastName(flag.CommandLine); op {
-	case "approve":
-		p = path.Join(RestApprove, args[0])
-	case "deny":
-		p = path.Join(RestDeny, args[0])
-	case "unsubscribe":
-		p = path.Join(RestUnsubscribe, args[0])
-	default:
-		return xerrors.ErrInvalid
+	var kv []string
+	if len(args) > 1 {
+		kv = []string{"zones", strings.Join(args[1:], ",")}
 	}
-	_, err = restPut(ctx, os.Stdout, "", nil, p)
+	_, err = restPut(ctx, os.Stdout, "", nil, path.
+		Join(RestApprove, args[0]), kv...)
 	return err
 }
 
@@ -398,6 +392,27 @@ Import registry certificate.
 	}
 	defer wc.Close()
 	return pem.Encode(wc, &blk)
+}
+
+func RestDenyReq(ctx context.Context, args []string) error {
+	xflag.TemplateUsage(`
+usage: {{.Name}} [flags] <subscriber>
+Reject the named subscription.
+
+{{flags .}}`)
+
+	err := RestFlags.Define()
+	if err != nil {
+		return err
+	} else if err = flag.CommandLine.Parse(args); err != nil {
+		return err
+	} else if args = flag.CommandLine.Args(); len(args) == 0 {
+		return xerrors.Incomplete("subscriber")
+	} else if err = restInit(); err != nil {
+		return err
+	}
+	_, err = restPut(ctx, os.Stdout, "", nil, path.Join(RestDeny, args[0]))
+	return err
 }
 
 func RestGetReq(ctx context.Context, args []string) error {
@@ -539,6 +554,28 @@ RESTful subscribe to VPN.
 	} else {
 		_, err = restPut(ctx, os.Stdout, "", nil, RestSubscribe)
 	}
+	return err
+}
+
+func RestUnsubscribeReq(ctx context.Context, args []string) error {
+	xflag.TemplateUsage(`
+usage: {{.Name}} [flags] <subscriber>
+Unsubscribe the named guest or exchange.
+
+{{flags .}}`)
+
+	err := RestFlags.Define()
+	if err != nil {
+		return err
+	} else if err = flag.CommandLine.Parse(args); err != nil {
+		return err
+	} else if args = flag.CommandLine.Args(); len(args) == 0 {
+		return xerrors.Incomplete("subscriber")
+	} else if err = restInit(); err != nil {
+		return err
+	}
+	_, err = restPut(ctx, os.Stdout, "", nil, path.
+		Join(RestUnsubscribe, args[0]))
 	return err
 }
 

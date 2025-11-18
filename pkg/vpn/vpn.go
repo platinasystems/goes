@@ -26,9 +26,9 @@ var Features = map[string]any{
 }
 
 var MainFeatures = map[string]any{
-	"approve":     RestAdminReq,
+	"approve":     RestApproveReq,
 	"certify":     RestCertifyReq,
-	"deny":        RestAdminReq,
+	"deny":        RestDenyReq,
 	"exchange":    Exchange,
 	"get":         RestGetReq,
 	"guest":       Guest,
@@ -36,7 +36,7 @@ var MainFeatures = map[string]any{
 	"reload":      RestReloadReq,
 	"registry":    Registry,
 	"subscribe":   RestSubscribeReq,
-	"unsubscribe": RestAdminReq,
+	"unsubscribe": RestUnsubscribeReq,
 	"update":      RestUpdateReq,
 }
 

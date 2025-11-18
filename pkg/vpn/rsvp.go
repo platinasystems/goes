@@ -5,9 +5,14 @@
 package vpn
 
 import (
+	"errors"
+	"fmt"
+	"io/fs"
 	"net/http"
 	"strings"
 	"sync"
+
+	"github.com/platinasystems/goes/v2/pkg/xerrors"
 )
 
 type rsvp struct {
@@ -25,6 +30,39 @@ var rsvpPool = &sync.Pool{
 }
 
 func (rsvp *rsvp) done() { rsvp.doneC <- done }
+
+// Just return if errors is nil; otherwise,
+// [http.Error] with error string
+// and appropriate status code.
+func (rsvp *rsvp) reporterr(err error) {
+	var code int
+	if err == nil {
+		return
+	}
+	if xerrors.IsIncomplete(err) ||
+		xerrors.IsInvalid(err) ||
+		xerrors.IsRange(err) {
+		code = http.StatusBadRequest
+	} else if xerrors.IsNotFound(err) {
+		code = http.StatusNotFound
+	} else if xerrors.IsUnavailable(err) {
+		code = http.StatusConflict
+	} else if errors.Is(err, fs.ErrPermission) {
+		code = http.StatusForbidden
+	} else {
+		code = http.StatusInternalServerError
+	}
+	http.Error(rsvp, err.Error(), code)
+}
+
+// Print “OK” if nil error; otherwise, [reporterr].
+func (rsvp *rsvp) reportok(err error) {
+	if err == nil {
+		fmt.Fprintln(rsvp, "OK")
+	} else {
+		rsvp.reporterr(err)
+	}
+}
 
 func (rsvp *rsvp) reqargs(cmd string) []string {
 	s := strings.TrimPrefix(rsvp.req.URL.Path, cmd)

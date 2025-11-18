@@ -42,6 +42,7 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xmaps"
 	"github.com/platinasystems/goes/v2/pkg/xnet"
 	"github.com/platinasystems/goes/v2/pkg/xnet/xdns/xdnsmessage"
+	"github.com/platinasystems/goes/v2/pkg/xos"
 	"github.com/platinasystems/goes/v2/pkg/xprogram"
 	"github.com/platinasystems/goes/v2/pkg/xsignal"
 )
@@ -352,57 +353,53 @@ func (reg *registry) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func (reg *registry) approve(rsvp *rsvp) {
+func (reg *registry) approve(rsvp *rsvp) error {
 	args := rsvp.reqargs(RestApprove)
 	if len(args) == 0 {
-		http.Error(rsvp, "incomplete subscriber", http.StatusBadRequest)
-		return
+		return xerrors.Incomplete("subscriber")
 	}
 	name := args[0]
-	_, err := os.Stat(xmain.StateDir)
-	if err != nil {
+	if _, err := os.Stat(xmain.StateDir); err != nil {
 		if os.IsNotExist(err) {
 			err = os.MkdirAll(xmain.StateDir, 0755)
 		}
 		if err != nil {
-			http.Error(rsvp, err.Error(),
-				http.StatusInternalServerError)
-			return
+			return err
 		}
 	}
 	i, sub := reg.lookupPending(name)
 	if i < 0 || sub == nil {
-		http.Error(rsvp, name, http.StatusNotFound)
-		return
+		return xerrors.NotFound(name)
 	}
+
+	if err := reg.rezone(rsvp, sub); err != nil {
+		return err
+	}
+
 	reg.pending = slices.Delete(reg.pending, i, i+1)
 	blk := pem.Block{
 		Type:  cert.BlockType,
 		Bytes: sub.CertDER,
 	}
 	if f, err := os.Create(sub.stateFileName()); err != nil {
-		http.Error(rsvp, err.Error(),
-			http.StatusInternalServerError)
-		return
-	} else if err = pem.Encode(f, &blk); err != nil {
-		f.Close()
-		http.Error(rsvp, err.Error(),
-			http.StatusInternalServerError)
-		return
+		return err
 	} else {
+		err = pem.Encode(f, &blk)
 		f.Close()
+		if err != nil {
+			return err
+		}
 	}
 
-	if err = reg.assignAddr(sub); err != nil {
-		http.Error(rsvp, err.Error(),
-			http.StatusInternalServerError)
-		return
+	if err := reg.assignAddr(sub); err != nil {
+		return err
 	}
+
 	reg.named[name] = sub
 	sub.Id = Id(len(reg.indexed))
 	reg.indexed = append(reg.indexed, sub)
 
-	fmt.Fprintln(rsvp, "OK")
+	return nil
 }
 
 func (reg *registry) assignAddr(sub *Subscriber) error {
@@ -1001,6 +998,10 @@ func (reg *registry) loadSubscribers() error {
 func (reg *registry) loadZonesFile() error {
 	path := xmain.ConfigFile(zonesFile)
 	err := kvc.RangeFile(path, SplitConfLine, reg.loadZonesKeyValues)
+	if err == nil || errors.Is(err, fs.ErrNotExist) {
+		path = xmain.StateFile(zonesFile)
+		err = kvc.RangeFile(path, SplitConfLine, reg.loadZonesKeyValues)
+	}
 	return xerrors.Suppress(err, fs.ErrNotExist)
 }
 
@@ -1137,7 +1138,7 @@ func (reg *registry) rest(rsvp *rsvp) {
 		switch {
 		case strings.HasPrefix(rsvp.req.URL.Path, RestApprove):
 			if reg.atVcsRevision(rsvp) && reg.isAdmin(rsvp) {
-				reg.approve(rsvp)
+				rsvp.reportok(reg.approve(rsvp))
 			}
 		case strings.HasPrefix(rsvp.req.URL.Path, RestCheckinExchange):
 			if reg.atVcsRevision(rsvp) && reg.isSubscriber(rsvp) {
@@ -1226,6 +1227,37 @@ func (reg *registry) reviseIds(rsvp *rsvp) {
 		}
 	}
 	rsvp.Write(data)
+}
+
+func (reg *registry) rezone(rsvp *rsvp, sub *Subscriber) error {
+	zones := strings.Split(rsvp.req.URL.Query().Get("zones"), ",")
+	if len(zones) == 0 {
+		return nil
+	}
+	for _, s := range zones {
+		if s == "*" {
+			sub.zones = AllZones
+			break
+		} else if bit, ok := reg.zoneBitByName[s]; ok {
+			sub.zones |= 1 << bit
+		} else if n := len(reg.zoneBitByName); n < 8 {
+			sub.zones |= 1 << n
+			reg.zoneBitByName[s] = uint8(n)
+		} else {
+			return xerrors.Range(s)
+		}
+	}
+	path := xmain.StateFile(zonesFile)
+	perm := fs.FileMode(0644)
+	if fi, err := os.Stat(path); err == nil {
+		perm = fi.Mode()
+	}
+	f, err := xos.AppendFile(path, perm)
+	if err == nil {
+		defer f.Close()
+		fmt.Fprintln(f, sub.name(), strings.Join(zones, " "))
+	}
+	return err
 }
 
 func (reg *registry) showAddress(rsvp *rsvp) {
