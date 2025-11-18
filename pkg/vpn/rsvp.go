@@ -15,6 +15,37 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 )
 
+var (
+	ErrAlreadySubscribed      = errors.New("already subscribed")
+	ErrAlreadyPendingApproval = errors.New("already pending approval")
+	ErrNameInUse              = errors.New("name in use")
+	ErrNone                   = errors.New("none")
+	ErrNotAllowed             = errors.New("not allowed")
+	ErrUnauthorized           = errors.New("unauthorized")
+	ErrUnprocessable          = errors.New("unprocessable")
+	ErrVcsMatch               = errors.New("upgrade required")
+)
+
+func AlreadySubscribed(args ...any) error {
+	return xerrors.Label(ErrAlreadySubscribed, args...)
+}
+
+func AlreadyPendingApproval(args ...any) error {
+	return xerrors.Label(ErrAlreadyPendingApproval, args...)
+}
+
+func NameInUse(args ...any) error {
+	return xerrors.Label(ErrNameInUse, args...)
+}
+
+func NotAllowed(args ...any) error {
+	return xerrors.Label(ErrNotAllowed, args...)
+}
+
+func Unauthorized(args ...any) error {
+	return xerrors.Label(ErrUnauthorized, args...)
+}
+
 type rsvp struct {
 	http.ResponseWriter
 	req   *http.Request
@@ -35,24 +66,7 @@ func (rsvp *rsvp) done() { rsvp.doneC <- done }
 // [http.Error] with error string
 // and appropriate status code.
 func (rsvp *rsvp) reporterr(err error) {
-	var code int
-	if err == nil {
-		return
-	}
-	if xerrors.IsIncomplete(err) ||
-		xerrors.IsInvalid(err) ||
-		xerrors.IsRange(err) {
-		code = http.StatusBadRequest
-	} else if xerrors.IsNotFound(err) {
-		code = http.StatusNotFound
-	} else if xerrors.IsUnavailable(err) {
-		code = http.StatusConflict
-	} else if errors.Is(err, fs.ErrPermission) {
-		code = http.StatusForbidden
-	} else {
-		code = http.StatusInternalServerError
-	}
-	http.Error(rsvp, err.Error(), code)
+	reporterr(rsvp.ResponseWriter, err)
 }
 
 // Print “OK” if nil error; otherwise, [reporterr].
@@ -71,4 +85,45 @@ func (rsvp *rsvp) reqargs(cmd string) []string {
 		return nil
 	}
 	return strings.Split(s, "/")
+}
+
+func reporterr(w http.ResponseWriter, err error) {
+	if err == nil {
+		return
+	}
+	var code int
+	if xerrors.IsIncomplete(err) ||
+		xerrors.IsInvalid(err) ||
+		xerrors.IsRange(err) {
+		code = http.StatusBadRequest
+	} else if xerrors.IsNotFound(err) {
+		code = http.StatusNotFound
+	} else if xerrors.IsUnavailable(err) {
+		code = http.StatusConflict
+	} else if xerrors.IsBroken(err) {
+		code = http.StatusInternalServerError
+	} else if errors.Is(err, ErrUnauthorized) {
+		code = http.StatusUnauthorized
+	} else if errors.Is(err, ErrAlreadySubscribed) {
+		code = http.StatusGone
+	} else if errors.Is(err, ErrAlreadyPendingApproval) {
+		code = http.StatusConflict
+	} else if errors.Is(err, ErrNameInUse) {
+		code = http.StatusForbidden
+	} else if errors.Is(err, ErrNone) {
+		code = http.StatusNoContent
+	} else if errors.Is(err, ErrNotAllowed) {
+		code = http.StatusMethodNotAllowed
+	} else if errors.Is(err, ErrUnprocessable) {
+		code = http.StatusUnprocessableEntity
+	} else if errors.Is(err, ErrVcsMatch) {
+		code = http.StatusUpgradeRequired
+	} else if errors.Is(err, fs.ErrNotExist) {
+		code = http.StatusNotFound
+	} else if errors.Is(err, fs.ErrPermission) {
+		code = http.StatusForbidden
+	} else {
+		code = http.StatusInternalServerError
+	}
+	http.Error(w, err.Error(), code)
 }

@@ -327,13 +327,13 @@ func (reg *registry) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	defer req.Body.Close()
 
 	if !req.TLS.HandshakeComplete {
-		http.Error(w, "incomplete handshake", http.StatusUnauthorized)
+		reporterr(w, Unauthorized("incomplete handshake"))
 		return
 	}
 
 	if len(req.URL.Path) == 0 || req.URL.Path == "/" {
 		if req.Method != http.MethodGet {
-			http.Error(w, req.Method, http.StatusMethodNotAllowed)
+			reporterr(w, NotAllowed(req.Method))
 		} else {
 			reg.dir(w)
 		}
@@ -349,11 +349,18 @@ func (reg *registry) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	if req.Method == http.MethodGet {
 		reg.file(w, strings.TrimPrefix(req.URL.Path, "/"))
 	} else {
-		http.Error(w, req.Method, http.StatusMethodNotAllowed)
+		reporterr(w, NotAllowed(req.Method))
 	}
 }
 
 func (reg *registry) approve(rsvp *rsvp) error {
+	err := reg.assertVcsMatch(rsvp)
+	if err != nil {
+		return err
+	}
+	if err = reg.assertAdmin(rsvp); err != nil {
+		return err
+	}
 	args := rsvp.reqargs(RestApprove)
 	if len(args) == 0 {
 		return xerrors.Incomplete("subscriber")
@@ -402,6 +409,48 @@ func (reg *registry) approve(rsvp *rsvp) error {
 	return nil
 }
 
+func (reg *registry) assertAdmin(rsvp *rsvp) error {
+	return reg.assertMember(rsvp, reg.admin)
+}
+
+func (reg *registry) assertMember(
+	rsvp *rsvp, club map[string]*Subscriber,
+) error {
+	if err := reg.assertPeer0(rsvp); err != nil {
+		return err
+	}
+	peer0 := rsvp.req.TLS.PeerCertificates[0]
+	if peer0.Equal(reg.cert) {
+		return nil
+	}
+	cn := peer0.Subject.CommonName
+	if sub, ok := club[cn]; !ok || !peer0.Equal(sub.cert) {
+		return xerrors.Label(fs.ErrPermission, cn)
+	}
+	return nil
+}
+
+func (reg *registry) assertPeer0(rsvp *rsvp) (err error) {
+	if len(rsvp.req.TLS.PeerCertificates) == 0 ||
+		rsvp.req.TLS.PeerCertificates[0] == nil {
+		err = Unauthorized("no client certificate")
+	}
+	return
+}
+
+func (reg *registry) assertSubscriber(rsvp *rsvp) error {
+	return reg.assertMember(rsvp, reg.named)
+}
+
+func (reg *registry) assertVcsMatch(rsvp *rsvp) (err error) {
+	if sl, ok := rsvp.req.Header[RestVcsRevision]; !ok || len(sl) == 0 {
+		err = xerrors.Label(ErrVcsMatch, "missing-vcs")
+	} else if sl[0] != reg.vcsRev {
+		err = xerrors.Label(ErrVcsMatch, "mismatched-vcs")
+	}
+	return
+}
+
 func (reg *registry) assignAddr(sub *Subscriber) error {
 	var found bool
 	cn := sub.cert.Subject.CommonName
@@ -425,17 +474,6 @@ func (reg *registry) assignAddr(sub *Subscriber) error {
 	sub.Addr = reg.topAddr
 	reg.addressed[sub.Addr] = sub
 	return nil
-}
-
-func (reg *registry) atVcsRevision(rsvp *rsvp) bool {
-	if sl, ok := rsvp.req.Header[RestVcsRevision]; !ok || len(sl) == 0 {
-		http.Error(rsvp, "no vcs", http.StatusUpgradeRequired)
-		return false
-	} else if sl[0] != reg.vcsRev {
-		http.Error(rsvp, "mismatched vcs", http.StatusUpgradeRequired)
-		return false
-	}
-	return true
 }
 
 // single threaded operations
@@ -462,9 +500,13 @@ func (reg *registry) queueReq(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func (reg *registry) checkin(rsvp *rsvp) *Subscriber {
-	if !reg.hasCertificate(rsvp) {
-		return nil
+func (reg *registry) checkin(rsvp *rsvp) (*Subscriber, error) {
+	err := reg.assertVcsMatch(rsvp)
+	if err != nil {
+		return nil, err
+	}
+	if err = reg.assertPeer0(rsvp); err != nil {
+		return nil, err
 	}
 
 	peer0 := rsvp.req.TLS.PeerCertificates[0]
@@ -472,39 +514,37 @@ func (reg *registry) checkin(rsvp *rsvp) *Subscriber {
 
 	sub, ok := reg.named[cn]
 	if !ok {
-		http.Error(rsvp, cn, http.StatusNotFound)
-		return nil
+		return nil, xerrors.NotFound(cn)
 	}
 	sub.Id.Revise()
 
-	return sub
+	return sub, nil
 }
 
-func (reg *registry) checkinExchange(rsvp *rsvp) {
-	sub := reg.checkin(rsvp)
+func (reg *registry) checkinExchange(rsvp *rsvp) error {
+	sub, err := reg.checkin(rsvp)
 	if sub == nil {
-		return
+		return err
 	}
+
 	sub.zones = AllZones
 	if sub.Port == 0 {
-		http.Error(rsvp, "unassigned port", http.StatusBadRequest)
+		err = xerrors.Broken("unassigned port")
 	} else {
 		fmt.Fprint(rsvp, uint(sub.Id), " ", sub.Port)
 	}
+	return err
 }
 
-func (reg *registry) checkinGuest(rsvp *rsvp) {
-	var err error
-
-	sub := reg.checkin(rsvp)
-	if sub == nil {
-		return
+func (reg *registry) checkinGuest(rsvp *rsvp) error {
+	sub, err := reg.checkin(rsvp)
+	if err != nil {
+		return err
 	}
 
 	sub.EncapKey, err = io.ReadAll(rsvp.req.Body)
 	if err != nil {
-		http.Error(rsvp, err.Error(), http.StatusBadRequest)
-		return
+		return err
 	}
 
 	rsvp.Header().Set("Content-Type", "application/json")
@@ -515,25 +555,32 @@ func (reg *registry) checkinGuest(rsvp *rsvp) {
 		ExchangePrecedence: sub.ExchangePrecedence,
 	}
 	b, err := json.Marshal(&receipt)
-	if err != nil {
-		http.Error(rsvp, err.Error(), http.StatusInternalServerError)
-	} else {
+	if err == nil {
 		rsvp.Write(b)
 	}
+	return err
 }
 
-func (reg *registry) deny(rsvp *rsvp) {
+func (reg *registry) deny(rsvp *rsvp) error {
+	err := reg.assertVcsMatch(rsvp)
+	if err != nil {
+		return err
+	}
+	if err = reg.assertAdmin(rsvp); err != nil {
+		return err
+	}
 	args := rsvp.reqargs(RestDeny)
 	if len(args) == 0 {
-		http.Error(rsvp, "incomplete subscriber", http.StatusBadRequest)
+		return xerrors.Incomplete("subscriber")
 	}
 	name := args[0]
 	i, sub := reg.lookupPending(name)
 	if i < 0 || sub == nil {
-		http.Error(rsvp, name, http.StatusNotFound)
-		return
+		err = xerrors.NotFound(name)
+	} else {
+		reg.pending = slices.Delete(reg.pending, i, i+1)
 	}
-	reg.pending = slices.Delete(reg.pending, i, i+1)
+	return err
 }
 
 func (reg *registry) dir(w http.ResponseWriter) {
@@ -663,9 +710,8 @@ func (reg *registry) dnsAnswerName(
 	})
 }
 
-func (reg *registry) dnsQuery(rsvp *rsvp) {
+func (reg *registry) dnsQuery(rsvp *rsvp) (err error) {
 	var b []byte
-	var err error
 
 	if rsvp.req.Method == http.MethodPost {
 		b, err = io.ReadAll(rsvp.req.Body)
@@ -675,8 +721,6 @@ func (reg *registry) dnsQuery(rsvp *rsvp) {
 		b, err = base64.URLEncoding.DecodeString(ev)
 	}
 	if err != nil {
-		http.Error(rsvp, err.Error(), http.StatusBadRequest)
-		xlog.Errata.Println(err)
 		return
 	}
 
@@ -684,8 +728,6 @@ func (reg *registry) dnsQuery(rsvp *rsvp) {
 	defer query.Free()
 
 	if err = query.UnmarshalBinary(b); err != nil {
-		http.Error(rsvp, err.Error(), http.StatusBadRequest)
-		xlog.Errata.Println(err)
 		return
 	}
 
@@ -694,15 +736,20 @@ func (reg *registry) dnsQuery(rsvp *rsvp) {
 
 	rsvp.Header().Set("Content-Type", "application/dns-message")
 	b, err = answer.AppendTo(make([]byte, 0, 4<<10))
-	if err != nil {
-		http.Error(rsvp, err.Error(), http.StatusInternalServerError)
-		xlog.Errata.Println(err)
-	} else if _, err = rsvp.Write(b); err != nil {
-		xlog.Errata.Print(err)
+	if err == nil {
+		rsvp.Write(b)
 	}
+	return
 }
 
-func (reg *registry) dumpSubscribers(rsvp *rsvp) {
+func (reg *registry) dumpSubscribers(rsvp *rsvp) error {
+	err := reg.assertVcsMatch(rsvp)
+	if err != nil {
+		return err
+	}
+	if err = reg.assertSubscriber(rsvp); err != nil {
+		return err
+	}
 	blk := pem.Block{
 		Type: "CERTIFICATE",
 	}
@@ -713,6 +760,7 @@ func (reg *registry) dumpSubscribers(rsvp *rsvp) {
 			break
 		}
 	}
+	return nil
 }
 
 func (reg *registry) fromVpn(ctx context.Context, m *xnet.Msg) {
@@ -751,80 +799,63 @@ func (reg *registry) fromVpn(ctx context.Context, m *xnet.Msg) {
 	mp.Put(m)
 }
 
-func (reg *registry) file(w http.ResponseWriter, name string) {
+func (reg *registry) file(w http.ResponseWriter, name string) error {
 	xlog.Trace.Println(http.MethodGet, name)
 
 	w.Header().Add(RestUnixMicroStart, reg.start)
 	w.Header().Add(RestVcsRevision, reg.vcsRev)
 
-	ecode := http.StatusInternalServerError
 	if name == vlink() {
 		f, err := os.Open(xprogram.Path())
 		if err != nil {
-			if errors.Is(err, fs.ErrPermission) {
-				ecode = http.StatusForbidden
-			}
-			http.Error(w, err.Error(), ecode)
-		} else {
-			io.Copy(w, f)
-			f.Close()
+			return err
 		}
-		return
+		io.Copy(w, f)
+		f.Close()
+		return nil
 	}
 
 	name = xmain.DataFile(name)
 	if fi, err := os.Stat(name); err != nil {
-		if errors.Is(err, fs.ErrNotExist) {
-			ecode = http.StatusNotFound
-		} else if errors.Is(err, fs.ErrPermission) {
-			ecode = http.StatusForbidden
-		}
-		http.Error(w, err.Error(), ecode)
+		return err
 	} else if !fi.Mode().IsRegular() {
-		http.Error(w, "irregular file", http.StatusUnprocessableEntity)
+		return xerrors.Label(ErrUnprocessable, "irregular file")
 	} else if f, err := os.Open(name); err != nil {
-		if errors.Is(err, fs.ErrPermission) {
-			ecode = http.StatusForbidden
-		}
-		http.Error(w, err.Error(), ecode)
+		return err
 	} else {
-		_, err = io.Copy(w, f)
+		io.Copy(w, f)
 		f.Close()
 	}
+	return nil
 }
 
-func (reg *registry) hasCertificate(rsvp *rsvp) bool {
-	t := len(rsvp.req.TLS.PeerCertificates) > 0 &&
-		rsvp.req.TLS.PeerCertificates[0] != nil
-	if !t {
-		const emsg = "no client certificate"
-		xlog.Errata.Println(emsg)
-		http.Error(rsvp, emsg, http.StatusUnauthorized)
+func (reg *registry) invite(rsvp *rsvp) error {
+	err := reg.assertVcsMatch(rsvp)
+	if err != nil {
+		return err
 	}
-	return t
-}
-
-func (reg *registry) invite(rsvp *rsvp) {
+	if err = reg.assertSubscriber(rsvp); err != nil {
+		return err
+	}
 	from := reg.named[rsvp.req.TLS.PeerCertificates[0].Subject.CommonName]
 	text, err := io.ReadAll(rsvp.req.Body)
 	if err != nil {
-		http.Error(rsvp, err.Error(), http.StatusBadRequest)
+		return err
 	}
 	args := rsvp.reqargs(RestInvite)
 	if len(args) == 0 {
-		http.Error(rsvp, "incomplete subscriber", http.StatusBadRequest)
+		return xerrors.Incomplete("subscriber")
 	}
 	s := args[0]
 	to, ok := reg.named[s]
 	if !ok {
-		xlog.Errata.Println(s, "not found in", xmaps.Keys(reg.named))
-		http.Error(rsvp, s, http.StatusNotFound)
+		return xerrors.NotFound(s)
 	}
 	for i, x := range reg.invitations {
 		if x.from == to.Id && x.to == from.Id {
 			rsvp.Write(x.text)
 			reg.invitations = slices.Delete(reg.invitations, i, i+1)
-			return
+			return nil
 		}
 	}
 	reg.invitations = append(reg.invitations, &invitation{
@@ -832,10 +863,11 @@ func (reg *registry) invite(rsvp *rsvp) {
 		to:   to.Id,
 		text: text,
 	})
+	return nil
 }
 
 func (reg *registry) inZone(rsvp *rsvp, sub *Subscriber) bool {
-	if !reg.hasCertificate(rsvp) || sub == nil {
+	if err := reg.assertPeer0(rsvp); err != nil {
 		return false
 	}
 	peer0 := rsvp.req.TLS.PeerCertificates[0]
@@ -856,31 +888,12 @@ func (reg *registry) inZone(rsvp *rsvp, sub *Subscriber) bool {
 	return t
 }
 
-func (reg *registry) isMember(
-	rsvp *rsvp, club map[string]*Subscriber,
-) bool {
-	if !reg.hasCertificate(rsvp) {
-		return false
+func (reg *registry) marshalSub(rsvp *rsvp, sub *Subscriber) error {
+	b, err := json.MarshalIndent(sub, "", "  ")
+	if err == nil {
+		rsvp.Write(b)
 	}
-	peer0 := rsvp.req.TLS.PeerCertificates[0]
-	if peer0.Equal(reg.cert) {
-		return true
-	}
-	cn := peer0.Subject.CommonName
-	sub, ok := club[cn]
-	t := ok && peer0.Equal(sub.cert)
-	if !t {
-		http.Error(rsvp, cn, http.StatusForbidden)
-	}
-	return t
-}
-
-func (reg *registry) isAdmin(rsvp *rsvp) bool {
-	return reg.isMember(rsvp, reg.admin)
-}
-
-func (reg *registry) isSubscriber(rsvp *rsvp) bool {
-	return reg.isMember(rsvp, reg.named)
+	return err
 }
 
 func (reg *registry) loadAdminsFile() error {
@@ -1045,16 +1058,16 @@ func (reg *registry) lookupPending(name string) (int, *Subscriber) {
 	return -1, nil
 }
 
-func (reg *registry) reload(rsvp *rsvp) {
-	err := reg.loadAdminsFile()
-	if err == nil {
-		if err = reg.loadHostsFile(); err == nil {
-			err = reg.loadExchangesFile()
-		}
-	}
+func (reg *registry) reload(rsvp *rsvp) error {
+	err := reg.assertVcsMatch(rsvp)
 	if err != nil {
-		http.Error(rsvp, err.Error(), http.StatusInternalServerError)
+	} else if err = reg.assertAdmin(rsvp); err != nil {
+		return err
+	} else if err = reg.loadAdminsFile(); err != nil {
+	} else if err = reg.loadHostsFile(); err == nil {
+		err = reg.loadExchangesFile()
 	}
+	return err
 }
 
 func (reg *registry) rest(rsvp *rsvp) {
@@ -1065,37 +1078,21 @@ func (reg *registry) rest(rsvp *rsvp) {
 	case http.MethodGet:
 		switch {
 		case rsvp.req.URL.Path == DnsQuery:
-			reg.dnsQuery(rsvp)
+			rsvp.reporterr(reg.dnsQuery(rsvp))
 		case rsvp.req.URL.Path == RestCertify:
-			reg.atVcsRevision(rsvp)
 			// empty response so that client may retrieve this
 			// certificate from TLS negotiation.
+			rsvp.reporterr(reg.assertVcsMatch(rsvp))
 		case strings.HasPrefix(rsvp.req.URL.Path, RestShowAddress):
-			if reg.atVcsRevision(rsvp) && reg.isSubscriber(rsvp) {
-				reg.showAddress(rsvp)
-			}
+			rsvp.reporterr(reg.showAddress(rsvp))
 		case strings.HasPrefix(rsvp.req.URL.Path, RestShowAdmins):
-			if reg.atVcsRevision(rsvp) && reg.isSubscriber(rsvp) {
-				keys := xmaps.Keys(reg.admin)
-				slices.Sort(keys)
-				for _, k := range keys {
-					fmt.Fprintln(rsvp, "-", k)
-				}
-			}
+			rsvp.reporterr(reg.showAdmins(rsvp))
 		case rsvp.req.URL.Path == RestShowDomain:
 			fmt.Fprintln(rsvp, domain)
 		case rsvp.req.URL.Path == RestShowExchanges:
-			if reg.atVcsRevision(rsvp) && reg.isSubscriber(rsvp) {
-				for _, sub := range reg.indexed {
-					if sub.Port != 0 {
-						fmt.Fprintln(rsvp, sub)
-					}
-				}
-			}
+			rsvp.reporterr(reg.showExchanges(rsvp))
 		case rsvp.req.URL.Path == RestShowPending:
-			if reg.atVcsRevision(rsvp) && reg.isSubscriber(rsvp) {
-				reg.showPending(rsvp)
-			}
+			rsvp.reporterr(reg.showPending(rsvp))
 		case rsvp.req.URL.Path == RestShowPrefix:
 			fmt.Fprintln(rsvp, prefix)
 		case rsvp.req.URL.Path == RestShowStart:
@@ -1103,9 +1100,7 @@ func (reg *registry) rest(rsvp *rsvp) {
 		case rsvp.req.URL.Path == RestShowStatus:
 			fmt.Fprintln(rsvp, "OK")
 		case strings.HasPrefix(rsvp.req.URL.Path, RestShowSubscriber):
-			if reg.atVcsRevision(rsvp) && reg.isSubscriber(rsvp) {
-				reg.showSubscriber(rsvp)
-			}
+			rsvp.reporterr(reg.showSubscriber(rsvp))
 		case rsvp.req.URL.Path == RestShowVCS:
 			fmt.Fprint(rsvp, xprogram.VcsRevision)
 			if xprogram.VcsModified.String() == "true" {
@@ -1113,74 +1108,48 @@ func (reg *registry) rest(rsvp *rsvp) {
 			}
 			fmt.Fprintln(rsvp)
 		case strings.HasPrefix(rsvp.req.URL.Path, RestWhoisAddressed):
-			if reg.atVcsRevision(rsvp) && reg.isSubscriber(rsvp) {
-				reg.whoisAddressed(rsvp)
-			}
+			rsvp.reporterr(reg.whoisAddressed(rsvp))
 		case strings.HasPrefix(rsvp.req.URL.Path, RestWhoisId):
-			if reg.atVcsRevision(rsvp) && reg.isSubscriber(rsvp) {
-				reg.whoisId(rsvp)
-			}
+			rsvp.reporterr(reg.whoisId(rsvp))
 		case strings.HasPrefix(rsvp.req.URL.Path, RestWhoisNamed):
-			if reg.atVcsRevision(rsvp) && reg.isSubscriber(rsvp) {
-				reg.whoisNamed(rsvp)
-			}
+			rsvp.reporterr(reg.whoisNamed(rsvp))
 		default:
-			http.Error(rsvp, rsvp.req.URL.Path, http.StatusNotFound)
+			rsvp.reporterr(xerrors.NotFound(rsvp.req.URL.Path))
 		}
 	case http.MethodPost:
 		switch {
 		case rsvp.req.URL.Path == DnsQuery:
-			reg.dnsQuery(rsvp)
+			rsvp.reporterr(reg.dnsQuery(rsvp))
 		default:
-			http.Error(rsvp, rsvp.req.URL.Path, http.StatusNotFound)
+			rsvp.reporterr(xerrors.NotFound(rsvp.req.URL.Path))
 		}
 	case http.MethodPut:
 		switch {
 		case strings.HasPrefix(rsvp.req.URL.Path, RestApprove):
-			if reg.atVcsRevision(rsvp) && reg.isAdmin(rsvp) {
-				rsvp.reportok(reg.approve(rsvp))
-			}
+			rsvp.reportok(reg.approve(rsvp))
 		case strings.HasPrefix(rsvp.req.URL.Path, RestCheckinExchange):
-			if reg.atVcsRevision(rsvp) && reg.isSubscriber(rsvp) {
-				reg.checkinExchange(rsvp)
-			}
+			rsvp.reporterr(reg.checkinExchange(rsvp))
 		case rsvp.req.URL.Path == RestCheckinGuest:
-			if reg.atVcsRevision(rsvp) && reg.isSubscriber(rsvp) {
-				reg.checkinGuest(rsvp)
-			}
+			rsvp.reporterr(reg.checkinGuest(rsvp))
 		case strings.HasPrefix(rsvp.req.URL.Path, RestDeny):
-			if reg.atVcsRevision(rsvp) && reg.isAdmin(rsvp) {
-				reg.deny(rsvp)
-			}
+			rsvp.reportok(reg.deny(rsvp))
 		case rsvp.req.URL.Path == RestDumpSubscribers:
-			if reg.atVcsRevision(rsvp) && reg.isSubscriber(rsvp) {
-				reg.dumpSubscribers(rsvp)
-			}
+			rsvp.reporterr(reg.dumpSubscribers(rsvp))
 		case strings.HasPrefix(rsvp.req.URL.Path, RestInvite):
-			if reg.atVcsRevision(rsvp) && reg.isSubscriber(rsvp) {
-				reg.invite(rsvp)
-			}
+			rsvp.reporterr(reg.invite(rsvp))
 		case rsvp.req.URL.Path == RestReload:
-			if reg.atVcsRevision(rsvp) && reg.isAdmin(rsvp) {
-				reg.reload(rsvp)
-			}
+			rsvp.reportok(reg.reload(rsvp))
 		case rsvp.req.URL.Path == RestReviseIds:
-			if reg.atVcsRevision(rsvp) {
-				reg.reviseIds(rsvp)
-			}
+			rsvp.reporterr(reg.reviseIds(rsvp))
 		case rsvp.req.URL.Path == RestSubscribe:
-			if reg.atVcsRevision(rsvp) {
-				reg.subscribe(rsvp)
-			}
+			rsvp.reporterr(reg.subscribe(rsvp))
 		case strings.HasPrefix(rsvp.req.URL.Path, RestUnsubscribe):
-			if reg.atVcsRevision(rsvp) && reg.isSubscriber(rsvp) {
-				reg.unsubscribe(rsvp)
-			}
+			rsvp.reportok(reg.unsubscribe(rsvp))
 		default:
-			http.Error(rsvp, rsvp.req.URL.Path, http.StatusNotFound)
+			rsvp.reporterr(xerrors.NotFound(rsvp.req.URL.Path))
 		}
 	default:
-		http.Error(rsvp, rsvp.req.Method, http.StatusMethodNotAllowed)
+		rsvp.reporterr(xerrors.Label(ErrNotAllowed, rsvp.req.Method))
 	}
 }
 
@@ -1195,38 +1164,39 @@ func (reg *registry) restsvc() {
 	}
 }
 
-func (reg *registry) reviseIds(rsvp *rsvp) {
+func (reg *registry) reviseIds(rsvp *rsvp) error {
+	err := reg.assertVcsMatch(rsvp)
+	if err != nil {
+		return err
+	}
+	if err = reg.assertSubscriber(rsvp); err != nil {
+		return err
+	}
 	data, err := io.ReadAll(rsvp.req.Body)
 	if err != nil {
-		http.Error(rsvp, err.Error(), http.StatusBadRequest)
-		return
+		return err
 	}
 	for i, n := 0, 0; i < len(data); i += n {
 		var id Id
 		n, err = xnet.ByteOrderDecode(data[i:], &id)
 		if err != nil {
-			http.Error(rsvp, err.Error(), http.StatusBadRequest)
-			return
+			return err
 		}
 		idi := id.Index()
 		if idi >= len(reg.indexed) {
-			http.Error(rsvp, id.String(), http.StatusNotFound)
-			return
+			return xerrors.NotFound(id.String())
 		}
 		sub := reg.indexed[idi]
 		if sub == nil {
-			http.Error(rsvp, "nil subcriber",
-				http.StatusInternalServerError)
-			return
+			return xerrors.Broken("subscriber-index")
 		}
 		n, err = xnet.ByteOrderEncode(data[i:], sub.Id)
 		if err != nil {
-			http.Error(rsvp, err.Error(),
-				http.StatusInternalServerError)
-			return
+			return err
 		}
 	}
 	rsvp.Write(data)
+	return nil
 }
 
 func (reg *registry) rezone(rsvp *rsvp, sub *Subscriber) error {
@@ -1260,13 +1230,20 @@ func (reg *registry) rezone(rsvp *rsvp, sub *Subscriber) error {
 	return err
 }
 
-func (reg *registry) showAddress(rsvp *rsvp) {
+func (reg *registry) showAddress(rsvp *rsvp) error {
+	err := reg.assertVcsMatch(rsvp)
+	if err != nil {
+		return err
+	}
+	if err = reg.assertSubscriber(rsvp); err != nil {
+		return err
+	}
 	args := rsvp.reqargs(RestShowAddress)
 	if len(args) > 0 {
-		if sub, ok := reg.named[args[0]]; ok {
-			fmt.Fprintln(rsvp, sub.Addr)
+		if sub, ok := reg.named[args[0]]; !ok {
+			return xerrors.NotFound(args[0])
 		} else {
-			http.Error(rsvp, args[0], http.StatusNotFound)
+			fmt.Fprintln(rsvp, sub.Addr)
 		}
 	} else {
 		for _, sub := range reg.indexed {
@@ -1275,13 +1252,43 @@ func (reg *registry) showAddress(rsvp *rsvp) {
 			}
 		}
 	}
+	return nil
 }
 
-func (reg *registry) showPending(rsvp *rsvp) {
-	if len(reg.pending) == 0 {
-		http.Error(rsvp, "none", http.StatusNoContent)
+func (reg *registry) showAdmins(rsvp *rsvp) error {
+	err := reg.assertVcsMatch(rsvp)
+	if err != nil {
+	} else if err = reg.assertSubscriber(rsvp); err == nil {
+		keys := xmaps.Keys(reg.admin)
+		slices.Sort(keys)
+		for _, k := range keys {
+			fmt.Fprintln(rsvp, "-", k)
+		}
+	}
+	return err
+}
+
+func (reg *registry) showExchanges(rsvp *rsvp) error {
+	err := reg.assertVcsMatch(rsvp)
+	if err != nil {
+	} else if err = reg.assertSubscriber(rsvp); err == nil {
+		for _, sub := range reg.indexed {
+			if sub.Port != 0 {
+				fmt.Fprintln(rsvp, sub)
+			}
+		}
+	}
+	return err
+}
+func (reg *registry) showPending(rsvp *rsvp) error {
+	err := reg.assertVcsMatch(rsvp)
+	if err != nil {
+		return err
+	}
+	if err = reg.assertSubscriber(rsvp); err != nil {
+	} else if len(reg.pending) == 0 {
+		err = xerrors.Label(ErrNone, "pending")
 	} else if t, err := cert.NewTemplate(); err != nil {
-		http.Error(rsvp, err.Error(), http.StatusInternalServerError)
 	} else {
 		certs := make([]*x509.Certificate, len(reg.pending))
 		for i, sub := range reg.pending {
@@ -1289,9 +1296,17 @@ func (reg *registry) showPending(rsvp *rsvp) {
 		}
 		t.Execute(rsvp, certs)
 	}
+	return err
 }
 
-func (reg *registry) showSubscriber(rsvp *rsvp) {
+func (reg *registry) showSubscriber(rsvp *rsvp) error {
+	err := reg.assertVcsMatch(rsvp)
+	if err != nil {
+		return err
+	}
+	if err = reg.assertSubscriber(rsvp); err != nil {
+		return err
+	}
 	args := rsvp.reqargs(RestShowSubscriber)
 	if len(args) == 0 {
 		names := xmaps.Keys(reg.named)
@@ -1299,7 +1314,7 @@ func (reg *registry) showSubscriber(rsvp *rsvp) {
 		for _, name := range names {
 			fmt.Fprintln(rsvp, reg.named[name])
 		}
-		return
+		return nil
 	}
 	s := args[0]
 	if s == "self" {
@@ -1310,21 +1325,20 @@ func (reg *registry) showSubscriber(rsvp *rsvp) {
 		fmt.Fprintln(rsvp, sub)
 	} else if r, rsz := utf8.DecodeRuneInString(s); r == utf8.RuneError ||
 		rsz == 0 {
-		http.Error(rsvp, "can't decode: "+s, http.StatusBadRequest)
+		err = xerrors.Invalid(s)
 	} else if unicode.IsDigit(r) ||
 		(r >= 'a' && r <= 'f') ||
 		(r >= 'A' && r <= 'F') {
 		if addr, err := netip.ParseAddr(s); err != nil {
-			http.Error(rsvp, err.Error(), http.StatusBadRequest)
 		} else if sub, ok := reg.addressed[addr]; !ok {
-			http.Error(rsvp, "addressed: "+addr.String(),
-				http.StatusNotFound)
+			err = xerrors.NotFound(addr)
 		} else {
 			fmt.Fprintln(rsvp, sub)
 		}
 	} else {
-		http.Error(rsvp, "named: "+s, http.StatusNotFound)
+		err = xerrors.NotFound(s)
 	}
+	return err
 }
 
 func (reg *registry) shutdown(ctx context.Context) {
@@ -1339,30 +1353,38 @@ func (reg *registry) shutdown(ctx context.Context) {
 // This has an empty response.  The client will retrieve the server cert
 // through its TLS negotiation; then prompt the user to ise as root certificate
 // authority.
-func (reg *registry) subscribe(rsvp *rsvp) {
-	if !reg.hasCertificate(rsvp) {
-		return
+func (reg *registry) subscribe(rsvp *rsvp) error {
+	err := reg.assertVcsMatch(rsvp)
+	if err != nil {
+		return err
+	}
+	if err = reg.assertPeer0(rsvp); err != nil {
+		return err
 	}
 	c := rsvp.req.TLS.PeerCertificates[0]
 	cn := c.Subject.CommonName
 	if sub, found := reg.named[cn]; found {
 		if c.Equal(sub.cert) {
-			http.Error(rsvp, "already subscribed", http.StatusGone)
+			err = AlreadySubscribed(cn)
 		} else {
-			http.Error(rsvp, "name in use", http.StatusForbidden)
+			err = NameInUse(cn)
 		}
 	} else if i, _ := reg.lookupPending(cn); i >= 0 {
-		http.Error(rsvp, "subscription pending approval",
-			http.StatusConflict)
+		err = AlreadyPendingApproval(cn)
 	} else {
 		reg.pending = append(reg.pending, NewSubscriber(c))
 		fmt.Fprintln(rsvp, "pending approval")
 	}
+	return err
 }
 
-func (reg *registry) unsubscribe(rsvp *rsvp) {
-	if !reg.hasCertificate(rsvp) {
-		return
+func (reg *registry) unsubscribe(rsvp *rsvp) error {
+	err := reg.assertVcsMatch(rsvp)
+	if err != nil {
+		return err
+	}
+	if err = reg.assertSubscriber(rsvp); err != nil {
+		return err
 	}
 	peer0 := rsvp.req.TLS.PeerCertificates[0]
 	args := rsvp.reqargs(RestUnsubscribe)
@@ -1373,10 +1395,9 @@ func (reg *registry) unsubscribe(rsvp *rsvp) {
 		name = args[0]
 	}
 	if sub, found := reg.named[name]; !found {
-		http.Error(rsvp, name, http.StatusNotFound)
-	} else if !peer0.Equal(sub.cert) && !reg.isAdmin(rsvp) {
-		http.Error(rsvp, fmt.Sprint("unsubscribe ", name),
-			http.StatusForbidden)
+		err = xerrors.NotFound(name)
+	} else if !peer0.Equal(sub.cert) && reg.assertAdmin(rsvp) != nil {
+		err = xerrors.Label(fs.ErrPermission, peer0.Subject.CommonName)
 	} else {
 		delete(reg.addressed, sub.Addr)
 		delete(reg.admin, name)
@@ -1386,54 +1407,56 @@ func (reg *registry) unsubscribe(rsvp *rsvp) {
 		}
 		os.Remove(sub.stateFileName())
 	}
+	return err
 }
 
-func (reg *registry) whoisAddressed(rsvp *rsvp) {
-	args := rsvp.reqargs(RestWhoisAddressed)
-	if len(args) == 0 {
-		http.Error(rsvp, "incomplete address", http.StatusBadRequest)
-	} else if addr, err := netip.ParseAddr(args[0]); err != nil {
-		http.Error(rsvp, err.Error(), http.StatusBadRequest)
+func (reg *registry) whoisAddressed(rsvp *rsvp) error {
+	var addr netip.Addr
+	err := reg.assertVcsMatch(rsvp)
+	if err != nil {
+	} else if err = reg.assertSubscriber(rsvp); err != nil {
+	} else if args := rsvp.reqargs(RestWhoisAddressed); len(args) == 0 {
+		err = xerrors.Incomplete("address")
+	} else if addr, err = netip.ParseAddr(args[0]); err != nil {
 	} else if sub, ok := reg.addressed[addr]; !ok || sub == nil ||
 		!reg.inZone(rsvp, sub) {
-		http.Error(rsvp, args[0], http.StatusNotFound)
+		err = xerrors.NotFound(args[0])
 	} else {
-		reg.marshalSub(rsvp, sub)
+		err = reg.marshalSub(rsvp, sub)
 	}
+	return err
 }
 
-func (reg *registry) whoisId(rsvp *rsvp) {
-	args := rsvp.reqargs(RestWhoisId)
-	if len(args) == 0 {
-		http.Error(rsvp, "incomplete id", http.StatusBadRequest)
-	} else if id, err := ParseId(args[0]); err != nil {
-		http.Error(rsvp, err.Error(), http.StatusBadRequest)
+func (reg *registry) whoisId(rsvp *rsvp) error {
+	var id Id
+	err := reg.assertVcsMatch(rsvp)
+	if err != nil {
+	} else if err = reg.assertSubscriber(rsvp); err != nil {
+	} else if args := rsvp.reqargs(RestWhoisId); len(args) == 0 {
+		err = xerrors.Incomplete("id")
+	} else if id, err = ParseId(args[0]); err != nil {
 	} else if i := id.Index(); i >= len(reg.indexed) ||
 		!reg.inZone(rsvp, reg.indexed[i]) {
-		http.Error(rsvp, args[0], http.StatusNotFound)
+		err = xerrors.NotFound(args[0])
 	} else {
-		reg.marshalSub(rsvp, reg.indexed[i])
+		err = reg.marshalSub(rsvp, reg.indexed[i])
 	}
+	return err
 }
 
-func (reg *registry) whoisNamed(rsvp *rsvp) {
-	args := rsvp.reqargs(RestWhoisNamed)
-	if len(args) == 0 {
-		http.Error(rsvp, "incomplete name", http.StatusBadRequest)
+func (reg *registry) whoisNamed(rsvp *rsvp) error {
+	err := reg.assertVcsMatch(rsvp)
+	if err != nil {
+	} else if err = reg.assertSubscriber(rsvp); err != nil {
+	} else if args := rsvp.reqargs(RestWhoisNamed); len(args) == 0 {
+		err = xerrors.Incomplete("name")
 	} else if sub, ok := reg.named[args[0]]; !ok || sub == nil ||
 		!reg.inZone(rsvp, sub) {
-		http.Error(rsvp, args[0], http.StatusNotFound)
+		err = xerrors.NotFound(args[0])
 	} else {
-		reg.marshalSub(rsvp, sub)
+		err = reg.marshalSub(rsvp, sub)
 	}
-}
-
-func (reg *registry) marshalSub(rsvp *rsvp, sub *Subscriber) {
-	if b, err := json.MarshalIndent(sub, "", "  "); err != nil {
-		http.Error(rsvp, err.Error(), http.StatusInternalServerError)
-	} else {
-		rsvp.Write(b)
-	}
+	return err
 }
 
 func SplitConfLine(s string) []string {
