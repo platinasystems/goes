@@ -119,7 +119,7 @@ func newRegistry() *registry {
 }
 
 var (
-	adminsFile, exchangesFile, hostsFile, zonesFile string
+	AdminsFile, ExchangesFile, HostsFile, ZonesFile string
 
 	domain = ".example.platina.io."
 )
@@ -134,11 +134,11 @@ An optional file w/in the current or config directory containing
 a newline separated list of certificate common names that may
 administer subscriptions.`[1:], func() any {
 		if v, ok := xmain.LookupEnv("ADMINS"); ok {
-			adminsFile = v
+			AdminsFile = v
 		} else {
-			adminsFile = "admins"
+			AdminsFile = "admins"
 		}
-		return &adminsFile
+		return &AdminsFile
 	}},
 	RestCertAkaFlag,
 	{"domain", "Search domain suffix.", &domain},
@@ -147,22 +147,22 @@ An optional file w/in the current or config directory containing
 a newline separated list of guest exhange assignment and
 exchange port numbers.`[1:], func() any {
 		if v, ok := xmain.LookupEnv("EXCHANGES"); ok {
-			exchangesFile = v
+			ExchangesFile = v
 		} else {
-			exchangesFile = "exchanges"
+			ExchangesFile = "exchanges"
 		}
-		return &exchangesFile
+		return &ExchangesFile
 	}},
 	{"hosts", `
 An optional file w/in the current or config directory containing
 a newline separated list of static address assignments in
 /ets/hosts format.`[1:], func() any {
 		if v, ok := xmain.LookupEnv("HOSTS"); ok {
-			hostsFile = v
+			HostsFile = v
 		} else {
-			hostsFile = "hosts"
+			HostsFile = "hosts"
 		}
-		return &hostsFile
+		return &HostsFile
 	}},
 	RestPortFlag,
 	{"prefix", "Network prefix.", func() any {
@@ -178,11 +178,11 @@ An optional file w/in the current or config directory containing
 a newline separated list of subscriber zone assignments.
 An asterisk permits the named subscriber in all zones.`[1:], func() any {
 		if v, ok := xmain.LookupEnv("ZONES"); ok {
-			zonesFile = v
+			ZonesFile = v
 		} else {
-			zonesFile = "zones"
+			ZonesFile = "zones"
 		}
-		return &zonesFile
+		return &ZonesFile
 	}},
 }
 
@@ -897,7 +897,7 @@ func (reg *registry) marshalSub(rsvp *rsvp, sub *Subscriber) error {
 }
 
 func (reg *registry) loadAdminsFile() error {
-	path := xmain.ConfigFile(adminsFile)
+	path := xmain.ConfigFile(AdminsFile)
 	err := kvc.RangeFile(path, SplitConfLine, reg.loadAdminsKeyValues)
 	return xerrors.Suppress(err, fs.ErrNotExist)
 }
@@ -910,7 +910,7 @@ func (reg *registry) loadAdminsKeyValues(
 }
 
 func (reg *registry) loadExchangesFile() error {
-	path := xmain.ConfigFile(exchangesFile)
+	path := xmain.ConfigFile(ExchangesFile)
 	err := kvc.RangeFile(path, SplitConfLine, reg.loadExchangesKeyValues)
 	return xerrors.Suppress(err, fs.ErrNotExist)
 }
@@ -918,7 +918,7 @@ func (reg *registry) loadExchangesFile() error {
 func (reg *registry) loadExchangesKeyValues(
 	lno int, key string, values []string,
 ) error {
-	path := xmain.ConfigFile(exchangesFile)
+	path := xmain.ConfigFile(ExchangesFile)
 	if len(values) < 0 {
 		return xerrors.Label(xerrors.Incomplete(lno), path)
 	}
@@ -927,7 +927,7 @@ func (reg *registry) loadExchangesKeyValues(
 }
 
 func (reg *registry) loadHostsFile() error {
-	path := xmain.ConfigFile(hostsFile)
+	path := xmain.ConfigFile(HostsFile)
 	err := kvc.RangeFile(path, SplitConfLine, reg.loadHostsKeyValues)
 	return xerrors.Suppress(err, fs.ErrNotExist)
 }
@@ -935,7 +935,7 @@ func (reg *registry) loadHostsFile() error {
 func (reg *registry) loadHostsKeyValues(
 	lno int, key string, values []string,
 ) error {
-	path := xmain.ConfigFile(hostsFile)
+	path := xmain.ConfigFile(HostsFile)
 	if len(values) < 0 {
 		return xerrors.Label(xerrors.Incomplete(lno), path)
 	}
@@ -1009,10 +1009,10 @@ func (reg *registry) loadSubscribers() error {
 }
 
 func (reg *registry) loadZonesFile() error {
-	path := xmain.ConfigFile(zonesFile)
+	path := xmain.ConfigFile(ZonesFile)
 	err := kvc.RangeFile(path, SplitConfLine, reg.loadZonesKeyValues)
 	if err == nil || errors.Is(err, fs.ErrNotExist) {
-		path = xmain.StateFile(zonesFile)
+		path = xmain.StateFile(ZonesFile)
 		err = kvc.RangeFile(path, SplitConfLine, reg.loadZonesKeyValues)
 	}
 	return xerrors.Suppress(err, fs.ErrNotExist)
@@ -1021,7 +1021,7 @@ func (reg *registry) loadZonesFile() error {
 func (reg *registry) loadZonesKeyValues(
 	lno int, key string, values []string,
 ) error {
-	path := xmain.ConfigFile(zonesFile)
+	path := xmain.ConfigFile(ZonesFile)
 	if len(values) < 0 {
 		return xerrors.Label(xerrors.Incomplete(lno), path)
 	}
@@ -1217,7 +1217,7 @@ func (reg *registry) rezone(rsvp *rsvp, sub *Subscriber) error {
 			return xerrors.Range(s)
 		}
 	}
-	path := xmain.StateFile(zonesFile)
+	path := xmain.StateFile(ZonesFile)
 	perm := fs.FileMode(0644)
 	if fi, err := os.Stat(path); err == nil {
 		perm = fi.Mode()

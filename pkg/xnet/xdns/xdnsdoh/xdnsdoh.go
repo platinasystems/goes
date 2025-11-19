@@ -25,12 +25,14 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xnet/xdns/xdnsmessage"
 )
 
+const ConfigFile = "doh"
+
 type Config struct {
 	URL, Search string
 }
 
 var GetConfig = sync.OnceValues(func() (cfg Config, err error) {
-	fn := xmain.ConfigFile("doh")
+	fn := xmain.ConfigFile(ConfigFile)
 	err = kvc.RangeFile(fn, func(s string) []string {
 		s = strings.TrimSpace(s)
 		if len(s) == 0 || []rune(s)[0] == '#' {
