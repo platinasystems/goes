@@ -23,6 +23,7 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xmain"
 	"github.com/platinasystems/goes/v2/pkg/xnet/xdns/xdnsmessage"
+	"golang.org/x/sys/unix"
 )
 
 const ConfigFile = "doh"
@@ -109,6 +110,11 @@ func LookupAddrPort(ctx context.Context, nw, s string) (
 	return
 }
 
+func fallback(err error) bool {
+	return errors.Is(err, fs.ErrNotExist) ||
+		errors.Is(err, unix.ECONNREFUSED)
+}
+
 // Like [net.Resolver.LookupAddr] but with [netip.Addr]
 // instead of string parameter.
 func LookupName(ctx context.Context, addr netip.Addr) ([]string, error) {
@@ -116,7 +122,8 @@ func LookupName(ctx context.Context, addr netip.Addr) ([]string, error) {
 	doh, err := New()
 	if err == nil {
 		names, err = doh.LookupName(ctx, addr)
-	} else if errors.Is(err, fs.ErrNotExist) {
+	}
+	if fallback(err) {
 		names, err = net.DefaultResolver.LookupAddr(ctx, addr.String())
 	}
 	if err == nil && len(names) == 0 {
@@ -144,7 +151,8 @@ func LookupNetIP(ctx context.Context, s string) ([]netip.Addr, error) {
 		addrs = []netip.Addr{addr}
 	} else if doh, err = New(); err == nil {
 		addrs, err = doh.LookupNetIP(ctx, s)
-	} else if errors.Is(err, fs.ErrNotExist) {
+	}
+	if fallback(err) {
 		addrs, err = net.DefaultResolver.LookupNetIP(ctx, "ip", s)
 	}
 	if err == nil && len(addrs) == 0 {
