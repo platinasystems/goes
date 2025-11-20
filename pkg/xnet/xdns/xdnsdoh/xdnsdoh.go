@@ -15,6 +15,7 @@ import (
 	"net"
 	"net/http"
 	"net/netip"
+	"slices"
 	"strings"
 	"sync"
 
@@ -104,9 +105,6 @@ func LookupAddrPort(ctx context.Context, nw, s string) (
 		}
 		aps = append(aps, netip.AddrPortFrom(addr, uint16(port)))
 	}
-	if len(aps) == 0 {
-		err = xerrors.NotFound(s)
-	}
 	return
 }
 
@@ -155,15 +153,26 @@ func LookupNetIP(ctx context.Context, s string) ([]netip.Addr, error) {
 	if fallback(err) {
 		addrs, err = net.DefaultResolver.LookupNetIP(ctx, "ip", s)
 	}
-	if err == nil && len(addrs) == 0 {
-		err = xerrors.NotFound(s)
-	} else {
-		for i, addr := range addrs {
-			if addr.Is4In6() {
-				addrs[i] = addr.Unmap()
-			}
+	if err != nil {
+		return addrs, err
+	}
+	if len(addrs) == 0 {
+		return addrs, xerrors.NotFound(s)
+	}
+	for i, addr := range addrs {
+		if addr.Is4In6() {
+			addrs[i] = addr.Unmap()
 		}
 	}
+	slices.SortFunc(addrs, func(a, b netip.Addr) int {
+		if a.Is4() && b.Is6() {
+			return -1
+		}
+		if a.Is6() && b.Is4() {
+			return 1
+		}
+		return a.Compare(b)
+	})
 	return addrs, err
 }
 
