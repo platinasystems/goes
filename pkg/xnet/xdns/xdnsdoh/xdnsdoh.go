@@ -2,7 +2,7 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-// DNS Over HTTPS
+// Dns-Over-Http(s)
 package xdnsdoh
 
 import (
@@ -11,315 +11,402 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/fs"
 	"net"
 	"net/http"
 	"net/netip"
-	"slices"
+	"os"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/platinasystems/goes/v2/pkg/cert"
 	"github.com/platinasystems/goes/v2/pkg/kvc"
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
+	"github.com/platinasystems/goes/v2/pkg/xflag"
 	"github.com/platinasystems/goes/v2/pkg/xmain"
+	"github.com/platinasystems/goes/v2/pkg/xnet"
+	"github.com/platinasystems/goes/v2/pkg/xnet/xdns"
 	"github.com/platinasystems/goes/v2/pkg/xnet/xdns/xdnsmessage"
-	"golang.org/x/sys/unix"
 )
 
-const ConfigFile = "doh"
+var client *http.Client
+var config struct{ url, search string }
 
-type Config struct {
-	URL, Search string
-}
+// only make one request at a time
+var mutex sync.Mutex
 
-var GetConfig = sync.OnceValues(func() (cfg Config, err error) {
-	fn := xmain.ConfigFile(ConfigFile)
-	err = kvc.RangeFile(fn, func(s string) []string {
-		s = strings.TrimSpace(s)
-		if len(s) == 0 || []rune(s)[0] == '#' {
-			return nil
-		}
-		args := strings.Fields(s)
-		for i, arg := range args {
-			if len(arg) == 0 || []rune(arg)[0] == '#' {
-				args = args[:i]
-				break
-			}
-		}
-		return args
-	}, func(lno int, key string, values []string) error {
-		if len(values) < 0 {
-			return xerrors.Label(xerrors.Incomplete(lno), fn)
-		}
-		switch key {
-		case "search":
-			cfg.Search = values[0]
-		case "url":
-			cfg.URL = values[0]
-		default:
-			return xerrors.Label(xerrors.Invalid(lno), fn)
-		}
-		return nil
-	})
-	return
-})
+const DefaultConfigFile = "doh"
 
-// Return successful [netip.ParseAddrPort];
-// otherwise, [LookupNetIP] and [net.DefaultResolver.LookupPort]
-// the respective host and port segments returned from [net.SplitHostPort](s);
-// then recombine as [netip.AddrPort] list.
-// The returned ports are zero if (s) didn't have a “:<port>” suffix.
-func LookupAddrPort(ctx context.Context, nw, s string) (
-	aps []netip.AddrPort, err error,
-) {
-	is4nw := strings.HasSuffix(nw, "4")
-	is6nw := strings.HasSuffix(nw, "6")
-	ap, err := netip.ParseAddrPort(s)
-	if err == nil {
-		aps = append(aps, ap)
-		return
-	}
+var (
+	ConfigFile = DefaultConfigFile
+	ConfigFlag = xflag.Label{"doh", `
+File w/in current or config directory containing line separated
+assignments of Dns-Over-Http(s) “url” and “search” keywords.
+No DOH if this flag is empty or default file doesn't exist.`[1:], &ConfigFile}
+)
 
-	var hs, ps string
-	if strings.Count(s, ":") != 1 && strings.Count(s, "]:") != 1 {
-		hs = s
-	} else if hs, ps, err = net.SplitHostPort(s); err != nil {
-		return
+// If [ConfigFile] exists or given optional “url” parameter,
+// this returns an [xdns.Asker] compatible function
+// to forward binary encoded DNS requests to DOH server;
+// otherwise, returns nil so that caller may establish fallback.
+func Asker(skipVerify bool, url ...any) (xdns.Asker, error) {
+	var err error
+	if len(url) > 0 {
+		config.url = fmt.Sprint(url...)
+	} else if err = loadConfig(); err != nil {
+		return nil, err
+	} else if len(config.url) == 0 {
+		return nil, nil
 	}
-
-	var port int
-	if len(ps) > 0 {
-		port, err = net.DefaultResolver.LookupPort(ctx, nw, ps)
-		if err != nil {
-			return
-		}
+	if skipVerify {
+		cert.Verify = false
 	}
-	addrs, err := LookupNetIP(ctx, hs)
-	if err != nil {
-		return
-	}
-	for _, addr := range addrs {
-		if (is4nw && addr.Is6()) || (is6nw && addr.Is4()) {
-			continue
-		}
-		aps = append(aps, netip.AddrPortFrom(addr, uint16(port)))
-	}
-	return
-}
-
-func fallback(err error) bool {
-	return errors.Is(err, fs.ErrNotExist) ||
-		errors.Is(err, unix.ECONNREFUSED)
-}
-
-// Like [net.Resolver.LookupAddr] but with [netip.Addr]
-// instead of string parameter.
-func LookupName(ctx context.Context, addr netip.Addr) ([]string, error) {
-	var names []string
-	doh, err := New()
-	if err == nil {
-		names, err = doh.LookupName(ctx, addr)
-	}
-	if fallback(err) {
-		names, err = net.DefaultResolver.LookupAddr(ctx, addr.String())
-	}
-	if err == nil && len(names) == 0 {
-		err = xerrors.NotFound(addr)
-	}
-	return names, err
-}
-
-// Return successful [netip.ParseAddr];
-// otherwise, returned lookup of the configured URL,
-// or if that's unconfigured,
-// the result of [net.DefaultResolver.LookupNetIP].
-// A nil-error result will always return at least one [netip.Addr].
-func LookupNetIP(ctx context.Context, s string) ([]netip.Addr, error) {
-	var (
-		addr  netip.Addr
-		addrs []netip.Addr
-		doh   *DOH
-		err   error
-	)
-	if addr, err = netip.ParseAddr(s); err == nil {
-		if addr.Is4In6() {
-			addr = addr.Unmap()
-		}
-		addrs = []netip.Addr{addr}
-	} else if doh, err = New(); err == nil {
-		addrs, err = doh.LookupNetIP(ctx, s)
-	}
-	if fallback(err) {
-		addrs, err = net.DefaultResolver.LookupNetIP(ctx, "ip", s)
-	}
-	if err != nil {
-		return addrs, err
-	}
-	if len(addrs) == 0 {
-		return addrs, xerrors.NotFound(s)
-	}
-	for i, addr := range addrs {
-		if addr.Is4In6() {
-			addrs[i] = addr.Unmap()
-		}
-	}
-	slices.SortFunc(addrs, func(a, b netip.Addr) int {
-		if a.Is4() && b.Is6() {
-			return -1
-		}
-		if a.Is6() && b.Is4() {
-			return 1
-		}
-		return a.Compare(b)
-	})
-	return addrs, err
-}
-
-type DOH struct {
-	*http.Client
-	buf []byte
-	url,
-	search string
-}
-
-// Create [http.Client] of [URL] to ask DOH queries.
-var New = sync.OnceValues(func() (*DOH, error) {
-	cfg, err := GetConfig()
+	client, err = cert.NewHTTPClient()
 	if err != nil {
 		return nil, err
 	}
-	httpc, err := cert.NewHTTPClient()
+	return ask, nil
+}
+
+// If [ConfigFile] exists and has an assigned “search” keyword,
+// append this to the unqualified (no dot) string to form a
+// Fully-Qualified-Domain-Name;
+// otherwise, return unchanged.
+func FQDN(s string) string {
+	if len(config.search) == 0 || strings.IndexRune(s, '.') >= 0 {
+		return s
+	}
+	if !strings.HasPrefix(config.search, ".") {
+		s += "."
+	}
+	s += config.search
+	if !strings.HasSuffix(s, ".") {
+		s += "."
+	}
+	return s
+}
+
+// If [ConfigFile] exists,
+// this returns a custom [net.Resolver]
+// that has a custom [net.Resolver.Dial]
+// that returns a custom [net.Conn]
+// whose [net.Conn.Write] makes a DOH query with
+// the binary DNS formatted slice
+// and [net.Conn.Read] returns the response.
+// Otherwise, return [net.DefaultResolver].
+func Resolver() (*net.Resolver, error) {
+	err := loadConfig()
 	if err != nil {
 		return nil, err
 	}
-	return NewClient(httpc, cfg.URL, cfg.Search), nil
-})
-
-// Use [http.Client] to ask DOH queries from “url”.
-func NewClient(cl *http.Client, url, search string) *DOH {
-	return &DOH{
-		Client: cl,
-		buf:    xdnsmessage.MakeBuffer(),
-		url:    url,
-		search: search,
+	if len(config.url) == 0 {
+		return net.DefaultResolver, nil
 	}
+	client, err = cert.NewHTTPClient()
+	if err != nil {
+		return nil, err
+	}
+	return &net.Resolver{
+		PreferGo: true,
+		Dial:     dial,
+	}, nil
 }
 
-func (doh *DOH) Ask(ctx context.Context, b []byte) ([]byte, error) {
+func ask(ctx context.Context, b []byte) ([]byte, error) {
+	mutex.Lock()
+	defer mutex.Unlock()
 	r := bytes.NewReader(b)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, doh.url, r)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
+		config.url, r)
 	if err != nil {
 		return b[:0], err
 	}
 	req.Header.Set("Content-Type", "application/dns-message")
-	rsp, err := doh.Do(req)
+	rsp, err := client.Do(req)
 	if err != nil {
 		return b[:0], err
 	}
 	if rsp == nil {
-		return b[:0], errors.New("nil")
+		return b[:0], errors.New("nil response")
 	}
 	defer rsp.Body.Close()
+	n, err := rsp.Body.Read(b[:cap(b)])
+	if err != nil {
+		n = 0
+	}
+	b = b[:n]
 	if rsp.StatusCode == http.StatusOK {
-		buf := new(bytes.Buffer)
-		io.Copy(buf, rsp.Body)
-		return buf.Bytes(), nil
+	} else if n == 0 {
+		err = errors.New(rsp.Status)
+	} else {
+		err = fmt.Errorf("%s, %s", rsp.Status, b)
+		b = b[:0]
 	}
-	sb := new(strings.Builder)
-	io.Copy(sb, rsp.Body)
-	if sb.Len() == 0 {
-		return b[:0], errors.New(rsp.Status)
-	}
-	return b[:0], fmt.Errorf("%s, %s", rsp.Status, sb.String())
+	return b, err
 }
 
-func (doh *DOH) RecursiveLookup(
-	ctx context.Context,
-	us xdnsmessage.UniqueString,
-	c xdnsmessage.Class,
-	t xdnsmessage.Type,
-) (answers []xdnsmessage.WireResource, err error) {
-	var rsp xdnsmessage.Message
-	q := xdnsmessage.NewQuery(true, us, c, t)
-	doh.buf, err = q.AppendTo(doh.buf[:0])
-	if err == nil {
-		if doh.buf, err = doh.Ask(ctx, doh.buf); err == nil {
-			if err = rsp.UnmarshalBinary(doh.buf); err == nil {
-				if rsp.ID == q.ID {
-					answers = rsp.Answers
-				} else {
-					err = fmt.Errorf("rsp id %d != req %d",
-						rsp.ID, q.ID)
+func dial(ctx context.Context, nw, s string) (net.Conn, error) {
+	var lap netip.AddrPort
+	rap, err := netip.ParseAddrPort(s)
+	if err != nil {
+		return nil, err
+	}
+	if a := rap.Addr(); a.Is4In6() {
+		rap = netip.AddrPortFrom(a.Unmap(), rap.Port())
+	}
+	if rap.Addr().Is6() {
+		lap = netip.AddrPortFrom(netip.IPv4Unspecified(), 0)
+	} else {
+		lap = netip.AddrPortFrom(netip.IPv4Unspecified(), 0)
+	}
+	if strings.HasPrefix(nw, "tcp") {
+		la := net.TCPAddrFromAddrPort(lap)
+		ra := net.TCPAddrFromAddrPort(rap)
+		return newTCP(ctx, la, ra), nil
+	}
+	la := net.UDPAddrFromAddrPort(lap)
+	ra := net.UDPAddrFromAddrPort(rap)
+	return newUDP(ctx, la, ra), nil
+}
+
+// If [ConfigFile] is an empty string or is [DefaultConfigFile]
+// and that doesn't exist, this returns nil and [config.url] will be empty.
+func loadConfig() error {
+	if len(ConfigFile) == 0 {
+		return nil
+	}
+	fn := ConfigFile
+	_, err := os.Stat(fn)
+	if err != nil {
+		if strings.IndexRune(fn, os.PathSeparator) >= 0 {
+			return err
+		}
+		fn = xmain.ConfigFile(ConfigFile)
+		if _, err = os.Stat(fn); err != nil {
+			if ConfigFile == DefaultConfigFile {
+				return nil
+			}
+			return err
+		}
+	}
+	err = kvc.RangeFile(fn,
+		func(s string) []string {
+			s = strings.TrimSpace(s)
+			if len(s) == 0 || []rune(s)[0] == '#' {
+				return nil
+			}
+			args := strings.Fields(s)
+			for i, arg := range args {
+				if len(arg) == 0 || []rune(arg)[0] == '#' {
+					args = args[:i]
+					break
 				}
 			}
-		}
-	}
-	return
-}
-
-// Like [net.Resolver.LookupAddr] but with [netip.Addr]
-// instead of string parameter.
-func (doh *DOH) LookupName(ctx context.Context, addr netip.Addr) (
-	names []string, err error,
-) {
-	const (
-		class   = xdnsmessage.ClassINET
-		typePTR = xdnsmessage.TypePTR
-	)
-	name := xdnsmessage.Reverse(addr)
-	us := xdnsmessage.MakeUniqueString(name)
-	ans, err := doh.RecursiveLookup(ctx, us, class, typePTR)
-	if err != nil {
-		return
-	}
-	for _, a := range ans {
-		names = append(names, a.String())
-	}
-	return
-}
-
-// Like [net.Resolver.LookupNetIP] w/o the “network” parameter.
-func (doh *DOH) LookupNetIP(ctx context.Context, name string) (
-	addr []netip.Addr, err error,
-) {
-	const (
-		class    = xdnsmessage.ClassINET
-		typeA    = xdnsmessage.TypeA
-		typeAAAA = xdnsmessage.TypeAAAA
-	)
-	if !strings.Contains(name, ".") {
-		if len(doh.search) == 0 {
-			err = xerrors.Incomplete(name)
-			return
-		}
-		if !strings.HasPrefix(doh.search, ".") {
-			name += "."
-		}
-		name += doh.search
-	}
-	if !strings.HasSuffix(name, ".") {
-		name += "."
-	}
-	us := xdnsmessage.MakeUniqueString(name)
-	ans, err := doh.RecursiveLookup(ctx, us, class, typeA)
-	if err != nil {
-		return
-	}
-	for _, a := range ans {
-		if a.Type() == typeA {
-			res := a.Resource().(xdnsmessage.TypeAResource)
-			addr = append(addr, res.Addr)
-		}
-	}
-	ans, err = doh.RecursiveLookup(ctx, us, class, typeAAAA)
-	if err == nil {
-		for _, a := range ans {
-			if a.Type() == typeAAAA {
-				x := a.Resource().(xdnsmessage.TypeAAAAResource)
-				addr = append(addr, x.Addr)
+			return args
+		},
+		func(lno int, key string, values []string) error {
+			if len(values) > 0 {
+				switch key {
+				case "search":
+					config.search = values[0]
+				case "url":
+					config.url = values[0]
+				}
 			}
+			return nil
+		})
+	if err != nil {
+		return err
+	}
+	if len(config.url) == 0 {
+		return xerrors.Label(xerrors.Incomplete("url"), fn)
+	}
+	return nil
+}
+
+type tcpConn struct {
+	dohConn
+	// accumulate writes until prefaced length
+	buf []byte
+	n   int
+}
+
+func newTCP(ctx context.Context, la, ra net.Addr) net.Conn {
+	c := new(tcpConn)
+	c.init(ctx, la, ra)
+	c.buf = xdnsmessage.MakeBuffer()
+	return c
+}
+
+func (c *tcpConn) Read(b []byte) (int, error) {
+	n, err := c.read(b[2:])
+	if err == nil {
+		xnet.ByteOrder.PutUint16(b, uint16(n))
+		n += 2
+	} else {
+		n = 0
+	}
+	return n, err
+}
+
+func (c *tcpConn) Write(b []byte) (int, error) {
+	if c.n == 0 {
+		c.n = int(xnet.ByteOrder.Uint16(b))
+		c.buf = append(c.buf[:0], b[2:]...)
+		if len(c.buf) < c.n {
+			return len(b), nil
+		}
+	} else {
+		c.buf = append(c.buf, b...)
+		if len(c.buf) < c.n {
+			return len(b), nil
 		}
 	}
+	_, err := c.write(c.buf[:c.n])
+	c.n = 0
+	return len(b), err
+}
+
+type udpConn struct {
+	dohConn
+}
+
+func newUDP(ctx context.Context, la, ra net.Addr) interface {
+	net.Conn
+	net.PacketConn
+} {
+	c := new(udpConn)
+	c.init(ctx, la, ra)
+	return c
+}
+
+func (c *udpConn) Read(b []byte) (int, error) {
+	return c.read(b)
+}
+
+func (c *udpConn) ReadFrom(b []byte) (int, net.Addr, error) {
+	n, err := c.read(b)
+	return n, c.ra, err
+}
+
+func (c *udpConn) Write(b []byte) (int, error) {
+	return c.write(b)
+}
+
+func (c *udpConn) WriteTo(b []byte, ra net.Addr) (int, error) {
+	return c.write(b)
+}
+
+type dohConn struct {
+	ctx    context.Context
+	cancel context.CancelFunc
+	once   sync.Once
+	ans    chan any // buf or error
+	la, ra net.Addr
+	mt     struct {
+		// Mutexed Timeout
+		sync.RWMutex
+		time.Duration
+	}
+}
+
+func (c *dohConn) init(ctx context.Context, la, ra net.Addr) {
+	c.ctx, c.cancel = context.WithCancel(ctx)
+	c.ans = make(chan any, 1)
+	c.ra = ra
+	c.ra = ra
+}
+
+func (c *dohConn) Close() error {
+	c.cancel()
+	return nil
+}
+
+func (c *dohConn) LocalAddr() net.Addr  { return c.la }
+func (c *dohConn) RemoteAddr() net.Addr { return c.ra }
+
+func (c *dohConn) SetDeadline(t time.Time) error {
+	c.SetReadDeadline(t)
+	c.SetWriteDeadline(t)
+	return nil
+}
+
+func (c *dohConn) SetReadDeadline(t time.Time) error {
+	// do not timeout
+	return nil
+}
+
+func (c *dohConn) SetWriteDeadline(t time.Time) (err error) {
+	c.mt.Lock()
+	defer c.mt.Unlock()
+	if t.IsZero() {
+		c.mt.Duration = 0
+	} else if now := time.Now(); t.After(now) {
+		c.mt.Duration = t.Sub(now)
+	} else {
+		err = os.ErrDeadlineExceeded
+	}
 	return
+}
+
+func (c *dohConn) ask(buf []byte) {
+	buf, err := ask(c.ctx, buf)
+	if err != nil {
+		xdnsmessage.FreeBuffer(buf)
+		c.ans <- err
+	} else {
+		c.ans <- buf
+	}
+}
+
+func (c *dohConn) dump(prefix string, buf []byte) error {
+	m := xdnsmessage.NewMessage()
+	defer m.Free()
+	err := m.UnmarshalBinary(buf)
+	if err == nil {
+		fmt.Println(prefix, m)
+	}
+	return err
+}
+
+func (c *dohConn) read(b []byte) (int, error) {
+	select {
+	case <-c.ctx.Done():
+		return 0, c.ctx.Err()
+	case ans, ok := <-c.ans:
+		if !ok || ans == nil {
+			return 0, io.EOF
+		}
+		err, iserr := ans.(error)
+		if iserr {
+			return 0, err
+		}
+		buf, isbuf := ans.([]byte)
+		if !isbuf {
+			return 0, fmt.Errorf("unexpected %T", ans)
+		}
+		n := copy(b, buf)
+		xdnsmessage.FreeBuffer(buf)
+		return n, nil
+	}
+}
+
+func (c *dohConn) timeout() time.Duration {
+	c.mt.RLock()
+	defer c.mt.RUnlock()
+	return c.mt.Duration
+}
+
+func (c *dohConn) write(b []byte) (int, error) {
+	err := c.ctx.Err()
+	if err != nil {
+		c.once.Do(func() { close(c.ans) })
+		return 0, err
+	}
+	client.Timeout = c.timeout()
+	buf := xdnsmessage.MakeBuffer()
+	n := copy(buf, b)
+	buf = buf[:n]
+	go c.ask(buf)
+	return n, nil
 }

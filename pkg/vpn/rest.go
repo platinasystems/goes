@@ -35,8 +35,6 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xflag"
 	"github.com/platinasystems/goes/v2/pkg/xlog"
 	"github.com/platinasystems/goes/v2/pkg/xmain"
-	"github.com/platinasystems/goes/v2/pkg/xnet/xdns/xdnsdoh"
-	"github.com/platinasystems/goes/v2/pkg/xnet/xdns/xdnsmessage"
 	"github.com/platinasystems/goes/v2/pkg/xprogram"
 )
 
@@ -455,48 +453,6 @@ func RestInviteReq(ctx context.Context, name string, cipherText []byte) (
 		return nil, err
 	}
 	return bytes.Clone(buf.Bytes()), nil
-}
-
-func RestLookupReq(ctx context.Context, args []string) error {
-	const class = xdnsmessage.ClassINET
-
-	xflag.TemplateUsage(`
-usage: {{.Name}} <address|name>
-Print name of addressed, or address of named subscriber.
-
-{{flags .}}`)
-
-	err := RestFlags.Define()
-	if err != nil {
-		return err
-	} else if err = flag.CommandLine.Parse(args); err != nil {
-		return err
-	} else if args = flag.CommandLine.Args(); len(args) == 0 {
-		return err
-	} else if err = restInit(); err != nil {
-		return err
-	}
-
-	clone := *rest.url
-	clone.Path = DnsQuery
-	doh := xdnsdoh.NewClient(&rest.Client, clone.String(), "")
-
-	if addr, pe := netip.ParseAddr(args[0]); pe == nil {
-		var names []string
-		if names, err = doh.LookupName(ctx, addr); err == nil {
-			for _, name := range names {
-				fmt.Println(name)
-			}
-		}
-	} else {
-		var addrs []netip.Addr
-		if addrs, err = doh.LookupNetIP(ctx, args[0]); err == nil {
-			for _, addr := range addrs {
-				fmt.Println(addr)
-			}
-		}
-	}
-	return err
 }
 
 func RestReloadReq(ctx context.Context, args []string) error {

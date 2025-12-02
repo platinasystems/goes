@@ -6,10 +6,8 @@ package host
 
 import (
 	"context"
-	"errors"
 	"flag"
 	"fmt"
-	"io/fs"
 	"time"
 
 	"github.com/platinasystems/goes/v2/pkg/cert"
@@ -38,6 +36,7 @@ var hostFlags = xflag.Labels{
 	xmain.ConfigFlag,
 	xmain.StateFlag,
 	cert.VerifyFlag,
+	xdnsdoh.ConfigFlag,
 	{"4", "Only use IPv4 query transport.", &host_4},
 	{"6", "Only use IPv6 query transport.", &host_6},
 	{"A", "Like -a but omits RRSIG, NSEC, NSEC3.", &host_A},
@@ -71,7 +70,6 @@ Mimic BIND9's DNS lookup utility.
 {{flags .}}`)
 
 	var name string
-	var dns xdns.Asker
 	var rsp xdnsmessage.Message
 
 	err := hostFlags.Define()
@@ -119,9 +117,11 @@ Mimic BIND9's DNS lookup utility.
 
 	b := xdnsmessage.MakeBuffer()
 
-	if dns, err = xdnsdoh.New(); err == nil {
-	} else if !errors.Is(err, fs.ErrNotExist) {
+	ask, err := xdnsdoh.Asker(false)
+	if err != nil {
 		return err
+	} else if ask != nil {
+		name = xdnsdoh.FQDN(name)
 	} else {
 		nw := "udp"
 		if host_4 {
@@ -134,7 +134,7 @@ Mimic BIND9's DNS lookup utility.
 			return err
 		}
 		defer udp.Close()
-		dns = xdnspkt.TimeLimitedAsker(udp, 30*time.Second)
+		ask = xdnspkt.NewTimeLimitedAsk(udp, 30*time.Second)
 	}
 
 	types := []xdnsmessage.Type{host_t}
@@ -150,7 +150,7 @@ Mimic BIND9's DNS lookup utility.
 		if err != nil {
 			return err
 		}
-		if b, err = dns.Ask(ctx, b); err != nil {
+		if b, err = ask(ctx, b); err != nil {
 			return err
 		}
 		if err = rsp.UnmarshalBinary(b); err != nil {

@@ -15,7 +15,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/platinasystems/goes/v2/pkg/cert"
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xflag"
 	"github.com/platinasystems/goes/v2/pkg/xmain"
@@ -44,7 +43,7 @@ var usage string
 var r *xresolv.Resolv
 
 var allq = struct {
-	dns xdns.Asker
+	ask xdns.Asker
 	buf []byte
 
 	ip4, ip6, m, r, u bool
@@ -152,16 +151,11 @@ func Dig(ctx context.Context, args []string) error {
 		}
 	}
 	if len(allq.o.https) > 0 {
-		if allq.o.httpsSkipVerify {
-			cert.Verify = false
-		}
-		httpc, err := cert.NewHTTPClient()
+		allq.ask, err = xdnsdoh.Asker(allq.o.httpsSkipVerify,
+			"https://", allq.svr, ":", allq.p, allq.o.https)
 		if err != nil {
 			return err
 		}
-		url := fmt.Sprint("https://", allq.svr, ":", allq.p,
-			allq.o.https)
-		allq.dns = xdnsdoh.NewClient(httpc, url, "")
 	} else {
 		var a string
 		nw := "udp"
@@ -181,7 +175,7 @@ func Dig(ctx context.Context, args []string) error {
 		}
 		defer udp.Close()
 		allq.svr += fmt.Sprint("(", udp.RemoteAddr(), ")")
-		allq.dns = xdnspkt.TimeLimitedAsker(udp, 30*time.Second)
+		allq.ask = xdnspkt.NewTimeLimitedAsk(udp, 30*time.Second)
 	}
 	if !allq.o.short && allq.o.cmd {
 		fmt.Println("; <<>> goes-dig", xmain.Version(), "<<>>", cmd)
@@ -302,7 +296,7 @@ func query(ctx context.Context, args []string) ([]string, error) {
 		return args, err
 	}
 	beg := time.Now()
-	if allq.buf, err = allq.dns.Ask(ctx, allq.buf); err != nil {
+	if allq.buf, err = allq.ask(ctx, allq.buf); err != nil {
 		return args, err
 	}
 	end := time.Now()

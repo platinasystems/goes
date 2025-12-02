@@ -6,6 +6,9 @@
 package main
 
 import (
+	"github.com/platinasystems/goes/v2/pkg/bind/dig"
+	"github.com/platinasystems/goes/v2/pkg/bind/host"
+	"github.com/platinasystems/goes/v2/pkg/bind/nslookup"
 	"github.com/platinasystems/goes/v2/pkg/cert"
 	"github.com/platinasystems/goes/v2/pkg/goes"
 	goes_util "github.com/platinasystems/goes/v2/pkg/goes-util"
@@ -27,11 +30,14 @@ func init() {
 		cert.Features,
 		vpn.MainFeatures,
 		map[string]any{
-			"im":     im.InstantMessaging,
-			"nc":     netcat.NetCat,
-			"netcat": netcat.NetCat,
-			"ping":   icmp.Ping,
-			"show":   vpn.ShowFeatures,
+			"dig":      dig.Dig,
+			"host":     host.Host,
+			"im":       im.InstantMessaging,
+			"nc":       netcat.NetCat,
+			"nslookup": nslookup.Nslookup,
+			"netcat":   netcat.NetCat,
+			"ping":     icmp.Ping,
+			"show":     vpn.ShowFeatures,
 		},
 	)
 }

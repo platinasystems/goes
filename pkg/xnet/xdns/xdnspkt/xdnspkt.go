@@ -17,13 +17,13 @@ import (
 
 // When asked, resends the buffered query every 1 sec until response or context
 // is cancelled.
-func TenaciousAsker(udp net.Conn) xdns.Asker {
-	return tenacious{udp}
+func NewTenaciousAsk(udp net.Conn) xdns.Asker {
+	return tenacious{udp}.Ask
 }
 
 // When asked, resends the buffered query with deadlined context.
-func TimeLimitedAsker(udp net.Conn, limit time.Duration) xdns.Asker {
-	return timeLimited{tenacious{udp}, limit}
+func NewTimeLimitedAsk(udp net.Conn, limit time.Duration) xdns.Asker {
+	return timeLimited{tenacious{udp}, limit}.Ask
 }
 
 var zero time.Time

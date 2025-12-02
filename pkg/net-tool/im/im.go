@@ -23,7 +23,6 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xnet/xdns/xdnsdoh"
 )
 
-// “Foo”
 const Help = `
 Type EOF to quit or enter the following to send a message to the
 last origin or the comma separated destinations;
@@ -56,6 +55,8 @@ var im struct {
 	named map[string]netip.AddrPort
 }
 
+var resolver *net.Resolver
+
 func InstantMessaging(ctx context.Context, args []string) error {
 	xflag.TemplateUsage(`
 usage: {{.Name}} [flags] [interface]
@@ -66,11 +67,16 @@ Instant Messaging over named or all interface(s).
 	im.port = Port
 	err := xflag.Labels{
 		xmain.ConfigFlag,
-		xflag.Label{"p", "Instant Messaging Port.", &im.port},
+		xdnsdoh.ConfigFlag,
+		{"p", "Instant Messaging Port.", &im.port},
 	}.Define()
 	if err != nil {
 		return err
 	} else if err = flag.CommandLine.Parse(args); err != nil {
+		return err
+	}
+
+	if resolver, err = xdnsdoh.Resolver(); err != nil {
 		return err
 	}
 
@@ -154,7 +160,7 @@ func imName(ctx context.Context, ap netip.AddrPort) string {
 	if name, ok := im.name[ap]; ok {
 		return name
 	}
-	names, err := xdnsdoh.LookupName(ctx, ap.Addr())
+	names, err := resolver.LookupAddr(ctx, ap.Addr().String())
 	if err != nil {
 		return ap.String()
 	}
@@ -226,25 +232,31 @@ func imTo(ctx context.Context, s string) (
 			fmt.Fprint(&prompt, dst)
 			continue
 		}
-		var found []netip.AddrPort
-		found, err = xdnsdoh.LookupAddrPort(ctx, "udp", dst)
+		p := im.port
+		hs, ps, se := net.SplitHostPort(dst)
+		if se != nil {
+			hs = dst
+		} else {
+			hs = xdnsdoh.FQDN(hs)
+			pi, pe := net.DefaultResolver.LookupPort(ctx, "udp", ps)
+			if pe != nil {
+				if _, err = fmt.Sscan(ps, &pi); pe != nil {
+					return
+				}
+			}
+			p = uint16(pi)
+		}
+		var found []netip.Addr
+		found, err = resolver.LookupNetIP(ctx, "udp", hs)
 		if err != nil {
 			return
 		}
-		ap := found[0]
-		if ap.Port() == 0 {
-			ap = netip.AddrPortFrom(ap.Addr(), im.port)
-		}
+		ap := netip.AddrPortFrom(found[0], p)
 		aps = append(aps, ap)
-		if strings.Index(dst, ":") > 0 {
-			if h, _, e := net.SplitHostPort(dst); e == nil {
-				dst = h
-			}
-		}
-		dst = imShortName(dst)
-		im.name[ap] = dst
-		im.named[dst] = ap
-		fmt.Fprint(&prompt, dst)
+		hs = imShortName(hs)
+		im.name[ap] = hs
+		im.named[hs] = ap
+		fmt.Fprint(&prompt, hs)
 	}
 	fmt.Fprint(&prompt, ", ")
 	im.clio.SetPrompt(prompt.String())

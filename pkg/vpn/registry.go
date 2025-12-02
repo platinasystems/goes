@@ -728,6 +728,7 @@ func (reg *registry) dnsQuery(rsvp *rsvp) (err error) {
 	defer query.Free()
 
 	if err = query.UnmarshalBinary(b); err != nil {
+		xlog.Errata.Println(err)
 		return
 	}
 

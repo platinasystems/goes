@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"golang.org/x/net/dns/dnsmessage"
 )
 
@@ -194,36 +195,36 @@ func (m *Message) UnmarshalBinary(data []byte) error {
 	var p dnsmessage.Parser
 	h, err := p.Start(data)
 	if err != nil {
-		return err
+		return xerrors.Mark(err)
 	}
 	m.ID = h.ID
 	m.HF = NewHeaderFlags(h)
 	m.OpCode = OpCode(h.OpCode)
 	m.RCode = RCode(h.RCode)
 	if m.Questions, err = unpackQuestions(p.Question); err != nil {
-		return err
+		return xerrors.Mark(err)
 	}
 	if m.Answers, err = unpackResources(p.Answer); err != nil {
-		return err
+		return xerrors.Mark(err)
 	}
 	if m.Authorities, err = unpackResources(p.Authority); err != nil {
-		return err
+		return xerrors.Mark(err)
 	}
 	m.Additionals, err = unpackResources(p.Additional)
-	return err
+	return xerrors.Mark(err)
 }
 
 func unpackQuestions(unpack func() (dnsmessage.Question, error)) (
 	[]WireQuestion, error,
 ) {
 	var wqs []WireQuestion
-	for {
+	for i := 0; true; i++ {
 		q, err := unpack()
 		if err != nil {
 			if errors.Is(err, dnsmessage.ErrSectionDone) {
 				break
 			}
-			return wqs, err
+			return wqs, fmt.Errorf("question[%d]: %w", i, err)
 		}
 		wqs = append(wqs, WireQuestion{
 			Name:  MakeUniqueString(q.Name.String()),
@@ -354,7 +355,16 @@ func LineWrap(w io.Writer, s string, indent int) {
 	}
 }
 
-func MakeBuffer() []byte { return make([]byte, Cap, Cap) }
+var BufferPool = sync.Pool{
+	New: func() any { return make([]byte, Cap, Cap) },
+}
+
+func FreeBuffer(b []byte) {
+	b = b[:cap(b)]
+	BufferPool.Put(b)
+}
+
+func MakeBuffer() []byte { return BufferPool.Get().([]byte) }
 
 func NewQuery(recursive bool, name UniqueString, c Class, t Type) *Message {
 	var hf HF
@@ -367,14 +377,17 @@ func NewQuery(recursive bool, name UniqueString, c Class, t Type) *Message {
 	if t == 0 {
 		t = TypeA
 	}
-	return &Message{
-		HF:     hf,
-		ID:     NewID(),
-		OpCode: OpCodeQuery,
-		Questions: []WireQuestion{{
-			Name:  name,
-			Class: c,
-			Type:  t,
-		}},
+	m := NewMessage()
+	m.HF = hf
+	m.ID = NewID()
+	m.OpCode = OpCodeQuery
+	if len(m.Questions) == 0 {
+		m.Questions = make([]WireQuestion, 1)
+	} else {
+		m.Questions = m.Questions[:1]
 	}
+	m.Questions[0].Name = name
+	m.Questions[0].Class = c
+	m.Questions[0].Type = t
+	return m
 }

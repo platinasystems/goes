@@ -31,7 +31,7 @@ usage: {{.Name}} [flags] [host]
 Send ICMP ECHO_REQUEST packets to network “host”. (default localhost)
 {{flags .}}`)
 
-	var quiet, privileged, verbose bool
+	var privileged, quiet, verbose bool
 
 	count := DefaultCount
 	interval := DefaultInterval
@@ -41,6 +41,7 @@ Send ICMP ECHO_REQUEST packets to network “host”. (default localhost)
 
 	err := xflag.Labels{
 		xmain.ConfigFlag,
+		xdnsdoh.ConfigFlag,
 		{"c", "Count.", &count},
 		{"i", "Interval.", &interval},
 		{"l", "Request Time To Live.", &ttl},
@@ -66,18 +67,22 @@ Send ICMP ECHO_REQUEST packets to network “host”. (default localhost)
 	args = flag.Args()
 
 	host := "localhost"
+	resolver, err := xdnsdoh.Resolver()
+	if err != nil {
+		return err
+	}
 	if args = flag.Args(); len(args) > 0 {
-		host = args[0]
+		host = xdnsdoh.FQDN(args[0])
 	}
 
-	addrs, err := xdnsdoh.LookupNetIP(ctx, host)
+	nw := "ip"
+	addrs, err := resolver.LookupNetIP(ctx, nw, host)
 	if err != nil {
 		return err
 	}
 	ipaddr := &net.IPAddr{
 		IP: net.IP(addrs[0].AsSlice()),
 	}
-	nw := "ip"
 	if addrs[0].Is4() {
 		nw = "ip4"
 	} else if addrs[0].Is6() {

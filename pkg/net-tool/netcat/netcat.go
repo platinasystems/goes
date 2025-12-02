@@ -9,9 +9,9 @@ import (
 	"flag"
 	"io"
 	"net"
-	"net/netip"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xflag"
@@ -28,6 +28,7 @@ Pipe stdin/out with TCP connection to the named or numbered host/port.
 
 	err := xflag.Labels{
 		xmain.ConfigFlag,
+		xdnsdoh.ConfigFlag,
 	}.Define()
 	if err != nil {
 		return err
@@ -39,36 +40,27 @@ Pipe stdin/out with TCP connection to the named or numbered host/port.
 		return xerrors.Incomplete("port")
 	}
 
-	addrs, err := xdnsdoh.LookupNetIP(ctx, args[0])
+	resolver, err := xdnsdoh.Resolver()
 	if err != nil {
 		return err
 	}
-
-	nw := "tcp"
-	if addrs[0].Is4() {
-		nw = "tcp4"
-	} else if addrs[0].Is6() {
-		nw = "tcp6"
+	d := &net.Dialer{
+		Timeout:   30 * time.Second,
+		KeepAlive: 30 * time.Second,
+		Resolver:  resolver,
 	}
 
-	port, err := net.DefaultResolver.LookupPort(ctx, nw, args[1])
-	if err != nil {
-		return err
-	}
-
-	ap := netip.AddrPortFrom(addrs[0], uint16(port))
-
-	var d net.Dialer
-	conn, err := d.DialContext(ctx, nw, ap.String())
+	address := net.JoinHostPort(xdnsdoh.FQDN(args[0]), args[1])
+	conn, err := d.DialContext(ctx, "tcp", address)
 	if err != nil {
 		return err
 	}
 
 	var wg sync.WaitGroup
+	defer wg.Wait()
+	defer conn.Close()
 	wg.Go(func() { io.Copy(os.Stdout, conn) })
 	wg.Go(func() { io.Copy(conn, os.Stdin) })
 	<-ctx.Done()
-	conn.Close()
-	wg.Wait()
 	return nil
 }
