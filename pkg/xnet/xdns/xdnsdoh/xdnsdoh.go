@@ -42,15 +42,73 @@ var (
 	ConfigFlag = xflag.Label{"doh", `
 File w/in current or config directory containing line separated
 assignments of Dns-Over-Http(s) “url” and “search” keywords.
-No DOH if this flag is empty or default file doesn't exist.`[1:], &ConfigFile}
+No DOH if this flag is "", ".", or non-existing "doh".`[1:],
+		&ConfigFile}
 )
+
+// If [ConfigFile] is “”, “.”,  or non-existing [DefaultConfigFile],
+// this returns nil and [config.url] will be empty.
+var loadConfig = sync.OnceValue(func() error {
+	if len(ConfigFile) == 0 || ConfigFile == "." {
+		return nil
+	}
+	fn := ConfigFile
+	_, err := os.Stat(fn)
+	if err != nil {
+		if strings.IndexRune(fn, os.PathSeparator) >= 0 {
+			return err
+		}
+		fn = xmain.ConfigFile(ConfigFile)
+		if _, err = os.Stat(fn); err != nil {
+			if ConfigFile == DefaultConfigFile {
+				return nil
+			}
+			return err
+		}
+	}
+	err = kvc.RangeFile(fn,
+		func(s string) []string {
+			s = strings.TrimSpace(s)
+			if len(s) == 0 || []rune(s)[0] == '#' {
+				return nil
+			}
+			args := strings.Fields(s)
+			for i, arg := range args {
+				if len(arg) == 0 || []rune(arg)[0] == '#' {
+					args = args[:i]
+					break
+				}
+			}
+			return args
+		},
+		func(lno int, key string, values []string) error {
+			if len(values) > 0 {
+				switch key {
+				case "search":
+					config.search = values[0]
+				case "url":
+					config.url = values[0]
+				}
+			}
+			return nil
+		})
+	if err != nil {
+		return err
+	}
+	if len(config.url) == 0 {
+		return xerrors.Label(xerrors.Incomplete("url"), fn)
+	}
+	return nil
+})
 
 // If [ConfigFile] exists or given optional “url” parameter,
 // this returns an [xdns.Asker] compatible function
 // to forward binary encoded DNS requests to DOH server;
 // otherwise, returns nil so that caller may establish fallback.
-func Asker(skipVerify bool, url ...any) (xdns.Asker, error) {
+func Asker(url ...any) (xdns.Asker, error) {
 	var err error
+	mutex.Lock()
+	defer mutex.Unlock()
 	if len(url) > 0 {
 		config.url = fmt.Sprint(url...)
 	} else if err = loadConfig(); err != nil {
@@ -58,32 +116,40 @@ func Asker(skipVerify bool, url ...any) (xdns.Asker, error) {
 	} else if len(config.url) == 0 {
 		return nil, nil
 	}
-	if skipVerify {
-		cert.Verify = false
+	if client == nil {
+		if tp, err := cert.NewTransport(); err != nil {
+			return nil, err
+		} else {
+			client = &http.Client{Transport: tp}
+		}
 	}
-	client, err = cert.NewHTTPClient()
-	if err != nil {
-		return nil, err
-	}
-	return ask, nil
+	return ask, err
 }
 
-// If [ConfigFile] exists and has an assigned “search” keyword,
-// append this to the unqualified (no dot) string to form a
-// Fully-Qualified-Domain-Name;
+// If [ConfigFile] [HasSearch] and “host” [IsUnqualified],
+// append the search value to to form a Fully-Qualified-Domain-Name;
 // otherwise, return unchanged.
-func FQDN(s string) string {
-	if len(config.search) == 0 || strings.IndexRune(s, '.') >= 0 {
-		return s
+func FQDN(host string) string {
+	if HasSearch() && IsUnqualified(host) {
+		if !strings.HasPrefix(config.search, ".") {
+			host += "."
+		}
+		host += config.search
+		if !strings.HasSuffix(host, ".") {
+			host += "."
+		}
 	}
-	if !strings.HasPrefix(config.search, ".") {
-		s += "."
-	}
-	s += config.search
-	if !strings.HasSuffix(s, ".") {
-		s += "."
-	}
-	return s
+	return host
+}
+
+// The loaded [ConfigFile] exists and has an assigned “search” keyword.
+func HasSearch() bool {
+	return loadConfig() == nil && len(config.search) != 0
+}
+
+// “host” doesn't have any periods.
+func IsUnqualified(host string) bool {
+	return strings.IndexRune(host, '.') < 0
 }
 
 // If [ConfigFile] exists,
@@ -95,6 +161,8 @@ func FQDN(s string) string {
 // and [net.Conn.Read] returns the response.
 // Otherwise, return [net.DefaultResolver].
 func Resolver() (*net.Resolver, error) {
+	mutex.Lock()
+	defer mutex.Unlock()
 	err := loadConfig()
 	if err != nil {
 		return nil, err
@@ -102,14 +170,24 @@ func Resolver() (*net.Resolver, error) {
 	if len(config.url) == 0 {
 		return net.DefaultResolver, nil
 	}
-	client, err = cert.NewHTTPClient()
-	if err != nil {
-		return nil, err
+	if client == nil {
+		if tp, err := cert.NewTransport(); err != nil {
+			return nil, err
+		} else {
+			client = &http.Client{Transport: tp}
+		}
 	}
 	return &net.Resolver{
 		PreferGo: true,
 		Dial:     dial,
-	}, nil
+	}, err
+}
+
+// Use given client with custom [Resolver].
+func With(c *http.Client) {
+	mutex.Lock()
+	defer mutex.Unlock()
+	client = c
 }
 
 func ask(ctx context.Context, b []byte) ([]byte, error) {
@@ -167,61 +245,6 @@ func dial(ctx context.Context, nw, s string) (net.Conn, error) {
 	la := net.UDPAddrFromAddrPort(lap)
 	ra := net.UDPAddrFromAddrPort(rap)
 	return newUDP(ctx, la, ra), nil
-}
-
-// If [ConfigFile] is an empty string or is [DefaultConfigFile]
-// and that doesn't exist, this returns nil and [config.url] will be empty.
-func loadConfig() error {
-	if len(ConfigFile) == 0 {
-		return nil
-	}
-	fn := ConfigFile
-	_, err := os.Stat(fn)
-	if err != nil {
-		if strings.IndexRune(fn, os.PathSeparator) >= 0 {
-			return err
-		}
-		fn = xmain.ConfigFile(ConfigFile)
-		if _, err = os.Stat(fn); err != nil {
-			if ConfigFile == DefaultConfigFile {
-				return nil
-			}
-			return err
-		}
-	}
-	err = kvc.RangeFile(fn,
-		func(s string) []string {
-			s = strings.TrimSpace(s)
-			if len(s) == 0 || []rune(s)[0] == '#' {
-				return nil
-			}
-			args := strings.Fields(s)
-			for i, arg := range args {
-				if len(arg) == 0 || []rune(arg)[0] == '#' {
-					args = args[:i]
-					break
-				}
-			}
-			return args
-		},
-		func(lno int, key string, values []string) error {
-			if len(values) > 0 {
-				switch key {
-				case "search":
-					config.search = values[0]
-				case "url":
-					config.url = values[0]
-				}
-			}
-			return nil
-		})
-	if err != nil {
-		return err
-	}
-	if len(config.url) == 0 {
-		return xerrors.Label(xerrors.Incomplete("url"), fn)
-	}
-	return nil
 }
 
 type tcpConn struct {

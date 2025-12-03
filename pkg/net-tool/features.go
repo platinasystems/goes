@@ -13,6 +13,7 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/net-tool/netstat"
 	"github.com/platinasystems/goes/v2/pkg/net-tool/route"
 	udp_echo "github.com/platinasystems/goes/v2/pkg/net-tool/udp-echo"
+	"github.com/platinasystems/goes/v2/pkg/net-tool/wget"
 	www_echo "github.com/platinasystems/goes/v2/pkg/net-tool/www-echo"
 )
 
@@ -27,5 +28,6 @@ var Features = map[string]any{
 	"ping":     icmp.Ping,
 	"route":    route.Features,
 	"udp-echo": udp_echo.Features,
+	"wget":     wget.Wget,
 	"www-echo": www_echo.Features,
 }

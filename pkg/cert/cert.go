@@ -355,20 +355,15 @@ The default filename is “` + CertFile + `” w/in the “-config” directory.
 	return pem.Encode(w, blk)
 }
 
-func NewHTTPClient() (*http.Client, error) {
-	rootCAs, err := MainConfigDirPlusSystemCertPool()
-	if err != nil {
-		return nil, err
-	}
+func NewTransport() (*http.Transport, error) {
 	tp := http.DefaultTransport.(*http.Transport).Clone()
+	rootCAs, err := MainConfigDirPlusSystemCertPool()
 	tp.TLSClientConfig = &tls.Config{
 		MinVersion:         tls.VersionTLS13,
 		InsecureSkipVerify: !Verify,
 		RootCAs:            rootCAs,
 	}
-	return &http.Client{
-		Transport: tp,
-	}, nil
+	return tp, err
 }
 
 // Print parsed certificate(s).

@@ -117,7 +117,7 @@ Mimic BIND9's DNS lookup utility.
 
 	b := xdnsmessage.MakeBuffer()
 
-	ask, err := xdnsdoh.Asker(false)
+	ask, err := xdnsdoh.Asker()
 	if err != nil {
 		return err
 	} else if ask != nil {
