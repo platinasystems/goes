@@ -1023,12 +1023,12 @@ func (reg *registry) loadZonesKeyValues(
 	lno int, key string, values []string,
 ) error {
 	path := xmain.ConfigFile(ZonesFile)
-	if len(values) < 0 {
-		return xerrors.Label(xerrors.Incomplete(lno), path)
-	}
 	sub, ok := reg.named[key]
 	if !ok {
-		return xerrors.Label(xerrors.NotFound(lno), path)
+		return xerrors.Label(xerrors.NotFound(key), path, lno)
+	}
+	if len(values) == 0 {
+		return nil
 	}
 	if values[0] == "*" {
 		sub.zones = AllZones
@@ -1038,7 +1038,8 @@ func (reg *registry) loadZonesKeyValues(
 		bit, ok := reg.zoneBitByName[name]
 		if !ok {
 			if n := len(reg.zoneBitByName); n >= 8 {
-				return xerrors.Label(xerrors.Range(lno), path)
+				err := xerrors.Range(name)
+				return xerrors.Label(err, path, lno)
 			} else {
 				bit = uint8(n)
 				reg.zoneBitByName[name] = bit
