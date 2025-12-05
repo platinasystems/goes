@@ -769,7 +769,9 @@ func (reg *registry) fromVpn(ctx context.Context, m *xnet.Msg) {
 
 	if fi := fid.Index(); fi >= len(reg.indexed) {
 		xlog.Trace.Println("dropped from unknown", fid)
-	} else if from := reg.indexed[fi]; from.Id.Version() != fid.Version() {
+	} else if from := reg.indexed[fi]; from == nil {
+		xlog.Trace.Println("dropped unregistered from", fi)
+	} else if from.Id.Version() != fid.Version() {
 		xlog.Trace.Print("dropped ", from.name(),
 			", version ", from.Id.Version(), " != ", fid.Version())
 	} else if fid == tid {
@@ -785,7 +787,9 @@ func (reg *registry) fromVpn(ctx context.Context, m *xnet.Msg) {
 		}
 	} else if ti := tid.Index(); ti >= len(reg.indexed) {
 		xlog.Trace.Println("dropped", from.name(), "-> unknown")
-	} else if to := reg.indexed[ti]; to.Id.Version() != tid.Version() {
+	} else if to := reg.indexed[ti]; to == nil {
+		xlog.Trace.Println("dropped unregistered to", ti)
+	} else if to.Id.Version() != tid.Version() {
 		xlog.Trace.Print("dropped ", from.name(), " -> ", to.name(),
 			", version ", to.Id.Version(), " != ", tid.Version())
 	} else if !to.ap.IsValid() {
@@ -1190,7 +1194,7 @@ func (reg *registry) reviseIds(rsvp *rsvp) error {
 		}
 		sub := reg.indexed[idi]
 		if sub == nil {
-			return xerrors.Broken("subscriber-index")
+			return xerrors.Unavailable("subscriber", idi)
 		}
 		n, err = xnet.ByteOrderEncode(data[i:], sub.Id)
 		if err != nil {
@@ -1249,7 +1253,7 @@ func (reg *registry) showAddress(rsvp *rsvp) error {
 		}
 	} else {
 		for _, sub := range reg.indexed {
-			if sub.Addr.IsValid() {
+			if sub != nil && sub.Addr.IsValid() {
 				fmt.Fprintln(rsvp, sub.Addr, sub.name())
 			}
 		}
@@ -1275,7 +1279,7 @@ func (reg *registry) showExchanges(rsvp *rsvp) error {
 	if err != nil {
 	} else if err = reg.assertSubscriber(rsvp); err == nil {
 		for _, sub := range reg.indexed {
-			if sub.Port != 0 {
+			if sub != nil && sub.Port != 0 {
 				fmt.Fprintln(rsvp, sub)
 			}
 		}
