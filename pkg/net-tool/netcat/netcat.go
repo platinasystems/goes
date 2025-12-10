@@ -19,17 +19,20 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xnet/xdns/xdnsdoh"
 )
 
-func NetCat(ctx context.Context, args []string) error {
-	xflag.TemplateUsage(`
+const NetCatUsage = `
 usage: {{.Name}} [flags] <host> <port>
 Pipe stdin/out with TCP connection to the named or numbered host/port.
 
-{{flags .}}`)
+{{flags .}}`
 
-	err := xflag.Labels{
-		xmain.ConfigFlag,
-		xdnsdoh.ConfigFlag,
-	}.Define()
+var NetCatFlags = xflag.Labels{
+	xmain.ConfigFlag,
+	xdnsdoh.ConfigFlag,
+}
+
+func NetCat(ctx context.Context, args []string) error {
+	xflag.TemplateUsage(NetCatUsage)
+	err := NetCatFlags.Define()
 	if err != nil {
 		return err
 	} else if err = flag.CommandLine.Parse(args); err != nil {

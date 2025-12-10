@@ -17,51 +17,54 @@ import (
 	probing "github.com/prometheus-community/pro-bing"
 )
 
-const (
-	DefaultCount    = -1
-	DefaultInterval = time.Second
-	DefaultSize     = 24
-	DefaultTimeout  = 100000 * time.Second
-	DefaultTTL      = 64
-)
-
-func Ping(ctx context.Context, args []string) error {
-	xflag.TemplateUsage(`
+const PingUsage = `
 usage: {{.Name}} [flags] [host]
 Send ICMP ECHO_REQUEST packets to network “host”. (default localhost)
-{{flags .}}`)
+{{flags .}}`
 
-	var privileged, quiet, verbose bool
+const (
+	PingDefaultCount    = -1
+	PingDefaultInterval = time.Second
+	PingDefaultTimeout  = 100000 * time.Second
+)
 
-	count := DefaultCount
-	interval := DefaultInterval
-	size := DefaultSize
-	timeout := DefaultTimeout
-	ttl := DefaultTTL
+var (
+	Ping_c = PingDefaultCount
+	Ping_i = PingDefaultInterval
+	Ping_l = 64
+	Ping_s = 24
+	Ping_t = PingDefaultTimeout
+	Ping_p,
+	Ping_q,
+	Ping_v bool
+)
 
-	err := xflag.Labels{
-		xmain.ConfigFlag,
-		xdnsdoh.ConfigFlag,
-		{"c", "Count.", &count},
-		{"i", "Interval.", &interval},
-		{"l", "Request Time To Live.", &ttl},
-		{"p", "Privileged, raw ICMP.", &privileged},
-		{"q", "Quiet.", &quiet},
-		{"s", "Size.", &size},
-		{"t", "Timeout regardless of how many received packets.",
-			&timeout},
-		{"v", "Verbose.", &verbose},
-	}.Define()
+var PingFlags = xflag.Labels{
+	xmain.ConfigFlag,
+	xdnsdoh.ConfigFlag,
+	{"c", "Count. (<1 infinite)", &Ping_c},
+	{"i", "Interval.", &Ping_i},
+	{"l", "Request Time To Live.", &Ping_l},
+	{"p", "Privileged, raw ICMP.", &Ping_p},
+	{"q", "Quiet.", &Ping_q},
+	{"s", "Size.", &Ping_s},
+	{"t", "Timeout regardless of how many received packets.", &Ping_t},
+	{"v", "Verbose.", &Ping_v},
+}
+
+func Ping(ctx context.Context, args []string) error {
+	xflag.TemplateUsage(PingUsage)
+	err := PingFlags.Define()
 	if err != nil {
 		return err
 	} else if err = flag.CommandLine.Parse(args); err != nil {
 		return err
 	}
 
-	if count != DefaultCount &&
-		timeout == DefaultTimeout &&
-		interval == DefaultInterval {
-		timeout = time.Duration(count+1) * interval
+	if Ping_c != PingDefaultCount &&
+		Ping_t == PingDefaultTimeout &&
+		Ping_i == PingDefaultInterval {
+		Ping_t = time.Duration(Ping_c+1) * Ping_i
 	}
 
 	args = flag.Args()
@@ -90,15 +93,15 @@ Send ICMP ECHO_REQUEST packets to network “host”. (default localhost)
 	}
 
 	pinger := probing.New(host)
-	pinger.Count = count
-	pinger.Interval = interval
-	pinger.Size = size
-	pinger.Timeout = timeout
-	pinger.TTL = ttl
+	pinger.Count = Ping_c
+	pinger.Interval = Ping_i
+	pinger.Size = Ping_s
+	pinger.Timeout = Ping_t
+	pinger.TTL = Ping_l
 
 	pinger.SetNetwork(nw)
 	pinger.SetIPAddr(ipaddr)
-	pinger.SetPrivileged(privileged)
+	pinger.SetPrivileged(Ping_p)
 
 	/* e.g.
 	PING localhost (127.0.0.1): 56 data bytes
@@ -110,7 +113,7 @@ Send ICMP ECHO_REQUEST packets to network “host”. (default localhost)
 	3 packets transmitted, 3 packets received, 0.0% packet loss
 	round-trip min/avg/max/stddev = 0.082/0.122/0.151/0.029 ms
 	*/
-	if quiet {
+	if Ping_q {
 		pinger.OnDuplicateRecv = onDuplicateQuiet
 		pinger.OnFinish = onFinishQuiet
 		pinger.OnRecv = onRecvQuiet
@@ -121,7 +124,7 @@ Send ICMP ECHO_REQUEST packets to network “host”. (default localhost)
 		pinger.OnFinish = onFinish
 		pinger.OnSetup = func() { onSetup(host, pinger) }
 	}
-	if verbose {
+	if Ping_v {
 		pinger.OnSend = onSendVerbose
 	} else {
 		pinger.OnSend = onSend

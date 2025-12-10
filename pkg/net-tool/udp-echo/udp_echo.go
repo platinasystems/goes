@@ -21,24 +21,42 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xsync"
 )
 
+const UDPEchoServerUsage = `
+usage: {{.Name}} [<address>:<port>]
+UDP Echo server. (default listen “address:port”: “:7”)
+`
+
+const UDPEchoPingUsage = `
+usage: {{.Name}} [host]
+Ping host with sequenced packets.
+
+Host:
+
+  - [<ip6>]:<port>
+  - <ip6>
+  - <ip4>:<port>
+  - <ip4>
+  - <name>:<port>
+  - <name>
+
+Default: 127.0.0.1:7
+`
+
 const (
-	DefaultPort     = 7
-	PacketWindow    = 4
-	ExpectedPackets = 1024
+	DefaultUDPEchoPort     = 7
+	UDPEchoPacketWindow    = 4
+	ExpectedUDPEchoPackets = 1024
 )
 
 var Features = map[string]any{
-	"ping":   Ping,
-	"server": Server,
+	"ping":   UDPEchoPing,
+	"server": UDPEchoServer,
 }
 
-func Server(ctx context.Context, args []string) error {
+func UDPEchoServer(ctx context.Context, args []string) error {
 	var udpa *net.UDPAddr
 
-	xflag.TemplateUsage(`
-usage: {{.Name}} [<address>:<port>]
-UDP Echo server. (default listen “address:port”: “:7”)
-`)
+	xflag.TemplateUsage(UDPEchoServerUsage)
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
 		return err
@@ -68,22 +86,8 @@ UDP Echo server. (default listen “address:port”: “:7”)
 	return nil
 }
 
-func Ping(ctx context.Context, args []string) error {
-	xflag.TemplateUsage(`
-usage: {{.Name}} [host]
-Ping host with sequenced packets.
-
-Host:
-
-  - [<ip6>]:<port>
-  - <ip6>
-  - <ip4>:<port>
-  - <ip4>
-  - <name>:<port>
-  - <name>
-
-Default: 127.0.0.1:7
-`)
+func UDPEchoPing(ctx context.Context, args []string) error {
+	xflag.TemplateUsage(UDPEchoPingUsage)
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
 		return err
@@ -96,7 +100,7 @@ Default: 127.0.0.1:7
 		addr = args[0]
 	}
 
-	aps, err := xnet.ResolveAddrPort(ctx, nil, addr, DefaultPort)
+	aps, err := xnet.ResolveAddrPort(ctx, nil, addr, DefaultUDPEchoPort)
 	if err != nil {
 		return err
 	}
@@ -149,16 +153,16 @@ Default: 127.0.0.1:7
 			if seq <= acked {
 				continue
 			} else if seq == acked+1 {
-				if acked = seq; acked == ExpectedPackets {
+				if acked = seq; acked == ExpectedUDPEchoPackets {
 					break
 				}
-				win = PacketWindow - (next - acked) + 1
+				win = UDPEchoPacketWindow - (next - acked) + 1
 			} else {
 				retx += 1
 				next = acked + 1
 			}
 		}
-		for i := 0; i < win && next <= ExpectedPackets; i++ {
+		for i := 0; i < win && next <= ExpectedUDPEchoPackets; i++ {
 			binary.BigEndian.PutUint64(pg, uint64(next))
 			if _, err = c.Write(pg[:8]); err != nil {
 				return err
@@ -167,7 +171,7 @@ Default: 127.0.0.1:7
 		}
 	}
 	fmt.Print(retx, " retransmits, ",
-		ExpectedPackets/time.Now().Sub(start).Seconds(), "pps\n")
+		ExpectedUDPEchoPackets/time.Now().Sub(start).Seconds(), "pps\n")
 	return ctx.Err()
 }
 

@@ -35,81 +35,81 @@ const (
 )
 
 var (
-	routeExpire time.Duration
+	RouteExpire time.Duration
 
-	routeFib, routeFlags, routeIfa, routeIfp, routeJail, routeMetrics string
+	RouteFib, RouteFlags, RouteIfa, RouteIfp, RouteJail, RouteMetrics string
 
-	routeHopCount, routeMetric, routeMTU, routeRTT, routeRTTVar,
-	routeSSThresh, routeTOS uint
+	RouteHopCount, RouteMetric, RouteMTU, RouteRTT, RouteRTTVar,
+	RouteSSThresh, RouteTOS uint
 
-	routeDebug, routeGenMask, routeHost, routeIface, routeInet, routeInet6,
-	routeNet, routeNumeric, routeQuiet, routeTestMode, routeVerbose bool
+	RouteDebug, RouteGenMask, RouteHost, RouteIface, RouteInet, RouteInet6,
+	RouteNet, RouteNumeric, RouteQuiet, RouteTestMode, RouteVerbose bool
 
-	routePrefixlen = -1
-	routeProtocol  = "boot"
-	routeScope     = "global"
-	routeTable     = "main"
-	routeTo        = "unicast"
+	RoutePrefixlen = -1
+	RouteProtocol  = "boot"
+	RouteScope     = "global"
+	RouteTable     = "main"
+	RouteTo        = "unicast"
 )
+
+var Flags = xflag.Labels{
+	{"d", "Debug mode.", &RouteDebug},
+	{"host", "Host <destination>.", &RouteHost},
+	{"inet", "Address hint or filter.", &RouteInet},
+	{"4", "aka -inet", &RouteInet},
+	{"inet6", "Address hint or filter.", &RouteInet6},
+	{"6", "aka -inet6", &RouteInet6},
+	{"net", "Network <destination>.", &RouteNet},
+	{"n", "Numeric address output.", &RouteNumeric},
+	{"prefixlen",
+		"If >= 0, use instead of 1st arg/<suffix> or 3rd arg.",
+		&RoutePrefixlen,
+	},
+	{"q", "Suppress most output.", &RouteQuiet},
+	{"t", "Test mode.", &RouteTestMode},
+	{"v", "Verbose output.", &RouteVerbose},
+}
+
+var FibFlag = xflag.
+	Label{"fib", "A comma separated list of FIB IDs != default.", &RouteFib}
+var JailFlag = xflag.Label{"j", "Run inside jail.", &RouteJail}
 
 func (rt Route) op(ctx context.Context, args []string) error {
 	xflag.TemplateUsage(Usage[rt])
-
-	err := xflag.Labels{
-		{"d", "Debug mode.", &routeDebug},
-		{"host", "Host <destination>.", &routeHost},
-		{"inet", "Address hint or filter.", &routeInet},
-		{"4", "aka -inet", &routeInet},
-		{"inet6", "Address hint or filter.", &routeInet6},
-		{"6", "aka -inet6", &routeInet6},
-		{"net", "Network <destination>.", &routeNet},
-		{"n", "Numeric address output.", &routeNumeric},
-		{"prefixlen",
-			"If >= 0, use instead of 1st arg/<suffix> or 3rd arg.",
-			&routePrefixlen,
-		},
-		{"q", "Suppress most output.", &routeQuiet},
-		{"t", "Test mode.", &routeTestMode},
-		{"v", "Verbose output.", &routeVerbose},
-	}.Define()
+	err := Flags.Define()
 	if err != nil {
 		return err
 	}
 	if HaveFibs {
-		err = xflag.Labels{
-			{"fib",
-				"A comma separated list of FIB IDs != default.",
-				&routeFib,
-			},
-		}.Define()
+		err = xflag.Labels{FibFlag}.Define()
 		if err != nil {
 			return err
 		}
 	}
 	if xexec.CanJail {
-		err = xflag.Labels{
-			{"j", "Run inside jail.", &routeJail},
-		}.Define()
+		err = xflag.Labels{JailFlag}.Define()
 		if err != nil {
 			return err
 		}
 	}
-
-	rt.defineGWFlags()
-
+	if rt == Delete || rt == Get {
+		if err = GatewayFlags.Define(); err != nil {
+			return err
+		}
+	}
 	if err = flag.CommandLine.Parse(args); err != nil {
 		return err
 	}
 
-	if len(routeJail) > 0 {
-		if err = xexec.Jail(ctx, routeJail); err != nil {
+	if len(RouteJail) > 0 {
+		if err = xexec.Jail(ctx, RouteJail); err != nil {
 			return err
 		}
 	}
 
 	fibs := []int{-1}
-	if len(routeFib) > 0 {
-		fibs, err = sscanFibs(strings.Split(routeFib, ","))
+	if len(RouteFib) > 0 {
+		fibs, err = sscanFibs(strings.Split(RouteFib, ","))
 		if err != nil {
 			return err
 		}

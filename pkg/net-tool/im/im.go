@@ -37,10 +37,16 @@ or without argument(s), send subsequent, non-blank entries.
 	im>
 `
 
-const Port = 8004
-const Prompt = "im> "
+const DefaultImPort = 8004
+const ImPrompt = "im> "
 
-var im struct {
+const ImUsage = `
+usage: {{.Name}} [flags] [interface]
+Instant Messaging over named or all interface(s).
+
+{{flags .}}`
+
+var im = struct {
 	sync.Mutex
 	clio *clio.CLIO
 	port uint16
@@ -53,23 +59,21 @@ var im struct {
 
 	name  map[netip.AddrPort]string
 	named map[string]netip.AddrPort
+}{
+	port: DefaultImPort,
 }
 
 var resolver *net.Resolver
 
+var ImFlags = xflag.Labels{
+	xmain.ConfigFlag,
+	xdnsdoh.ConfigFlag,
+	{"p", "Instant Messaging Port.", &im.port},
+}
+
 func InstantMessaging(ctx context.Context, args []string) error {
-	xflag.TemplateUsage(`
-usage: {{.Name}} [flags] [interface]
-Instant Messaging over named or all interface(s).
-
-{{flags .}}`)
-
-	im.port = Port
-	err := xflag.Labels{
-		xmain.ConfigFlag,
-		xdnsdoh.ConfigFlag,
-		{"p", "Instant Messaging Port.", &im.port},
-	}.Define()
+	xflag.TemplateUsage(ImUsage)
+	err := ImFlags.Define()
 	if err != nil {
 		return err
 	} else if err = flag.CommandLine.Parse(args); err != nil {
@@ -105,12 +109,12 @@ Instant Messaging over named or all interface(s).
 		return err
 	}
 
-	im.clio, err = clio.New(os.Stdin, Prompt, nil)
+	im.clio, err = clio.New(os.Stdin, ImPrompt, nil)
 	if err != nil {
 		im.udp.Close()
 		return err
 	}
-	im.clio.SetPrompt(Prompt)
+	im.clio.SetPrompt(ImPrompt)
 	defer fmt.Println()
 
 	var wg sync.WaitGroup
@@ -135,7 +139,7 @@ Instant Messaging over named or all interface(s).
 			if len(aps) == 0 {
 				fmt.Fprint(im.clio, Help[1:])
 			} else {
-				im.clio.SetPrompt(Prompt)
+				im.clio.SetPrompt(ImPrompt)
 				aps = aps[:0]
 			}
 		} else if s == "?" || s == "h" || s == "help" {
@@ -148,7 +152,7 @@ Instant Messaging over named or all interface(s).
 		} else if len(s) > 0 {
 			err = imTx(s, aps)
 			aps = aps[:0]
-			im.clio.SetPrompt(Prompt)
+			im.clio.SetPrompt(ImPrompt)
 		}
 	}
 	return xerrors.Suppress(err, io.EOF)

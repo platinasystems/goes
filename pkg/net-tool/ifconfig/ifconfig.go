@@ -23,7 +23,7 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xslices"
 )
 
-const ifconfigUsage = `
+const IfconfigUsage = `
 usage: {{.Name}} [flags]... [parameters]...
 This emulates the Unix net-tools command to configure and display network
 interface parameters.
@@ -65,27 +65,39 @@ Commands:
 Parameters:
 ` + netif.AddressParameters + netif.ConfigParameters + netif.CreateParameters
 
+var (
+	Ifconfig_C,
+	Ifconfig_L,
+	Ifconfig_a,
+	Ifconfig_d,
+	Ifconfig_l,
+	Ifconfig_m,
+	Ifconfig_r,
+	Ifconfig_u,
+	Ifconfig_v bool
+	Ifconfig_X string
+)
+
+var IfconfigFlags = xflag.Labels{
+	{"C", "List cloneable devices.", &Ifconfig_C},
+	{"L", "Display IPv6 address lifetime as offset.", &Ifconfig_L},
+	{"X", "Pattern match interface name.", &Ifconfig_X},
+	{"a", "Display all (implied unless -d, -u, -X).", &Ifconfig_a},
+	{"d", "Only display down interfaces.", &Ifconfig_d},
+	{"l", "List available interfaces.", &Ifconfig_l},
+	{"m", "Display all supported media.", &Ifconfig_m},
+	{"r", "Display route references.", &Ifconfig_r},
+	{"u", "Only display up interfaces.", &Ifconfig_u},
+	{"v", "Verbose display.", &Ifconfig_v},
+}
+
 var inets = []string{"inet", "inet6"}
 
 func Ifconfig(ctx context.Context, complete bool, args []string) error {
-	xflag.TemplateUsage(ifconfigUsage)
-
 	var pat *regexp.Regexp
-	var C, L, a, d, l, m, r, u, v bool
-	var X string
 
-	err := xflag.Labels{
-		{"C", "List cloneable devices.", &C},
-		{"L", "Display IPv6 address lifetime as offset.", &L},
-		{"X", "Pattern match interface name.", &X},
-		{"a", "Display all (implied unless -d, -u, -X).", &a},
-		{"d", "Only display down interfaces.", &d},
-		{"l", "List available interfaces.", &l},
-		{"m", "Display all supported media.", &m},
-		{"r", "Display route references.", &r},
-		{"u", "Only display up interfaces.", &u},
-		{"v", "Verbose display.", &v},
-	}.Define()
+	xflag.TemplateUsage(IfconfigUsage)
+	err := IfconfigFlags.Define()
 	if err != nil {
 		return err
 	} else if err = flag.CommandLine.Parse(args); err != nil {
@@ -118,14 +130,14 @@ func Ifconfig(ctx context.Context, complete bool, args []string) error {
 		return nil
 	}
 
-	if len(X) > 0 {
-		if pat, err = regexp.Compile(X); err != nil {
+	if len(Ifconfig_X) > 0 {
+		if pat, err = regexp.Compile(Ifconfig_X); err != nil {
 			return err
 		}
 	}
 
 	switch {
-	case C:
+	case Ifconfig_C:
 		var sep string
 		for _, dev := range netif.Cloneable {
 			fmt.Print(sep, dev)
@@ -135,12 +147,12 @@ func Ifconfig(ctx context.Context, complete bool, args []string) error {
 			fmt.Println()
 		}
 		return nil
-	case l:
+	case Ifconfig_l:
 		var sep string
 		for _, nif := range nifs {
 			isup := (nif.Flags & net.FlagUp) == net.FlagUp
-			if (d && !isup) || (u && isup) ||
-				(!d && !u) {
+			if (Ifconfig_d && !isup) || (Ifconfig_u && isup) ||
+				(!Ifconfig_d && !Ifconfig_u) {
 				// FIXME family filter
 				fmt.Print(sep, nif.Name)
 				sep = " "
@@ -150,9 +162,9 @@ func Ifconfig(ctx context.Context, complete bool, args []string) error {
 			fmt.Println()
 		}
 		return nil
-	case a || len(args) == 0:
+	case Ifconfig_a || len(args) == 0:
 		switch {
-		case d:
+		case Ifconfig_d:
 			for _, nif := range nifs {
 				if pat == nil || pat.MatchString(nif.Name) {
 					if nif.Flags&net.FlagUp == 0 {
@@ -160,7 +172,7 @@ func Ifconfig(ctx context.Context, complete bool, args []string) error {
 					}
 				}
 			}
-		case u:
+		case Ifconfig_u:
 			for _, nif := range nifs {
 				if pat == nil || pat.MatchString(nif.Name) {
 					if nif.Flags&net.FlagUp == net.FlagUp {

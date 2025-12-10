@@ -18,20 +18,34 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xsync"
 )
 
-const DefaultPort = ":8080"
+const DefaultWWWEchoPort = ":8080"
 
-var Features = map[string]any{
-	"ping":   Ping,
-	"server": Server,
-}
-
-func Server(ctx context.Context, args []string) error {
-	xflag.TemplateUsage(`
+const WWWEchoServerUsage = `
 usage: {{.Name}} [<address>:<port>]
 WWW echo server that responds with path of http request.
 
-Default: “` + DefaultPort + `”
-`)
+Default: “` + DefaultWWWEchoPort + `”
+`
+
+const WWWEchoPingUsage = `
+usage: {{.Name}} [host]
+Ping WWW echo server.
+
+Host:
+  - [<ip6>]:<port>
+  - <ip4>:<port>
+  - <name>:<port>
+
+Default: “127.0.0.1` + DefaultWWWEchoPort + `”
+`
+
+var Features = map[string]any{
+	"ping":   WWWEchoPing,
+	"server": WWWEchoServer,
+}
+
+func WWWEchoServer(ctx context.Context, args []string) error {
+	xflag.TemplateUsage(WWWEchoServerUsage)
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
 		return err
@@ -39,7 +53,7 @@ Default: “` + DefaultPort + `”
 
 	args = flag.Args()
 
-	a := DefaultPort
+	a := DefaultWWWEchoPort
 	if len(args) > 0 {
 		a = args[0]
 	}
@@ -66,20 +80,10 @@ Default: “` + DefaultPort + `”
 	return err
 }
 
-func Ping(ctx context.Context, args []string) error {
+func WWWEchoPing(ctx context.Context, args []string) error {
 	const nl = "\n"
 
-	xflag.TemplateUsage(`
-usage: {{.Name}} [host]
-Ping WWW echo server.
-
-Host:
-  - [<ip6>]:<port>
-  - <ip4>:<port>
-  - <name>:<port>
-
-Default: “127.0.0.1` + DefaultPort + `”
-`)
+	xflag.TemplateUsage(WWWEchoPingUsage)
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
 		return err
@@ -87,7 +91,7 @@ Default: “127.0.0.1` + DefaultPort + `”
 
 	args = flag.Args()
 
-	url := fmt.Sprint("http://127.0.0.1", DefaultPort, "/hello")
+	url := fmt.Sprint("http://127.0.0.1", DefaultWWWEchoPort, "/hello")
 	if len(args) > 0 {
 		url = fmt.Sprint("http://", args[0], "/hello")
 	}

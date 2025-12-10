@@ -68,21 +68,16 @@ type gwmetric struct {
 	dsc  string
 }
 
-func (rt Route) defineGWFlags() error {
-	if rt == Get {
-		return nil
-	}
-	return xflag.Labels{
-		{"flags", "A comma separated list." + gwFlags, &routeFlags},
-		{"genmask", "Generate netmask.", &routeGenMask},
-		{"ifa", "A MAC address of a point-to-point peer?", &routeIfa},
-		{"iface", "Inticates <gateway> is point-to-point interface.",
-			&routeIface},
-		{"interface", "aka -iface", &routeIface},
-		{"ifp", "A point-to-point peer interface and MAC.", &routeIfp},
-		{"metrics", "A comma separated NAME=VALUE." + gwMetrics,
-			&routeMetrics},
-	}.Define()
+var GatewayFlags = xflag.Labels{
+	{"flags", "A comma separated list." + gwFlags, &RouteFlags},
+	{"genmask", "Generate netmask.", &RouteGenMask},
+	{"ifa", "A MAC address of a point-to-point peer?", &RouteIfa},
+	{"iface", "Inticates <gateway> is point-to-point interface.",
+		&RouteIface},
+	{"interface", "aka -iface", &RouteIface},
+	{"ifp", "A point-to-point peer interface and MAC.", &RouteIfp},
+	{"metrics", "A comma separated NAME=VALUE." + gwMetrics,
+		&RouteMetrics},
 }
 
 func (rt Route) req(
@@ -108,7 +103,7 @@ func (rt Route) req(
 		if dst.Bits() == dst.Addr().BitLen() {
 			integer.Set(&rtm.Flags, unix.RTF_HOST)
 		}
-		ff := strings.Split(routeFlags, ",")
+		ff := strings.Split(RouteFlags, ",")
 		for _, name := range ff {
 			if val, ok := gwFlagValues[name]; ok {
 				integer.Set(&rtm.Flags, val)
@@ -116,7 +111,7 @@ func (rt Route) req(
 				integer.Reset(&rtm.Flags, val)
 			}
 		}
-		metrics := strings.Split(routeMetrics, ",")
+		metrics := strings.Split(RouteMetrics, ",")
 		rtmmetrics(rtm, metrics)
 	case Delete:
 		rtm.Type = unix.RTM_DELETE
@@ -168,13 +163,13 @@ func (rt Route) req(
 		rtm = netrt.PointerRtMsghdr2(msg)
 		integer.Set(&rtm.Addrs, 1<<unix.RTAX_NETMASK)
 	}
-	if routeGenMask {
+	if RouteGenMask {
 		// FIXME e.g. 255.255.255.255 ?
 	}
-	if len(routeIfp) > 0 {
+	if len(RouteIfp) > 0 {
 		// FIXME e.g. eth0:1.2.3.4.5.6 ?
 	}
-	if len(routeIfa) > 0 {
+	if len(RouteIfa) > 0 {
 		// FIXME e.g. 1.2.3.4.5.6 ?
 	}
 	return netrt.Request(msg, fib)

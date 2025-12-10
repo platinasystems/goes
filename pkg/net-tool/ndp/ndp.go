@@ -19,43 +19,44 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xnet"
 )
 
-var (
-	ndp_A int
-
-	ndp_I, ndp_d, ndp_f, ndp_i string
-
-	ndp_H, ndp_P, ndp_R, ndp_a, ndp_c, ndp_l, ndp_n, ndp_p, ndp_r, ndp_s,
-	ndp_t, ndp_x, ndp_w bool
-)
-
-func NDP(ctx context.Context, args []string) error {
-	xflag.TemplateUsage(`
+const NdpUsage = `
 usage: {{.Name}} [flags] [args]
 Control/diagnose IPv6 neighbor discovery protocol
-{{flags .}}`)
-	err := xflag.Labels{
-		{"A", "Repeat show interval (seconds).", &ndp_A},
-		{"H", "Harmonize routing and neighbor tables.", &ndp_H},
-		{"I", "Set, “show” or “delete” default interface.", &ndp_I},
-		{"P", "Flush all the entries in the prefix list.", &ndp_P},
-		{"R", "Flush all the entries in the default router list.",
-			&ndp_R},
-		{"a", "Show current entries.", &ndp_a},
-		{"c", "Erase all entries.", &ndp_c},
-		{"d", "Delete specified entry.", &ndp_d},
-		{"f", "Table configuration file.", &ndp_f},
-		{"i", "View information for the specified interface.", &ndp_i},
-		{"l", "Show link-layer reachability information.", &ndp_l},
-		{"n", "Don't resolve numeric addresses to hostnames.", &ndp_n},
-		{"p", "Show prefix list.", &ndp_p},
-		{"r", "Show default router list.", &ndp_r},
-		{"s", "Register an NDP entry for a node.", &ndp_s},
-		{"t", "Show timestamp for each entry.", &ndp_t},
-		{"x", "Show extended link-layer reachability information.",
-			&ndp_x},
-		{"w", "Show node's cryptographically generated address.",
-			&ndp_w},
-	}.Define()
+{{flags .}}`
+
+var (
+	Ndp_A int
+
+	Ndp_I, Ndp_d, Ndp_f, Ndp_i string
+
+	Ndp_H, Ndp_P, Ndp_R, Ndp_a, Ndp_c, Ndp_l, Ndp_n, Ndp_p, Ndp_r, Ndp_s,
+	Ndp_t, Ndp_x, Ndp_w bool
+)
+
+var NdpFlags = xflag.Labels{
+	{"A", "Repeat show interval (seconds).", &Ndp_A},
+	{"H", "Harmonize routing and neighbor tables.", &Ndp_H},
+	{"I", "Set, “show” or “delete” default interface.", &Ndp_I},
+	{"P", "Flush all the entries in the prefix list.", &Ndp_P},
+	{"R", "Flush all the entries in the default router list.", &Ndp_R},
+	{"a", "Show current entries.", &Ndp_a},
+	{"c", "Erase all entries.", &Ndp_c},
+	{"d", "Delete specified entry.", &Ndp_d},
+	{"f", "Table configuration file.", &Ndp_f},
+	{"i", "View information for the specified interface.", &Ndp_i},
+	{"l", "Show link-layer reachability information.", &Ndp_l},
+	{"n", "Don't resolve numeric addresses to hostnames.", &Ndp_n},
+	{"p", "Show prefix list.", &Ndp_p},
+	{"r", "Show default router list.", &Ndp_r},
+	{"s", "Register an NDP entry for a node.", &Ndp_s},
+	{"t", "Show timestamp for each entry.", &Ndp_t},
+	{"x", "Show extended link-layer reachability information.", &Ndp_x},
+	{"w", "Show node's cryptographically generated address.", &Ndp_w},
+}
+
+func NDP(ctx context.Context, args []string) error {
+	xflag.TemplateUsage(NdpUsage)
+	err := NdpFlags.Define()
 	if err != nil {
 		return err
 	} else if err = flag.CommandLine.Parse(args); err != nil {
@@ -63,25 +64,25 @@ Control/diagnose IPv6 neighbor discovery protocol
 	}
 
 	switch {
-	case len(ndp_f) > 0:
+	case len(Ndp_f) > 0:
 		err = script()
-	case ndp_a || ndp_c:
+	case Ndp_a || Ndp_c:
 		_, err = dump(ctx)
-	case len(ndp_d) > 0:
+	case len(Ndp_d) > 0:
 		err = remove()
-	case len(ndp_i) > 0:
-		err = ifinfo(ctx, ndp_i)
-	case len(ndp_I) > 0:
+	case len(Ndp_i) > 0:
+		err = ifinfo(ctx, Ndp_i)
+	case len(Ndp_I) > 0:
 		err = defif()
-	case ndp_p:
+	case Ndp_p:
 		err = prefixes()
-	case ndp_r:
+	case Ndp_r:
 		err = routers()
-	case ndp_s:
+	case Ndp_s:
 		err = set()
-	case ndp_H:
+	case Ndp_H:
 		err = harmonize()
-	case ndp_P || ndp_R:
+	case Ndp_P || Ndp_R:
 		err = flush()
 	default:
 		if flag.NArg() == 0 {
@@ -121,7 +122,7 @@ Neighbor                                Linklayer Address  Netif Expire    St Fl
 		return 0, xerrors.Mark(err)
 	}
 	defer nder.Close()
-	if !ndp_t {
+	if !Ndp_t {
 		fmt.Println(heading[1:])
 	}
 	count := 0
@@ -151,13 +152,13 @@ Neighbor                                Linklayer Address  Netif Expire    St Fl
 			dst = dst.WithZone(nif.Name)
 		}
 		name := dst.String()
-		if !ndp_n {
+		if !Ndp_n {
 			l, err := net.LookupAddr(name)
 			if err == nil && len(l) > 0 {
 				name = l[0]
 			}
 		}
-		if ndp_t {
+		if Ndp_t {
 			fmt.Print(utc.Format("15:04:05.000000"), " ")
 		}
 		fmt.Printf("%-39s ", name)

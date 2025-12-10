@@ -25,37 +25,36 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xnet/xdns/xdnsdoh"
 )
 
-const wgetRel = "../"
-
-var (
-	wget_B xflag.URL
-	wget_i,
-	wget_O string
-	wget_P = "."
-
-	wgetFlags = xflag.Labels{
-		xmain.ConfigFlag,
-		xdnsdoh.ConfigFlag,
-		{"i", `
-Read URLs from named file or stdin if "-".`[1:], &wget_i},
-		{"B", `
-URL to resolve input file's "../" prefaced relative links.`[1:], &wget_B},
-		{"O", `
-Concentate downloads to named file, or stdout if "-",
-instead of each to the base path of the url.`[1:], &wget_O},
-		{"P", `
-Directory prefix of downloaded files.`[1:], &wget_P},
-	}
-)
-
-func Wget(ctx context.Context, args []string) error {
-	xflag.TemplateUsage(`
+const WgetUsage = `
 usage: {{.Name}} [flags] <url>
 A non-interactive network downloader.
 
-{{flags .}}`)
+{{flags .}}`
 
-	err := wgetFlags.Define()
+const wgetRel = "../"
+
+var (
+	Wget_B xflag.URL
+	Wget_i,
+	Wget_O string
+	Wget_P = "."
+)
+
+var WgetFlags = xflag.Labels{
+	xmain.ConfigFlag,
+	xdnsdoh.ConfigFlag,
+	{"i", "Read URLs from named file or stdin if '-'.", &Wget_i},
+	{"B", `
+URL to resolve input file's "../" prefaced relative links.`[1:], &Wget_B},
+	{"O", `
+Concentate downloads to named file, or stdout if "-",
+instead of each to the base path of the url.`[1:], &Wget_O},
+	{"P", "Directory prefix of downloaded files.", &Wget_P},
+}
+
+func Wget(ctx context.Context, args []string) error {
+	xflag.TemplateUsage(WgetUsage)
+	err := WgetFlags.Define()
 	if err != nil {
 		return err
 	} else if err = flag.CommandLine.Parse(args); err != nil {
@@ -105,14 +104,14 @@ func wgetFetch(
 		req *http.Request
 		rsp *http.Response
 	)
-	if len(wget_O) > 0 {
-		if wget_O == "-" {
+	if len(Wget_O) > 0 {
+		if Wget_O == "-" {
 			o = os.Stdout
 		} else {
-			if strings.IndexRune(wget_O, os.PathSeparator) != 0 {
-				wget_O = filepath.Join(wget_P, wget_O)
+			if strings.IndexRune(Wget_O, os.PathSeparator) != 0 {
+				Wget_O = filepath.Join(Wget_P, Wget_O)
 			}
-			if o, err = os.Create(wget_O); err != nil {
+			if o, err = os.Create(Wget_O); err != nil {
 				return
 			}
 			defer o.Close()
@@ -138,9 +137,9 @@ func wgetFetch(
 			var f io.WriteCloser
 			fn := path.Base(u.Path)
 			if len(fn) == 0 || fn == "/" {
-				f, err = os.CreateTemp(wget_P, "wget_*")
+				f, err = os.CreateTemp(Wget_P, "Wget_*")
 			} else {
-				f, err = os.Create(filepath.Join(wget_P, fn))
+				f, err = os.Create(filepath.Join(Wget_P, fn))
 			}
 			if err == nil {
 				_, err = io.Copy(f, rsp.Body)
@@ -184,10 +183,10 @@ func wgetURLs(args []string) (urls []*url.URL, err error) {
 		fqdn(u)
 		urls = append(urls, u)
 	}
-	if len(wget_i) == 0 {
+	if len(Wget_i) == 0 {
 		return urls, nil
 	}
-	burl := wget_B.URL()
+	burl := Wget_B.URL()
 	burlIsAbs := burl.IsAbs()
 	if burlIsAbs && !strings.HasPrefix(burl.Scheme, "http") {
 		err = xerrors.Unsupported(burl.Scheme)
@@ -195,9 +194,9 @@ func wgetURLs(args []string) (urls []*url.URL, err error) {
 		return
 	}
 	var i *os.File
-	if wget_i == "-" {
+	if Wget_i == "-" {
 		i = os.Stdin
-	} else if i, err = os.Open(wget_i); err != nil {
+	} else if i, err = os.Open(Wget_i); err != nil {
 		return
 	} else {
 		defer i.Close()
@@ -216,7 +215,7 @@ func wgetURLs(args []string) (urls []*url.URL, err error) {
 			u.JoinPath(strings.TrimPrefix(line, wgetRel))
 			urls = append(urls, u)
 		} else if u, err = url.Parse(line); err != nil {
-			err = xerrors.Label(err, wget_i, lno)
+			err = xerrors.Label(err, Wget_i, lno)
 		} else {
 			urls = append(urls, u)
 		}

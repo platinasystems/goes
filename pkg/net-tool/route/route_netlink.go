@@ -120,29 +120,23 @@ var types = map[string]uint8{
 	"cnt":         rtnetlink.RTN_CNT,
 }
 
-func (rt Route) defineGWFlags() error {
-	if rt == Delete || rt == Get {
-		return nil
-	}
-	return xflag.Labels{
-		{"expire", "Seconds from now.", &routeExpire},
-		{"hopcount", "FIXME", &routeHopCount},
-		{"iface",
-			"Inticates <gateway> is a point-to-point interface name.",
-			&routeIface,
-		},
-		{"interface", "aka -iface", &routeIface},
-		{"metric", "FIXME", &routeMetric},
-		{"mtu", "FIXME", &routeMTU},
-		{"protocol", "{boot, kernel, redirect, static}", &routeProtocol},
-		{"rtt", "FIXME", &routeRTT},
-		{"rttvar", "FIXME", &routeRTTVar},
-		{"scope", "{global, nowhere, host, link, site}", &routeScope},
-		{"ssthresh", "FIXME", &routeSSThresh},
-		{"table", "{compat, default, main, local}", &routeTable},
-		{"to ", "{unicast, broadcast, blackhole, etc.}", &routeTo},
-		{"tos", "Set type-of-service.", &routeTOS},
-	}.Define()
+var GatewayFlags = xflag.Labels{
+	{"expire", "Seconds from now.", &RouteExpire},
+	{"hopcount", "FIXME", &RouteHopCount},
+	{"iface", "Inticates <gateway> is a point-to-point interface name.",
+		&RouteIface,
+	},
+	{"interface", "aka -iface", &RouteIface},
+	{"metric", "FIXME", &RouteMetric},
+	{"mtu", "FIXME", &RouteMTU},
+	{"protocol", "{boot, kernel, redirect, static}", &RouteProtocol},
+	{"rtt", "FIXME", &RouteRTT},
+	{"rttvar", "FIXME", &RouteRTTVar},
+	{"scope", "{global, nowhere, host, link, site}", &RouteScope},
+	{"ssthresh", "FIXME", &RouteSSThresh},
+	{"table", "{compat, default, main, local}", &RouteTable},
+	{"to ", "{unicast, broadcast, blackhole, etc.}", &RouteTo},
+	{"tos", "Set type-of-service.", &RouteTOS},
 }
 
 func (rt Route) req(
@@ -192,23 +186,23 @@ func (rt Route) req(
 	rtm.Table = rtnetlink.RT_TABLE_MAIN
 	rtm.Scope = rtnetlink.RT_SCOPE_NOWHERE
 	if hdr.Type != rtnetlink.RTM_DELROUTE {
-		rtm.TOS = uint8(routeTOS)
-		if v, ok := protocols[routeProtocol]; ok {
+		rtm.TOS = uint8(RouteTOS)
+		if v, ok := protocols[RouteProtocol]; ok {
 			rtm.Protocol = v
 		} else {
 			return nil, xerrors.Invalid("protocol")
 		}
-		if v, ok := scopes[routeScope]; ok {
+		if v, ok := scopes[RouteScope]; ok {
 			rtm.Scope = v
 		} else {
 			return nil, xerrors.Invalid("scope")
 		}
-		if v, ok := tables[routeTable]; ok {
+		if v, ok := tables[RouteTable]; ok {
 			rtm.Table = v
 		} else {
 			return nil, xerrors.Invalid("table")
 		}
-		if v, ok := types[routeTo]; ok {
+		if v, ok := types[RouteTo]; ok {
 			rtm.Type = v
 		} else {
 			return nil, xerrors.Invalid("to")
@@ -241,26 +235,26 @@ func (rt Route) req(
 			return nil, xerrors.Invalid("gateway")
 		}
 	}
-	if mtu := uint32(routeMTU); mtu != 1500 {
+	if mtu := uint32(RouteMTU); mtu != 1500 {
 		mx = netlink.CatAttr(mx, rtnetlink.RTAX_MTU, mtu)
 	}
-	if routeExpire != 0 {
-		expire := uint32(time.Now().Add(routeExpire).Unix())
+	if RouteExpire != 0 {
+		expire := uint32(time.Now().Add(RouteExpire).Unix())
 		req = netlink.CatAttr(req, rtnetlink.RTA_EXPIRES, expire)
 	}
-	if hc := uint32(routeHopCount); hc != 0 {
+	if hc := uint32(RouteHopCount); hc != 0 {
 		mx = netlink.CatAttr(mx, rtnetlink.RTAX_HOPLIMIT, hc)
 	}
-	if metric := uint32(routeMetric); metric != 0 {
+	if metric := uint32(RouteMetric); metric != 0 {
 		req = netlink.CatAttr(req, rtnetlink.RTA_PRIORITY, metric)
 	}
-	if t := uint32(routeSSThresh); t != 0 {
+	if t := uint32(RouteSSThresh); t != 0 {
 		mx = netlink.CatAttr(mx, rtnetlink.RTAX_SSTHRESH, t)
 	}
-	if rtt := uint32(routeRTT); rtt != 0 {
+	if rtt := uint32(RouteRTT); rtt != 0 {
 		mx = netlink.CatAttr(mx, rtnetlink.RTAX_RTT, rtt)
 	}
-	if rttvar := uint32(routeRTTVar); rttvar != 0 {
+	if rttvar := uint32(RouteRTTVar); rttvar != 0 {
 		mx = netlink.CatAttr(mx, rtnetlink.RTAX_RTTVAR, rttvar)
 	}
 	if len(mx) > 0 {
