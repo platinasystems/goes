@@ -28,28 +28,34 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xsync"
 )
 
-const namedDefaultConf = "/etc/named.conf"
+const DefaultNamedConf = "/etc/named.conf"
 
-var named_4, named_6, named_C, named_V, named_q bool
-var named_T, named_Z string
-var named_c = namedDefaultConf
-var named_p = "53"
-var named_z = "."
+const NamedUsage = `
+usage: {{.Name}} [[-flags]
+Mimic BIND9's Internet domain name daemon.
 
-var namedFlags = xflag.Labels{
+{{flags .}}`
+
+var Named_4, Named_6, Named_C, Named_V, Named_q bool
+var Named_T, Named_Z string
+var Named_c = DefaultNamedConf
+var Named_p = "53"
+var Named_z = "."
+
+var NamedFlags = xflag.Labels{
 	xlog.QuietFlag,
 	xlog.VerboseFlag,
-	{"4", `Only service IPv4 host addresses.`, &named_4},
-	{"6", `Only service IPv6 host addresses.`, &named_6},
-	{"C", `Print configuration and exit.`, &named_C},
+	{"4", `Only service IPv4 host addresses.`, &Named_4},
+	{"6", `Only service IPv6 host addresses.`, &Named_6},
+	{"C", `Print configuration and exit.`, &Named_C},
 	{"T", `
 Commas separated “<key>[=<value>]” options.  e.g.
-    -T notcp,key=/etc/named.key,cert=/etc/named.crt`[1:], &named_T},
-	{"V", `Print version and exit.`, &named_V},
+    -T notcp,key=/etc/named.key,cert=/etc/named.crt`[1:], &Named_T},
+	{"V", `Print version and exit.`, &Named_V},
 	{"Z", `
 Comma separated zone files instead of
-or in addition to configuation.`[1:], &named_Z},
-	{"c", "Absolute path name of configuration file.", &named_c},
+or in addition to configuation.`[1:], &Named_Z},
+	{"c", "Absolute path name of configuration file.", &Named_c},
 	{"p", `
 Comma separated ports on which the server will listen for queries.
 If value is of the form “<portnum> or “dns=<portnum>”, the server will
@@ -58,8 +64,8 @@ listen for DNS queries on the numbered port. If value is of the form
 the default is 853.  If value is of the form “https=<portnum>”,
 the server will listen for HTTPS queries on portnum; the default is 443.
 If value is of the form “http=<portnum>”, the server will listen for
-HTTP queries on portnum; the default is 80.`[1:], &named_p},
-	{"z", "Default zone.", &named_z},
+HTTP queries on portnum; the default is 80.`[1:], &Named_p},
+	{"z", "Default zone.", &Named_z},
 }
 
 type namedListener interface {
@@ -70,13 +76,8 @@ type namedListener interface {
 var namedWG xsync.WaitGroup
 
 func Named(ctx context.Context, args []string) error {
-	xflag.TemplateUsage(`
-usage: {{.Name}} [[-flags]
-Mimic BIND9's Internet domain name daemon.
-
-{{flags .}}`)
-
-	err := namedFlags.Define()
+	xflag.TemplateUsage(NamedUsage)
+	err := NamedFlags.Define()
 	if err != nil {
 		return err
 	} else if err := flag.CommandLine.Parse(args); err != nil {
@@ -91,27 +92,27 @@ Mimic BIND9's Internet domain name daemon.
 		"endpoints": "/dns/query",
 	}
 
-	if named_V {
+	if Named_V {
 		fmt.Println(xmain.Version())
 		return nil
 	}
 
 	xlog.SetFlags(0)
 
-	if len(named_c) > 0 {
-		if conf, err = named_conf.NewConf(named_c); err != nil {
+	if len(Named_c) > 0 {
+		if conf, err = named_conf.NewConf(Named_c); err != nil {
 			if !os.IsNotExist(err) ||
-				named_c != namedDefaultConf {
+				Named_c != DefaultNamedConf {
 				return err
 			}
 		}
 	}
-	if named_C {
+	if Named_C {
 		fmt.Print(conf)
 		return nil
 	}
 
-	for _, s := range strings.Split(named_T, ",") {
+	for _, s := range strings.Split(Named_T, ",") {
 		eq := strings.Index(s, "=")
 		if eq < 0 {
 			opt[s] = "true"
@@ -128,9 +129,9 @@ Mimic BIND9's Internet domain name daemon.
 
 	namedWG.Go(func() { xdnsdb.Server(ctx, xlog.Info) })
 
-	if len(named_Z) > 0 {
-		for _, fn := range strings.Split(named_Z, ",") {
-			err = xdnsdb.Include(ctx, named_z, fn)
+	if len(Named_Z) > 0 {
+		for _, fn := range strings.Split(Named_Z, ",") {
+			err = xdnsdb.Include(ctx, Named_z, fn)
 			if err != nil {
 				cancel()
 				namedWG.Wait()
@@ -142,17 +143,17 @@ Mimic BIND9's Internet domain name daemon.
 	host := ":"
 	tcpNW := "tcp"
 	udpNW := "udp"
-	if named_4 {
+	if Named_4 {
 		host = "0.0.0.0:"
 		tcpNW = "tcp4"
 		udpNW = "udp4"
-	} else if named_6 {
+	} else if Named_6 {
 		host = "[::]:"
 		tcpNW = "tcp6"
 		udpNW = "udp6"
 	}
 
-	for _, s := range strings.Split(named_p, ",") {
+	for _, s := range strings.Split(Named_p, ",") {
 		if strings.HasPrefix(s, "http=") {
 			laddr := host + strings.TrimPrefix(s, "http=")
 			srv := &http.Server{Addr: laddr}

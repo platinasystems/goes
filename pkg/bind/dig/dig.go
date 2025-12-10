@@ -38,7 +38,7 @@ const (
 )
 
 //go:embed usage.txt
-var usage string
+var Usage string
 
 var r *xresolv.Resolv
 
@@ -70,7 +70,7 @@ var allq = struct {
 
 func Dig(ctx context.Context, args []string) error {
 	var err error
-	xflag.TemplateUsage(usage)
+	xflag.TemplateUsage(Usage)
 	if len(args) == 0 {
 		flag.CommandLine.Usage()
 		return xerrors.ErrIncomplete

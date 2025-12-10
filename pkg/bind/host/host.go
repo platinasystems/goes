@@ -21,65 +21,79 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xnet/xdns/xdnspkt"
 )
 
-var host_4, host_6, host_A, host_C, host_S, host_T, host_V, host_a, host_i,
-	host_l, host_m, host_r, host_s, host_w bool
-var host_U = true
-var host_N int
-var host_R = 3
-var host_W = 30 * time.Second
-var host_c = xdnsmessage.ClassINET
-var host_p = 53
-var host_t = xdnsmessage.TypeA
+const HostUsage = `
+usage: {{.Name}} [flags] {name} [server]
+Mimic BIND9's DNS lookup utility.
 
-var hostFlags = xflag.Labels{
+{{flags .}}`
+
+var (
+	Host_4,
+	Host_6,
+	Host_A,
+	Host_C,
+	Host_S,
+	Host_T,
+	Host_V,
+	Host_a,
+	Host_i,
+	Host_l,
+	Host_m,
+	Host_r,
+	Host_s,
+	Host_w bool
+	Host_U = true
+	Host_N int
+	Host_R = 3
+	Host_W = 30 * time.Second
+	Host_c = xdnsmessage.ClassINET
+	Host_p = 53
+	Host_t = xdnsmessage.TypeA
+)
+
+var HostFlags = xflag.Labels{
 	xlog.VerboseFlag,
 	xmain.ConfigFlag,
 	xmain.StateFlag,
 	cert.VerifyFlag,
 	xdnsdoh.ConfigFlag,
-	{"4", "Only use IPv4 query transport.", &host_4},
-	{"6", "Only use IPv6 query transport.", &host_6},
-	{"A", "Like -a but omits RRSIG, NSEC, NSEC3.", &host_A},
-	{"C", `Compare SOA records on authoritative servers.`[1:], &host_C},
-	{"N", "Number of dots before root lookup is done.", &host_N},
-	{"R", "UDP retries.", &host_R},
-	{"S", "Skip DOH server verification. (or. -ssl-verify=false)", &host_S},
-	{"T", "TCP mode.", &host_T},
-	{"U", "UDP mode.", &host_U},
-	{"V", "Print version number and exit.", &host_V},
-	{"W", "Reply wait time.", &host_W},
-	{"a", "Equivalent to -v -t ANY", &host_a},
-	{"c", "Query class for non-IN data.", &host_c},
-	{"i", "FIXME?", &host_i},
-	{"l", "Using AXFR, lists all hosts in a domain.", &host_l},
-	{"m", "Memory debugging.", &host_m},
-	{"p", "Server port.", &host_p},
-	{"r", "Disable recursive processing.", &host_r},
-	{"s", "Stop query on SERVFAIL response.", &host_s},
-	{"t", "Query type.", &host_t},
-	{"w", "Wait forever for a reply.", &host_w},
+	{"4", "Only use IPv4 query transport.", &Host_4},
+	{"6", "Only use IPv6 query transport.", &Host_6},
+	{"A", "Like -a but omits RRSIG, NSEC, NSEC3.", &Host_A},
+	{"C", `Compare SOA records on authoritative servers.`[1:], &Host_C},
+	{"N", "Number of dots before root lookup is done.", &Host_N},
+	{"R", "UDP retries.", &Host_R},
+	{"S", "Skip DOH server verification. (or. -ssl-verify=false)", &Host_S},
+	{"T", "TCP mode.", &Host_T},
+	{"U", "UDP mode.", &Host_U},
+	{"V", "Print version number and exit.", &Host_V},
+	{"W", "Reply wait time.", &Host_W},
+	{"a", "Equivalent to -v -t ANY", &Host_a},
+	{"c", "Query class for non-IN data.", &Host_c},
+	{"i", "FIXME?", &Host_i},
+	{"l", "Using AXFR, lists all hosts in a domain.", &Host_l},
+	{"m", "Memory debugging.", &Host_m},
+	{"p", "Server port.", &Host_p},
+	{"r", "Disable recursive processing.", &Host_r},
+	{"s", "Stop query on SERVFAIL response.", &Host_s},
+	{"t", "Query type.", &Host_t},
+	{"w", "Wait forever for a reply.", &Host_w},
 }
 
 func Host(ctx context.Context, args []string) error {
 	const class = xdnsmessage.ClassINET
-
-	xflag.TemplateUsage(`
-usage: {{.Name}} [-flags] {name} [server]
-Mimic BIND9's DNS lookup utility.
-
-{{flags .}}`)
-
 	var name string
 	var rsp xdnsmessage.Message
 
-	err := hostFlags.Define()
+	xflag.TemplateUsage(HostUsage)
+	err := HostFlags.Define()
 	if err != nil {
 		return err
 	} else if err = flag.CommandLine.Parse(args); err != nil {
 		return err
 	}
 
-	if host_V {
+	if Host_V {
 		fmt.Println(xmain.Version())
 		return nil
 	}
@@ -124,9 +138,9 @@ Mimic BIND9's DNS lookup utility.
 		name = xdnsdoh.FQDN(name)
 	} else {
 		nw := "udp"
-		if host_4 {
+		if Host_4 {
 			nw = "udp4"
-		} else if host_6 {
+		} else if Host_6 {
 			nw = "udp6"
 		}
 		udp, err := xdns.DialContext(ctx, nw, svr)
@@ -137,15 +151,15 @@ Mimic BIND9's DNS lookup utility.
 		ask = xdnspkt.NewTimeLimitedAsk(udp, 30*time.Second)
 	}
 
-	types := []xdnsmessage.Type{host_t}
-	if host_a || host_A {
+	types := []xdnsmessage.Type{Host_t}
+	if Host_a || Host_A {
 		types[0] = xdnsmessage.TypeANY
-	} else if host_t == xdnsmessage.TypeA {
+	} else if Host_t == xdnsmessage.TypeA {
 		types = append(types, xdnsmessage.TypeAAAA, xdnsmessage.TypeMX)
 	}
 	us := xdnsmessage.MakeUniqueString(name)
 	for _, t := range types {
-		q := xdnsmessage.NewQuery(!host_r, us, class, t)
+		q := xdnsmessage.NewQuery(!Host_r, us, class, t)
 		b, err = q.AppendTo(b[:0])
 		if err != nil {
 			return err

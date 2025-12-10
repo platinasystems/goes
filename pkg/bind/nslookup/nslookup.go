@@ -16,16 +16,22 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xnet/xdns/xdnsdoh"
 )
 
+const NslookupUsage = `
+usage: {{.Name}} [flags] [-|<name>|<address> [<server>]]
+Query internet name server.
+
+{{flags .}}`
+
+var NslookupFlags = xflag.Labels{
+	xmain.ConfigFlag,
+	xdnsdoh.ConfigFlag,
+}
+
 func Nslookup(ctx context.Context, args []string) error {
 	var sep string
 
-	xflag.TemplateUsage(`
-usage: {{.Name}} [flags] [-|<name>|<address> [<server>]]
-`)
-	err := xflag.Labels{
-		xmain.ConfigFlag,
-		xdnsdoh.ConfigFlag,
-	}.Define()
+	xflag.TemplateUsage(NslookupUsage)
+	err := NslookupFlags.Define()
 	err = flag.CommandLine.Parse(args)
 	if err != nil {
 		return err
