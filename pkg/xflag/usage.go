@@ -5,14 +5,14 @@
 package xflag
 
 import (
-	. "flag"
+	"flag"
 	"fmt"
 	"strings"
 	"text/template"
 )
 
 // These results are passed to the usage template execution.
-var UsageData = func(flags *FlagSet) any {
+var UsageData = func(flags *flag.FlagSet) any {
 	return flags
 }
 
@@ -22,7 +22,7 @@ var UsageFuncs = template.FuncMap{
 }
 
 // Redirect [FlagSet.PrintDefaults] to string.
-func SprintDefaults(flags *FlagSet) string {
+func SprintDefaults(flags *flag.FlagSet) string {
 	save := flags.Output()
 	defer flags.SetOutput(save)
 	var sb strings.Builder
@@ -31,15 +31,15 @@ func SprintDefaults(flags *FlagSet) string {
 	return sb.String()
 }
 
-// [TemplateUsageIn] [CommandLine]
+// [TemplateUsageIn] [flag.CommandLine]
 func TemplateUsage(tmpl string) {
-	TemplateUsageIn(CommandLine, tmpl)
+	TemplateUsageIn(flag.CommandLine, tmpl)
 }
 
 // Assign [FlagSet.Usage] to a closure that creates a new [text/template]
 // with [UsageFuncs]; parses “tmpl”; then [text/template.Template.Execute]'s
 // to [FlagSet.Output] with [UsageData].
-func TemplateUsageIn(flags *FlagSet, tmpl string) {
+func TemplateUsageIn(flags *flag.FlagSet, tmpl string) {
 	flags.Usage = func() {
 		w := flags.Output()
 		tmpl = strings.TrimLeft(tmpl, " \t\n")

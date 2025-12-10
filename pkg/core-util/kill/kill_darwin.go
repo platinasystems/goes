@@ -1,0 +1,37 @@
+package kill
+
+import "syscall"
+
+var killSignalNamed = map[string]syscall.Signal{
+	"abrt":   syscall.SIGABRT,
+	"alrm":   syscall.SIGALRM,
+	"bus":    syscall.SIGBUS,
+	"chld":   syscall.SIGCHLD,
+	"cont":   syscall.SIGCONT,
+	"emt":    syscall.SIGEMT,
+	"fpe":    syscall.SIGFPE,
+	"hup":    syscall.SIGHUP,
+	"ill":    syscall.SIGILL,
+	"info":   syscall.SIGINFO,
+	"int":    syscall.SIGINT,
+	"io":     syscall.SIGIO,
+	"kill":   syscall.SIGKILL,
+	"pipe":   syscall.SIGPIPE,
+	"prof":   syscall.SIGPROF,
+	"quit":   syscall.SIGQUIT,
+	"segv":   syscall.SIGSEGV,
+	"stop":   syscall.SIGSTOP,
+	"sys":    syscall.SIGSYS,
+	"term":   syscall.SIGTERM,
+	"trap":   syscall.SIGTRAP,
+	"tstp":   syscall.SIGTSTP,
+	"ttin":   syscall.SIGTTIN,
+	"ttou":   syscall.SIGTTOU,
+	"urg":    syscall.SIGURG,
+	"usr1":   syscall.SIGUSR1,
+	"usr2":   syscall.SIGUSR2,
+	"vtalrm": syscall.SIGVTALRM,
+	"winch":  syscall.SIGWINCH,
+	"xcpu":   syscall.SIGXCPU,
+	"xfsz":   syscall.SIGXFSZ,
+}

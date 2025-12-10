@@ -67,3 +67,12 @@ func (up UserProcess) Died() {
 		C.pututxline(up.utx)
 	}
 }
+
+func NUsers() (n uint) {
+	C.setutxent()
+	defer C.endutxent()
+	for C.getutxent() != nil {
+		n += 1
+	}
+	return
+}

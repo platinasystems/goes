@@ -15,11 +15,13 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/xflag"
 )
 
-func Cat(ctx context.Context, complete bool, args []string) error {
-	xflag.TemplateUsage(`
+const CatUsage = `
 usage: {{.Name}} [file(s)|-]
 Concatenate file(s) or stdin (-) to stdout.
-`)
+`
+
+func Cat(ctx context.Context, complete bool, args []string) error {
+	xflag.TemplateUsage(CatUsage)
 	err := flag.CommandLine.Parse(args)
 	if err != nil {
 		return err
