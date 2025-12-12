@@ -10,13 +10,48 @@ import (
 	"flag"
 	"os"
 	"os/signal"
+	"strconv"
 	"time"
 
+	"github.com/platinasystems/goes/v2/pkg/cert"
+	"github.com/platinasystems/goes/v2/pkg/sig"
 	"github.com/platinasystems/goes/v2/pkg/xflag"
 	"github.com/platinasystems/goes/v2/pkg/xlog"
+	"github.com/platinasystems/goes/v2/pkg/xmain"
 	"github.com/platinasystems/goes/v2/pkg/xnet"
 	"github.com/platinasystems/goes/v2/pkg/xsignal"
 )
+
+const ExchangeUsage = `
+usage: {{.Name}} [flags]
+Exchange ciphered packets between guests.
+
+{{flags .}}`
+
+var Exchange_p uint = DefaultExchangePort
+
+var ExchangeFlags = xflag.Labels{
+	xlog.TraceFlag,
+	xlog.VerboseFlag,
+
+	xmain.ConfigFlag,
+	cert.ClientFlag,
+	cert.ServerFlag,
+	sig.Flag,
+
+	RestCertFlag,
+	RestServerFlag,
+	RestPortFlag,
+
+	{"p", "Port. (or $<main>_EXCHANGE_PORT)", func() *uint {
+		if s, ok := xmain.LookupEnv("EXCHANGE_PORT"); ok {
+			if u, err := strconv.ParseUint(s, 10, 16); err == nil {
+				Exchange_p = uint(u)
+			}
+		}
+		return &Exchange_p
+	}},
+}
 
 var exchange struct {
 	sub map[int]*Subscriber
@@ -27,12 +62,8 @@ var exchange struct {
 
 // Exchange is a UDP server that forwards ciphered packets between guest's.
 func Exchange(ctx context.Context, args []string) error {
-	xflag.TemplateUsage(`
-usage: {{.Name}} [flags]
-Exchange ciphered packets between guests.
-
-{{flags .}}`)
-	err := append(xlog.Flags, RestFlags...).Define()
+	xflag.TemplateUsage(ExchangeUsage)
+	err := ExchangeFlags.Define()
 	if err != nil {
 		return err
 	} else if err = flag.CommandLine.Parse(args); err != nil {
@@ -58,7 +89,7 @@ Exchange ciphered packets between guests.
 		return err
 	}
 
-	port, err := RestCheckinExchangeReq(ctx)
+	port, err := RestCheckinExchangeReq(ctx, uint16(Exchange_p))
 	if err != nil {
 		return err
 	} else if port == 0 {

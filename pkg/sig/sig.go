@@ -43,7 +43,7 @@ var (
 	File = "sig.pk8"
 	Flag = xflag.Label{"sig", `
 Signature file w/in current or config directory.
-(or $<main>_KEY_FILE, $SSL_KEY_FILE)`[1:], func() any {
+(or $<main>_KEY_FILE, $SSL_KEY_FILE)`[1:], func() *string {
 		if s, ok := xmain.LookupEnv("KEY_FILE"); ok {
 			File = s
 		} else if s, ok = os.LookupEnv("SSL_KEY_FILE"); ok {

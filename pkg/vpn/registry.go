@@ -118,6 +118,12 @@ func newRegistry() *registry {
 	return reg
 }
 
+const RegistryUsage = `
+usage: {{.Name}} [flags]
+A RESTful WWW server and packet exchange.
+
+{{flags .}}`
+
 var (
 	AdminsFile, ExchangesFile, HostsFile, ZonesFile string
 
@@ -125,14 +131,19 @@ var (
 )
 
 var RegistryFlags = xflag.Labels{
+	xlog.TraceFlag,
+	xlog.VerboseFlag,
+
 	xmain.DataFlag,
 	xmain.ConfigFlag,
 	xmain.StateFlag,
+
+	sig.Flag,
 	cert.ClientFlag,
 	{"admins", `
 An optional file w/in the current or config directory containing
 a newline separated list of certificate common names that may
-administer subscriptions.`[1:], func() any {
+administer subscriptions.`[1:], func() *string {
 		if v, ok := xmain.LookupEnv("ADMINS"); ok {
 			AdminsFile = v
 		} else {
@@ -140,12 +151,13 @@ administer subscriptions.`[1:], func() any {
 		}
 		return &AdminsFile
 	}},
-	RestCertAkaFlag,
+
+	RestCertFlag,
 	{"domain", "Search domain suffix.", &domain},
 	{"exchanges", `
 An optional file w/in the current or config directory containing
 a newline separated list of guest exhange assignment and
-exchange port numbers.`[1:], func() any {
+exchange port numbers.`[1:], func() *string {
 		if v, ok := xmain.LookupEnv("EXCHANGES"); ok {
 			ExchangesFile = v
 		} else {
@@ -156,7 +168,7 @@ exchange port numbers.`[1:], func() any {
 	{"hosts", `
 An optional file w/in the current or config directory containing
 a newline separated list of static address assignments in
-/ets/hosts format.`[1:], func() any {
+/ets/hosts format.`[1:], func() *string {
 		if v, ok := xmain.LookupEnv("HOSTS"); ok {
 			HostsFile = v
 		} else {
@@ -176,7 +188,7 @@ a newline separated list of static address assignments in
 	{"zones", `
 An optional file w/in the current or config directory containing
 a newline separated list of subscriber zone assignments.
-An asterisk permits the named subscriber in all zones.`[1:], func() any {
+An asterisk permits the named subscriber in all zones.`[1:], func() *string {
 		if v, ok := xmain.LookupEnv("ZONES"); ok {
 			ZonesFile = v
 		} else {
@@ -195,15 +207,10 @@ var vlink = sync.OnceValue(func() string {
 // Registry is a web server providing a REST interface to persistent
 // files and ephemeral tables.
 func Registry(ctx context.Context, args []string) error {
-	xflag.TemplateUsage(`
-usage: {{.Name}} [flags]
-A RESTful WWW server and packet exchange.
-
-{{flags .}}`)
-
 	xlog.SetPrefixes("registry/")
+	xflag.TemplateUsage(RegistryUsage)
 
-	err := append(xlog.Flags, RegistryFlags...).Define()
+	err := RegistryFlags.Define()
 	if err != nil {
 		return err
 	} else if err = flag.CommandLine.Parse(args); err != nil {
@@ -529,10 +536,18 @@ func (reg *registry) checkinExchange(rsvp *rsvp) error {
 
 	sub.zones = AllZones
 	if sub.Port == 0 {
-		err = xerrors.Broken("unassigned port")
-	} else {
-		fmt.Fprint(rsvp, uint(sub.Id), " ", sub.Port)
+		qv := rsvp.req.URL.Query()
+		if !qv.Has(RestOpCheckinExchangePort) {
+			return xerrors.Broken("unassigned port")
+		}
+		s := qv.Get(RestOpCheckinExchangePort)
+		u, err := strconv.ParseUint(s, 10, 16)
+		if err != nil {
+			return xerrors.Label(err, RestOpCheckinExchangePort)
+		}
+		sub.Port = uint16(u)
 	}
+	fmt.Fprint(rsvp, uint(sub.Id), " ", sub.Port)
 	return err
 }
 
@@ -547,6 +562,15 @@ func (reg *registry) checkinGuest(rsvp *rsvp) error {
 		return err
 	}
 
+	if len(sub.ExchangePrecedence) == 0 {
+		qv := rsvp.req.URL.Query()
+		if qv.Has(RestOpCheckinGuestExchanges) {
+			s := qv.Get(RestOpCheckinGuestExchanges)
+			if len(s) > 0 {
+				sub.ExchangePrecedence = strings.Split(s, ",")
+			}
+		}
+	}
 	rsvp.Header().Set("Content-Type", "application/json")
 	receipt := GuestReceipt{
 		Id:     sub.Id,
@@ -925,9 +949,10 @@ func (reg *registry) loadExchangesKeyValues(
 ) error {
 	path := xmain.ConfigFile(ExchangesFile)
 	if len(values) < 0 {
-		return xerrors.Label(xerrors.Incomplete(lno), path)
+		xlog.Errata.Print(path, ":", lno, ": incomplete")
+	} else {
+		reg.exchangeAssignment[key] = values
 	}
-	reg.exchangeAssignment[key] = values
 	return nil
 }
 
@@ -999,12 +1024,13 @@ func (reg *registry) loadSubscribers() error {
 		sub.ExchangePrecedence = reg.exchangeAssignment[sub.name()]
 	}
 
-	for name, sl := range reg.exchangeAssignment {
-		var xp uint16
-		if x := reg.named[name]; x != nil {
-			if len(sl) > 0 {
-				if _, e := fmt.Sscan(sl[0], &xp); e == nil {
-					x.Port = xp
+	// if key'd value is an interger, use as exchange port number.
+	for k, v := range reg.exchangeAssignment {
+		if x := reg.named[k]; x != nil {
+			if len(v) == 1 {
+				u, e := strconv.ParseUint(v[0], 0, 16)
+				if e == nil {
+					x.Port = uint16(u)
 				}
 			}
 		}
@@ -1029,7 +1055,8 @@ func (reg *registry) loadZonesKeyValues(
 	path := xmain.ConfigFile(ZonesFile)
 	sub, ok := reg.named[key]
 	if !ok {
-		return xerrors.Label(xerrors.NotFound(key), path, lno)
+		xlog.Errata.Print(path, ":", lno, ":", key, ": not found")
+		return nil
 	}
 	if len(values) == 0 {
 		return nil

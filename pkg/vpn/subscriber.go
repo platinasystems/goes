@@ -11,6 +11,7 @@ import (
 	"crypto/x509"
 	"fmt"
 	"net/netip"
+	"strings"
 
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xlog"
@@ -66,15 +67,21 @@ func NewSubscriber(c *x509.Certificate) *Subscriber {
 }
 
 func (sub *Subscriber) Format(w fmt.State, verb rune) {
-	fmt.Fprint(w, sub.name(), ",", sub.Id)
+	fmt.Fprint(w, sub.name(), ";", sub.Id)
 	if sub.Addr.IsValid() {
-		fmt.Fprint(w, ",", sub.Addr)
+		fmt.Fprint(w, ";", sub.Addr)
 	}
 	if sub.ap.IsValid() {
-		fmt.Fprint(w, ",", sub.ap)
+		fmt.Fprint(w, ";", sub.ap)
 	}
 	if sub.isGuest() {
-		fmt.Fprint(w, ",guest")
+		fmt.Fprint(w, ";guest")
+		if len(sub.ExchangePrecedence) > 0 {
+			xes := strings.Join(sub.ExchangePrecedence, ",")
+			fmt.Fprint(w, ";via:", xes)
+		}
+	} else {
+		fmt.Fprint(w, ";exchange;port:", sub.Port)
 	}
 }
 

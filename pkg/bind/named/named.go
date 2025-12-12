@@ -43,7 +43,6 @@ var Named_p = "53"
 var Named_z = "."
 
 var NamedFlags = xflag.Labels{
-	xlog.QuietFlag,
 	xlog.VerboseFlag,
 	{"4", `Only service IPv4 host addresses.`, &Named_4},
 	{"6", `Only service IPv6 host addresses.`, &Named_6},

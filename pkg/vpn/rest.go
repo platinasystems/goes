@@ -110,6 +110,7 @@ var RestPrefixes = []string{
 type RestVcsCheck struct{}
 
 const RestOpCheckinExchangePort = "port"
+const RestOpCheckinGuestExchanges = "exchanges"
 
 const (
 	RestReqDepth = 8
@@ -151,21 +152,26 @@ var rest struct {
 	rspC chan any
 }
 
-var RestCertAkaFlag = xflag.Label{"cert", "aka. -ssl-client-cn", &cert.Client}
-
-var RestPortFlag = xflag.Label{"port", "REST listener.", func() any {
-	rest.port = 8003
-	return &rest.port
-}}
+var (
+	RestCertFlag = xflag.Label{"cert", "aka. -ssl-client-cn",
+		&cert.Client}
+	RestServerFlag = xflag.Label{"registry", "aka. -ssl-server-dn",
+		&cert.Server}
+	RestPortFlag = xflag.Label{"port", "REST listener.", func() *uint {
+		rest.port = 8003
+		return &rest.port
+	}}
+)
 
 var RestFlags = xflag.Labels{
 	xmain.ConfigFlag,
 	cert.ClientFlag,
 	cert.ServerFlag,
 	sig.Flag,
-	RestCertAkaFlag,
+
+	RestCertFlag,
+	RestServerFlag,
 	RestPortFlag,
-	xflag.Label{"registry", "aka. -ssl-server-dn", &cert.Server},
 }
 
 func restInit() error {
@@ -282,14 +288,14 @@ Approve pending subscription to the default, specified, or with “*”, all zon
 	return err
 }
 
-func RestCheckinExchangeReq(ctx context.Context) (uint16, error) {
+func RestCheckinExchangeReq(ctx context.Context, port uint16) (uint16, error) {
 	var id uint
-	var port uint16
 
 	buf := restAlloc()
 	defer restFree(buf)
 
-	_, err := restPut(ctx, buf, "", nil, RestCheckinExchange)
+	_, err := restPut(ctx, buf, "", nil, RestCheckinExchange,
+		RestOpCheckinExchangePort, fmt.Sprint(port))
 	if err != nil {
 		return 0, err
 	}
@@ -301,16 +307,20 @@ func RestCheckinExchangeReq(ctx context.Context) (uint16, error) {
 	return port, nil
 }
 
-func RestCheckinGuestReq(ctx context.Context, encap []byte) (
+func RestCheckinGuestReq(ctx context.Context, encap []byte, exchanges string) (
 	*GuestReceipt, error,
 ) {
 	buf := restAlloc()
 	defer restFree(buf)
 
+	var kv []string
+	if len(exchanges) > 0 {
+		kv = []string{RestOpCheckinGuestExchanges, exchanges}
+	}
 	receipt := new(GuestReceipt)
 	_, err := restPut(ctx, buf,
 		"application/octet-stream", bytes.NewReader(encap),
-		RestCheckinGuest)
+		RestCheckinGuest, kv...)
 	if err != nil {
 		return receipt, err
 	}
@@ -335,7 +345,7 @@ Import registry certificate.
 		xmain.ConfigFlag,
 		cert.ClientFlag,
 		sig.Flag,
-		RestCertAkaFlag,
+		RestCertFlag,
 		xflag.Label{"y", "Yes, to write remote certificate.", &yes},
 	}.Define()
 	if err != nil {

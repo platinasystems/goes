@@ -31,102 +31,92 @@ var Features = map[string]any{
 
 var (
 	CacheDir  string
-	CacheFlag = xflag.Label{"cache",
-		"Directory of non-essential, ephemeral data.",
-		func() any {
-			var ok bool
-			if CacheDir, ok = LookupEnv("CACHE"); ok {
-			} else if os.Geteuid() == 0 {
-				CacheDir = BestDir(fhs.Cache(),
-					xdg.CacheHome())
-			} else {
-				CacheDir = BestDir(xdg.CacheHome(),
-					fhs.Cache())
-			}
-			return &CacheDir
-		}}
+	CacheFlag = xflag.Label{"cache", `
+Directory of non-essential, ephemeral data.
+(or $<main>_CACHE; or XDG/FHS dir)`[1:], func() *string {
+		var ok bool
+		if CacheDir, ok = LookupEnv("CACHE"); ok {
+		} else if os.Geteuid() == 0 {
+			CacheDir = BestDir(fhs.Cache(), xdg.CacheHome())
+		} else {
+			CacheDir = BestDir(xdg.CacheHome(), fhs.Cache())
+		}
+		return &CacheDir
+	}}
 	CacheFile = func(s string) string { return File(CacheDir, s) }
 )
 
 var (
 	ConfigDir  string
-	ConfigFlag = xflag.Label{"config",
-		"Directory of configuration files.",
-		func() any {
-			var ok bool
-			if ConfigDir, ok = LookupEnv("CONFIG"); ok {
-			} else if xprogram.IsKoApp() {
-				ConfigDir = SubDir(fhs.Config())
-			} else if os.Geteuid() == 0 {
-				ConfigDir = BestDir(fhs.Config(),
-					xdg.ConfigHome())
-			} else {
-				ConfigDir = BestDir(xdg.ConfigHome(),
-					fhs.Config())
-			}
-			return &ConfigDir
-		}}
+	ConfigFlag = xflag.Label{"config", `
+Directory of configuration files.
+(or $<main>_CONFIG; or XDG/FHS dir)`[1:], func() *string {
+		var ok bool
+		if ConfigDir, ok = LookupEnv("CONFIG"); ok {
+		} else if xprogram.IsKoApp() {
+			ConfigDir = SubDir(fhs.Config())
+		} else if os.Geteuid() == 0 {
+			ConfigDir = BestDir(fhs.Config(), xdg.ConfigHome())
+		} else {
+			ConfigDir = BestDir(xdg.ConfigHome(), fhs.Config())
+		}
+		return &ConfigDir
+	}}
 	ConfigFile = func(s string) string { return File(ConfigDir, s) }
 )
 
 var (
 	DataDir  string
-	DataFlag = xflag.Label{"data",
-		"Directory of essential, persistent data.",
-		func() any {
-			var ok bool
-			DataDir, ok = os.LookupEnv("KO_DATA_PATH")
-			if ok {
-			} else if DataDir, ok = LookupEnv("DATA"); ok {
-			} else if os.Geteuid() == 0 {
-				DataDir = BestDir(fhs.Data(),
-					xdg.DataHome())
-			} else {
-				DataDir = BestDir(xdg.DataHome(),
-					fhs.Data())
-			}
-			return &DataDir
-		}}
+	DataFlag = xflag.Label{"data", `
+Directory of essential, persistent data.
+(or $KO_DATA_PATH, $<main>_DATA); or XDG/FHS dir)`[1:], func() *string {
+		var ok bool
+		DataDir, ok = os.LookupEnv("KO_DATA_PATH")
+		if ok {
+		} else if DataDir, ok = LookupEnv("DATA"); ok {
+		} else if os.Geteuid() == 0 {
+			DataDir = BestDir(fhs.Data(), xdg.DataHome())
+		} else {
+			DataDir = BestDir(xdg.DataHome(), fhs.Data())
+		}
+		return &DataDir
+	}}
 	DataFile = func(s string) string { return File(DataDir, s) }
 )
 
 var (
 	RunDir  string
-	RunFlag = xflag.Label{"run",
-		"Directory of ephemeral files and sockets.",
-		func() any {
-			var ok bool
-			if RunDir, ok = LookupEnv("RUN"); ok {
-			} else if os.Geteuid() == 0 {
-				RunDir = BestDir(fhs.RunTime(),
-					xdg.RunTimeDir())
-			} else {
-				RunDir = BestDir(xdg.RunTimeDir(),
-					fhs.RunTime())
-			}
-			return &RunDir
-		}}
+	RunFlag = xflag.Label{"run", `
+Directory of ephemeral files and sockets.
+(or $<main>_RUN; or XDG/FHS dir)`[1:], func() *string {
+		var ok bool
+		if RunDir, ok = LookupEnv("RUN"); ok {
+		} else if os.Geteuid() == 0 {
+			RunDir = BestDir(fhs.RunTime(), xdg.RunTimeDir())
+		} else {
+			RunDir = BestDir(xdg.RunTimeDir(), fhs.RunTime())
+		}
+		return &RunDir
+	}}
 	RunFile = func(s string) string { return File(RunDir, s) }
 )
 
 var (
 	StateDir  string
-	StateFlag = xflag.Label{"state",
-		"Directory that persists through restart.",
-		func() any {
-			var ok bool
-			if StateDir, ok = LookupEnv("STATE"); ok {
-			} else if xprogram.IsKoApp() {
-				StateDir = SubDir(fhs.State())
-			} else if os.Geteuid() == 0 {
-				StateDir = BestDir(fhs.State(),
-					xdg.StateHome())
-			} else {
-				StateDir = BestDir(xdg.StateHome(),
-					fhs.State())
-			}
-			return &StateDir
-		}}
+	StateFlag = xflag.Label{"state", `
+Directory that persists through restart.
+(or $(<main>_STATE); or XDG/FHS dir)`[1:], func() *string {
+		var ok bool
+		if StateDir, ok = LookupEnv("STATE"); ok {
+		} else if xprogram.IsKoApp() {
+			StateDir = SubDir(fhs.State())
+		} else if os.Geteuid() == 0 {
+			StateDir = BestDir(fhs.State(), xdg.StateHome())
+		} else {
+			StateDir = BestDir(xdg.StateHome(), fhs.State())
+		}
+		return &StateDir
+	}}
 	StateFile = func(s string) string { return File(StateDir, s) }
 )
 

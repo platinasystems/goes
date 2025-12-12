@@ -15,13 +15,17 @@ import (
 	"net/netip"
 	"os"
 	"os/signal"
+	"strconv"
 	"time"
 
+	"github.com/platinasystems/goes/v2/pkg/cert"
 	"github.com/platinasystems/goes/v2/pkg/netif"
 	"github.com/platinasystems/goes/v2/pkg/nettun"
+	"github.com/platinasystems/goes/v2/pkg/sig"
 	"github.com/platinasystems/goes/v2/pkg/xerrors"
 	"github.com/platinasystems/goes/v2/pkg/xflag"
 	"github.com/platinasystems/goes/v2/pkg/xlog"
+	"github.com/platinasystems/goes/v2/pkg/xmain"
 	"github.com/platinasystems/goes/v2/pkg/xnet"
 	"github.com/platinasystems/goes/v2/pkg/xnet/netpdu"
 	"github.com/platinasystems/goes/v2/pkg/xnet/netph"
@@ -49,6 +53,50 @@ const (
 
 	minWhoisRetryTicks = 6
 )
+
+const GuestUsage = `
+usage: {{.Name}} [flags]
+Forward ciphered packets between exchange and tunnel interface.
+
+{{flags .}}`
+
+var (
+	Guest_t = -1
+	Guest_x string
+)
+
+var GuestFlags = xflag.Labels{
+	xlog.TraceFlag,
+	xlog.VerboseFlag,
+
+	xmain.ConfigFlag,
+	cert.ClientFlag,
+	cert.ServerFlag,
+	sig.Flag,
+
+	RestCertFlag,
+	RestServerFlag,
+	RestPortFlag,
+
+	{"t", `
+Tunnel unit number, auto selected if negative.
+(or $<main>_TUNNEL_UNIT)`[1:], func() *int {
+		if s, ok := xmain.LookupEnv("TUNNEL_UNIT"); ok {
+			if i, err := strconv.ParseInt(s, 10, 32); err == nil {
+				Guest_t = int(i)
+			}
+		}
+		return &Guest_t
+	}},
+	{"x", `
+Comma separated list of preferred exchanges.
+(or $<main>_GUEST_EXCHANGES)`[1:], func() *string {
+		if s, ok := xmain.LookupEnv("GUEST_EXCHANGES"); ok {
+			Guest_x = s
+		}
+		return &Guest_x
+	}},
+}
 
 var guest struct {
 	addressed map[netip.Addr]*Subscriber
@@ -86,19 +134,8 @@ var guest struct {
 func Guest(ctx context.Context, args []string) error {
 	defer xlog.Info.Println("stopped")
 
-	xflag.TemplateUsage(`
-usage: {{.Name}} [flags]
-Forward ciphered packets between exchange and tunnel interface.
-
-{{flags .}}`)
-
-	unit := -1
-
-	err := append(xlog.Flags, append(RestFlags, xflag.Label{
-		"t",
-		"Tunnel unit number, auto selected if negative.",
-		&unit,
-	})...).Define()
+	xflag.TemplateUsage(GuestUsage)
+	err := GuestFlags.Define()
 	if err != nil {
 		return err
 	} else if err = flag.CommandLine.Parse(args); err != nil {
@@ -126,15 +163,18 @@ Forward ciphered packets between exchange and tunnel interface.
 		return err
 	}
 	encapKey := guest.decapKey.EncapsulationKey()
-	guest.receipt, err = RestCheckinGuestReq(ctx, encapKey.Bytes())
+	guest.receipt, err = RestCheckinGuestReq(ctx, encapKey.Bytes(), Guest_x)
 	if err != nil {
 		return err
 	}
 
+	xlog.Info.Printf("receipt.ExchangePrecedence: %q",
+		guest.receipt.ExchangePrecedence)
+
 	// the registry is always the exchange of last resort
+	guest.exchanges = make([]*Subscriber, 0,
+		1+len(guest.receipt.ExchangePrecedence))
 	regname := rest.reg.Subject.CommonName
-	guest.exchanges =
-		make([]*Subscriber, 1+len(guest.receipt.ExchangePrecedence))
 	x, err := RestWhoisReq(ctx, regname)
 	if err != nil {
 		return fmt.Errorf("%s: %w", regname, err)
@@ -148,15 +188,21 @@ Forward ciphered packets between exchange and tunnel interface.
 		x.Port = DefaultExchangePort
 	}
 	x.ap = netip.AddrPortFrom(regaddr, x.Port)
-	guest.exchanges[0] = x
+	guest.exchanges = append(guest.exchanges, x)
 	guest.addressed[x.Addr] = x
 	guest.indexed[x.Id.Index()] = x
 
-	for i, name := range guest.receipt.ExchangePrecedence {
-		if x, err = RestWhoisReq(ctx, name); err != nil {
+	for _, name := range guest.receipt.ExchangePrecedence {
+		if len(name) == 0 {
+			xlog.Errata.Println("skip missing exchange name")
+			continue
+		}
+		x, err = RestWhoisReq(ctx, name)
+		if err != nil {
+			guest.exchanges = append(guest.exchanges, nil)
 			xlog.Errata.Printf("%s: %w", name, err)
 		} else {
-			guest.exchanges[1+i] = x
+			guest.exchanges = append(guest.exchanges, x)
 			guest.addressed[x.Addr] = x
 			guest.indexed[x.Id.Index()] = x
 			if x.resolve(ctx); !x.ap.IsValid() {
@@ -180,7 +226,7 @@ Forward ciphered packets between exchange and tunnel interface.
 
 	guestHelloToAllExchanges(ctx, 0)
 
-	guest.tun, err = nettun.New(unit, IsTap, TunPersist, TunOwner,
+	guest.tun, err = nettun.New(Guest_t, IsTap, TunPersist, TunOwner,
 		TunGroup, ha)
 	if err != nil {
 		return err
@@ -368,7 +414,7 @@ func guestExchangeMatch(sub *Subscriber) {
 	sub.gxi = 0
 	for _, name := range sub.ExchangePrecedence {
 		for i, x := range guest.exchanges {
-			if name == x.name() {
+			if x != nil && x.name() == name {
 				sub.gxi = i
 				return
 			}
@@ -565,10 +611,20 @@ func guestHelloToAllExchanges(ctx context.Context, now int64) {
 	for i, x := range guest.exchanges {
 		if x == nil {
 			var name string
+			names := guest.receipt.ExchangePrecedence
 			if i == 0 {
 				name = rest.reg.Subject.CommonName
+			} else if i > len(names) {
+				xlog.Errata.Println("index", i, "exceeds",
+					names)
+				continue
 			} else {
 				name = guest.receipt.ExchangePrecedence[i-1]
+				if len(name) == 0 {
+					xlog.Errata.Println("no name at", i,
+						"of", names)
+					continue
+				}
 			}
 			xlog.Trace.Println("queue whois", name)
 			restQueueWhois(ctx, name)

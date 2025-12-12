@@ -47,8 +47,13 @@ permitted to administrate VPN subscriptions.
 
 The [ExchangesFile] is a line separated list of key/value(s) assigning
 guest exchange preference in left (highest) to right (lowest) order.
-The registry is implied as the lowest precedent exchange.
+The registry is implied as the lowest precedent exchange.  The file may
+also specify UDP port numbers of each exchange.  If unpecified w/in this
+file, the guest and exchange daemons may specify the respective
+parameters through command flags and environment variables.
 
+	exchange0 8003
+	exchange1 8003
 	guesta	exchange0 exchange1
 	guestb	exchange0 exchange1
 	guestc	exchange0 exchange1

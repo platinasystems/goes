@@ -21,10 +21,8 @@ var (
 )
 
 var (
-	QuietFlag   = xflag.Label{"quiet", "Log errata only.", Errata.Reset}
-	TraceFlag   = xflag.Label{"trace", "Very verbose logging.", Trace.Set}
-	VerboseFlag = xflag.Label{"verbose", "Log info.", Info.Set}
-	Flags       = xflag.Labels{QuietFlag, TraceFlag, VerboseFlag}
+	TraceFlag   = xflag.Label{"trace", "Very verbose.", Trace.Enable}
+	VerboseFlag = xflag.Label{"verbose", "Log info.", Info.Enable}
 )
 
 // SetFlags of [Errata], [Info], and [Trace].
@@ -68,19 +66,7 @@ func (m *Mutable) Mute() {
 	m.SetOutput(io.Discard)
 }
 
-func (m *Mutable) Reset(s string) error {
-	t, err := strconv.ParseBool(s)
-	if err == nil {
-		if t {
-			m.Mute()
-		} else {
-			m.Unmute()
-		}
-	}
-	return err
-}
-
-func (m *Mutable) Set(s string) error {
+func (m *Mutable) Enable(s string) error {
 	t, err := strconv.ParseBool(s)
 	if err == nil {
 		if t {

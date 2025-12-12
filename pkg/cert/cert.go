@@ -65,7 +65,7 @@ var (
 	})
 	ClientFlag = xflag.Label{"ssl-client-cn", `
 The file or common name (CN) of the client certificate.
-(or $<main>_CLIENT_CN, $SSL_CLIENT_CN)`[1:], func() any {
+(or $<main>_CLIENT_CN, $SSL_CLIENT_CN)`[1:], func() *string {
 		if s, ok := xmain.LookupEnv("CLIENT_CN"); ok {
 			Client = s
 		} else if s, ok = os.LookupEnv("SSL_CLIENT_CN"); ok {
@@ -129,7 +129,7 @@ var (
 	})
 	ServerFlag = xflag.Label{"ssl-server-dn", `
 The file or distinguished name (DN) of the server certificate.
-(or $<main>_SERVER_DN, $SSL_SERVER_DN)`[1:], func() any {
+(or $<main>_SERVER_DN, $SSL_SERVER_DN)`[1:], func() *string {
 		if s, ok := xmain.LookupEnv("SERVER_DN"); ok {
 			Server = s
 		} else if s, ok = os.LookupEnv("SSL_SERVER_DN"); ok {
@@ -216,14 +216,16 @@ var NewTemplate = sync.OnceValues(func() (*template.Template, error) {
 {{end}}`)
 })
 
-// Create PEM encoded x509 certificate file.
-func New(ctx context.Context, args []string) error {
-	xflag.TemplateUsage(`
+const NewCertUsage = `
 usage: {{.Name}} [flags] [- | <filename>]
 Create PEM encoded x509 certificate file.
 The default filename is “` + CertFile + `” w/in the “-config” directory.
 
-{{flags .}}`)
+{{flags .}}`
+
+// Create PEM encoded x509 certificate file.
+func New(ctx context.Context, args []string) error {
+	xflag.TemplateUsage(NewCertUsage)
 	var dns, email, org, unit, street, city, state, country, zip,
 		uri string
 	dur := Year
