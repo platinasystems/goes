@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"strconv"
 	"sync"
 
 	"github.com/platinasystems/goes/v2/pkg/xflag"
@@ -20,19 +21,10 @@ var (
 )
 
 var (
-	QuietFlag = xflag.Label{"quiet", "Log errata only.", func() error {
-		Errata.Mute()
-		return nil
-	}}
-	TraceFlag = xflag.Label{"trace", "Very verbose logging.", func() error {
-		Trace.Unmute()
-		return nil
-	}}
-	VerboseFlag = xflag.Label{"verbose", "Log info.", func() error {
-		Info.Unmute()
-		return nil
-	}}
-	Flags = xflag.Labels{QuietFlag, TraceFlag, VerboseFlag}
+	QuietFlag   = xflag.Label{"quiet", "Log errata only.", Errata.Reset}
+	TraceFlag   = xflag.Label{"trace", "Very verbose logging.", Trace.Set}
+	VerboseFlag = xflag.Label{"verbose", "Log info.", Info.Set}
+	Flags       = xflag.Labels{QuietFlag, TraceFlag, VerboseFlag}
 )
 
 // SetFlags of [Errata], [Info], and [Trace].
@@ -74,6 +66,30 @@ func (m *Mutable) Mute() {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.SetOutput(io.Discard)
+}
+
+func (m *Mutable) Reset(s string) error {
+	t, err := strconv.ParseBool(s)
+	if err == nil {
+		if t {
+			m.Mute()
+		} else {
+			m.Unmute()
+		}
+	}
+	return err
+}
+
+func (m *Mutable) Set(s string) error {
+	t, err := strconv.ParseBool(s)
+	if err == nil {
+		if t {
+			m.Unmute()
+		} else {
+			m.Mute()
+		}
+	}
+	return err
 }
 
 func (m *Mutable) Toggle() {
