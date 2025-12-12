@@ -11,29 +11,32 @@ import (
 	"fmt"
 	"net"
 	"reflect"
-	"strconv"
 	"time"
 )
 
-type Enabler = func() error
+type Enabler = func(string) error
 type Initializer = func() any
+type Handler func(string) error
+type handler = func(string) error
 
 type isBooler interface{ IsBoolFlag() bool }
 type setter interface{ Set(string) error }
 
 var (
-	ErrNilItem    = errors.New("<nil>")
-	ErrNonPointer = errors.New("can't define")
+	ErrNilItem     = errors.New("<nil>")
+	ErrUndefinable = errors.New("undefinable")
 )
 
 /*
 A Label associates a flag Name and Usage with an Item that is later defined
 in a [flag.FlagSet].
-The Item may be a package or function scoped variable pointer,
-an [Enabler],
+The Item may be a variable pointer,
+a boolean [Enabler],
+a generic [Handler]
 or an [Initializer].
 
-An [Enabler] is called when the named boolean flag is set true.
+An [Enabler] or [Handler] is called each time the named boolean or generic flag
+is parsed.
 
 The non-error, [Initializer] pointer result
 overrides the Item before the flag is defined.
@@ -51,59 +54,88 @@ func (lbl *Label) Define() error { return lbl.DefineIn(flag.CommandLine) }
 
 func (lbl *Label) DefineIn(fs *flag.FlagSet) error {
 	if lbl.Item == nil {
-		return ErrNilItem
+		return fmt.Errorf("%s: %w", lbl.Name, ErrNilItem)
 	}
-	// first try to define with the built-in type functions.
+	var err error
 	switch t := lbl.Item.(type) {
 	case *bool:
 		fs.BoolVar(t, lbl.Name, *t, lbl.Usage)
+	case func() *bool:
+		lbl.Item = t()
+		err = lbl.DefineIn(fs)
 	case *time.Duration:
 		fs.DurationVar(t, lbl.Name, *t, lbl.Usage)
 	case *float64:
 		fs.Float64Var(t, lbl.Name, *t, lbl.Usage)
 	case *int:
 		fs.IntVar(t, lbl.Name, *t, lbl.Usage)
+	case func() *int:
+		lbl.Item = t()
+		err = lbl.DefineIn(fs)
 	case *int64:
 		fs.Int64Var(t, lbl.Name, *t, lbl.Usage)
+	case func() *int64:
+		lbl.Item = t()
+		err = lbl.DefineIn(fs)
 	case *string:
 		fs.StringVar(t, lbl.Name, *t, lbl.Usage)
+	case func() *string:
+		lbl.Item = t()
+		err = lbl.DefineIn(fs)
 	case *uint:
 		fs.UintVar(t, lbl.Name, *t, lbl.Usage)
+	case func() *uint:
+		lbl.Item = t()
+		err = lbl.DefineIn(fs)
 	case *uint64:
 		fs.Uint64Var(t, lbl.Name, *t, lbl.Usage)
-	default:
-		if _, ok := lbl.Item.(Enabler); !ok {
-			if f, ok := lbl.Item.(Initializer); ok {
-				v := f()
-				if err, oops := v.(error); oops {
-					return err
-				}
-				lbl.Item = v
-			}
-			k := reflect.ValueOf(lbl.Item).Kind()
-			if k != reflect.Ptr {
-				return fmt.Errorf("%w %v", ErrNonPointer, k)
+	case func() *uint64:
+		lbl.Item = t()
+		err = lbl.DefineIn(fs)
+	case Enabler:
+		fs.BoolFunc(lbl.Name, lbl.Usage, t)
+	case Initializer:
+		lbl.Item = t()
+		if ie, oops := lbl.Item.(error); oops {
+			err = ie
+		} else {
+			err = lbl.DefineIn(fs)
+		}
+	case Handler:
+		fs.Func(lbl.Name, lbl.Usage, (handler)(t))
+	case encoding.TextUnmarshaler:
+		v := reflect.ValueOf(t)
+		if k := v.Kind(); k != reflect.Ptr {
+			err = fmt.Errorf("(%v)%s: %w",
+				k, lbl.Name, ErrUndefinable)
+		} else {
+			elem := v.Elem().Interface()
+			if tm, ok := elem.(encoding.TextMarshaler); ok {
+				fs.TextVar(t, lbl.Name, tm, lbl.Usage)
+			} else {
+				err = fmt.Errorf("*(%v)%s: %w",
+					k, lbl.Name, ErrUndefinable)
 			}
 		}
-		fs.Var(lbl, lbl.Name, lbl.Usage)
+	default:
+		v := reflect.ValueOf(t)
+		if k := v.Kind(); k != reflect.Ptr {
+			err = fmt.Errorf("(%v)%s %wv",
+				k, lbl.Name, ErrUndefinable)
+		} else if val, ok := t.(flag.Value); ok {
+			fs.Var(val, lbl.Name, lbl.Usage)
+		} else {
+			fs.Var(lbl, lbl.Name, lbl.Usage)
+		}
 	}
-	return nil
+	return err
 }
 
 func (lbl *Label) Get() any {
-	if lbl.Item == nil {
-		return nil
-	}
 	if getter, ok := lbl.Item.(flag.Getter); ok {
 		return getter.Get()
 	}
-	if _, ok := lbl.Item.(Enabler); ok {
-		return false
-	}
-	if v := reflect.ValueOf(lbl.Item); v.Kind() == reflect.Ptr {
-		return v.Elem().Interface()
-	}
-	return nil
+	return reflect.ValueOf(lbl.Item).Elem().Interface()
 }
 
 func (lbl *Label) IsBoolFlag() bool {
@@ -120,27 +152,8 @@ func (lbl *Label) IsBoolFlag() bool {
 }
 
 func (lbl *Label) Set(s string) (err error) {
-	if lbl.Item == nil {
-		err = ErrNilItem
-	} else if f, ok := lbl.Item.(Enabler); ok {
-		if len(s) > 0 {
-			if t, err := strconv.ParseBool(s); !t || err != nil {
-				return err
-			}
-		}
-		return f()
-	} else if setter, ok := lbl.Item.(setter); ok {
-		return setter.Set(s)
-	} else if t, ok := lbl.Item.(*string); ok {
-		*t = s
-	} else if t, ok := lbl.Item.(*bool); ok && len(s) == 0 {
-		*t = true
-	} else if t, ok := lbl.Item.(*time.Duration); ok {
-		*t, err = time.ParseDuration(s)
-	} else if t, ok := lbl.Item.(*net.HardwareAddr); ok {
+	if t, ok := lbl.Item.(*net.HardwareAddr); ok {
 		*t, err = net.ParseMAC(s)
-	} else if t, ok := lbl.Item.(encoding.TextUnmarshaler); ok {
-		err = t.UnmarshalText([]byte(s))
 	} else {
 		_, err = fmt.Sscan(s, lbl.Item)
 	}
@@ -148,32 +161,6 @@ func (lbl *Label) Set(s string) (err error) {
 }
 
 func (lbl *Label) String() string {
-	if lbl.Item == nil {
-		return ""
-	}
-	if _, ok := lbl.Item.(Enabler); ok {
-		return "false"
-	}
-	if _, ok := lbl.Item.(Initializer); ok {
-		return "uninitialized"
-	}
-	if t, ok := lbl.Item.(fmt.Stringer); ok {
-		return t.String()
-	}
-	switch t := lbl.Item.(type) {
-	case *string:
-		return *t
-	case *uint:
-		return strconv.FormatUint(uint64(*t), 10)
-	case *uint8:
-		return strconv.FormatUint(uint64(*t), 10)
-	case *uint16:
-		return strconv.FormatUint(uint64(*t), 10)
-	case *uint32:
-		return strconv.FormatUint(uint64(*t), 10)
-	case *uint64:
-		return strconv.FormatUint(uint64(*t), 10)
-	}
 	return fmt.Sprint(lbl.Item)
 }
 
