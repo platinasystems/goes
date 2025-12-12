@@ -1233,7 +1233,11 @@ func (reg *registry) reviseIds(rsvp *rsvp) error {
 }
 
 func (reg *registry) rezone(rsvp *rsvp, sub *Subscriber) error {
-	zones := strings.Split(rsvp.req.URL.Query().Get("zones"), ",")
+	s := rsvp.req.URL.Query().Get("zones")
+	if len(s) == 0 {
+		return nil
+	}
+	zones := strings.Split(s, ",")
 	if len(zones) == 0 {
 		return nil
 	}
