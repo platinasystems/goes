@@ -40,16 +40,26 @@ var MainFeatures = map[string]any{
 }
 
 var ShowFeatures = map[string]any{
-	"address":    RestShowReq,
-	"admins":     RestShowReq,
-	"domain":     RestShowReq,
-	"exchanges":  RestShowReq,
-	"pending":    RestShowReq,
-	"prefix":     RestShowReq,
-	"start":      RestShowReq,
-	"status":     RestShowReq,
-	"subscriber": RestShowReq,
-	"vcs":        RestShowReq,
+	"address":   RestShowReq,
+	"admins":    RestShowReq,
+	"domain":    RestShowReq,
+	"exchanges": RestShowReq,
+	"pending":   RestShowReq,
+	"prefix":    RestShowReq,
+	"start":     RestShowReq,
+	"status":    RestShowReq,
+	"subscriber": map[string]any{
+		"addressed": RestShowReq,
+		"id":        RestShowReq,
+		"named":     RestShowReq,
+	},
+	"subscribers": map[string]any{
+		"all":      RestShowReq,
+		"in":       RestShowReq,
+		"matching": RestShowReq,
+		"on":       RestShowReq,
+	},
+	"vcs": RestShowReq,
 }
 
 const (

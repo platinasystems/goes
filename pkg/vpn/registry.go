@@ -29,8 +29,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"unicode"
-	"unicode/utf8"
 
 	"github.com/platinasystems/goes/v2/pkg/cert"
 	"github.com/platinasystems/goes/v2/pkg/kvc"
@@ -361,11 +359,8 @@ func (reg *registry) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 }
 
 func (reg *registry) approve(rsvp *rsvp) error {
-	err := reg.assertVcsMatch(rsvp)
+	err := reg.assertVcsMatchingAdmin(rsvp)
 	if err != nil {
-		return err
-	}
-	if err = reg.assertAdmin(rsvp); err != nil {
 		return err
 	}
 	args := rsvp.reqargs(RestApprove)
@@ -373,7 +368,7 @@ func (reg *registry) approve(rsvp *rsvp) error {
 		return xerrors.Incomplete("subscriber")
 	}
 	name := args[0]
-	if _, err := os.Stat(xmain.StateDir); err != nil {
+	if _, err = os.Stat(xmain.StateDir); err != nil {
 		if os.IsNotExist(err) {
 			err = os.MkdirAll(xmain.StateDir, 0755)
 		}
@@ -458,6 +453,30 @@ func (reg *registry) assertVcsMatch(rsvp *rsvp) (err error) {
 	return
 }
 
+func (reg *registry) assertVcsMatchingAdmin(rsvp *rsvp) error {
+	err := reg.assertVcsMatch(rsvp)
+	if err == nil {
+		err = reg.assertAdmin(rsvp)
+	}
+	return err
+}
+
+func (reg *registry) assertVcsMatchingPeer0(rsvp *rsvp) error {
+	err := reg.assertVcsMatch(rsvp)
+	if err == nil {
+		err = reg.assertPeer0(rsvp)
+	}
+	return err
+}
+
+func (reg *registry) assertVcsMatchingSubscriber(rsvp *rsvp) error {
+	err := reg.assertVcsMatch(rsvp)
+	if err == nil {
+		err = reg.assertSubscriber(rsvp)
+	}
+	return err
+}
+
 func (reg *registry) assignAddr(sub *Subscriber) error {
 	var found bool
 	cn := sub.cert.Subject.CommonName
@@ -508,11 +527,7 @@ func (reg *registry) queueReq(w http.ResponseWriter, req *http.Request) {
 }
 
 func (reg *registry) checkin(rsvp *rsvp) (*Subscriber, error) {
-	err := reg.assertVcsMatch(rsvp)
-	if err != nil {
-		return nil, err
-	}
-	if err = reg.assertPeer0(rsvp); err != nil {
+	if err := reg.assertVcsMatchingPeer0(rsvp); err != nil {
 		return nil, err
 	}
 
@@ -586,11 +601,7 @@ func (reg *registry) checkinGuest(rsvp *rsvp) error {
 }
 
 func (reg *registry) deny(rsvp *rsvp) error {
-	err := reg.assertVcsMatch(rsvp)
-	if err != nil {
-		return err
-	}
-	if err = reg.assertAdmin(rsvp); err != nil {
+	if err := reg.assertVcsMatchingAdmin(rsvp); err != nil {
 		return err
 	}
 	args := rsvp.reqargs(RestDeny)
@@ -600,11 +611,10 @@ func (reg *registry) deny(rsvp *rsvp) error {
 	name := args[0]
 	i, sub := reg.lookupPending(name)
 	if i < 0 || sub == nil {
-		err = xerrors.NotFound(name)
-	} else {
-		reg.pending = slices.Delete(reg.pending, i, i+1)
+		return xerrors.NotFound(name)
 	}
-	return err
+	reg.pending = slices.Delete(reg.pending, i, i+1)
+	return nil
 }
 
 func (reg *registry) dir(w http.ResponseWriter) {
@@ -768,11 +778,7 @@ func (reg *registry) dnsQuery(rsvp *rsvp) (err error) {
 }
 
 func (reg *registry) dumpSubscribers(rsvp *rsvp) error {
-	err := reg.assertVcsMatch(rsvp)
-	if err != nil {
-		return err
-	}
-	if err = reg.assertSubscriber(rsvp); err != nil {
+	if err := reg.assertVcsMatchingSubscriber(rsvp); err != nil {
 		return err
 	}
 	blk := pem.Block{
@@ -859,11 +865,7 @@ func (reg *registry) file(w http.ResponseWriter, name string) error {
 }
 
 func (reg *registry) invite(rsvp *rsvp) error {
-	err := reg.assertVcsMatch(rsvp)
-	if err != nil {
-		return err
-	}
-	if err = reg.assertSubscriber(rsvp); err != nil {
+	if err := reg.assertVcsMatchingSubscriber(rsvp); err != nil {
 		return err
 	}
 	from := reg.named[rsvp.req.TLS.PeerCertificates[0].Subject.CommonName]
@@ -883,7 +885,8 @@ func (reg *registry) invite(rsvp *rsvp) error {
 	for i, x := range reg.invitations {
 		if x.from == to.Id && x.to == from.Id {
 			rsvp.Write(x.text)
-			reg.invitations = slices.Delete(reg.invitations, i, i+1)
+			reg.invitations = slices.
+				Delete(reg.invitations, i, i+1)
 			return nil
 		}
 	}
@@ -1092,10 +1095,8 @@ func (reg *registry) lookupPending(name string) (int, *Subscriber) {
 }
 
 func (reg *registry) reload(rsvp *rsvp) error {
-	err := reg.assertVcsMatch(rsvp)
+	err := reg.assertVcsMatchingAdmin(rsvp)
 	if err != nil {
-	} else if err = reg.assertAdmin(rsvp); err != nil {
-		return err
 	} else if err = reg.loadAdminsFile(); err != nil {
 	} else if err = reg.loadHostsFile(); err == nil {
 		err = reg.loadExchangesFile()
@@ -1132,8 +1133,27 @@ func (reg *registry) rest(rsvp *rsvp) {
 			fmt.Fprintln(rsvp, time.UnixMicro(RegistryStart))
 		case rsvp.req.URL.Path == RestShowStatus:
 			fmt.Fprintln(rsvp, "OK")
-		case strings.HasPrefix(rsvp.req.URL.Path, RestShowSubscriber):
-			rsvp.reporterr(reg.showSubscriber(rsvp))
+		case strings.HasPrefix(rsvp.req.URL.Path,
+			RestShowSubscriberAddressed):
+			rsvp.reporterr(reg.showSubscriberAddressed(rsvp))
+		case strings.HasPrefix(rsvp.req.URL.Path,
+			RestShowSubscriberId):
+			rsvp.reporterr(reg.showSubscriberId(rsvp))
+		case strings.HasPrefix(rsvp.req.URL.Path,
+			RestShowSubscriberNamed):
+			rsvp.reporterr(reg.showSubscriberNamed(rsvp))
+		case strings.HasPrefix(rsvp.req.URL.Path,
+			RestShowSubscribersAll):
+			rsvp.reporterr(reg.showSubscribersAll(rsvp))
+		case strings.HasPrefix(rsvp.req.URL.Path,
+			RestShowSubscribersIn):
+			rsvp.reporterr(reg.showSubscribersIn(rsvp))
+		case strings.HasPrefix(rsvp.req.URL.Path,
+			RestShowSubscribersMatching):
+			rsvp.reporterr(reg.showSubscribersMatching(rsvp))
+		case strings.HasPrefix(rsvp.req.URL.Path,
+			RestShowSubscribersOn):
+			rsvp.reporterr(reg.showSubscribersOn(rsvp))
 		case rsvp.req.URL.Path == RestShowVCS:
 			fmt.Fprint(rsvp, xprogram.VcsRevision)
 			if xprogram.VcsModified.String() == "true" {
@@ -1198,11 +1218,7 @@ func (reg *registry) restsvc() {
 }
 
 func (reg *registry) reviseIds(rsvp *rsvp) error {
-	err := reg.assertVcsMatch(rsvp)
-	if err != nil {
-		return err
-	}
-	if err = reg.assertSubscriber(rsvp); err != nil {
+	if err := reg.assertVcsMatchingSubscriber(rsvp); err != nil {
 		return err
 	}
 	data, err := io.ReadAll(rsvp.req.Body)
@@ -1268,11 +1284,7 @@ func (reg *registry) rezone(rsvp *rsvp, sub *Subscriber) error {
 }
 
 func (reg *registry) showAddress(rsvp *rsvp) error {
-	err := reg.assertVcsMatch(rsvp)
-	if err != nil {
-		return err
-	}
-	if err = reg.assertSubscriber(rsvp); err != nil {
+	if err := reg.assertVcsMatchingSubscriber(rsvp); err != nil {
 		return err
 	}
 	args := rsvp.reqargs(RestShowAddress)
@@ -1293,36 +1305,32 @@ func (reg *registry) showAddress(rsvp *rsvp) error {
 }
 
 func (reg *registry) showAdmins(rsvp *rsvp) error {
-	err := reg.assertVcsMatch(rsvp)
-	if err != nil {
-	} else if err = reg.assertSubscriber(rsvp); err == nil {
-		keys := xmaps.Keys(reg.admin)
-		slices.Sort(keys)
-		for _, k := range keys {
-			fmt.Fprintln(rsvp, "-", k)
-		}
+	if err := reg.assertVcsMatchingSubscriber(rsvp); err != nil {
+		return err
 	}
-	return err
+	keys := xmaps.Keys(reg.admin)
+	slices.Sort(keys)
+	for _, k := range keys {
+		fmt.Fprintln(rsvp, "-", k)
+	}
+	return nil
 }
 
 func (reg *registry) showExchanges(rsvp *rsvp) error {
-	err := reg.assertVcsMatch(rsvp)
-	if err != nil {
-	} else if err = reg.assertSubscriber(rsvp); err == nil {
-		for _, sub := range reg.indexed {
-			if sub != nil && sub.Port != 0 {
-				fmt.Fprintln(rsvp, sub)
-			}
-		}
-	}
-	return err
-}
-func (reg *registry) showPending(rsvp *rsvp) error {
-	err := reg.assertVcsMatch(rsvp)
-	if err != nil {
+	if err := reg.assertVcsMatchingSubscriber(rsvp); err != nil {
 		return err
 	}
-	if err = reg.assertSubscriber(rsvp); err != nil {
+	for _, sub := range reg.indexed {
+		if sub != nil && sub.Port != 0 {
+			fmt.Fprintln(rsvp, sub)
+		}
+	}
+	return nil
+}
+
+func (reg *registry) showPending(rsvp *rsvp) error {
+	err := reg.assertVcsMatchingSubscriber(rsvp)
+	if err != nil {
 	} else if len(reg.pending) == 0 {
 		err = xerrors.Label(ErrNone, "pending")
 	} else if t, err := cert.NewTemplate(); err != nil {
@@ -1336,46 +1344,164 @@ func (reg *registry) showPending(rsvp *rsvp) error {
 	return err
 }
 
-func (reg *registry) showSubscriber(rsvp *rsvp) error {
-	err := reg.assertVcsMatch(rsvp)
+func (reg *registry) showSubscriberAddressed(rsvp *rsvp) error {
+	if err := reg.assertVcsMatchingSubscriber(rsvp); err != nil {
+		return err
+	}
+	args := rsvp.reqargs(RestShowSubscriberAddressed)
+	if len(args) == 0 {
+		return xerrors.Incomplete("address")
+	}
+	s := args[0]
+	addr, err := netip.ParseAddr(s)
 	if err != nil {
 		return err
 	}
-	if err = reg.assertSubscriber(rsvp); err != nil {
-		return err
-	}
-	args := rsvp.reqargs(RestShowSubscriber)
-	if len(args) == 0 {
-		names := xmaps.Keys(reg.named)
-		slices.Sort(names)
-		for _, name := range names {
-			fmt.Fprintln(rsvp, reg.named[name])
-		}
-		return nil
-	}
-	s := args[0]
-	if s == "self" {
-		s = rsvp.req.TLS.PeerCertificates[0].Subject.CommonName
-	}
-	sub, ok := reg.named[s]
+	sub, ok := reg.addressed[addr]
 	if ok {
 		fmt.Fprintln(rsvp, sub)
-	} else if r, rsz := utf8.DecodeRuneInString(s); r == utf8.RuneError ||
-		rsz == 0 {
-		err = xerrors.Invalid(s)
-	} else if unicode.IsDigit(r) ||
-		(r >= 'a' && r <= 'f') ||
-		(r >= 'A' && r <= 'F') {
-		if addr, err := netip.ParseAddr(s); err != nil {
-		} else if sub, ok := reg.addressed[addr]; !ok {
-			err = xerrors.NotFound(addr)
-		} else {
+		return nil
+	}
+	for _, sub := range reg.indexed {
+		if sub != nil && sub.ap.IsValid() &&
+			sub.ap.Addr().Compare(addr) == 0 {
+			fmt.Fprintln(rsvp, sub)
+			return nil
+		}
+	}
+	return xerrors.NotFound(s)
+}
+
+func (reg *registry) showSubscriberId(rsvp *rsvp) error {
+	if err := reg.assertVcsMatchingSubscriber(rsvp); err != nil {
+		return err
+	}
+	args := rsvp.reqargs(RestShowSubscriberId)
+	if len(args) == 0 {
+		return xerrors.Incomplete("id")
+	}
+	i, err := strconv.ParseInt(args[0], 10, 32)
+	if err != nil {
+		return err
+	}
+	if i < 0 || int(i) >= len(reg.indexed) {
+		return xerrors.Range("id")
+	}
+	sub := reg.indexed[i]
+	if sub == nil {
+		return fmt.Errorf("%d: unsubscribed", i)
+	}
+	fmt.Fprintln(rsvp, sub)
+	return nil
+}
+
+func (reg *registry) showSubscriberNamed(rsvp *rsvp) error {
+	if err := reg.assertVcsMatchingSubscriber(rsvp); err != nil {
+		return err
+	}
+	args := rsvp.reqargs(RestShowSubscriberNamed)
+	if len(args) == 0 {
+		return xerrors.Incomplete("name")
+	}
+	name := args[0]
+	if name == "self" {
+		name = rsvp.req.TLS.PeerCertificates[0].Subject.CommonName
+	}
+	sub, ok := reg.named[name]
+	if !ok {
+		return xerrors.NotFound(name)
+	}
+	fmt.Fprintln(rsvp, sub)
+	return nil
+}
+
+func (reg *registry) showSubscribersAll(rsvp *rsvp) error {
+	if err := reg.assertVcsMatchingSubscriber(rsvp); err != nil {
+		return err
+	}
+	clone := make([]*Subscriber, len(reg.indexed))
+	copy(clone, reg.indexed)
+	slices.SortFunc(clone, func(subi, subj *Subscriber) int {
+		return subi.cmp(subj)
+	})
+	for _, sub := range clone {
+		if sub != nil {
 			fmt.Fprintln(rsvp, sub)
 		}
-	} else {
-		err = xerrors.NotFound(s)
+	}
+	return nil
+}
+
+func (reg *registry) showSubscribersIn(rsvp *rsvp) error {
+	if err := reg.assertVcsMatchingSubscriber(rsvp); err != nil {
+		return err
+	}
+	args := rsvp.reqargs(RestShowSubscribersIn)
+	if len(args) == 0 {
+		return xerrors.Incomplete("zone")
+	}
+	zb, ok := reg.zoneBitByName[args[0]]
+	if !ok {
+		return xerrors.Invalid(args[0])
+	}
+	zone := uint8(1 << zb)
+	if zone == 0 {
+		return xerrors.Range(args[0])
+	}
+	for _, sub := range reg.indexed {
+		if sub == nil {
+			continue
+		}
+		if sub.zones&zone == zone {
+			fmt.Fprintln(rsvp, sub)
+		}
+	}
+	return nil
+}
+
+func (reg *registry) showSubscribersMatching(rsvp *rsvp) error {
+	err := reg.assertVcsMatchingSubscriber(rsvp)
+	if err != nil {
+		return err
+	}
+	args := rsvp.reqargs(RestShowSubscribersMatching)
+	if len(args) == 0 {
+		return xerrors.Incomplete("glob")
+	}
+	for _, sub := range reg.indexed {
+		var ok bool
+		if sub == nil {
+			continue
+		}
+		if ok, err = filepath.Match(args[0], sub.name()); err != nil {
+			break
+		} else if ok {
+			fmt.Fprintln(rsvp, sub)
+		}
 	}
 	return err
+}
+
+func (reg *registry) showSubscribersOn(rsvp *rsvp) error {
+	if err := reg.assertVcsMatchingSubscriber(rsvp); err != nil {
+		return err
+	}
+	args := rsvp.reqargs(RestShowSubscribersOn)
+	if len(args) == 0 {
+		return xerrors.Incomplete("exchange")
+	}
+	for _, sub := range reg.indexed {
+		if sub == nil {
+			continue
+		}
+		for _, ex := range sub.ExchangePrecedence {
+			if ex == args[0] {
+				fmt.Fprintln(rsvp, sub)
+				break
+			}
+		}
+	}
+	return nil
 }
 
 func (reg *registry) shutdown(ctx context.Context) {
@@ -1416,11 +1542,8 @@ func (reg *registry) subscribe(rsvp *rsvp) error {
 }
 
 func (reg *registry) unsubscribe(rsvp *rsvp) error {
-	err := reg.assertVcsMatch(rsvp)
+	err := reg.assertVcsMatchingSubscriber(rsvp)
 	if err != nil {
-		return err
-	}
-	if err = reg.assertSubscriber(rsvp); err != nil {
 		return err
 	}
 	peer0 := rsvp.req.TLS.PeerCertificates[0]
@@ -1449,9 +1572,8 @@ func (reg *registry) unsubscribe(rsvp *rsvp) error {
 
 func (reg *registry) whoisAddressed(rsvp *rsvp) error {
 	var addr netip.Addr
-	err := reg.assertVcsMatch(rsvp)
+	err := reg.assertVcsMatchingSubscriber(rsvp)
 	if err != nil {
-	} else if err = reg.assertSubscriber(rsvp); err != nil {
 	} else if args := rsvp.reqargs(RestWhoisAddressed); len(args) == 0 {
 		err = xerrors.Incomplete("address")
 	} else if addr, err = netip.ParseAddr(args[0]); err != nil {
@@ -1466,9 +1588,8 @@ func (reg *registry) whoisAddressed(rsvp *rsvp) error {
 
 func (reg *registry) whoisId(rsvp *rsvp) error {
 	var id Id
-	err := reg.assertVcsMatch(rsvp)
+	err := reg.assertVcsMatchingSubscriber(rsvp)
 	if err != nil {
-	} else if err = reg.assertSubscriber(rsvp); err != nil {
 	} else if args := rsvp.reqargs(RestWhoisId); len(args) == 0 {
 		err = xerrors.Incomplete("id")
 	} else if id, err = ParseId(args[0]); err != nil {
@@ -1482,9 +1603,8 @@ func (reg *registry) whoisId(rsvp *rsvp) error {
 }
 
 func (reg *registry) whoisNamed(rsvp *rsvp) error {
-	err := reg.assertVcsMatch(rsvp)
+	err := reg.assertVcsMatchingSubscriber(rsvp)
 	if err != nil {
-	} else if err = reg.assertSubscriber(rsvp); err != nil {
 	} else if args := rsvp.reqargs(RestWhoisNamed); len(args) == 0 {
 		err = xerrors.Incomplete("name")
 	} else if sub, ok := reg.named[args[0]]; !ok || sub == nil ||

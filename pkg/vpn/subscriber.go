@@ -78,11 +78,26 @@ func (sub *Subscriber) Format(w fmt.State, verb rune) {
 		fmt.Fprint(w, ";guest")
 		if len(sub.ExchangePrecedence) > 0 {
 			xes := strings.Join(sub.ExchangePrecedence, ",")
-			fmt.Fprint(w, ";via:", xes)
+			fmt.Fprint(w, ";on:", xes)
 		}
 	} else {
 		fmt.Fprint(w, ";exchange;port:", sub.Port)
 	}
+}
+
+func (sub *Subscriber) cmp(peer *Subscriber) (r int) {
+	if sub == nil {
+		if peer != nil {
+			r = -1
+		}
+	} else if peer == nil {
+		r = 1
+	} else if subS, peerS := sub.name(), peer.name(); subS < peerS {
+		r = -1
+	} else if subS > peerS {
+		r = 1
+	}
+	return
 }
 
 func (sub *Subscriber) helloCheck(m *xnet.Msg) (err error) {

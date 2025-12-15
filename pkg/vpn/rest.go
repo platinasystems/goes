@@ -60,19 +60,30 @@ const (
 const (
 	DnsQuery = "/dns-query"
 
-	RestApprove         = "/approve"
-	RestCertify         = "/certify"
-	RestCheckin         = "/checkin"
+	RestApprove     = "/approve"
+	RestCertify     = "/certify"
+	RestCheckin     = "/checkin"
+	RestDeny        = "/deny"
+	RestDump        = "/dump"
+	RestInvite      = "/invite"
+	RestReload      = "/reload"
+	RestRevise      = "/revise"
+	RestShow        = "/show"
+	RestSubscribe   = "/subscribe"
+	RestUnsubscribe = "/unsubscribe"
+	RestWhois       = "/whois"
+)
+
+const (
 	RestCheckinExchange = RestCheckin + "/exchange"
 	RestCheckinGuest    = RestCheckin + "/guest"
-	RestDeny            = "/deny"
-	RestDump            = "/dump"
-	RestDumpSubscribers = RestDump + "/subscribers"
-	RestInvite          = "/invite"
-	RestReload          = "/reload"
-	RestRevise          = "/revise"
-	RestReviseIds       = RestRevise + "/ids"
-	RestShow            = "/show"
+)
+
+const RestDumpSubscribers = RestDump + "/subscribers"
+
+const RestReviseIds = RestRevise + "/ids"
+
+const (
 	RestShowAddress     = RestShow + "/address"
 	RestShowAdmins      = RestShow + "/admins"
 	RestShowDomain      = RestShow + "/domain"
@@ -82,13 +93,27 @@ const (
 	RestShowStart       = RestShow + "/start"
 	RestShowStatus      = RestShow + "/status"
 	RestShowSubscriber  = RestShow + "/subscriber"
+	RestShowSubscribers = RestShow + "/subscribers"
 	RestShowVCS         = RestShow + "/vcs"
-	RestSubscribe       = "/subscribe"
-	RestUnsubscribe     = "/unsubscribe"
-	RestWhois           = "/whois"
-	RestWhoisAddressed  = RestWhois + "/addressed"
-	RestWhoisId         = RestWhois + "/id"
-	RestWhoisNamed      = RestWhois + "/named"
+)
+
+const (
+	RestShowSubscriberAddressed = RestShowSubscriber + "/addressed"
+	RestShowSubscriberId        = RestShowSubscriber + "/id"
+	RestShowSubscriberNamed     = RestShowSubscriber + "/named"
+)
+
+const (
+	RestShowSubscribersAll      = RestShowSubscribers + "/all"
+	RestShowSubscribersIn       = RestShowSubscribers + "/in"
+	RestShowSubscribersMatching = RestShowSubscribers + "/matching"
+	RestShowSubscribersOn       = RestShowSubscribers + "/on"
+)
+
+const (
+	RestWhoisAddressed = RestWhois + "/addressed"
+	RestWhoisId        = RestWhois + "/id"
+	RestWhoisNamed     = RestWhois + "/named"
 )
 
 var RestPrefixes = []string{
@@ -498,11 +523,14 @@ RESTful query and print registry object.
 		return err
 	}
 
-	s := path.Join(RestShow, xflag.LastName(flag.CommandLine))
-	for _, arg := range flag.CommandLine.Args() {
-		s = path.Join(s, arg)
+	cl := os.Args
+	for i, s := range cl {
+		if s == "show" {
+			cl = cl[i:]
+			break
+		}
 	}
-	_, err = restGet(ctx, os.Stdout, s)
+	_, err = restGet(ctx, os.Stdout, path.Join(cl...))
 	return err
 }
 
